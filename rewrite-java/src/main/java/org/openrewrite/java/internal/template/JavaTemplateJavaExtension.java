@@ -57,7 +57,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private boolean substituted;
 
             @Override
-            public J visitAnnotation(J.Annotation annotation, Integer integer) {
+            public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
                     isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
@@ -66,14 +66,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                                         substitutedTemplate +
                                                         "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
                     }
-                    return gen.get(0).withPrefix(annotation.getPrefix());
+                    return autoFormat(gen.get(0).withPrefix(annotation.getPrefix()), p, getCursor().getParentOrThrow());
                 } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
-                return super.visitAnnotation(annotation, integer);
+                return super.visitAnnotation(annotation, p);
             }
 
             @Override

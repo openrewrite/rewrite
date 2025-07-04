@@ -53,6 +53,33 @@ public class AnnotationTemplateGenerator {
             } else {
                 after.insert(0, "static class $Clazz {}");
             }
+        } else if (j instanceof J.Annotation) {
+            // Handle nested annotations by finding their ultimate parent
+            J annotationParent = cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
+            int level = 1;
+            while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Annotation) {
+                level += 1;
+                if (cursor.getParent(level) == null) {
+                    break;
+                }
+                annotationParent = cursor.getParent(level).firstEnclosing(J.class);
+            }
+            
+            if (annotationParent instanceof J.MethodDeclaration) {
+                after.insert(0, " void $method() {}");
+            } else if (annotationParent instanceof J.VariableDeclarations) {
+                after.insert(0, " int $variable;");
+            } else if (annotationParent instanceof J.ClassDeclaration) {
+                Cursor classCursor = cursor.getParent(level);
+                if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                    after.insert(0, "class $Clazz {}");
+                } else {
+                    after.insert(0, "static class $Clazz {}");
+                }
+            } else {
+                // Fallback for annotations without typical targets
+                after.insert(0, "@interface $Placeholder {}");
+            }
         }
 
         if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
@@ -89,12 +116,18 @@ public class AnnotationTemplateGenerator {
                         after.insert(0, " void $method() {}");
                     } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
                         after.insert(0, " int $variable;");
-                    } else if (j instanceof J.ClassDeclaration) {
-                        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                    } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
+                        // Check if this is a top-level class or nested class
+                        Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
+                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
                             after.insert(0, "class $Clazz {}");
                         } else {
                             after.insert(0, "static class $Clazz {}");
                         }
+                    } else if (j instanceof J.Annotation && annotationParent == null) {
+                        // Fallback for annotations that couldn't find a typical target
+                        // This handles cases like nested annotations in annotation arrays
+                        after.insert(0, "@interface $Placeholder {}");
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });

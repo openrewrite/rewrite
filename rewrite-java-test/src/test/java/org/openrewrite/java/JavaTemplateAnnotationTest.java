@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -158,4 +159,77 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5712")
+    @Test
+    void replaceArgumentsInNestedAnnotation() {
+        rewriteRun(
+          spec -> spec
+            .afterTypeValidationOptions(TypeValidation.none()) // the annotations are not on classpath
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                    if (annotation.getSimpleName().equals("NestedAnnotation") &&
+                      !annotation.getArguments().isEmpty()) {
+                        // Check if this annotation still has the 'a' attribute that needs to be replaced
+                        J.Assignment arg = (J.Assignment) annotation.getArguments().get(0);
+                        if (arg.getVariable() instanceof J.Identifier &&
+                          ((J.Identifier) arg.getVariable()).getSimpleName().equals("a")) {
+                            // Only apply the template if we haven't already transformed this annotation
+                            J.Literal value = (J.Literal) arg.getAssignment();
+
+                            // Replace 'a' with 'b' in the annotation
+                            return JavaTemplate.builder("@NestedAnnotation(b = #{any(java.lang.String)})")
+                              .build()
+                              .apply(getCursor(), annotation.getCoordinates().replace(), value);
+                        }
+                    }
+                    return super.visitAnnotation(annotation, ctx);
+                }
+            })),
+          java(
+            """
+              import java.lang.annotation.*;
+              
+              @Repeatable(NestedAnnotations.class)
+              @interface NestedAnnotation {
+                  String a() default "";
+                  String b() default "";
+              }
+              
+              @interface NestedAnnotations {
+                  NestedAnnotation[] value();
+              }
+              
+              @NestedAnnotations({
+                      @NestedAnnotation(a = "1"),
+                      @NestedAnnotation(a = "2")
+              })
+              class Test {
+              }
+              """,
+            """
+              import java.lang.annotation.*;
+              
+              @Repeatable(NestedAnnotations.class)
+              @interface NestedAnnotation {
+                  String a() default "";
+                  String b() default "";
+              }
+              
+              @interface NestedAnnotations {
+                  NestedAnnotation[] value();
+              }
+              
+              @NestedAnnotations({
+                      @NestedAnnotation(b = "1"),
+                      @NestedAnnotation(b = "2")
+              })
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
 }
