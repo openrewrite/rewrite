@@ -295,8 +295,13 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
-            return this.rightPadded(j, this.semicolonPrefix(n), (n => {
-                const last = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile);
+            // let last = n.getLastToken(this.sourceFile);
+            let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
+            if (last && last.kind === ts.SyntaxKind.ExpressionStatement && n.kind === ts.SyntaxKind.LabeledStatement) {
+                last = last.getLastToken(this.sourceFile);
+            }
+            const sp = this.semicolonPrefix(n);
+            return this.rightPadded(j, sp, (n => {
                 return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
@@ -463,7 +468,10 @@ export class JavaScriptParserVisitor {
     }
 
     private semicolonPrefix = (node: ts.Node) => {
-        const last = node.getChildren(this.sourceFile).slice(-1)[0];
+        let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
+        if (last && last.kind === ts.SyntaxKind.ExpressionStatement) {
+           last = last.getLastToken(this.sourceFile);
+        }
         return last?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(last) : emptySpace;
     }
 
@@ -2855,28 +2863,20 @@ export class JavaScriptParserVisitor {
     }
 
     visitLabeledStatement(node: ts.LabeledStatement): J.Label {
-        return {
+        const ret = {
             kind: J.Kind.Label,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             label: this.rightPadded(this.visit(node.label), this.suffix(node.label)),
-            statement: {
-                kind: JS.Kind.TrailingTokenStatement,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                expression: this.rightPadded(
-                    this.visit(node.statement),
-                    this.semicolonPrefix(node.statement),
-                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: J.Markers.Semicolon,
-                        id: randomId()
-                    }) : emptyMarkers
-                ),
-                type: this.mapType(node.statement)
-            } satisfies JS.TrailingTokenStatement as JS.TrailingTokenStatement
+            statement: this.visit(node.statement),
+                    // this.semicolonPrefix(node.statement),
+                    // node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                    //     kind: J.Markers.Semicolon,
+                    //     id: randomId()
+                    // })
         };
+        return ret;
     }
 
     visitThrowStatement(node: ts.ThrowStatement): J.Throw {
