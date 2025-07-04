@@ -142,7 +142,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           java(
             """
               import org.jetbrains.annotations.NotNull;
-  
+
               public record Person(
                   @NotNull String firstName,
                   @NotNull String lastName
