@@ -533,6 +533,42 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void changeWhenSetTargetsNonUsedMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "value", "1", null, true, false)),
+          java(
+            """
+              package org.junit;
+              public @interface Test {
+                  long other() default 0L;
+                  int value() default 0L;
+              }
+              """
+          ),
+          java(
+            """
+              import org.junit.Test;
+              
+              class SomeTest {
+                  @Test(other = 0)
+                  void foo() {
+                  }
+              }
+              """,
+            """
+              import org.junit.Test;
+              
+              class SomeTest {
+                  @Test(value = 1, other = 0)
+                  void foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void arrayInAnnotationAttribute() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(

@@ -113,10 +113,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     String x = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString() : newAttributeValue;
                     return JavaTemplate
                             .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, x);
-                } else if (!TRUE.equals(addOnly)) {
-                    // UPDATE the value when the annotation has arguments, like `@Foo(name="example")`
+                }
+
+                // UPDATE the value when the annotation has arguments, like `@Foo(name="example")`
+                if (!TRUE.equals(addOnly)) {
                     final J.Annotation finalA = a;
-                    List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
+                    a = a.withArguments(ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
                             return update((J.Assignment) it, finalA, newAttributeValue);
                         } else if (it instanceof J.Literal) {
@@ -127,14 +129,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             return update((J.NewArray) it, finalA, newAttributeValue);
                         }
                         return it;
-                    });
-                     a = a.withArguments(newArgs);
+                    }));
+                }
 
-                    // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, like `@Foo(value = "someValue")` with an attributeName of `name`
-                    if (oldAttributeValue == null && newAttributeValue != null && !attributeValIsAlreadyPresent(newArgs, getAttributeValues())) {
-                        J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
-                        a = a.withArguments(ListUtils.concat(as, a.getArguments()));
-                    }
+                // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, like `@Foo(value = "someValue")` with an attributeName of `name`
+                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues())) {
+                    J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
+                    a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                 }
 
                 return maybeAutoFormat(original, a, ctx);
@@ -258,7 +259,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         if (TRUE.equals(appendArray)) {
             List<Expression> newItemsList = new ArrayList<>();
             for (String attribute : attributeList) {
-                if (attributeValIsAlreadyPresent(initializerList, singleton(attribute))) {
+                if (attributeNameOrValIsAlreadyPresent(initializerList, singleton(attribute))) {
                     continue;
                 }
                 newItemsList.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
@@ -271,7 +272,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             if (i >= attributeList.size()) {
                 return null;
             }
-            if (attributeValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
+            if (attributeNameOrValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
                 return it;
             }
             return new J.Literal(randomId(), it.getPrefix(), EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String);
@@ -350,15 +351,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods();
     }
 
-    private boolean attributeValIsAlreadyPresent(Collection<Expression> expression, Collection<?> values) {
-        return expression.stream().anyMatch(e -> attributeValIsAlreadyPresent(e, values));
+    private boolean attributeNameOrValIsAlreadyPresent(Collection<Expression> expression, Collection<?> values) {
+        return expression.stream().anyMatch(e -> attributeNameOrValIsAlreadyPresent(e, values));
     }
 
-    private boolean attributeValIsAlreadyPresent(Expression e, Collection<?> values) {
+    private boolean attributeNameOrValIsAlreadyPresent(Expression e, Collection<?> values) {
         if (e instanceof J.Assignment) {
             J.Assignment as = (J.Assignment) e;
-            if (as.getVariable() instanceof J.Identifier && ((J.Identifier) as.getVariable()).getSimpleName().equals(attributeName())) {
-                return attributeValIsAlreadyPresent(as.getAssignment(), values);
+            if (as.getVariable() instanceof J.Identifier) {
+                return ((J.Identifier) as.getVariable()).getSimpleName().equals(attributeName());
             }
         } else if (e instanceof J.Literal) {
             return values.contains(((J.Literal) e).getValue() + "");
@@ -366,7 +367,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return values.contains(e.toString());
         } else if (e instanceof J.NewArray) {
             List<Expression> initializer = ((J.NewArray) e).getInitializer();
-            return (initializer == null && attributeValue == null) || (initializer != null && attributeValIsAlreadyPresent(initializer, values));
+            return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));
         }
         return false;
     }
