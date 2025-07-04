@@ -16,14 +16,18 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
@@ -75,15 +79,13 @@ public class DeleteMethodArgument extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern), new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern)));
+        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
+        return Preconditions.check(new UsesMethod<>(methodMatcher), new DeleteMethodArgumentVisitor(methodMatcher));
     }
 
+    @RequiredArgsConstructor
     private class DeleteMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-
-        public DeleteMethodArgumentVisitor(MethodMatcher methodMatcher) {
-            this.methodMatcher = methodMatcher;
-        }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -111,9 +113,41 @@ public class DeleteMethodArgument extends Recipe {
                 } else if (argumentIndex == 0) {
                     args.set(0, args.get(0).withPrefix(removed.getPrefix()));
                 }
-
                 m = m.withArguments(args);
 
+                Set<String> importsToMaybeRemove = new JavaIsoVisitor<Set<String>>() {
+                    @Override
+                    public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> types) {
+                        if (javaType instanceof JavaType.Class) {
+                            JavaType.Class type = (JavaType.Class) javaType;
+                            if (!type.getPackageName().startsWith("java.lang")) {
+                                types.add(type.getFullyQualifiedName());
+                            }
+                        } else if (javaType instanceof JavaType.Variable) {
+                            JavaType.Variable variable = (JavaType.Variable) javaType;
+                            if (variable.hasFlags(Flag.Static) && variable.getOwner() instanceof JavaType.Class) {
+                                JavaType.Class owner = (JavaType.Class) variable.getOwner();
+                                types.add(owner.getFullyQualifiedName() + "." + variable.getName());
+                            }
+                        }
+
+                        return super.visitType(javaType, types);
+                    }
+
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, Set<String> strings) {
+                        if (m.getMethodType() != null && m.getMethodType().hasFlags(Flag.Static) && m.getSelect() == null) {
+                            JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                            strings.add(receiverType.getFullyQualifiedName() + "." + m.getSimpleName());
+                        }
+                        return super.visitMethodInvocation(m, strings);
+                    }
+                }.reduce(removed, new HashSet<>());
+                for (String importName : importsToMaybeRemove) {
+                    maybeRemoveImport(importName);
+                }
+
+                // Update the method types
                 JavaType.Method methodType = m.getMethodType();
                 if (methodType != null) {
                     List<String> parameterNames = new ArrayList<>(methodType.getParameterNames());
