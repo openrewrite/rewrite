@@ -65,8 +65,7 @@ public class FindDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        GradleDependency.Matcher matcher = new GradleDependency.Matcher();
-        return matcher
+        return new GradleDependency.Matcher()
                 .groupId(groupId)
                 .artifactId(artifactId)
                 .configuration(configuration)
