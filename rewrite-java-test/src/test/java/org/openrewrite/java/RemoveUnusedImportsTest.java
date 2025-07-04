@@ -2120,4 +2120,112 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    void wildcardImportsWithConflictingNames() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              package com.helloworld;
+
+              import java.sql.*;
+              import java.sql.Date;
+              import java.util.*;
+
+              public final class Main {
+                final Date date = new Date(123);
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """,
+            """
+              package com.helloworld;
+
+              import java.sql.Date;
+
+              public final class Main {
+                final Date date = new Date(123);
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    void wildcardImportsWithSamePackageConflict() {
+        rewriteRun(
+          java(
+            """
+              package com.helloworld;
+
+              public class Date {}
+              """
+          ),
+          java(
+            """
+              package com.helloworld;
+
+              import java.util.*;
+
+              public final class Main {
+                final Date date = new Date();
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """,
+            """
+              package com.helloworld;
+
+              public final class Main {
+                final Date date = new Date();
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    void onlyFullyQualifiedUsageShouldRemoveWildcard() {
+        rewriteRun(
+          java(
+            """
+              package com.helloworld;
+
+              import java.util.*;
+
+              public final class Main {
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """,
+            """
+              package com.helloworld;
+
+              public final class Main {
+                final java.util.Date date2 = new java.util.Date(123);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    void keepImportWhenBothQualifiedAndUnqualifiedUsageExists() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Date;
+            
+            public class Test {
+                Date date1 = new Date();                    // unqualified usage
+                java.util.Date date2 = new java.util.Date();  // qualified usage
+            }
+            """
+          )
+        );
+    }
 }
