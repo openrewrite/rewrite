@@ -796,12 +796,11 @@ public class GroovyParserVisitor {
                     }
 
                     Space after = EMPTY;
-                    Markers markers = Markers.EMPTY;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
                             saveCursor = cursor;
                             Space before = whitespace();
-                            if (sourceStartsWith(",")) {
+                            if (source.charAt(cursor) == ',') {
                                 skip(",");
                                 JRightPadded<Expression> arg = JRightPadded.build(exp)
                                         .withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), sourceBefore(")"))))
@@ -823,7 +822,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(exp).withAfter(after).withMarkers(markers));
+                    args.add(JRightPadded.build(exp).withAfter(after));
                 }
             }
 
