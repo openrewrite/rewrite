@@ -101,7 +101,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 String newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
                 List<Expression> currentArgs = a.getArguments();
-                // ADD the value when the annotation has no arguments, like `@Foo`
+
+                // ADD the value when the annotation has no arguments, e.g. @Foo` to @Foo(name="new")
                 if (currentArgs == null || currentArgs.isEmpty() || currentArgs.get(0) instanceof J.Empty) {
                     if (newAttributeValue == null || oldAttributeValue != null) {
                         return a;
@@ -115,7 +116,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             .apply("#{} = #{}", getCursor(), a.getCoordinates().replaceArguments(), attributeName, x);
                 }
 
-                // UPDATE the value when the annotation has arguments, like `@Foo(name="example")`
+                // UPDATE the value when the annotation has arguments, e.g. @Foo(name="old") to `@Foo(name="new")
                 if (!TRUE.equals(addOnly)) {
                     final J.Annotation finalA = a;
                     a = a.withArguments(ListUtils.map(currentArgs, it -> {
@@ -132,7 +133,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }));
                 }
 
-                // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, like `@Foo(value = "someValue")` with an attributeName of `name`
+                // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
                 if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues())) {
                     J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
                     a = a.withArguments(ListUtils.concat(as, a.getArguments()));
