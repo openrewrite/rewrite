@@ -271,30 +271,18 @@ public class RewriteRpc implements AutoCloseable {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
 
-        String parseId = SnowflakeId.generateId();
-
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
-            private @Nullable List<String> currentBatch;
-            private int batchIndex = 0;
-            private boolean isFirstCall = true;
+            private @Nullable List<String> ids;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                // Get next batch if needed
-                if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    if (isFirstCall) {
-                        // First call with actual inputs
-                        currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-                        isFirstCall = false;
-                    } else {
-                        currentBatch = send("Parse", new Parse(parseId, emptyList(), null), ParseResponse.class);
-                    }
-                    batchIndex = 0;
+                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
 
                     // If batch is empty, we're done
-                    if (currentBatch.isEmpty()) {
+                    if (ids.isEmpty()) {
                         return false;
                     }
                 }
@@ -305,9 +293,8 @@ public class RewriteRpc implements AutoCloseable {
                 }
 
                 Parser.Input input = inputList.get(index);
-                String id = currentBatch.get(batchIndex);
+                String id = ids.get(index);
                 index++;
-                batchIndex++;
 
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);

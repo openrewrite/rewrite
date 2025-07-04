@@ -2730,17 +2730,23 @@ export class JavaScriptParserVisitor {
                             }, this.suffix(node.initializer));
                         } else if (ts.isArrayLiteralExpression(node.initializer)) {
                             return this.rightPadded({
-                                kind: JS.Kind.ArrayBindingPattern,
+                                kind: JS.Kind.ExpressionStatement,
                                 id: randomId(),
-                                elements: {
-                                    kind: J.Kind.Container,
-                                    before: emptySpace,
-                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
-                                    markers: emptyMarkers
-                                } satisfies J.Container<Expression> as J.Container<Expression>,
+                                prefix: emptySpace,
                                 markers: emptyMarkers,
-                                prefix: emptySpace
-                            }, this.suffix(node.initializer))
+                                expression: {
+                                    kind: JS.Kind.ArrayBindingPattern,
+                                    id: randomId(),
+                                    elements: {
+                                        kind: J.Kind.Container,
+                                        before: emptySpace,
+                                        elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                        markers: emptyMarkers
+                                    } satisfies J.Container<Expression> as J.Container<Expression>,
+                                    markers: emptyMarkers,
+                                    prefix: emptySpace
+                                } satisfies JS.ArrayBindingPattern as JS.ArrayBindingPattern,
+                            } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingPattern,
