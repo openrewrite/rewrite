@@ -130,6 +130,76 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeGradleDependencyWithCommentAfterDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2" // comment
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2" // comment
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeGradleDependencyWithCommentAfterLatestDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" // comment
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeGradleDependencyUsingMapNotation() {
         rewriteRun(
           buildGradle(
