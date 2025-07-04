@@ -92,8 +92,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             true, null)),
           pomXml(
             """
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
                   <artifactId>explicit-deps-app</artifactId>
@@ -134,8 +133,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               </project>
               """,
             """
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
                   <artifactId>explicit-deps-app</artifactId>
@@ -1697,8 +1695,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1724,8 +1721,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1759,8 +1755,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1785,8 +1780,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1820,8 +1814,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch:0.1.50"))),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1846,8 +1839,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1884,8 +1876,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   Lists.newArrayList("com.jcraft:jsch", "org.springframework.cloud:spring-cloud-schema-registry-*:1.1.1"))),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -1914,8 +1905,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
