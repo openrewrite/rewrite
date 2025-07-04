@@ -20,6 +20,9 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
 
 @Value
@@ -69,9 +72,21 @@ public class FindDependency extends Recipe {
                 .artifactId(artifactId)
                 .configuration(configuration)
                 .asVisitor((gd, ctx) -> {
-                    foundDependencyTable.insertRow(ctx, new Row(gd.getResolvedDependency().getGroupId(), gd.getResolvedDependency().getArtifactId(), gd.getResolvedDependency().getVersion()));
+                    foundDependencyTable.insertRow(ctx, new Row(getDeclaringFilePath(gd), gd.getResolvedDependency().getGroupId(), gd.getResolvedDependency().getArtifactId(), gd.getResolvedDependency().getVersion()));
                     return SearchResult.found(gd.getTree());
                 });
+    }
+
+    private String getDeclaringFilePath(GradleDependency gd) {
+        G.CompilationUnit gcu = gd.getCursor().firstEnclosing(G.CompilationUnit.class);
+        if (gcu != null) {
+            return gcu.getSourcePath().toString();
+        }
+        K.CompilationUnit kcu = gd.getCursor().firstEnclosing(K.CompilationUnit.class);
+        if (kcu != null) {
+            return kcu.getSourcePath().toString();
+        }
+        return "";
     }
 
     private static class FoundDependencyReport extends DataTable<Row> {
@@ -82,6 +97,10 @@ public class FindDependency extends Recipe {
 
     @Value
     public static class Row {
+        @Column(displayName = "Source path",
+                description = "Full path to the file declaring the dependency.")
+        String sourcePath;
+
         @Column(displayName = "GroupId",
                 description = "The groupId of the dependency.")
         String groupId;

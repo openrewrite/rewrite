@@ -132,8 +132,8 @@ class FindDependencyTest implements RewriteTest {
           spec -> {
               spec.dataTable(FindDependency.Row.class, rows -> {
                  assertThat(rows).containsExactly(
-                   new FindDependency.Row("org.openrewrite", "rewrite-core", "latest.release"),
-                   new FindDependency.Row("org.openrewrite", "rewrite-spring", "latest.release")
+                   new FindDependency.Row("build.gradle", "org.openrewrite", "rewrite-core", "latest.release"),
+                   new FindDependency.Row("build.gradle", "org.openrewrite", "rewrite-spring", "latest.release")
                  );
               });
               spec.recipe(new FindDependency("org.openrewrite*", "*", ""));
