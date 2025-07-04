@@ -142,7 +142,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           java(
             """
               import org.jetbrains.annotations.NotNull;
-              
+  
               public record Person(
                   @NotNull String firstName,
                   @NotNull String lastName
@@ -150,7 +150,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               """,
             """
               import lombok.NonNull;
-              
+
               public record Person(
                   @NonNull String firstName,
                   @NonNull String lastName
@@ -166,15 +166,15 @@ class JavaTemplateAnnotationTest implements RewriteTest {
         @Language("java")
         String annotations = """
           package foo;
-          
+
           import java.lang.annotation.*;
-          
+
           @Repeatable(NestedAnnotations.class)
           public @interface NestedAnnotation {
               String a() default "";
               String b() default "";
           }
-          
+
           public @interface NestedAnnotations {
               NestedAnnotation[] value();
           }
@@ -208,7 +208,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           java(
             """
               import foo.*;
-              
+
               @NestedAnnotations({
                       @NestedAnnotation(a = "1"),
                       @NestedAnnotation(a = "2")
@@ -218,7 +218,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               """,
             """
               import foo.*;
-              
+
               @NestedAnnotations({
                       @NestedAnnotation(b = "1"),
                       @NestedAnnotation(b = "2")
