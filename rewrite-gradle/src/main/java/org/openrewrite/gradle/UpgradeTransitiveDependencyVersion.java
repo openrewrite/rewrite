@@ -205,6 +205,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     acc.updatesPerProject.putIfAbsent(getGradleProjectKey(gradleProject), new HashMap<>());
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+
+                    // Determine the configurations used to declare dependencies that requested dependencies in the build
+                    List<GradleDependencyConfiguration> declaredConfigurations = gradleProject.getConfigurations().stream()
+                            .filter(c -> c.isCanBeDeclared() && !c.getRequested().isEmpty())
+                            .collect(Collectors.toList());
+
                     configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
                         // Skip when there's a direct dependency, as per openrewrite/rewrite#5355
@@ -223,7 +229,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                         continue;
                                     }
 
-                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration);
+                                    GradleDependencyConfiguration constraintConfig = constraintConfiguration(configuration, declaredConfigurations);
                                     if (constraintConfig == null) {
                                         continue;
                                     }
@@ -294,27 +300,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
              *     implementation("g:a:v") { }
              * }
              */
-            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
-                String constraintConfigName = config.getName();
-                switch (constraintConfigName) {
-                    case "compileClasspath":
-                    case "compileOnly":
-                    case "compile":
-                        constraintConfigName = "implementation";
-                        break;
-                    case "runtimeClasspath":
-                    case "runtime":
-                        constraintConfigName = "runtimeOnly";
-                        break;
-                    case "testCompileClasspath":
-                    case "testCompile":
-                        constraintConfigName = "testImplementation";
-                        break;
-                    case "testRuntimeClasspath":
-                    case "testRuntime":
-                        constraintConfigName = "testRuntimeOnly";
-                        break;
-                }
+            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config, List<GradleDependencyConfiguration> declaredConfigurations) {
+                // Check if the resolved configuration e.g. compileClasspath extends from a declared configuration
+                // defined in the build e.g. implementation. Constraints should only use the configuration name of the
+                // dependency declared in the build.
+                Optional<GradleDependencyConfiguration> declaredConfig = config.getExtendsFrom().stream()
+                        .filter(declaredConfigurations::contains)
+                        .findFirst();
+
+                // The configuration name for the used constraint should be the name of the declared configuration if it exists,
+                // otherwise the name of the current configuration
+                String constraintConfigName = declaredConfig.map(GradleDependencyConfiguration::getName)
+                        .orElseGet(config::getName);
 
                 if (onlyForConfigurations != null && !onlyForConfigurations.isEmpty()) {
                     if (!onlyForConfigurations.contains(constraintConfigName)) {
