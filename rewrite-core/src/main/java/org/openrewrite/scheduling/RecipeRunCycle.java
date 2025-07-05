@@ -42,7 +42,6 @@ import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
@@ -290,9 +289,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                              Throwable t) {
         ctx.getOnError().accept(t);
 
-        if (t instanceof RecipeRunException) {
+        if (t instanceof RecipeRunException && after != null) {
             RecipeRunException vt = (RecipeRunException) t;
-            after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(requireNonNull(after, "after is null"), 0);
+            after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
         }
 
         // Use the original source file to record the error, not the one that may have been modified by the visitor.
