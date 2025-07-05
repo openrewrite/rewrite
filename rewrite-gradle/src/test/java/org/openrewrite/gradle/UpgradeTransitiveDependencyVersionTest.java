@@ -129,14 +129,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      %s 'com.thoughtworks.xstream:xstream:1.4.17'
+                      %1$s 'com.thoughtworks.xstream:xstream:1.4.17'
                   }
               }
               
               dependencies {
-                  %s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
+                  %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName, configurationName),
+              """, configurationName),
             String.format("""
               plugins {
                   id 'java'
@@ -145,14 +145,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      %s 'com.thoughtworks.xstream:xstream:1.4.21'
+                      %1$s 'com.thoughtworks.xstream:xstream:1.4.21'
                   }
               }
               
               dependencies {
-                  %s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
+                  %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName, configurationName)
+              """, configurationName)
           )
         );
     }
@@ -166,7 +166,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
               }
               repositories { mavenCentral() }
@@ -176,7 +175,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
               }
               repositories { mavenCentral() }
@@ -554,7 +552,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
-                  deploy 'org.openrewrite:rewrite-java:7.0.0'
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
               
                   constraints {
                   }
@@ -565,10 +563,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
-                  deploy 'org.openrewrite:rewrite-java:7.0.0'
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
               
                   constraints {
-                      deploy('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
