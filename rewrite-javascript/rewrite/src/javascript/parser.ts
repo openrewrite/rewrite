@@ -28,7 +28,7 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {Asterisk, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {Generator, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
 import {
     emptyMarkers,
     markers,
@@ -943,10 +943,10 @@ export class JavaScriptParserVisitor {
         const markers = produce(emptyMarkers, draft => {
             if (node.asteriskToken) {
                 draft.markers.push({
-                    kind: JS.Markers.Asterisk,
+                    kind: JS.Markers.Generator,
                     id: randomId(),
                     prefix: this.prefix(node.asteriskToken)
-                } satisfies Asterisk as Asterisk);
+                } satisfies Generator as Generator);
             }
         });
 
@@ -1791,7 +1791,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitCallExpression(node: ts.CallExpression): J.MethodInvocation {
+    visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
         const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
 
@@ -1806,37 +1806,59 @@ export class JavaScriptParserVisitor {
             type: undefined,
             fieldType: undefined
         };
-
         if (ts.isIdentifier(node.expression) && !node.questionDotToken) {
             select = undefined;
             name = this.convert(node.expression);
         } else if (node.questionDotToken) {
             select = this.rightPadded(
                 produce(this.convert<Expression>(node.expression), draft => {
-                    if (node.questionDotToken) {
-                        draft.markers.markers.push({
-                            kind: JS.Markers.Optional,
-                            id: randomId(),
-                            prefix: this.suffix(node.expression)
-                        } satisfies Optional as Optional);
-                    }
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: emptySpace,
+                    } satisfies Optional as Optional)
                 }),
-                emptySpace
+                this.suffix(node.expression)
             )
+        } else if (ts.isPropertyAccessExpression(node.expression)) {
+            select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
+            if (node.expression.questionDotToken) {
+                select = produce(select, draft => {
+                    draft!.element.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: emptySpace
+                    } as Optional);
+                });
+            }
+            name = this.visit(node.expression.name);
         } else {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
         }
 
-        return {
-            kind: J.Kind.MethodInvocation,
-            id: randomId(),
-            prefix,
-            markers: emptyMarkers,
-            select,
-            typeParameters: typeArguments,
-            name,
-            arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-            methodType: this.mapMethodType(node)
+        if (name && name.simpleName.length > 0) {
+            return {
+                kind: J.Kind.MethodInvocation,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                select,
+                typeParameters: typeArguments,
+                name,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                methodType: this.mapMethodType(node)
+            }
+        } else {
+            return {
+                kind: JS.Kind.FunctionCall,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                function: select,
+                typeParameters: typeArguments,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                functionType: this.mapMethodType(node)
+            }
         }
     }
 
@@ -2410,14 +2432,13 @@ export class JavaScriptParserVisitor {
         return this.visit(node.expression);
     }
 
-    visitAsExpression(node: ts.AsExpression): JS.Binary {
+    visitAsExpression(node: ts.AsExpression): JS.As {
         return {
-            kind: JS.Kind.Binary,
+            kind: JS.Kind.As,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            left: this.convert(node.expression),
-            operator: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.Binary.Type.As),
+            left: this.rightPadded(this.convert(node.expression), this.prefix(node.getChildAt(1, this.sourceFile))),
             right: this.convert(node.type),
             type: this.mapType(node),
         };
@@ -2709,17 +2730,23 @@ export class JavaScriptParserVisitor {
                             }, this.suffix(node.initializer));
                         } else if (ts.isArrayLiteralExpression(node.initializer)) {
                             return this.rightPadded({
-                                kind: JS.Kind.ArrayBindingPattern,
+                                kind: JS.Kind.ExpressionStatement,
                                 id: randomId(),
-                                elements: {
-                                    kind: J.Kind.Container,
-                                    before: emptySpace,
-                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
-                                    markers: emptyMarkers
-                                } satisfies J.Container<Expression> as J.Container<Expression>,
+                                prefix: emptySpace,
                                 markers: emptyMarkers,
-                                prefix: emptySpace
-                            }, this.suffix(node.initializer))
+                                expression: {
+                                    kind: JS.Kind.ArrayBindingPattern,
+                                    id: randomId(),
+                                    elements: {
+                                        kind: J.Kind.Container,
+                                        before: emptySpace,
+                                        elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                        markers: emptyMarkers
+                                    } satisfies J.Container<Expression> as J.Container<Expression>,
+                                    markers: emptyMarkers,
+                                    prefix: emptySpace
+                                } satisfies JS.ArrayBindingPattern as JS.ArrayBindingPattern,
+                            } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingPattern,
@@ -3025,10 +3052,10 @@ export class JavaScriptParserVisitor {
 
                 if (node.asteriskToken) {
                     draft.markers.push({
-                        kind: JS.Markers.Asterisk,
+                        kind: JS.Markers.Generator,
                         id: randomId(),
                         prefix: this.prefix(node.asteriskToken)
-                    } satisfies Asterisk as Asterisk);
+                    } satisfies Generator as Generator);
                 }
             }),
             leadingAnnotations: [],
