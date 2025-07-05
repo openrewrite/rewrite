@@ -1288,6 +1288,51 @@ class MavenPomDownloaderTest implements RewriteTest {
                 assertThat(downloaded.getGav().getVersion()).isEqualTo("1");
             }
         }
+
+        @Test
+        @DisplayName("Clearly identify which pom failed to parse")
+        @Issue("https://github.com/openrewrite/rewrite/issues/5558")
+        void clearlyIdentifyWhichPomFailedToParse() throws Exception {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        assert recordedRequest.getPath() != null;
+                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom")) {
+                            // Deliberately malformed pom file, which Maven tolerates, but where jackson-databind fails
+                            return new MockResponse().setResponseCode(200).setBody(
+                                              //language=xml
+                                              """
+                              
+                                              <?xml version="1.0" encoding="UTF-8"?>
+                                              <project>
+                                                  <modelVersion>4.0.0</modelVersion>
+                              
+                                                  <groupId>com.mycompany.app</groupId>
+                                                  <artifactId>my-app</artifactId>
+                                                  <version>1</version>
+                                              </project>
+                                              """);                        }
+                        return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                var gav = new GroupArtifactVersion("fred", "fred", "1");
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class)
+                  .hasMessageContaining("Unable to download POM: fred:fred:1")
+                  .hasMessageContaining("Failed to parse pom")
+                  .hasMessageContaining("Illegal processing instruction target (\"xml\")");
+            }
+        }
     }
 
     @Test
@@ -1317,6 +1362,4 @@ class MavenPomDownloaderTest implements RewriteTest {
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
         assertThat(deps).hasSize(35);
     }
-
-
 }
