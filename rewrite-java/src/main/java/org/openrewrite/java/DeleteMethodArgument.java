@@ -103,8 +103,8 @@ public class DeleteMethodArgument extends Recipe {
             MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
-                                                    .filter(a -> !(a instanceof J.Empty))
-                                                    .count() >= argumentIndex + 1) {
+                    .filter(a -> !(a instanceof J.Empty))
+                    .count() >= argumentIndex + 1) {
                 List<Expression> args = new ArrayList<>(originalArgs);
 
                 Expression removed = args.remove(argumentIndex);
@@ -115,12 +115,13 @@ public class DeleteMethodArgument extends Recipe {
                 }
                 m = m.withArguments(args);
 
-                Set<String> importsToMaybeRemove = new JavaIsoVisitor<Set<String>>() {
+                // Remove imports of types used in the removed argument
+                new JavaIsoVisitor<Set<String>>() {
                     @Override
                     public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> types) {
                         if (javaType instanceof JavaType.Class) {
                             JavaType.Class type = (JavaType.Class) javaType;
-                            if (!type.getPackageName().startsWith("java.lang")) {
+                            if (!"java.lang".equals(type.getPackageName())) {
                                 types.add(type.getFullyQualifiedName());
                             }
                         } else if (javaType instanceof JavaType.Variable) {
@@ -130,22 +131,18 @@ public class DeleteMethodArgument extends Recipe {
                                 types.add(owner.getFullyQualifiedName() + "." + variable.getName());
                             }
                         }
-
                         return super.visitType(javaType, types);
                     }
 
                     @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, Set<String> strings) {
-                        if (m.getMethodType() != null && m.getMethodType().hasFlags(Flag.Static) && m.getSelect() == null) {
-                            JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-                            strings.add(receiverType.getFullyQualifiedName() + "." + m.getSimpleName());
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation mi, Set<String> strings) {
+                        if (mi.getMethodType() != null && mi.getMethodType().hasFlags(Flag.Static) && mi.getSelect() == null) {
+                            JavaType.FullyQualified receiverType = mi.getMethodType().getDeclaringType();
+                            strings.add(receiverType.getFullyQualifiedName() + "." + mi.getSimpleName());
                         }
-                        return super.visitMethodInvocation(m, strings);
+                        return super.visitMethodInvocation(mi, strings);
                     }
-                }.reduce(removed, new HashSet<>());
-                for (String importName : importsToMaybeRemove) {
-                    maybeRemoveImport(importName);
-                }
+                }.reduce(removed, new HashSet<>()).forEach(this::maybeRemoveImport);
 
                 // Update the method types
                 JavaType.Method methodType = m.getMethodType();
