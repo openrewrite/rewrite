@@ -48,13 +48,19 @@ public class ChangePluginConfiguration extends Recipe {
 
     @Language("xml")
     @Option(displayName = "Configuration",
-            description = "Plugin configuration provided as raw XML overriding any existing configuration. " +
+            description = "Plugin configuration provided as raw XML overriding or merging with any existing configuration. " +
                           "Configuration inside `<executions>` blocks will not be altered. " +
                           "Supplying `null` will remove any existing configuration.",
             example = "<foo>bar</foo>",
             required = false)
     @Nullable
     String configuration;
+
+    @Option(displayName = "Merge",
+            description = "If true, new values will be merged and matching ones will be overridden.",
+            required = false)
+    @Nullable
+    Boolean merge;
 
     @Override
     public String getDisplayName() {
@@ -90,10 +96,23 @@ public class ChangePluginConfiguration extends Recipe {
                         if (configuration == null) {
                             plugins = filterChildren(plugins, plugin,
                                     child -> !(child instanceof Xml.Tag && "configuration".equals(((Xml.Tag) child).getName())));
-                        } else  {
-                            plugins = addOrUpdateChild(plugins, plugin,
-                                    Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
-                                    getCursor().getParentOrThrow());
+                        } else {
+                            Xml.Tag configurationTag = Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>");
+                            if (Boolean.TRUE.equals(merge)) {
+                                Optional<Xml.Tag> existingConfiguration = plugin.getChild("configuration");
+                                if (existingConfiguration.isPresent()) {
+                                    // Merge each child tag from the new configuration into the existing configuration
+                                    Xml.Tag updatedConfiguration = existingConfiguration.get();
+                                    for (Xml.Tag childTag : configurationTag.getChildren()) {
+                                        updatedConfiguration = addOrUpdateChild(updatedConfiguration, childTag, getCursor());
+                                    }
+                                    plugins = addOrUpdateChild(plugins, plugin, updatedConfiguration, getCursor().getParentOrThrow());
+                                } else {
+                                    plugins = addOrUpdateChild(plugins, plugin, configurationTag, getCursor().getParentOrThrow());
+                                }
+                            } else {
+                                plugins = addOrUpdateChild(plugins, plugin, configurationTag, getCursor().getParentOrThrow());
+                            }
                         }
                     }
                 }
