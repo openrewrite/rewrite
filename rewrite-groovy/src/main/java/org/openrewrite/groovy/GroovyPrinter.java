@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
-import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -302,13 +301,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 p.append(",");
             });
             visit(multiVariable.getTypeExpression(), p);
-            // For backwards compatibility.
-            for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-                visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-                p.append('[');
-                visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-                p.append(']');
-            }
             if (multiVariable.getVarargs() != null) {
                 visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
                 p.append("...");

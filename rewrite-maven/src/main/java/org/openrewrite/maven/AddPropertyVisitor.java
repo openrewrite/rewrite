@@ -24,6 +24,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Value
@@ -55,9 +56,12 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
         if (!Boolean.TRUE.equals(preserveExistingValue) &&
-            isPropertyTag() && key.equals(tag.getName()) &&
-            !value.equals(tag.getValue().orElse(null))) {
-            doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+            isPropertyTag() && key.equals(tag.getName())) {
+            String tagValue = tag.getValue().orElse(null);
+            // Only update if values are different, considering null values
+            if (!Objects.equals(value, tagValue)) {
+                doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+            }
         }
         return super.visitTag(tag, ctx);
     }

@@ -214,7 +214,7 @@ public class ChangeParentPom extends Recipe {
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
                             Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
-                                if (!newParentProps.containsKey(propInUse.getKey())) {
+                                if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
                                     changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
                                 }
                             }

@@ -22,6 +22,9 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,7 +37,7 @@ import static org.openrewrite.Tree.randomId;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Value
 @With
-public class Markers {
+public class Markers implements RpcCodec<Markers> {
     public static final Markers EMPTY = new Markers(randomId(), emptyList());
 
     UUID id;
@@ -164,5 +167,17 @@ public class Markers {
                 .filter(markerType::isInstance)
                 .map(markerType::cast)
                 .findFirst();
+    }
+
+    @Override
+    public void rpcSend(Markers after, RpcSendQueue q) {
+        q.getAndSend(this, Markers::getId);
+        q.getAndSendList(this, Markers::getMarkers, Marker::getId, null);
+    }
+
+    @Override
+    public Markers rpcReceive(Markers before, RpcReceiveQueue q) {
+        return withId(q.receiveAndGet(getId(), UUID::fromString))
+                .withMarkers(q.receiveList(getMarkers(), null));
     }
 }

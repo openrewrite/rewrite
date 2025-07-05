@@ -184,7 +184,7 @@ describe("Independent Cache Management", () => {
             new GetRef(refId)
         );
         
-        expect(response).toHaveLength(2);
+        expect(response).toHaveLength(5);
         expect(response[0].state).toBe(RpcObjectState.ADD);
         expect(response[response.length - 1].state).toBe(RpcObjectState.END_OF_OBJECT);
     });

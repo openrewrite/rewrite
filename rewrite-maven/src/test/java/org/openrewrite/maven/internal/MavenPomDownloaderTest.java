@@ -65,7 +65,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         MavenRepository ossSonatype = MavenRepository.builder()
           .id("oss")
-          .uri("https://oss.sonatype.org/content/repositories/snapshots/")
+          .uri("https://central.sonatype.com/repository/maven-snapshots/")
           .snapshots(true)
           .build();
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
@@ -78,7 +78,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
       http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
       
-      https://oss.sonatype.org/content/repositories/snapshots/, https://oss.sonatype.org/content/repositories/snapshots/
+      https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
       https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
       https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
       https://jitpack.io/, https://jitpack.io/
@@ -298,11 +298,11 @@ class MavenPomDownloaderTest implements RewriteTest {
         void normalizeOssSnapshots() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             MavenRepository oss = downloader.normalizeRepository(
-              MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
+              MavenRepository.builder().id("oss").uri("https://central.sonatype.com/repository/maven-snapshots").build(),
               MavenExecutionContextView.view(ctx), null);
 
             assertThat(oss).isNotNull();
-            assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
+            assertThat(oss.getUri()).isEqualTo("https://central.sonatype.com/repository/maven-snapshots/");
         }
 
         @ParameterizedTest

@@ -35,13 +35,13 @@ import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {ParserInput} from "../parser";
-import {randomId} from "../uuid";
 import {ReferenceMap} from "./reference";
 import {Writable} from "node:stream";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
+    readonly localObjectGenerators: Map<string, (input: string) => any> = new Map<string, (input: string) => any>();
     readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
     private readonly localObjectIds = new IdentityMap();
@@ -72,12 +72,12 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, this.localRefs, options?.batchSize || 100,
-            !!options?.traceGetObjectOutput);
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjectGenerators, this.localObjects,
+            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
-        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 100, !!options?.traceGetObjectOutput);
+        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
-        Parse.handle(this.connection, this.localObjects);
+        Parse.handle(this.connection, this.localObjectGenerators);
         Print.handle(this.connection, getObject, getCursor);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry);
 
@@ -130,7 +130,7 @@ export class RewriteRpc {
         // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(randomId(), inputs, relativeTo)
+            new Parse(inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }

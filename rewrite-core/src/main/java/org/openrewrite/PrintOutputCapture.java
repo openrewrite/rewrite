@@ -76,6 +76,13 @@ public class PrintOutputCapture<P> implements Cloneable {
             }
         };
 
+        MarkerPrinter SEARCH_MARKERS_ONLY = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult ? marker.print(cursor, commentWrapper, false) : "";
+            }
+        };
+
         MarkerPrinter VERBOSE = new MarkerPrinter() {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {

@@ -29,18 +29,18 @@ import java.util.UUID;
 
 @Value
 @With
-public class Asterisk implements Marker, RpcCodec<Asterisk> {
+public class Generator implements Marker, RpcCodec<Generator> {
     UUID id;
     Space prefix;
 
     @Override
-    public void rpcSend(Asterisk after, RpcSendQueue q) {
+    public void rpcSend(Generator after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, Asterisk::getPrefix, space -> new JavaSender().visitSpace(space, q));
+        q.getAndSend(after, Generator::getPrefix, space -> new JavaSender().visitSpace(space, q));
     }
 
     @Override
-    public Asterisk rpcReceive(Asterisk before, RpcReceiveQueue q) {
+    public Generator rpcReceive(Generator before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
                 .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));

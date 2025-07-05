@@ -37,6 +37,7 @@ public class Print implements RpcRequest {
 
     public enum MarkerPrinter {
         DEFAULT,
+        SEARCH_MARKERS_ONLY,
         FENCED,
         SANITIZED,
         ;
@@ -44,6 +45,8 @@ public class Print implements RpcRequest {
         public static MarkerPrinter from(PrintOutputCapture.MarkerPrinter markerPrinter) {
             if (markerPrinter == PrintOutputCapture.MarkerPrinter.DEFAULT) {
                 return DEFAULT;
+            } else if (markerPrinter == PrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY) {
+                return SEARCH_MARKERS_ONLY;
             } else if (markerPrinter == PrintOutputCapture.MarkerPrinter.FENCED) {
                 return FENCED;
             } else if (markerPrinter == PrintOutputCapture.MarkerPrinter.SANITIZED) {

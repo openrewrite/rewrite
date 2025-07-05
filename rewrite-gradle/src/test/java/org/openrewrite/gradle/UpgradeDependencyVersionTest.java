@@ -1245,7 +1245,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1257,7 +1257,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1896,6 +1896,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           \"""
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """,
+            """
+              gradle.ext {
+                  jackson = '2.15.0'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+    
+              repositories {
+                  mavenCentral()
+              }
+    
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
               }
               """
           )
