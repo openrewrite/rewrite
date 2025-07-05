@@ -82,4 +82,66 @@ class GroovyParserTest implements RewriteTest {
           ));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5296")
+    @Test
+    void anonymousClassWithNestedGenericType() {
+        rewriteRun(groovy("new ArrayList<Map<String, String>>() {}"));
+    }
+
+    @Test
+    void deeplyNestedAnonymousGeneric() {
+        rewriteRun(groovy("new HashMap<String, List<Map<Integer, String>>>() {}"));
+    }
+
+    @Test
+    void rawAnonymousClassShouldNotGetGenerics() {
+        rewriteRun(groovy("new ArrayList() {}"));
+    }
+
+    @Test
+    void inferredGenericsWithDiamondOperator() {
+        rewriteRun(groovy("new ArrayList<>() {}"));
+    }
+
+    @Test
+    void nestedAnonymousWithGenerics() {
+        rewriteRun(
+          groovy(
+            """
+              new HashMap<String, List<String>>() {
+                  void inner() {
+                      new ArrayList<Map<Integer, String>>() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableDeclarationWithArrayInstantiationAsTheLastStatement() {
+        rewriteRun(
+          groovy(
+            """
+            def arr = new String[2]
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    void trailingCommaInMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              System.out.println("Hello World with no extra space",)
+              System.out.println("Hello World with space before comma" ,)
+              System.out.println("Hello World with space after comma", )
+              System.out.println("Hello World with space before & after comma" , )
+              """
+          )
+        );
+    }
+
 }

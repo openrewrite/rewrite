@@ -159,9 +159,9 @@ public class RpcSendQueue {
     private void add(@Nullable Object after, @Nullable Runnable onChange) {
         Object afterVal = Reference.getValue(after);
         Integer ref = null;
-        if (afterVal != null && after != afterVal /* Is a reference */) {
+        if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
-                put(new RpcObjectData(ADD, getValueType(afterVal), null, refs.get(afterVal), trace ? Trace.traceSender() : null));
+                put(new RpcObjectData(ADD, null, null, refs.get(afterVal), trace ? Trace.traceSender() : null));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
@@ -169,7 +169,7 @@ public class RpcSendQueue {
             refs.put(afterVal, ref);
         }
         //noinspection unchecked
-        RpcCodec<Object> afterCodec = after instanceof RpcCodec ? (RpcCodec<Object>) after : null;
+        RpcCodec<Object> afterCodec = afterVal instanceof RpcCodec ? (RpcCodec<Object>) afterVal : null;
         put(new RpcObjectData(ADD, getValueType(afterVal),
                 onChange == null && afterCodec == null ? afterVal : null, ref, trace ? Trace.traceSender() : null));
         doChange(afterVal, null, onChange, afterCodec);
@@ -198,6 +198,9 @@ public class RpcSendQueue {
         Class<?> type = after.getClass();
         if (type.isPrimitive() || type.getPackage().getName().startsWith("java.lang") ||
             type.equals(UUID.class) || Iterable.class.isAssignableFrom(type)) {
+            return null;
+        } else if (Enum.class.isAssignableFrom(type) && !type.getName().equals("org.openrewrite.java.tree.JavaType$Primitive")) {
+            // FIXME special case for `JavaType.Primitive` here
             return null;
         }
         return type.getName();
