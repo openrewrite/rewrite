@@ -220,7 +220,7 @@ class RawPomTest {
             """.getBytes()),
           null
         )).isInstanceOf(UncheckedIOException.class)
-          .hasMessageContaining("myArtifact-1.0.pom");
+          .hasMessageContaining("Failed to parse pom: Illegal processing instruction target (\"xml\")");
     }
 
 
