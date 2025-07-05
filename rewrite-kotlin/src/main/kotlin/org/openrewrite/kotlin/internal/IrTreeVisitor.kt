@@ -16,9 +16,9 @@
 package org.openrewrite.kotlin.internal
 
 import org.jetbrains.kotlin.ir.IrElement
-import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
+import org.jetbrains.kotlin.ir.visitors.IrVisitor
 
-open class IrTreeVisitor<T> : IrElementVisitor<Unit, T> {
+open class IrTreeVisitor<T> : IrVisitor<Unit, T>() {
     override fun visitElement(element: IrElement, data: T) : Unit {
         element.acceptChildren(this, data)
     }
