@@ -16,7 +16,6 @@
 package org.openrewrite.maven;
 
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -25,6 +24,9 @@ import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.maven.search.FindScm;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.Objects;
+import java.util.Optional;
 
 public class UpdateScmFromGitOrigin extends Recipe {
     @Override
@@ -37,42 +39,42 @@ public class UpdateScmFromGitOrigin extends Recipe {
         return "Updates the Maven <scm> section based on the Git remote origin.";
     }
 
-    @Nullable
-    private GitProvenance git;
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new FindScm(), new MavenVisitor<ExecutionContext>() {
-
-            @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                git = document.getMarkers().findFirst(GitProvenance.class).orElse(null);
-                return super.visitDocument(document, ctx);
-            }
-
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if ("scm".equals(tag.getName()) && git != null && git.getOrigin() != null) {
-                    String origin = git.getOrigin();
-                    ScmValues scmValues = ScmValues.fromOrigin(origin);
+                if ("project".equals(tag.getName())) {
+                    // Only process the <scm> tag if it's a direct child of <project>
+                    return super.visitTag(tag, ctx);
+                } else if ("scm".equals(tag.getName())) {
+                    ScmValues scmValues = Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
+                            .map(Xml.Document::getMarkers)
+                            .flatMap(markers -> markers.findFirst(GitProvenance.class))
+                            .map(GitProvenance::getOrigin)
+                            .map(ScmValues::fromOrigin)
+                            .orElse(null);
+                    if (scmValues == null) {
+                        return tag;
+                    }
 
                     tag.getChild("url").ifPresent(urlTag -> {
-                        if (!scmValues.getUrl().equals(urlTag.getValue().orElse(null))) {
+                        if (!Objects.equals(scmValues.getUrl(), urlTag.getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(urlTag, scmValues.getUrl()));
                         }
                     });
                     tag.getChild("connection").ifPresent(connTag -> {
-                        if (!scmValues.getConnection().equals(connTag.getValue().orElse(null))) {
+                        if (!Objects.equals(scmValues.getConnection(), connTag.getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(connTag, scmValues.getConnection()));
                         }
                     });
                     tag.getChild("developerConnection").ifPresent(devConnTag -> {
-                        if (!scmValues.getDeveloperConnection().equals(devConnTag.getValue().orElse(null))) {
+                        if (!Objects.equals(scmValues.getDeveloperConnection(), devConnTag.getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(devConnTag, scmValues.getDeveloperConnection()));
                         }
                     });
                 }
-                return super.visitTag(tag, ctx);
+                return tag;
             }
         });
     }
