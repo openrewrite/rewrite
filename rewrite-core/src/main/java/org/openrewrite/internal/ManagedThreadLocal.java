@@ -16,10 +16,10 @@
 package org.openrewrite.internal;
 
 import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -29,20 +29,35 @@ import java.util.function.Supplier;
  * Designed for AutoCloseable resources like database connections, file handles,
  * network connections, etc. that require proper cleanup.
  * <p>
+ * <strong>Resource Creation:</strong>
+ * Resources are created lazily - the factory function is not called until the
+ * resource is first accessed via the returned scope's {@code map()} method. This
+ * avoids creating expensive resources that may never be used.
+ * <p>
  * Typical usage:
  * <pre>
- * // At entry point (e.g., request handler)
- * try (var managed = DatabaseConnection.current().requireOrCreate(() -> new DatabaseConnection(...))) {
- *     // Application code can use require() throughout call chain
- *     processRequest();
- * } // Automatic cleanup of both ThreadLocal and resource
+ * // At entry point (e.g., request handler) - resource NOT created yet
+ * try (var scope = DatabaseConnection.current().requireOrCreate(() -> new DatabaseConnection(...))) {
+ *     // Application code can conditionally use the resource
+ *     if (needsDatabase()) {
+ *         // Resource is created HERE on first access
+ *         scope.map(conn -> {
+ *             conn.executeQuery("SELECT ...");
+ *             return conn.getResults();
+ *         });
+ *     }
+ * } // Automatic cleanup of both ThreadLocal and resource (if created)
  *
- * // In application code
+ * // In application code that assumes resource context exists
  * public void processRequest() {
  *     DatabaseConnection conn = DatabaseConnection.current().require();
  *     conn.executeQuery("SELECT ...");
  * }
  * </pre>
+ * <p>
+ * <strong>Thread Safety:</strong>
+ * This class uses ThreadLocal storage, so each thread maintains its own resource
+ * instance. Resources are not shared between threads.
  */
 public class ManagedThreadLocal<T extends AutoCloseable> {
     private final ThreadLocal<@Nullable T> threadLocal = new ThreadLocal<>();
@@ -65,12 +80,21 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
     }
 
     /**
-     * Gets or creates a managed resource with automatic cleanup.
+     * Requires a resource to exist, creating one if necessary with automatic cleanup.
      * <p>
      * If a resource already exists, returns it in a scope with no-op cleanup.
-     * If no resource exists, creates one using the factory and sets up automatic cleanup
-     * of both the ThreadLocal state and the resource itself when the returned
-     * Scope is closed.
+     * If no resource exists, defers creation until the resource is first accessed via
+     * the returned scope's {@code map()} method. The resource is created using the
+     * provided factory and automatic cleanup of both the ThreadLocal state and the
+     * resource itself is handled when the scope is closed.
+     * <p>
+     * <strong>Deferred creation behavior:</strong>
+     * <ul>
+     * <li>The factory is <em>not</em> called when this method returns</li>
+     * <li>Resource creation happens on first access via {@code scope.map()}</li>
+     * <li>Once created, the same resource instance is used for subsequent accesses</li>
+     * <li>If the scope is never accessed, no resource is created and no cleanup occurs</li>
+     * </ul>
      * <p>
      * Use this at entry points where you want to establish the resource context.
      *
@@ -85,22 +109,116 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
             });
         }
 
-        T newValue = factory.get();
-        threadLocal.set(newValue);
+        // No existing resource - set up lazy creation
+        AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
 
-        return new Scope<>(newValue, () -> {
-            try {
-                threadLocal.remove();
-            } finally {
-                newValue.close(); // Close the resource
-            }
-        });
+        return new Scope<>(
+                (Supplier<T>) () -> {
+                    T resource = resourceRef.get();
+                    if (resource == null) {
+                        resource = factory.get();
+                        threadLocal.set(resource);
+                        resourceRef.set(resource);
+                    }
+                    return resource;
+                },
+                () -> {
+                    T resource = resourceRef.get();
+                    if (resource != null) {
+                        try {
+                            threadLocal.remove();
+                        } finally {
+                            try {
+                                resource.close();
+                            } catch (Exception e) {
+                                // Log appropriately in real implementation
+                                System.err.println("Error closing managed resource: " + e.getMessage());
+                            }
+                        }
+                    }
+                }
+        );
+    }
+
+    /**
+     * Creates a new managed resource with automatic cleanup.
+     * <p>
+     * Always creates a new resource using the factory, regardless of whether a resource
+     * already exists in the current thread. The new resource is created when first accessed
+     * via the returned scope's {@code map()} method and will be automatically closed when
+     * the scope is closed. Any existing resource is temporarily replaced and restored when
+     * the scope closes.
+     * <p>
+     * <strong>Deferred creation behavior:</strong>
+     * <ul>
+     * <li>The factory is <em>not</em> called when this method returns</li>
+     * <li>Resource creation happens on first access via {@code scope.map()}</li>
+     * <li>Once created, the same resource instance is used for subsequent accesses</li>
+     * <li>If the scope is never accessed, no resource is created and no cleanup occurs</li>
+     * </ul>
+     * <p>
+     * This is useful when you need a guaranteed new resource instance, such as for
+     * temporary operations that require isolation from the existing resource context.
+     * <p>
+     * Example usage:
+     * <pre>
+     * // Create a temporary database connection for audit logging
+     * try (var scope = DatabaseConnection.current().create(() ->
+     *         new DatabaseConnection("jdbc:audit://localhost"))) {
+     *     scope.map(auditConn -> {
+     *         auditConn.logEvent("User action performed");
+     *         return null;
+     *     });
+     * } // Audit connection is closed, original connection restored
+     * </pre>
+     * <p>
+     * Compare with {@link #using(AutoCloseable)} which does not close the temporary resource,
+     * and {@link #requireOrCreate(Supplier)} which reuses existing resources.
+     *
+     * @param factory supplier to create the new resource
+     * @return a Scope that provides access to the new resource and handles cleanup
+     */
+    public Scope<T> create(Supplier<T> factory) {
+        T previousValue = threadLocal.get();
+        AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
+
+        return new Scope<>(
+                (Supplier<T>) () -> {
+                    T resource = resourceRef.get();
+                    if (resource == null) {
+                        resource = factory.get();
+                        threadLocal.set(resource);
+                        resourceRef.set(resource);
+                    }
+                    return resource;
+                },
+                () -> {
+                    T resource = resourceRef.get();
+                    try {
+                        // Restore the previous ThreadLocal state
+                        if (previousValue != null) {
+                            threadLocal.set(previousValue);
+                        } else {
+                            threadLocal.remove();
+                        }
+                    } finally {
+                        if (resource != null) {
+                            try {
+                                resource.close();
+                            } catch (Exception e) {
+                                // Log appropriately in real implementation
+                                System.err.println("Error closing created resource: " + e.getMessage());
+                            }
+                        }
+                    }
+                }
+        );
     }
 
     /**
      * Temporarily replace the resource, returning a Scope that restores the original.
      * <p>
-     * Use this when you need to temporarily use a different resource within a scope but can't use try-with-resources.
+     * Use this when you need to temporarily use a different resource within a scope.
      * The original resource is automatically restored when the returned Scope is closed.
      * <p>
      * Note: This does NOT close the temporary resource - you're responsible for its lifecycle.
@@ -125,7 +243,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * Provides access to the underlying ThreadLocal for advanced use cases.
      * <p>
      * Use with caution - direct ThreadLocal manipulation bypasses the managed
-     * resource lifecycle. Prefer the managed methods (require, requireOrCreate, using)
+     * resource lifecycle. Prefer the managed methods (require, requireOrCreate, create, using)
      * for typical usage.
      *
      * @return the underlying ThreadLocal instance
@@ -146,20 +264,32 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
     /**
      * A scoped resource that provides both the resource value and automatic cleanup.
      * <p>
-     * This is returned by requireOrCreate() and using(). It handles both ThreadLocal
+     * This is returned by requireOrCreate(), create(), and using(). It handles both ThreadLocal
      * restoration and resource cleanup when the scope is closed.
      */
-    @RequiredArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
     public static class Scope<T extends AutoCloseable> implements AutoCloseable {
-        final T resource;
-        final AutoCloseable cleanup;
+        Supplier<T> resourceSupplier;
+        AutoCloseable cleanup;
+
+        // Constructor for eager resources (using)
+        Scope(T resource, AutoCloseable cleanup) {
+            this.resourceSupplier = () -> resource;
+            this.cleanup = cleanup;
+        }
+
+        // Constructor for lazy resources (requireOrCreate, create)
+        Scope(Supplier<T> resourceSupplier, AutoCloseable cleanup) {
+            this.resourceSupplier = resourceSupplier;
+            this.cleanup = cleanup;
+        }
 
         /**
          * Applies a function to the scoped resource and returns the result.
          * <p>
          * This provides functional access to the resource without exposing it directly.
-         * The function is called with the current resource as its argument.
+         * For deferred resources, the function call triggers resource creation if it
+         * hasn't occurred yet.
          * <p>
          * Example usage:
          * <pre>
@@ -176,7 +306,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
          * @return the result of applying the function to the resource
          */
         public <R> R map(Function<T, R> mapper) {
-            return mapper.apply(resource);
+            return mapper.apply(resourceSupplier.get());
         }
 
         /**

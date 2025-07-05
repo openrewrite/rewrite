@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, TextComment} from "../../../src/java";
 
 describe('call mapping', () => {
     const spec = new RecipeSpec();
@@ -50,14 +51,32 @@ describe('call mapping', () => {
         ));
 
     test('with optional chaining operator', () =>
-        spec.rewriteRun(
+        spec.rewriteRun({
             //language=typescript
-            typescript(`
-                 const func = (message: string) => message;
-                 const result1 = func/*a*/?./*b*/("TS"); // Invokes the function
-                 const result2 = func/*a*/?./*b*/call("TS"); // Invokes the function
-             `)
-        ));
+            ...typescript(`
+                const func = (message: string) => message;
+                const result0 = func/*a*/?./*b*/("TS");
+                const result1 = func/*a*/?./*b*/call("TS");
+                const result2 = "hi"/*a*/./*b*/toUpperCase(); // usual call without optional chaining
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const inits = [1, 2, 3].map(i => (cu.statements[i].element as J.VariableDeclarations).variables[0].element.initializer!.element);
+                expect(inits[0].kind).toEqual(JS.Kind.FunctionCall);
+                expect(inits[1].kind).toEqual(J.Kind.MethodInvocation);
+                expect(inits[2].kind).toEqual(J.Kind.MethodInvocation);
+
+                for (let i = 0; i <= 2; i++) {
+                    const select = i == 0 ? (inits[i] as JS.FunctionCall).function! : (inits[i] as J.MethodInvocation).select!;
+                    expect(select.after.whitespace).toEqual("");
+                    expect(select.after.comments.length).toEqual(1);
+                    expect((select.after.comments[0] as TextComment).text).toEqual("a");
+                }
+
+                expect(((inits[0] as JS.FunctionCall).arguments.before.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[1] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
+                expect(((inits[2] as J.MethodInvocation).name.prefix.comments[0] as TextComment).text).toEqual("b");
+            }
+        }));
 
     test('call expression with type parameters', () =>
         spec.rewriteRun(
@@ -90,7 +109,6 @@ describe('call mapping', () => {
                  function identity<T>(value: T): T {
                      return value;
                  }
- 
                  const result1 = identity<string>?.("Hello TypeScript");
                  const result2 = identity?.<string>("Hello TypeScript");
                  const result3 = identity?.call("Hello TypeScript");
