@@ -1301,18 +1301,19 @@ class MavenPomDownloaderTest implements RewriteTest {
                         if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom")) {
                             // Deliberately malformed pom file, which Maven tolerates, but where jackson-databind fails
                             return new MockResponse().setResponseCode(200).setBody(
-                                              //language=xml
-                                              """
-                              
-                                              <?xml version="1.0" encoding="UTF-8"?>
-                                              <project>
-                                                  <modelVersion>4.0.0</modelVersion>
-                              
-                                                  <groupId>com.mycompany.app</groupId>
-                                                  <artifactId>my-app</artifactId>
-                                                  <version>1</version>
-                                              </project>
-                                              """);                        }
+                              //language=xml
+                              """
+                                
+                                <?xml version="1.0" encoding="UTF-8"?>
+                                <project>
+                                    <modelVersion>4.0.0</modelVersion>
+                                
+                                    <groupId>com.mycompany.app</groupId>
+                                    <artifactId>my-app</artifactId>
+                                    <version>1</version>
+                                </project>
+                                """);
+                        }
                         return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
                     }
                 });
