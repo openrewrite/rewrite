@@ -25,7 +25,6 @@ import org.openrewrite.maven.search.FindScm;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Objects;
 import java.util.Optional;
 
 public class UpdateScmFromGitOrigin extends Recipe {
@@ -45,35 +44,23 @@ public class UpdateScmFromGitOrigin extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
-                    // Only process the <scm> tag if it's a direct child of <project>
                     return super.visitTag(tag, ctx);
                 } else if ("scm".equals(tag.getName())) {
-                    ScmValues scmValues = Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
+                    ScmValues scm = Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
                             .map(Xml.Document::getMarkers)
                             .flatMap(markers -> markers.findFirst(GitProvenance.class))
                             .map(GitProvenance::getOrigin)
                             .map(ScmValues::fromOrigin)
                             .orElse(null);
-                    if (scmValues == null) {
+                    if (scm == null) {
                         return tag;
                     }
 
-                    tag.getChild("url").ifPresent(urlTag -> {
-                        if (!Objects.equals(scmValues.getUrl(), urlTag.getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(urlTag, scmValues.getUrl()));
-                        }
-                    });
-                    tag.getChild("connection").ifPresent(connTag -> {
-                        if (!Objects.equals(scmValues.getConnection(), connTag.getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(connTag, scmValues.getConnection()));
-                        }
-                    });
-                    tag.getChild("developerConnection").ifPresent(devConnTag -> {
-                        if (!Objects.equals(scmValues.getDeveloperConnection(), devConnTag.getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(devConnTag, scmValues.getDeveloperConnection()));
-                        }
-                    });
+                    tag.getChild("url").ifPresent(t -> doAfterVisit(new ChangeTagValueVisitor<>(t, scm.getUrl())));
+                    tag.getChild("connection").ifPresent(t -> doAfterVisit(new ChangeTagValueVisitor<>(t, scm.getConnection())));
+                    tag.getChild("developerConnection").ifPresent(t -> doAfterVisit(new ChangeTagValueVisitor<>(t, scm.getDeveloperConnection())));
                 }
+                // Only process the <scm> tag if it's a direct child of <project>
                 return tag;
             }
         });
