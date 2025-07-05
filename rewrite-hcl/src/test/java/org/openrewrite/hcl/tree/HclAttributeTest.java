@@ -31,7 +31,7 @@ class HclAttributeTest implements RewriteTest {
     void attributeValue() {
         rewriteRun(
           spec -> spec
-            .recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+            .recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
                   @Override
                   public Hcl visitBlock(Hcl.Block block, ExecutionContext executionContext) {
                       assertThat(block.<String>getAttributeValue("key"))

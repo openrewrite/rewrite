@@ -102,7 +102,7 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
         if (acc.destinationExists || acc.toMove == null) {
             return Collections.emptyList();
         }
-        Hcl.ConfigFile configFile = HclParser.builder().build().parse("")
+        Hcl.ConfigFile configFile = HclParser.builder().build().parse(ctx,"")
                 .findFirst()
                 .map(Hcl.ConfigFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
