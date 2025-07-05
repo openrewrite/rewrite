@@ -35,7 +35,7 @@ public class UpdateScmFromGitOrigin extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Updates the Maven <scm> section based on the Git remote origin.";
+        return "Updates the Maven `<scm>` section based on the Git remote origin.";
     }
 
     @Override
