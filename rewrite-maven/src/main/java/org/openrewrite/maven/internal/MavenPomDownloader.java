@@ -588,7 +588,7 @@ public class MavenPomDownloader {
 
                         if (pomFileExists) {
                             try (FileInputStream fis = new FileInputStream(pomFile)) {
-                                RawPom rawPom = RawPom.parse(inputPath, fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
+                                RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                                 Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                                 if (pom.getPackaging() == null || pom.hasJarPackaging()) {
@@ -615,7 +615,7 @@ public class MavenPomDownloader {
                             // Record the absense of the pom file
                             ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         // unable to read the pom from a file-based repository.
                         repositoryResponses.put(repo, e.getMessage());
                     }
@@ -625,7 +625,7 @@ public class MavenPomDownloader {
                             byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
-                            RawPom rawPom = RawPom.parse(inputPath,
+                            RawPom rawPom = RawPom.parse(
                                     new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
@@ -680,7 +680,7 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }

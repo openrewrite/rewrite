@@ -72,7 +72,7 @@ public class MavenParser implements Parser {
         for (Input source : sources) {
             Path pomPath = source.getRelativePath(relativeTo);
             try {
-                Pom pom = RawPom.parse(pomPath, source.getSource(ctx), null)
+                Pom pom = RawPom.parse(source.getSource(ctx), null)
                         .toPom(pomPath, null);
 
                 if (pom.getProperties().isEmpty()) {

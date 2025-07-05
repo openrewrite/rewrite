@@ -25,7 +25,6 @@ import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,7 +57,6 @@ class RawPomTest {
     @Test
     void repositoriesSerializationAndDeserialization() {
         RawPom pom = RawPom.parse(
-          null,
           //language=xml
           new ByteArrayInputStream("""
                 <project>
@@ -88,7 +86,6 @@ class RawPomTest {
     @Test
     void modulesAndSubProjects() {
         RawPom pom = RawPom.parse(
-          null,
           //language=xml
           new ByteArrayInputStream("""
                 <project>
@@ -124,7 +121,6 @@ class RawPomTest {
     @Test
     void serializePluginFlags() {
         RawPom pom = RawPom.parse(
-          null,
           //language=xml
           new ByteArrayInputStream("""
                 <project>
@@ -210,7 +206,6 @@ class RawPomTest {
     @Test
     void pomAtOriginOfDeserializationExceptionIsPartOfExceptionMessage() {
         assertThatThrownBy(() -> RawPom.parse(
-          Path.of("my", "groupId", "myArtifact", "1.0", "myArtifact-1.0.pom"),
           //language=xml
           new ByteArrayInputStream("""
                 

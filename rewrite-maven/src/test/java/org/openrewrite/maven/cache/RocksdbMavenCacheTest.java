@@ -100,6 +100,6 @@ class RocksdbMavenCacheTest {
     }
 
     private Pom parsePomXml(String pom) {
-        return RawPom.parse(null, new ByteArrayInputStream(pom.getBytes()), null).toPom(null, null);
+        return RawPom.parse(new ByteArrayInputStream(pom.getBytes()), null).toPom(null, null);
     }
 }
