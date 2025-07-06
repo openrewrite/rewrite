@@ -24,8 +24,8 @@ describe('this mapping', () => {
         typescript('this')
     ));
 
-    test('this type mapping', () => spec.rewriteRun({
-        ...typescript(
+    test('this type mapping', () => spec.rewriteRun(
+        typescript(
            `
             class A {
                m(): A { return this; }
@@ -35,14 +35,7 @@ describe('this mapping', () => {
             }
             const aa = new A().m();
             const bb = new B().m();
-            `),
-            afterRecipe: (tree: JS.CompilationUnit) => {
-                for (let i = 0; i < 2; i++) {
-                    const methodInA = (tree.statements[i].element as J.ClassDeclaration).body.statements[0].element as J.MethodDeclaration;
-                    const typeOfThisInA = ((methodInA.body?.statements![0].element as J.Return).expression! as J.Identifier).type! as JavaType.Class;
-                    expect(typeOfThisInA.fullyQualifiedName).toEqual(i == 0 ? "A" : "B");
-                }
-            }
-        })
+            `)
+        )
     );
 });

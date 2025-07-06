@@ -232,7 +232,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                     @Override
                     public JsonRpc get() {
-                        process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));
+                        process = new JavaScriptRewriteRpcProcess(logFile, trace, command.toArray(new String[0]));
                         process.start();
                         return requireNonNull(process.rpcClient);
                     }
@@ -352,6 +352,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     }
 
     private static class JavaScriptRewriteRpcProcess extends Thread {
+        private final @Nullable Path logFile;
         private final boolean trace;
         private final String[] command;
 
@@ -361,7 +362,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         @Getter
         private @Nullable JsonRpc rpcClient;
 
-        public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
+        public JavaScriptRewriteRpcProcess(@Nullable Path logFile, boolean trace, String... command) {
+            this.logFile = logFile;
             this.trace = trace;
             this.command = command;
             this.setDaemon(false);
@@ -371,6 +373,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         public void run() {
             try {
                 ProcessBuilder pb = new ProcessBuilder(command);
+                pb.redirectError(logFile != null ? ProcessBuilder.Redirect.appendTo(logFile.toFile()) :
+                        ProcessBuilder.Redirect.INHERIT);
                 process = pb.start();
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
