@@ -952,6 +952,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 typeExpression,
                 null,
+                emptyList(),
                 vars
         );
     }
@@ -2411,6 +2412,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     emptyList(),
                     typeExpression,
                     null,
+                    emptyList(),
                     singletonList(padRight(namedVariable, prefix(entry.getColon())))
             );
 
@@ -2436,6 +2438,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 null,
                 null,
+                emptyList(),
                 singletonList(padRight(emptyWithInitializer, Space.EMPTY))
         );
 
@@ -2698,6 +2701,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     emptyList(),
                     null,
                     null,
+                    emptyList(),
                     singletonList(infixReceiver)
             );
             implicitParam = implicitParam.withMarkers(implicitParam.getMarkers().addIfAbsent(new TypeReferencePrefix(randomId(), Space.EMPTY)));
@@ -2970,6 +2974,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 typeExpression,
                 null,
+                emptyList(),
                 variables
         );
 
@@ -3991,6 +3996,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(),
                 null,
                 null,
+                emptyList(),
                 variables
         );
 
