@@ -86,13 +86,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return statementExpression;
     }
 
-    override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(statement, p);
-        await this.visitRightPadded(statement.expression, p);
-        await this.afterSyntax(statement, p);
-        return statement;
-    }
-
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(inferType, p);
         await this.visitLeftPaddedLocal("infer", inferType.typeParameter, p);
