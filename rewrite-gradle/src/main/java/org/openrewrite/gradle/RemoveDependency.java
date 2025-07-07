@@ -27,16 +27,21 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.internal.StringUtils.LINE_BREAK;
+import static org.openrewrite.internal.StringUtils.hasLineBreak;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -111,25 +116,45 @@ public class RemoveDependency extends Recipe {
             }
 
             @Override
-            public J.@Nullable Return visitReturn(J.Return return_, ExecutionContext ctx) {
-                boolean dependencyInvocation = return_.getExpression() instanceof J.MethodInvocation && gradleDependencyMatcher.get(return_.getExpression(), getCursor()).isPresent();
-                J.Return r = super.visitReturn(return_, ctx);
-                if (dependencyInvocation && r.getExpression() == null) {
-                    //noinspection DataFlowIssue
-                    return null;
+            public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
+                J.Block b = super.visitBlock(block, executionContext);
+
+                if (withinDependenciesBlock(getCursor())) {
+                    AtomicReference<String> whitespace = new AtomicReference<>();
+                    List<Comment> comments = new ArrayList<>();
+                    AtomicBoolean lastStatementRemoved = new AtomicBoolean(false);
+                    
+                    b = b.withStatements(ListUtils.map(b.getStatements(), (i, stmt) -> {
+                        if (comments.isEmpty()) {
+                            if ((stmt instanceof J.MethodInvocation && gradleDependencyMatcher.get(stmt, getCursor()).isPresent()) ||
+                                    ((stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation && gradleDependencyMatcher.get(((J.Return) stmt).getExpression(), getCursor()).isPresent()))) {
+                                if (i != 0 && !stmt.getPrefix().getComments().isEmpty() && !hasLineBreak(stmt.getPrefix().getWhitespace())) {
+                                    whitespace.set(substringOfBeforeFirstLineBreak(stmt.getPrefix().getWhitespace()));
+                                    comments.addAll(getCommentsUntilLineBreak(stmt.getComments()));
+                                }
+                                if (stmt instanceof J.Return) {
+                                    lastStatementRemoved.set(true);
+                                }
+                                return null;
+                            }
+                        } else if (stmt instanceof J.MethodInvocation || stmt instanceof J.Return) {
+                            stmt = stmt.withPrefix(stmt.getPrefix().withWhitespace(whitespace.get()))
+                                    .withComments(ListUtils.concatAll(new ArrayList<>(comments), stmt.getComments()));
+                            whitespace.set("");
+                            comments.clear();
+                        }
+
+                        return stmt;
+                    }));
+                    if (!comments.isEmpty()) {
+                        List<Comment> commentsExceptLast = comments.subList(0, comments.size() - 1);
+                        Comment lastComment = comments.get(comments.size() - 1).withSuffix("\n");
+                        b = b.withEnd(Space.build(whitespace.get(), ListUtils.concat(commentsExceptLast, lastComment)));
+                    } else if (lastStatementRemoved.get() && !b.getEnd().getComments().isEmpty()) {
+                        b = b.withEnd(Space.build("\n", emptyList()));
+                    }
                 }
-                return r;
-            }
-
-            @Override
-            public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    return null;
-                }
-
-                return m;
+                return b;
             }
 
             private GradleProject updateGradleModel(GradleProject gp) {
@@ -164,5 +189,30 @@ public class RemoveDependency extends Recipe {
                 return gp;
             }
         });
+    }
+
+    private static boolean withinDependenciesBlock(Cursor cursor) {
+        try {
+            cursor.dropParentWhile(it -> it instanceof J.MethodInvocation && ((J.MethodInvocation) it).getSimpleName().equals("dependencies"));
+            return true;
+        } catch (IllegalStateException __) {
+            return false;
+        }
+    }
+
+    private static List<Comment> getCommentsUntilLineBreak(List<Comment> comments) {
+        List<Comment> Comments = new ArrayList<>();
+        for (Comment comment : comments) {
+            Comments.add(comment);
+            if (hasLineBreak(comment.getSuffix())) {
+                return Comments;
+            }
+        }
+        return Comments;
+    }
+
+    private String substringOfBeforeFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 0 ? lines[0] : "";
     }
 }
