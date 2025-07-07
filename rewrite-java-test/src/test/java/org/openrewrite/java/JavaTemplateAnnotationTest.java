@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -158,4 +159,75 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5712")
+    @Test
+    void replaceArgumentsInNestedAnnotation() {
+        @Language("java")
+        String annotations = """
+          package foo;
+
+          import java.lang.annotation.*;
+
+          @Repeatable(NestedAnnotations.class)
+          public @interface NestedAnnotation {
+              String a() default "";
+              String b() default "";
+          }
+
+          public @interface NestedAnnotations {
+              NestedAnnotation[] value();
+          }
+          """;
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().dependsOn(annotations))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                    if (annotation.getSimpleName().equals("NestedAnnotation") &&
+                      !annotation.getArguments().isEmpty()) {
+                        // Check if this annotation still has the 'a' attribute that needs to be replaced
+                        J.Assignment arg = (J.Assignment) annotation.getArguments().get(0);
+                        if (arg.getVariable() instanceof J.Identifier &&
+                          ((J.Identifier) arg.getVariable()).getSimpleName().equals("a")) {
+                            // Only apply the template if we haven't already transformed this annotation
+                            J.Literal value = (J.Literal) arg.getAssignment();
+
+                            // Replace 'a' with 'b' in the annotation
+                            return JavaTemplate.builder("@NestedAnnotation(b = #{any(java.lang.String)})")
+                              .javaParser(JavaParser.fromJavaVersion().dependsOn(annotations))
+                              .imports("foo.*")
+                              .build()
+                              .apply(getCursor(), annotation.getCoordinates().replace(), value);
+                        }
+                    }
+                    return super.visitAnnotation(annotation, ctx);
+                }
+            })),
+          java(
+            """
+              import foo.*;
+
+              @NestedAnnotations({
+                      @NestedAnnotation(a = "1"),
+                      @NestedAnnotation(a = "2")
+              })
+              class Test {
+              }
+              """,
+            """
+              import foo.*;
+
+              @NestedAnnotations({
+                      @NestedAnnotation(b = "1"),
+                      @NestedAnnotation(b = "2")
+              })
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
 }

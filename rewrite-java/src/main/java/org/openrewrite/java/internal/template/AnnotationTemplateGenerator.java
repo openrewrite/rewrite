@@ -89,8 +89,10 @@ public class AnnotationTemplateGenerator {
                         after.insert(0, " void $method() {}");
                     } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
                         after.insert(0, " int $variable;");
-                    } else if (j instanceof J.ClassDeclaration) {
-                        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                    } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
+                        // Check if this is a top-level class or nested class
+                        Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
+                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
                             after.insert(0, "class $Clazz {}");
                         } else {
                             after.insert(0, "static class $Clazz {}");
