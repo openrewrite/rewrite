@@ -1,0 +1,77 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.tree;
+
+import lombok.Getter;
+
+public class JsRightPadded {
+    @Getter
+    public enum Location {
+        ALIAS_PROPERTY_NAME(JsSpace.Location.ALIAS_PROPERTY_NAME_PREFIX),
+        ARRAY_LITERAL_ELEMENT_SUFFIX(JsSpace.Location.ARRAY_LITERAL_SUFFIX),
+        AS_LEFT(JsSpace.Location.AS_PREFIX),
+        BINDING_ELEMENT(JsSpace.Location.BINDING_ELEMENT_SUFFIX),
+        BINDING_ELEMENT_PROPERTY_NAME(JsSpace.Location.BINDING_ELEMENT_PROPERTY_NAME_SUFFIX),
+        EXPORT_ELEMENT_SUFFIX(JsSpace.Location.EXPORT_ELEMENT_SUFFIX),
+        COMPUTED_PROPERTY_NAME_SUFFIX(JsSpace.Location.COMPUTED_PROPERTY_NAME_SUFFIX),
+        FUNCTION_TYPE_PARAMETERS_SUFFIX(JsSpace.Location.FUNCTION_TYPE_PARAMETERS_SUFFIX),
+        IMPORT_ELEMENT_SUFFIX(JsSpace.Location.IMPORT_ELEMENT_SUFFIX),
+        IMPORT_NAME_SUFFIX(JsSpace.Location.IMPORT_NAME_SUFFIX),
+        PROPERTY_ASSIGNMENT_NAME(JsSpace.Location.PROPERTY_ASSIGNMENT_NAME_SUFFIX),
+        SCOPED_VARIABLE_DECLARATIONS_VARIABLE(JsSpace.Location.SCOPED_VARIABLE_DECLARATIONS_VARIABLE_SUFFIX),
+        TAG(JsSpace.Location.TAG_SUFFIX),
+        TUPLE_ELEMENT_SUFFIX(JsSpace.Location.TUPLE_ELEMENT_SUFFIX),
+        UNION_TYPE(JsSpace.Location.UNION_TYPE_SUFFIX),
+        INTERSECTION_TYPE(JsSpace.Location.INTERSECTION_TYPE_SUFFIX),
+        NAMESPACE_DECLARATION_NAME(JsSpace.Location.NAMESPACE_DECLARATION_PREFIX),
+        TYPE_LITERAL_MEMBERS(JsSpace.Location.TYPE_LITERAL_MEMBERS_SUFFIX),
+        INDEXED_SIGNATURE_DECLARATION_PARAMETERS(JsSpace.Location.INDEXED_SIGNATURE_DECLARATION_PARAMETERS_SUFFIX),
+        FOR_CONTROL_VAR(JsSpace.Location.FOR_INIT_SUFFIX),
+        FOR_CONTROL_ITER(JsSpace.Location.FOR_ITER_SUFFIX),
+        FOR_BODY(JsSpace.Location.FOR_BODY_SUFFIX),
+        ARRAY_BINDING_PATTERN_ELEMENTS(JsSpace.Location.FOR_BODY_SUFFIX),
+        EXPR_WITH_TYPE_ARG_PARAMETERS_SUFFIX(JsSpace.Location.EXPR_WITH_TYPE_ARG_PARAMETERS_SUFFIX),
+        TEMPLATE_EXPRESSION_TAG(JsSpace.Location.TEMPLATE_EXPRESSION_TAG_SUFFIX),
+        TEMPLATE_EXPRESSION_TYPE_ARG_PARAMETERS_SUFFIX(JsSpace.Location.TEMPLATE_EXPRESSION_TYPE_ARG_PARAMETERS_SUFFIX),
+        TEMPLATE_EXPRESSION_TEMPLATE_SPAN(JsSpace.Location.TEMPLATE_EXPRESSION_TEMPLATE_SPAN_SUFFIX),
+        IMPORT_TYPE_TYPEOF(JsSpace.Location.IMPORT_TYPE_TYPEOF_SUFFIX),
+        IMPORT_TYPE_TYPE_ARGUMENTS(JsSpace.Location.IMPORT_TYPE_TYPE_ARGUMENTS_SUFFIX),
+        NAMED_EXPORTS_ELEMENTS(JsSpace.Location.NAMED_EXPORTS_ELEMENTS_SUFFIX),
+        INDEXED_ACCESS_TYPE_INDEX_TYPE(JsSpace.Location.INDEXED_ACCESS_TYPE_INDEX_TYPE_SUFFIX),
+        INDEXED_ACCESS_TYPE_INDEX_TYPE_ELEMENT(JsSpace.Location.INDEXED_ACCESS_TYPE_INDEX_TYPE_ELEMENT_SUFFIX),
+        MAPPED_TYPE_VALUE_TYPE(JsSpace.Location.MAPPED_TYPE_VALUE_TYPE_SUFFIX),
+        MAPPED_TYPE_KEYS_REMAPPING_TYPE_PARAMETER(JsSpace.Location.MAPPED_TYPE_KEYS_REMAPPING_TYPE_PARAMETER_SUFFIX),
+        MAPPED_TYPE_KEYS_REMAPPING_NAME_TYPE(JsSpace.Location.MAPPED_TYPE_KEYS_REMAPPING_NAME_TYPE_SUFFIX),
+        TYPE_QUERY_TYPE_ARGUMENTS(JsSpace.Location.TYPE_QUERY_TYPE_ARGUMENTS_SUFFIX),
+        TRAILING_TOKEN_EXPRESSION(JsSpace.Location.TRAILING_TOKEN_EXPRESSION_SUFFIX),
+        WITH_BODY(JsSpace.Location.WITH_BODY_SUFFIX),
+        JS_IMPORT_CLAUSE_NAME(JsSpace.Location.IMPORT_CLAUSE_NAME_SUFFIX),
+        NAMED_IMPORTS_ELEMENTS(JsSpace.Location.NAMED_IMPORTS_ELEMENTS_SUFFIX),
+        JS_IMPORT_ATTRIBUTES_ELEMENTS(JsSpace.Location.IMPORT_ATTRIBUTES_ELEMENTS_SUFFIX),
+        IMPORT_TYPE_ARGUMENTS_AND_ATTRIBUTES(JsSpace.Location.IMPORT_TYPE_ARGUMENTS_AND_ATTRIBUTES_SUFFIX),
+        JS_IMPORT_TYPE_ATTRIBUTES_TOKEN(JsSpace.Location.IMPORT_TYPE_ATTRIBUTES_TOKEN_SUFFIX),
+        JS_IMPORT_TYPE_ATTRIBUTES_ELEMENTS(JsSpace.Location.IMPORT_TYPE_ATTRIBUTES_ELEMENTS_SUFFIX),
+        FUNCTION_CALL_FUNCTION(JsSpace.Location.FUNCTION_CALL_FUNCTION_SUFFIX)
+        ;
+
+        private final JsSpace.Location afterLocation;
+
+        Location(JsSpace.Location afterLocation) {
+            this.afterLocation = afterLocation;
+        }
+
+    }
+}

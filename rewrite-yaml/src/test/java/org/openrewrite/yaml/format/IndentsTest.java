@@ -25,6 +25,7 @@ import org.openrewrite.yaml.style.YamlDefaultStyles;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings("KubernetesUnknownResourcesInspection")
 class IndentsTest implements RewriteTest {
 
     @Override
@@ -36,26 +37,12 @@ class IndentsTest implements RewriteTest {
         ));
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
-    void multilineString() {
-        rewriteRun(
-          yaml("""
-            foo:
-              bar: >
-                A multiline string.
-              baz:
-                quz: Another string.
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void indentSequence() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   root:
                       - a: 0
                         b: 0
@@ -70,9 +57,26 @@ class IndentsTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    void multilineString() {
+        rewriteRun(
+          yaml(
+                """
+            foo:
+              bar: >
+                A multiline string.
+              baz:
+                quz: Another string.
+            """
+          )
+        );
+    }
+
+    @Test
     void indents() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   apiVersion: storage.cnrm.cloud.google.com/v1beta1
                   kind: StorageBucket
                   spec:
@@ -102,7 +106,8 @@ class IndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1135")
     void maintainIndentSpacingOnMixedTypeSequences() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 steps:
                   - checkout
                   - run:
@@ -112,6 +117,86 @@ class IndentsTest implements RewriteTest {
                       name: Run tests
                       command: npm run test:ci
             """
+          )
+        );
+    }
+
+    @Test
+    void indentSequenceComments() {
+        rewriteRun(
+          yaml(
+                """
+              key:
+              # a under-indented
+                  # a over-indented
+                - a :
+                # b under-indented
+                      # b over-indented
+                     - b
+              """,
+            """
+              key:
+                # a under-indented
+                # a over-indented
+                - a :
+                    # b under-indented
+                    # b over-indented
+                    - b
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentMappingComments() {
+        rewriteRun(
+          yaml(
+                """
+              key: # no change
+              # under-indented
+                  # over-indented
+                a : # no change
+              
+              
+                # under-indented
+                    # over-indented
+                  b : c
+              """,
+            """
+              key: # no change
+                # under-indented
+                # over-indented
+                a : # no change
+              
+              
+                  # under-indented
+                  # over-indented
+                  b : c
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentRootComments() {
+        rewriteRun(
+          yaml(
+                """
+                # over-indented 1
+              ---
+                # over-indented 2
+              key: value # no change
+                # over-indented 2
+              key2: value2
+              """,
+            """
+              # over-indented 1
+              ---
+              # over-indented 2
+              key: value # no change
+              # over-indented 2
+              key2: value2
+              """
           )
         );
     }

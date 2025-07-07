@@ -16,7 +16,7 @@
 package org.openrewrite;
 
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 

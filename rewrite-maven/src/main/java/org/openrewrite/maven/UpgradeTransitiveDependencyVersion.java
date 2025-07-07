@@ -17,8 +17,8 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
@@ -138,14 +138,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                         .stream()
                         .filter(dep -> dep.getDepth() > 0)
                         .collect(toCollection(LinkedHashSet::new));
-                if(matchingDependencies.isEmpty()) {
+                if (matchingDependencies.isEmpty()) {
                     return document;
                 }
                 Xml.Document d = document;
                 for (ResolvedDependency matchingDependency : matchingDependencies) {
                     d = (Xml.Document) addManagedDependency(matchingDependency.getGroupId(), matchingDependency.getArtifactId())
                             .getVisitor(acc)
-                            .visitNonNull(document, ctx);
+                            .visitNonNull(d, ctx);
                 }
                 return d;
             }

@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
@@ -50,7 +50,7 @@ public class ReplaceAnnotation extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace Annotation";
+        return "Replace annotation";
     }
 
     @Override

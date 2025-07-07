@@ -16,37 +16,38 @@
 package org.openrewrite.maven.tree;
 
 import lombok.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
+
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
+@With
 public class Dependency implements Serializable {
     GroupArtifactVersion gav;
 
-    @With
     @Nullable
     String classifier;
 
-    @With
     @Nullable
     String type;
 
     @With
+    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
     String scope;
 
-    @With
-    List<GroupArtifact> exclusions;
+    @Builder.Default
+    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
+    List<GroupArtifact> exclusions = emptyList();
 
-    @With
     @Nullable
     String optional;
 
-    @Nullable
-    public String getGroupId() {
+    public @Nullable String getGroupId() {
         return gav.getGroupId();
     }
 
@@ -54,16 +55,8 @@ public class Dependency implements Serializable {
         return gav.getArtifactId();
     }
 
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getVersion();
-    }
-
-    public Dependency withGav(GroupArtifactVersion gav) {
-        if(gav == this.gav) {
-            return this;
-        }
-        return new Dependency(gav, classifier, type, scope, exclusions, optional);
     }
 
     @Override

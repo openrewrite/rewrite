@@ -16,6 +16,7 @@
 package org.openrewrite.hcl;
 
 import org.antlr.v4.runtime.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
@@ -24,7 +25,6 @@ import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -81,7 +81,9 @@ public class HclParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".tf") || path.toString().endsWith(".tfvars");
+        return path.toString().endsWith(".hcl") ||
+                path.toString().endsWith(".tf") ||
+                path.toString().endsWith(".tfvars");
     }
 
     @Override

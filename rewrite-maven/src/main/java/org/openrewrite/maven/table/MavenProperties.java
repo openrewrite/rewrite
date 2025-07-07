@@ -17,18 +17,16 @@ package org.openrewrite.maven.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 @JsonIgnoreType
 public class MavenProperties extends DataTable<MavenProperties.Row> {
 
     public MavenProperties(Recipe recipe) {
-        super(recipe, Row.class,
-                MavenProperties.class.getName(),
-                "Maven properties", "Property and value.");
+        super(recipe, "Maven properties", "Property and value.");
     }
 
     @Value

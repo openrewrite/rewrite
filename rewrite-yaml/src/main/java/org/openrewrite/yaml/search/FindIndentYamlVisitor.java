@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.search;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -22,64 +23,28 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
 
 /**
  * Discover the most common indentation level of a tree.
  */
 public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
-    private final int enclosingIndent;
-
-    public FindIndentYamlVisitor(int enclosingIndent) {
-        this.enclosingIndent = enclosingIndent;
-    }
 
     @Override
-    public Yaml preVisit(Yaml tree, P p) {
+    public @Nullable Yaml preVisit(Yaml tree, P p) {
         String prefix = tree.getPrefix();
 
-        AtomicBoolean takeWhile = new AtomicBoolean(true);
-        if (prefix.chars()
-                .filter(c -> {
-                    takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                    return takeWhile.get();
-                })
-                .count() > 0) {
+        if (StringUtils.hasLineBreak(prefix)) {
             int indent = 0;
-            char[] chars = prefix.toCharArray();
-            for (char c : chars) {
+            for (char c : prefix.toCharArray()) {
                 if (c == '\n' || c == '\r') {
                     indent = 0;
-                    continue;
-                }
-                if (Character.isWhitespace(c)) {
+                } else if (Character.isWhitespace(c)) {
                     indent++;
                 }
             }
 
-            indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
-
-            AtomicBoolean dropWhile = new AtomicBoolean(false);
-            takeWhile.set(true);
-            Map<Boolean, Long> indentTypeCounts = prefix.chars()
-                    .filter(c -> {
-                        dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
-                        return dropWhile.get();
-                    })
-                    .filter(c -> {
-                        takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                        return takeWhile.get();
-                    })
-                    .mapToObj(c -> c == ' ')
-                    .collect(Collectors.groupingBy(identity(), counting()));
-
-            if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-            }
+            indentFrequencies.merge(indent, 1L, Long::sum);
         }
 
         return super.preVisit(tree, p);
@@ -87,10 +52,55 @@ public class FindIndentYamlVisitor<P> extends YamlVisitor<P> {
 
     public int getMostCommonIndent() {
         indentFrequencies.remove(0);
-        return StringUtils.mostCommonIndent(indentFrequencies);
+
+        if (indentFrequencies.getOrDefault(0, 0L) > 1) {
+            return 0;
+        }
+
+        return calculateMostCommonIndent();
     }
 
     public long nonZeroIndents() {
         return indentFrequencies.tailMap(1).values().stream().mapToLong(f -> f).sum();
+    }
+
+    private int calculateMostCommonIndent() {
+        // the frequency of each indent level is an integral divisor of longer indent levels
+        SortedMap<Integer, Integer> indentFrequencyAsDivisors = new TreeMap<>();
+        for (Map.Entry<Integer, Long> indentFrequency : indentFrequencies.entrySet()) {
+            int indent = indentFrequency.getKey();
+            int freq;
+            switch (indent) {
+                case 0:
+                    freq = indentFrequency.getValue().intValue();
+                    break;
+                case 1:
+                    // gcd(1, N) == 1, so we can avoid the test for this case
+                    freq = (int) indentFrequencies.tailMap(indent).values().stream().mapToLong(l -> l).sum();
+                    break;
+                default:
+                    freq = (int) indentFrequencies.tailMap(indent).entrySet().stream()
+                            .filter(inF -> gcd(inF.getKey(), indent) != 0)
+                            .mapToLong(Map.Entry::getValue)
+                            .sum();
+            }
+
+            indentFrequencyAsDivisors.put(indent, freq);
+        }
+
+        return indentFrequencyAsDivisors.entrySet().stream()
+                .max((e1, e2) -> {
+                    int valCompare = e1.getValue().compareTo(e2.getValue());
+                    return valCompare != 0 ?
+                            valCompare :
+                            // take the smallest indent otherwise, unless it would be zero
+                            e1.getKey() == 0 ? -1 : e2.getKey().compareTo(e1.getKey());
+                })
+                .map(Map.Entry::getKey)
+                .orElse(0);
+    }
+
+    private static int gcd(int n1, int n2) {
+        return n2 == 0 ? n1 : gcd(n2, n1 % n2);
     }
 }

@@ -16,10 +16,10 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
-import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -27,67 +27,69 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @param <Row> The model type for a single row of this extract.
+ * @param <Row> The model type for a single row of this data table.
  */
 @Getter
-@Incubating(since = "7.35.0")
 @JsonIgnoreType
+@RequiredArgsConstructor
 public class DataTable<Row> {
-    private final String name;
-    private final Class<Row> type;
-
     @Language("markdown")
     private final @NlsRewrite.DisplayName String displayName;
 
     @Language("markdown")
     private final @NlsRewrite.Description String description;
 
-    @Setter
-    private boolean enabled = true;
-
     /**
-     * Ignore any row insertions after this cycle. This prevents
-     * data table producing recipes from having to keep track of state across
-     * multiple cycles to prevent duplicate row entries.
+     * Construct a new data table.
+     *
+     * @param recipe      The recipe that this data table is associated with.
+     * @param displayName The display name of this data table.
+     * @param description The description of this data table.
      */
-    protected int maxCycle = 1;
-
-    public DataTable(Recipe recipe, Class<Row> type, String name,
-                     @Language("markdown") String displayName,
-                     @Language("markdown") String description) {
-        this.type = type;
-        this.name = name;
+    public DataTable(@Nullable Recipe recipe,
+                     @NlsRewrite.DisplayName @Language("markdown") String displayName,
+                     @NlsRewrite.Description @Language("markdown") String description) {
         this.displayName = displayName;
         this.description = description;
-        recipe.addDataTable(this);
+
+        // Only null when transferring DataTables over RPC.
+        //noinspection ConstantValue
+        if (recipe != null) {
+            recipe.addDataTable(this);
+        }
     }
 
-    public DataTable(Recipe recipe,
-                     @Language("markdown") String displayName,
-                     @Language("markdown") String description) {
+    public Class<Row> getType() {
         //noinspection unchecked
-        this.type = (Class<Row>) ((ParameterizedType) getClass().getGenericSuperclass())
+        return (Class<Row>) ((ParameterizedType) getClass().getGenericSuperclass())
                 .getActualTypeArguments()[0];
-        this.name = getClass().getName();
-        this.displayName = displayName;
-        this.description = description;
-        recipe.addDataTable(this);
     }
 
-    @SuppressWarnings("unused")
-    public TypeReference<List<Row>> getRowsTypeReference() {
-        return new TypeReference<List<Row>>() {
-        };
+    public String getName() {
+        return getClass().getName();
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (enabled && ctx.getCycle() <= maxCycle) {
-            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-                //noinspection unchecked
-                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-                dataTablesOfType.add(row);
-                return allDataTables;
-            });
+        if (!allowWritingInThisCycle(ctx)) {
+            return;
         }
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+            //noinspection unchecked
+            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+            dataTablesOfType.add(row);
+            return allDataTables;
+        });
+    }
+
+    /**
+     * This method is used to decide weather to ignore any row insertions in the current cycle.
+     * This prevents (by default) data table producing recipes from having to keep track of state across
+     * multiple cycles to prevent duplicate row entries.
+     *
+     * @param ctx the execution context
+     * @return weather to allow writing in this cycle
+     */
+    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
+        return ctx.getCycle() <= 1;
     }
 }

@@ -15,8 +15,9 @@
  */
 package org.openrewrite.remote;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -39,33 +40,35 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     }
 
     @Override
-    @Nullable
-    public Path get(URI uri) {
+    public @Nullable Path get(URI uri) {
         Path resolved = cacheDir.resolve(hashUri(uri));
         return Files.exists(resolved) ? resolved : null;
     }
 
     @Override
-    @Nullable
-    public Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
-        try {
+    public @Nullable Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
+        synchronized (this) {
             Path artifact = cacheDir.resolve(UUID.randomUUID() + ".tmp");
             try (InputStream is = artifactInputStream) {
                 Files.copy(is, artifact, StandardCopyOption.REPLACE_EXISTING);
-            }
-            Path cachedArtifact = cacheDir.resolve(hashUri(uri));
-            synchronized (this) {
+                Path cachedArtifact = cacheDir.resolve(hashUri(uri));
                 if (!Files.exists(cachedArtifact)) {
                     Files.move(artifact, cachedArtifact, StandardCopyOption.ATOMIC_MOVE,
                             StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    Files.delete(artifact);
+                }
+                return cachedArtifact;
+            } catch (Exception e) {
+                onError.accept(e);
+                return null;
+            } finally {
+                if (Files.exists(artifact)) {
+                    try {
+                        Files.delete(artifact);
+                    } catch (IOException ignored) {
+                        // Suppress
+                    }
                 }
             }
-            return cachedArtifact;
-        } catch (Exception e) {
-            onError.accept(e);
-            return null;
         }
     }
 

@@ -17,7 +17,10 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,7 +31,7 @@ import java.time.ZonedDateTime;
 
 @Value
 @With
-public class FileAttributes {
+public class FileAttributes implements RpcCodec<FileAttributes> {
     @Nullable
     ZonedDateTime creationTime;
 
@@ -46,8 +49,7 @@ public class FileAttributes {
 
     long size;
 
-    @Nullable
-    public static FileAttributes fromPath(Path path) {
+    public static @Nullable FileAttributes fromPath(Path path) {
         if (Files.exists(path)) {
             try {
                 BasicFileAttributes basicFileAttributes = Files.readAttributes(path, BasicFileAttributes.class);
@@ -61,5 +63,28 @@ public class FileAttributes {
             } catch (IOException ignored) {}
         }
         return null;
+    }
+
+    @Override
+    public void rpcSend(FileAttributes after, RpcSendQueue q) {
+        q.getAndSend(after, FileAttributes::getCreationTime);
+        q.getAndSend(after, FileAttributes::getLastModifiedTime);
+        q.getAndSend(after, FileAttributes::getLastAccessTime);
+        q.getAndSend(after, FileAttributes::isReadable);
+        q.getAndSend(after, FileAttributes::isWritable);
+        q.getAndSend(after, FileAttributes::isExecutable);
+        q.getAndSend(after, FileAttributes::getSize);
+    }
+
+    @Override
+    public FileAttributes rpcReceive(FileAttributes before, RpcReceiveQueue q) {
+        return before
+                .withCreationTime(q.receive(before.getCreationTime()))
+                .withLastModifiedTime(q.receive(before.getLastModifiedTime()))
+                .withLastAccessTime(q.receive(before.getLastAccessTime()))
+                .withReadable(q.receive(before.isReadable()))
+                .withWritable(q.receive(before.isWritable()))
+                .withExecutable(q.receive(before.isExecutable()))
+                .withSize(q.receive(before.getSize()));
     }
 }

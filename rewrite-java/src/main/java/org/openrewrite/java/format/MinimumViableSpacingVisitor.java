@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
@@ -201,7 +201,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
+        if (!(firstEnclosing instanceof J.Lambda.Parameters)) {
             if (Space.firstPrefix(v.getVariables()).isEmpty()) {
                 v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
                         v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
@@ -211,18 +211,30 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         return v;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public J.Case visitCase(J.Case _case, P p) {
+        J.Case c = super.visitCase(_case, p);
+
+        if (c.getGuard() != null) {
+            // At a minimum, we need a space between the guard and the case label
+            JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
+            return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+        }
+
+        return c;
+    }
+
+    @Override
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

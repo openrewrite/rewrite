@@ -15,14 +15,15 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -43,17 +44,20 @@ public class DependencyUseStringNotation extends Recipe {
     public String getDescription() {
         return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
                 "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`.";
+                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
+                "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m)) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
@@ -113,13 +117,38 @@ public class DependencyUseStringNotation extends Recipe {
                     } else {
                         m = m.withArguments(Collections.singletonList(stringNotation));
                     }
+                } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                    J.Assignment firstEntry = (J.Assignment) m.getArguments().get(0);
+                    Space prefix = firstEntry.getPrefix();
+                    Markers markers = firstEntry.getMarkers();
+
+                    for (Expression e : m.getArguments()) {
+                        if (e instanceof J.Assignment) {
+                            J.Assignment assignment = (J.Assignment) e;
+                            if (assignment.getVariable() instanceof J.Identifier) {
+                                J.Identifier key = (J.Identifier) assignment.getVariable();
+                                mapNotation.put(key.getSimpleName(), assignment.getAssignment());
+                            }
+                        }
+                    }
+
+                    J.Literal stringNotation = toLiteral(prefix, markers, mapNotation);
+                    if (stringNotation == null) {
+                        return m;
+                    }
+
+                    Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                    if (lastArg instanceof J.Lambda) {
+                        m = m.withArguments(Arrays.asList(stringNotation, lastArg));
+                    } else {
+                        m = m.withArguments(Collections.singletonList(stringNotation));
+                    }
                 }
 
                 return m;
             }
 
-            @Nullable
-            private J.Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
+            private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
                     String stringNotation = "";
 
@@ -148,8 +177,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return null;
             }
 
-            @Nullable
-            private String coerceToStringNotation(Expression expression) {
+            private @Nullable String coerceToStringNotation(Expression expression) {
                 if (expression instanceof J.Literal) {
                     return (String) ((J.Literal) expression).getValue();
                 } else if (expression instanceof J.Identifier) {

@@ -31,7 +31,8 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin"
+            "quarkus-extension-maven-plugin",
+            null
           )),
           pomXml(
             """
@@ -100,6 +101,56 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
+    @Test
+    void changePluginGroupIdAndArtifactIdWithVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "io.quarkus",
+            "quarkus-bootstrap-maven-plugin",
+            null,
+            "quarkus-extension-maven-plugin",
+            "4.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-extension-maven-plugin</artifactId>
+                              <version>4.0.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void changePluginGroupIdAndArtifactIdNoChange() {
         rewriteRun(
@@ -107,7 +158,54 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin"
+            "quarkus-extension-maven-plugin",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-extension-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                      <version>3.0.0.Beta1</version>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePluginGroupIdAndArtifactIdNoChangeWithVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "io.quarkus",
+            "quarkus-bootstrap-maven-plugin",
+            null,
+            "quarkus-extension-maven-plugin",
+            "4.0.0"
           )),
           pomXml(
             """
@@ -152,7 +250,8 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin"
+            "quarkus-extension-maven-plugin",
+            null
           )),
           pomXml(
             """
@@ -256,13 +355,188 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void changeManagedPluginGroupIdAndArtifactIdWithVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "io.quarkus",
+            "quarkus-bootstrap-maven-plugin",
+            null,
+            "quarkus-extension-maven-plugin",
+            "4.0.0"
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>io.quarkus</groupId>
+                                          <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                          <version>3.0.0.Beta1</version>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                  <version>4.0.0</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-extension-maven-plugin</artifactId>
+                              <version>4.0.0</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>io.quarkus</groupId>
+                                          <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                          <version>4.0.0</version>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeManagedPluginGroupIdAndArtifactIdNoChange() {
         rewriteRun(
           spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
             "io.quarkus",
             "quarkus-bootstrap-maven-plugin",
             null,
-            "quarkus-extension-maven-plugin"
+            "quarkus-extension-maven-plugin",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>io.quarkus</groupId>
+                                  <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                  <version>3.0.0.Beta1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-extension-maven-plugin</artifactId>
+                              <version>3.0.0.Beta1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>profile</id>
+                          <build>
+                              <pluginManagement>
+                                  <plugins>
+                                      <plugin>
+                                          <groupId>io.quarkus</groupId>
+                                          <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                          <version>3.0.0.Beta1</version>
+                                      </plugin>
+                                  </plugins>
+                              </pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>io.quarkus</groupId>
+                                      <artifactId>quarkus-extension-maven-plugin</artifactId>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeManagedPluginGroupIdAndArtifactIdNoChangeWithVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+            "io.quarkus",
+            "quarkus-bootstrap-maven-plugin",
+            null,
+            "quarkus-extension-maven-plugin",
+            "4.0.0"
           )),
           pomXml(
             """

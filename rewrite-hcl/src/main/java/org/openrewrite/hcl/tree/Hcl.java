@@ -19,14 +19,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.template.SourceTemplate;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -46,8 +45,7 @@ public interface Hcl extends Tree {
         return (R) acceptHcl(v.adapt(HclVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
+    default <P> @Nullable Hcl acceptHcl(HclVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -241,6 +239,75 @@ public interface Hcl extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LegacyIndexAttributeAccess implements Expression, Label {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        HclRightPadded<Expression> base;
+
+        @With
+        @Getter
+        Literal index;
+
+        @Override
+        public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
+            return v.visitLegacyIndexAttribute(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "LegacyIndexAttributeAccess{" + base + "." + index + "}";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LegacyIndexAttributeAccess t;
+
+            public HclRightPadded<Expression> getBase() {
+                return t.base;
+            }
+
+            public LegacyIndexAttributeAccess withBase(HclRightPadded<Expression> base) {
+                return t.base == base ? t : new LegacyIndexAttributeAccess(t.id, t.prefix, t.markers, base, t.index);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Binary implements Expression {
         @Nullable
         @NonFinal
@@ -363,8 +430,7 @@ public interface Hcl extends Tree {
         List<BodyContent> body;
 
         @Incubating(since = "7.27.0")
-        @Nullable
-        public Attribute getAttribute(String attrName) {
+        public @Nullable Attribute getAttribute(String attrName) {
             for (BodyContent t : body) {
                 if (t instanceof Attribute) {
                     Attribute attribute = (Attribute) t;
@@ -410,8 +476,7 @@ public interface Hcl extends Tree {
          * @return The text value of the attribute matching the provided name, if any.
          */
         @Incubating(since = "7.27.0")
-        @Nullable
-        public <T> T getAttributeValue(String attrName) {
+        public <T> @Nullable T getAttributeValue(String attrName) {
             Attribute attr = getAttribute(attrName);
             if (attr == null) {
                 return null;
@@ -769,8 +834,7 @@ public interface Hcl extends Tree {
         @Nullable
         HclLeftPadded<Expression> condition;
 
-        @Nullable
-        public Expression getCondition() {
+        public @Nullable Expression getCondition() {
             return condition == null ? null : condition.getElement();
         }
 
@@ -827,8 +891,7 @@ public interface Hcl extends Tree {
                 return t.updateValue == updateValue ? t : new ForObject(t.id, t.prefix, t.markers, t.intro, t.updateName, updateValue, t.ellipsis, t.condition, t.end);
             }
 
-            @Nullable
-            public HclLeftPadded<Expression> getCondition() {
+            public @Nullable HclLeftPadded<Expression> getCondition() {
                 return t.condition;
             }
 
@@ -877,8 +940,7 @@ public interface Hcl extends Tree {
         @Nullable
         HclLeftPadded<Expression> condition;
 
-        @Nullable
-        public Expression getCondition() {
+        public @Nullable Expression getCondition() {
             return condition == null ? null : condition.getElement();
         }
 
@@ -927,8 +989,7 @@ public interface Hcl extends Tree {
                 return t.update == update ? t : new ForTuple(t.id, t.prefix, t.markers, t.intro, update, t.condition, t.end);
             }
 
-            @Nullable
-            public HclLeftPadded<Expression> getCondition() {
+            public @Nullable HclLeftPadded<Expression> getCondition() {
                 return t.condition;
             }
 
@@ -1202,6 +1263,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable
         Object value;
 
         @With
@@ -1617,6 +1679,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable // FIXME remove this annotation after 2025-05-01, once new LST models are in use
         Identifier name;
 
         @Override

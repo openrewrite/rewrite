@@ -30,7 +30,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.metadata.name",
-            "monitoring"
+            "monitoring",
+            null
           )),
           yaml(
             """
@@ -53,10 +54,7 @@ class ChangeValueTest implements RewriteTest {
     @Test
     void updateScalarValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeValue(
-            "$.sources[?(@ == 'https://old-url.git')]",
-            "https://super-cool-url.git"
-          )),
+          spec -> spec.recipe(new ChangeValue("$.sources[?(@ == 'https://old-url.git')]", "https://super-cool-url.git", null)),
           yaml(
             """
                 sources:
@@ -84,7 +82,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.*.yo",
-            "howdy"
+            "howdy",
+            null
           )),
           yaml(
             """
@@ -108,7 +107,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.metadata.name",
-            "monitoring"
+            "monitoring",
+            null
           )),
           yaml(
             """
@@ -132,7 +132,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             ".name",
-            "monitoring"
+            "monitoring",
+            null
           )),
           yaml(
             """
@@ -156,7 +157,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.subjects[*].kind",
-            "Deployment"
+            "Deployment",
+            null
           )),
           yaml(
             """
@@ -182,7 +184,8 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.subjects[?(@.kind == 'ServiceAccount')].kind",
-            "Deployment"
+            "Deployment",
+            null
           )),
           yaml(
             """

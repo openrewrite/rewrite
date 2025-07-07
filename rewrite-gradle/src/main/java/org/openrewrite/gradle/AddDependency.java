@@ -17,24 +17,25 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
+import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
-import static java.util.Objects.requireNonNull;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -55,9 +56,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "29.X",
             required = false)
     @Nullable
@@ -65,7 +66,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example, " +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -73,7 +74,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Configuration",
             description = "A configuration to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                          "is used when adding a new as of yet unused dependency.",
+                    "is used when adding a new as of yet unused dependency.",
             example = "implementation",
             required = false)
     @Nullable
@@ -102,7 +103,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                          "Accepts '*' as a wildcard character.",
+                    "Accepts '*' as a wildcard character.",
             example = "com.fasterxml.jackson*",
             required = false)
     @Nullable
@@ -114,8 +115,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             required = false)
     @Nullable
     Boolean acceptTransitive;
-
-    static final String DEPENDENCY_PRESENT = "org.openrewrite.gradle.AddDependency.DEPENDENCY_PRESENT";
 
     @Override
     public String getDisplayName() {
@@ -142,7 +141,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     public static class Scanned {
-        boolean usingType;
+        Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
     }
 
@@ -155,12 +154,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
-            UsesType<ExecutionContext> usesType;
+            @Nullable
+            UsesType<ExecutionContext> usesType = null;
+
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
-                if(onlyIfUsing == null) {
+                if (onlyIfUsing == null) {
                     return true;
                 }
-                if(usesType == null) {
+                if (usesType == null) {
                     usesType = new UsesType<>(onlyIfUsing, true);
                 }
                 return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
@@ -168,15 +169,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (usesType(sourceFile, ctx)) {
-                                acc.usingType = true;
-                                Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
-                            }
-                        }));
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
+                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
+
+                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                });
                 return tree;
             }
         };
@@ -184,8 +187,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(acc.usingType && !acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(!acc.configurationsByProject.isEmpty(),
+                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -193,62 +196,60 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-                        if (!s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
-                            return s;
-                        }
-
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
-                        if (!maybeJp.isPresent()) {
+                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
+                        if (!maybeJp.isPresent() ||
+                                (onlyIfUsing != null && !acc.usingType.getOrDefault(maybeJp.get(), false)) || !acc.configurationsByProject.containsKey(maybeJp.get()) ||
+                                !maybeGp.isPresent()) {
                             return s;
                         }
 
                         JavaProject jp = maybeJp.get();
-                        if (!acc.configurationsByProject.containsKey(jp)) {
-                            return s;
-                        }
-
-                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeGp.isPresent()) {
-                            return s;
-                        }
-
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ? acc.configurationsByProject.get(jp) : new HashSet<>(Collections.singletonList(configuration));
-                        Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
-                            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
-                                resolvedConfigurations.remove(tmpConfiguration);
-                            }
+                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
+                                new HashSet<>(singletonList(configuration));
+                        if (resolvedConfigurations.isEmpty()) {
+                            resolvedConfigurations.add("implementation");
                         }
 
-                        tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
-                            for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
-                                if (resolvedConfigurations.contains(transitive.getName()) ||
-                                        (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
-                                    resolvedConfigurations.remove(transitive.getName());
-                                }
-                            }
-                        }
+                        GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
+                        gradleConfigurationFilter.removeTransitiveConfigurations();
+                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
+                        resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
 
                         if (resolvedConfigurations.isEmpty()) {
                             return s;
                         }
 
-                        G.CompilationUnit g = (G.CompilationUnit) s;
+                        Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
+                            JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
+                            if (jvmTestSuite != null) {
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, classifier, extension, metadataFailures, null, ctx)
+                                        .visitNonNull(s, ctx);
+                            } else {
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                        classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
+                            }
                         }
 
-                        return g;
+                        return s;
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
-                        return cursor.getParent().firstEnclosing(J.MethodInvocation.class) == null;
+                        return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
+                    }
+
+                    private @Nullable JvmTestSuite maybeJvmTestSuite(String configuration, Set<JvmTestSuite> jvmTestSuites) {
+                        for (JvmTestSuite jvmTestSuite : jvmTestSuites) {
+                            if (jvmTestSuite.isAcceptable(configuration)) {
+                                return jvmTestSuite;
+                            }
+                        }
+                        return null;
                     }
                 })
         );

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -75,9 +75,9 @@ public class DependencyMatcher {
     }
 
     public boolean matches(@Nullable String groupId, String artifactId, String version) {
-        return StringUtils.matchesGlob(groupId, groupPattern)
-                && StringUtils.matchesGlob(artifactId, artifactPattern)
-                && (versionComparator == null || versionComparator.isValid(null, version));
+        return StringUtils.matchesGlob(groupId, groupPattern) &&
+                StringUtils.matchesGlob(artifactId, artifactPattern) &&
+                (versionComparator == null || versionComparator.isValid(null, version));
     }
 
     public boolean matches(@Nullable String groupId, String artifactId) {

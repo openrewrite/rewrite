@@ -37,7 +37,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               public class A {
                   int n
-                  
+
                   def sum(int m) {
                       n+m
                   }
@@ -79,6 +79,28 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               public abstract class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsObject() {
+        rewriteRun(
+          groovy(
+            """
+              class B extends Object {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsScript() {
+        rewriteRun(
+          groovy(
+            """
+              abstract class B extends Script {}
               """
           )
         );
@@ -128,9 +150,22 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """ 
               package org.openrewrite
-               
+
               public class A{}
-               """
+              """
+          )
+        );
+    }
+
+    @Test
+    void hasPackageWithTrailingComma() {
+        rewriteRun(
+          groovy(
+            """ 
+              package org.openrewrite;
+
+              class A{}
+              """
           )
         );
     }
@@ -146,7 +181,7 @@ class ClassDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                var aType = cu.getClasses().get(0).getType();
+                var aType = cu.getClasses().getFirst().getType();
                 assertThat(aType).isNotNull();
                 assertThat(aType).isInstanceOf(JavaType.Class.class);
                 assertThat(((JavaType.Class) aType).getFullyQualifiedName()).isEqualTo("A");
@@ -168,17 +203,17 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               import groovy.transform.PackageScope
-                            
+
               @PackageScope
               class A {}
               """,
             spec ->
               spec.beforeRecipe(cu -> {
-                  var clazz = cu.getClasses().get(0);
+                  var clazz = cu.getClasses().getFirst();
                   assertThat(clazz.getModifiers())
                     .as("Groovy's default visibility is public, applying @PackageScope should prevent the public modifier from being present")
                     .hasSize(0);
-                  var annotations = cu.getClasses().get(0).getAllAnnotations();
+                  var annotations = cu.getClasses().getFirst().getAllAnnotations();
                   assertThat(annotations).hasSize(1);
               })
           )
@@ -198,14 +233,14 @@ class ClassDeclarationTest implements RewriteTest {
               interface C {}
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var typeParameters = cu.getClasses().get(0).getTypeParameters();
+                var typeParameters = cu.getClasses().getFirst().getTypeParameters();
                 assertThat(typeParameters).isNotNull();
                 assertThat(typeParameters).hasSize(2);
-                assertThat(requireNonNull(typeParameters.get(0)).getBounds()).isNull();
+                assertThat(requireNonNull(typeParameters.getFirst()).getBounds()).isNull();
                 var sParam = typeParameters.get(1);
                 assertThat(sParam.getBounds()).isNotNull();
                 assertThat(sParam.getBounds()).hasSize(2);
-                assertThat(sParam.getBounds().get(0)).isInstanceOf(J.ParameterizedType.class);
+                assertThat(sParam.getBounds().getFirst()).isInstanceOf(J.ParameterizedType.class);
             })
           )
         );
@@ -219,6 +254,35 @@ class ClassDeclarationTest implements RewriteTest {
               interface C {
                   class Inner {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void constructorWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def A() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorForClassInPackage() {
+        rewriteRun(
+          groovy(
+            """
+              package a
+              
+              class A {
+                  A() {}
               }
               """
           )
@@ -247,18 +311,18 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class A {
+              class B {
                   List<String> a
                   Map<Object, Object> b
               }
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var statements = cu.getClasses().get(0).getBody().getStatements();
+                var statements = cu.getClasses().getFirst().getBody().getStatements();
                 assertThat(statements).hasSize(2);
-                var a = ((J.VariableDeclarations) statements.get(0)).getVariables().get(0);
+                var a = ((J.VariableDeclarations) statements.getFirst()).getVariables().getFirst();
                 assertThat(requireNonNull(TypeUtils.asParameterized(a.getType())).toString())
                   .isEqualTo("java.util.List<java.lang.String>");
-                var b = ((J.VariableDeclarations) statements.get(1)).getVariables().get(0);
+                var b = ((J.VariableDeclarations) statements.get(1)).getVariables().getFirst();
                 assertThat(requireNonNull(TypeUtils.asParameterized(b.getType())).toString())
                   .isEqualTo("java.util.Map<java.lang.Object, java.lang.Object>");
             })
@@ -276,15 +340,137 @@ class ClassDeclarationTest implements RewriteTest {
               public final class A {}
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var annotations = cu.getClasses().get(0).getAllAnnotations();
+                var annotations = cu.getClasses().getFirst().getAllAnnotations();
                 assertThat(annotations.size()).isEqualTo(1);
-                var annotation = annotations.get(0);
+                var annotation = annotations.getFirst();
                 var type = annotation.getType();
                 assertThat(type).isNotNull();
                 assertThat(type).isInstanceOf(JavaType.FullyQualified.class);
                 assertThat(requireNonNull(TypeUtils.asFullyQualified(type)).getFullyQualifiedName())
                   .isEqualTo("java.lang.Deprecated");
             })
+          )
+        );
+    }
+
+    @Test
+    void instanceInitializerBlock() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                int a
+                {
+                    a = 1
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void staticInitializer() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                static int a
+                static {
+                    a = 1
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void anonymousInnerClass() {
+        rewriteRun(
+          groovy(
+            """
+              interface Something {}
+              
+              class Test {
+                  Something something = new Something() {}
+                  static def test() {
+                      new Something() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      String a;String[] b
+                      B(String $a, String... b) {
+                          this.a = $a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      String a;String[] b
+                      B(String a, String... b) {
+                          this.a = a
+                          this.b = b
+                      }
+                  }
+              }
+              """
           )
         );
     }

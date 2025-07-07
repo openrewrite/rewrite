@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
+import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
@@ -65,9 +66,23 @@ public class RemoveObjectsIsNull extends Recipe {
                 }
 
                 // Replace the method invocation with a simple null check
-                Expression e = m.getArguments().get(0);
-                Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
-                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx, getCursor());
+                Cursor parentTreeCursor = getCursor().getParentTreeCursor();
+                if (!(parentTreeCursor.getValue() instanceof J.ControlParentheses) &&
+                    !(parentTreeCursor.getValue() instanceof J.Parentheses)) {
+                    pattern = '(' + pattern + ')';
+                }
+                parentTreeCursor.putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);
+                Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), m.getArguments().get(0));
+                return (Expression) new UnnecessaryParenthesesVisitor<>().visitNonNull(replaced, ctx);
+            }
+
+            @Override
+            public J postVisit(J tree, ExecutionContext ctx) {
+                J j = super.postVisit(tree, ctx);
+                if (Boolean.TRUE.equals(getCursor().pollMessage("SIMPLIFY_BOOLEAN_EXPRESSION"))) {
+                    return new SimplifyBooleanExpressionVisitor().visit(j, ctx, getCursor().getParentOrThrow());
+                }
+                return j;
             }
         });
     }

@@ -17,9 +17,9 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -86,54 +86,58 @@ public class ExcludeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ExcludeDependencyVisitor();
-    }
+        return Repeat.repeatUntilStable(() -> new MavenVisitor<ExecutionContext>() {
+            @Nullable
+            private final Scope scope = ExcludeDependency.this.scope == null ? null : Scope.fromName(ExcludeDependency.this.scope);
 
-    private class ExcludeDependencyVisitor extends MavenVisitor<ExecutionContext> {
-        @Nullable
-        private final Scope scope = ExcludeDependency.this.scope == null ? null : Scope.fromName(ExcludeDependency.this.scope);
-
-        @Override
-        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag()) {
-                ResolvedDependency dependency = findDependency(tag, scope);
-                if (dependency != null &&
-                    !(matchesGlob(dependency.getGroupId(), groupId) && matchesGlob(dependency.getArtifactId(), artifactId)) &&
-                    dependency.findDependency(groupId, artifactId) != null) {
-                    Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
-                    if (maybeExclusions.isPresent()) {
-                        Xml.Tag exclusions = maybeExclusions.get();
-
-                        List<Xml.Tag> individualExclusions = exclusions.getChildren("exclusion");
-                        if (individualExclusions.stream().noneMatch(exclusion ->
-                                groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
-                                artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
-                            Xml.Tag newExclusions = (Xml.Tag) new AddToTagVisitor<>(exclusions,
-                                    Xml.Tag.build("" +
-                                                  "<exclusion>\n" +
-                                                  "<groupId>" + groupId + "</groupId>\n" +
-                                                  "<artifactId>" + artifactId + "</artifactId>\n" +
-                                                  "</exclusion>"))
-                                    .visitNonNull(exclusions, ctx, getCursor());
-                            tag = tag.withContent(ListUtils.map((List<Content>) tag.getContent(), t -> t == exclusions ? newExclusions : t));
-                        }
-                    } else {
-                        tag = (Xml.Tag) new AddToTagVisitor<>(tag,
-                                Xml.Tag.build("" +
-                                              "<exclusions>\n" +
-                                              "<exclusion>\n" +
-                                              "<groupId>" + groupId + "</groupId>\n" +
-                                              "<artifactId>" + artifactId + "</artifactId>\n" +
-                                              "</exclusion>\n" +
-                                              "</exclusions>"))
-                                .visitNonNull(tag, ctx, getCursor().getParentOrThrow());
-                    }
-                    maybeUpdateModel();
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml xml = super.visitDocument(document, ctx);
+                if (xml != document) {
+                    xml = new UpdateMavenModel<>().visitNonNull(xml, ctx);
                 }
-                return tag;
+                return xml;
             }
 
-            return super.visitTag(tag, ctx);
-        }
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag()) {
+                    ResolvedDependency dependency = findDependency(tag, scope);
+                    if (dependency != null &&
+                        !(matchesGlob(dependency.getGroupId(), groupId) && matchesGlob(dependency.getArtifactId(), artifactId)) &&
+                        dependency.findDependency(groupId, artifactId) != null) {
+                        Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
+                        if (maybeExclusions.isPresent()) {
+                            Xml.Tag exclusions = maybeExclusions.get();
+
+                            List<Xml.Tag> individualExclusions = exclusions.getChildren("exclusion");
+                            if (individualExclusions.stream().noneMatch(exclusion ->
+                                    groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
+                                    artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
+                                Xml.Tag newExclusions = (Xml.Tag) new AddToTagVisitor<>(exclusions, Xml.Tag.build(
+                                        "<exclusion>\n" +
+                                        "<groupId>" + groupId + "</groupId>\n" +
+                                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                                        "</exclusion>"))
+                                        .visitNonNull(exclusions, ctx, getCursor());
+                                //noinspection unchecked
+                                tag = tag.withContent(ListUtils.map((List<Content>) tag.getContent(), t -> t == exclusions ? newExclusions : t));
+                            }
+                        } else {
+                            tag = (Xml.Tag) new AddToTagVisitor<>(tag, Xml.Tag.build(
+                                    "<exclusions>\n" +
+                                    "<exclusion>\n" +
+                                    "<groupId>" + groupId + "</groupId>\n" +
+                                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                                    "</exclusion>\n" +
+                                    "</exclusions>"))
+                                    .visitNonNull(tag, ctx, getCursor().getParentOrThrow());
+                        }
+                    }
+                    return tag;
+                }
+                return super.visitTag(tag, ctx);
+            }
+        });
     }
 }

@@ -14,11 +14,18 @@ lexer grammar HCLLexer;
     private Stack<String> heredocIdentifier = new Stack<String>();
 }
 
-FOR_BRACE             : '{' (WS|NEWLINE)* 'for' WS;
-FOR_BRACK             : '[' (WS|NEWLINE)* 'for' WS;
+FOR_BRACE             : '{' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
+FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
 
 IF              : 'if';
 IN              : 'in';
+
+BooleanLiteral
+    : 'true'
+    | 'false'
+    ;
+
+NULL                            : 'null';
 
 LBRACE                          : '{'
 {
@@ -49,10 +56,10 @@ Identifier
 
 // Lexical Elements - Comments and Whitespace
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#comments-and-whitespace
-WS              : [ \t\r\u000C]+                   -> channel(HIDDEN);
-COMMENT         : '/*' .*? '*/'                    -> channel(HIDDEN);
-LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'?'\n'  -> channel(HIDDEN);
-NEWLINE         : '\n'                             -> channel(HIDDEN);
+WS              : [ \t\r\u000C]+                           -> channel(HIDDEN);
+COMMENT         : '/*' .*? '*/'                            -> channel(HIDDEN);
+LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'? ('\n' | EOF) -> channel(HIDDEN);
+NEWLINE         : '\n'                                     -> channel(HIDDEN);
 
 fragment LetterOrDigit
     : Letter
@@ -81,7 +88,7 @@ fragment HexDigit
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#numeric-literals
 
 NumericLiteral
-    : [0-9]+ '.' [0-9]* ExponentPart?
+    : [0-9]+ '.' [0-9]+ ExponentPart?
     | [0-9]+ ExponentPart
     | [0-9]+
     ;
@@ -90,13 +97,7 @@ fragment ExponentPart
     : [eE] [+\-]? [0-9]+
     ;
 
-BooleanLiteral
-    : 'true'
-    | 'false'
-    ;
-
 QUOTE                               : '"'       -> pushMode(TEMPLATE);
-NULL                                : 'null';
 
 // Lexical Elements - Operators and Delimiters
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#operators-and-delimiters
@@ -129,6 +130,7 @@ MOD                             : '%';
 ELLIPSIS                        : '...';
 TILDE                           : '~';
 
+
 // ----------------------------------------------------------------------------------------------
 mode TEMPLATE;
 // ----------------------------------------------------------------------------------------------
@@ -142,8 +144,10 @@ TemplateStringLiteral
 
 TemplateStringLiteralChar
     : ~[\n\r%$"]
-    | '$' ~[{]
-    | '%' ~[{]
+    | '$' '$'
+    | '$' {_input.LA(1) != '{'}?
+    | '%' '%'
+    | '%' {_input.LA(1) != '{'}?
     | EscapeSequence
     ;
 

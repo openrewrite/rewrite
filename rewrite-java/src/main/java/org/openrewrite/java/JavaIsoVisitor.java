@@ -195,6 +195,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
+    }
+
+    @Override
     public J.IntersectionType visitIntersectionType(J.IntersectionType intersectionType, P p) {
         return (J.IntersectionType) super.visitIntersectionType(intersectionType, p);
     }
@@ -207,6 +212,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public J.Lambda visitLambda(J.Lambda lambda, P p) {
         return (J.Lambda) super.visitLambda(lambda, p);
+    }
+
+    @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        return (J.Lambda.Parameters) super.visitLambdaParameters(parameters, p);
     }
 
     @Override
@@ -227,6 +237,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         return (J.MethodInvocation) super.visitMethodInvocation(method, p);
+    }
+
+    @Override
+    public J.Modifier visitModifier(J.Modifier modifier, P p) {
+        return (J.Modifier) super.visitModifier(modifier, p);
     }
 
     @Override
@@ -268,6 +283,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
         return (J.Parentheses<T>) super.visitParentheses(parens, p);
+    }
+
+    @Override
+    public J.ParenthesizedTypeTree visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        return (J.ParenthesizedTypeTree) super.visitParenthesizedTypeTree(parTree, p);
     }
 
     @Override
@@ -326,6 +346,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        return (J.TypeParameters) super.visitTypeParameters(typeParameters, p);
+    }
+
+    @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         return (J.Unary) super.visitUnary(unary, p);
     }
@@ -359,4 +384,10 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
     }
+
+    @Override
+    public J.Erroneous visitErroneous(J.Erroneous erroneous, P p) {
+        return (J.Erroneous) super.visitErroneous(erroneous, p);
+    }
+
 }

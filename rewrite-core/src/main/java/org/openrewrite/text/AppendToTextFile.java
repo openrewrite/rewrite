@@ -17,8 +17,8 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
-    @Option(displayName = "Relative File Name",
+    @Option(displayName = "Relative file name",
             description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",
             example = "foo/bar/baz.txt")
     String relativeFileName;
@@ -53,12 +53,12 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable Boolean appendNewline;
 
     @Option(displayName = "Existing file strategy",
-            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n"
-                          + "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
-                          + "- `Replace`: remove existing content from file.\n"
-                          + "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n"
-                          + "Note: this only affects the first interaction with the specified file per Rewrite execution.\n"
-                          + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
+            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n" +
+                          "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
+                          "- `Replace`: remove existing content from file.\n" +
+                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n" +
+                          "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
+                          "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"Continue", "Replace", "Leave"},
             required = false)
     @Nullable Strategy existingFileStrategy;

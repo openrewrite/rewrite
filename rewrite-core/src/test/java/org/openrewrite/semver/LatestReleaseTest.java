@@ -50,6 +50,12 @@ class LatestReleaseTest {
     }
 
     @Test
+    void datetimeVersion() {
+        assertThat(latestRelease.compare(null, "20230504141934.0.0", "20241212141934.0.0")).isNegative();
+        assertThat(latestRelease.compare(null, "20230504141934", "20241212141934")).isNegative();
+    }
+
+    @Test
     void others() {
         assertThat(latestRelease.compare(null, "2.5.6.SEC03", "6.0.4")).isLessThan(0);
     }
@@ -99,6 +105,43 @@ class LatestReleaseTest {
     }
 
     @Test
+    void releaseOrLatestKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "RELEASE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "RELEASE")).isNegative();
+        assertThat(latestRelease.compare(null, "RELEASE", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "RELEASE", "RELEASE")).isZero();
+
+        assertThat(latestRelease.compare(null, "LATEST", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "LATEST")).isNegative();
+        assertThat(latestRelease.compare(null, "LATEST", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "LATEST", "LATEST")).isZero();
+
+        assertThat(latestRelease.compare(null, "reLeaSE", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void compareQualifiers() {
+        assertThat(latestRelease.compare(null, "1.2.3.final", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.ga", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.release", "1.2.3")).isEqualTo(0);
+
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3.alpha-2")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.m", "1.2.3")).isNegative();
+
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3.final")).isPositive();
+
+        assertThat(latestRelease.compare(null, "1.2.3.mr", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void latestKeywordIsNewerThanReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
+        assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
+    }
+
+    @Test
     void guavaVariants() {
         assertThat(latestRelease.compare("1.0", "25.0-jre", "29.0-jre")).isLessThan(0);
     }
@@ -145,5 +188,16 @@ class LatestReleaseTest {
     @Test
     void matchCustomMetadata() {
         assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+    }
+
+    @Test
+    void preReleaseVersionsShouldBeLessThanReleaseVersions() {
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-RC2")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-alpha", "3.5.0-beta")).isLessThan(0);
+        // "RC" is a known qualifier and "beta" is not
+        assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isGreaterThan(0);
     }
 }

@@ -17,15 +17,16 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddOrUpdateChild;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -37,7 +38,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toCollection;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.RemoveRedundantDependencyVersions.Comparator.GTE;
+import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -74,7 +79,8 @@ public class ChangeParentPom extends Recipe {
     String newVersion;
 
     @Option(displayName = "Old relative path",
-            description = "The relativePath of the maven parent pom to be changed away from.",
+            description = "The relativePath of the maven parent pom to be changed away from. " +
+                          "Use an empty String to match `<relativePath />`, use `../pom.xml` to match the default value.",
             example = "../../pom.xml",
             required = false)
     @Nullable
@@ -114,7 +120,10 @@ public class ChangeParentPom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml. Identifies the parent pom to be changed by its groupId and artifactId.";
+        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, "
+                + "and updating it to a new groupId, artifactId, version, and optional relativePath. "
+                + "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. "
+                + "Removes redundant dependency versions already managed by the new parent.";
     }
 
     @Override
@@ -158,7 +167,7 @@ public class ChangeParentPom extends Recipe {
 
                     if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
                         matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId) &&
-                        (oldRelativePath == null || matchesGlob(resolvedPom.getValue(tag.getChildValue("relativePath").orElse(null)), oldRelativePath))) {
+                        (oldRelativePath == null || matchesGlob(determineRelativePath(tag, resolvedPom), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
                         String currentGroupId = tag.getChildValue("groupId").orElse(oldGroupId);
@@ -205,15 +214,21 @@ public class ChangeParentPom extends Recipe {
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
                             Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
-                                if(!newParentProps.containsKey(propInUse.getKey())) {
-                                    changeParentTagVisitors.add(new UnconditionalAddProperty(propInUse.getKey(), propInUse.getValue()));
+                                if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
+                                    changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
                                 }
                             }
 
                             // Update or add relativePath
-                            if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath)) {
-                                changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
-                            } else if (mismatches(tag.getChild("relativePath").orElse(null), targetRelativePath)) {
+                            Optional<Xml.Tag> existingRelativePath = t.getChild("relativePath");
+                            if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath) && existingRelativePath.isPresent()) {
+                                if (StringUtils.isBlank(targetRelativePath)) {
+                                    // ChangeTagValueVisitor would keep the closing tag
+                                    changeParentTagVisitors.add(new AddOrUpdateChild<>(t, Xml.Tag.build("<relativePath />")));
+                                } else {
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(existingRelativePath.get(), targetRelativePath));
+                                }
+                            } else if (mismatches(existingRelativePath.orElse(null), targetRelativePath)) {
                                 final Xml.Tag relativePathTag;
                                 if (StringUtils.isBlank(targetRelativePath)) {
                                     relativePathTag = Xml.Tag.build("<relativePath />");
@@ -229,8 +244,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null,
-                                        RemoveRedundantDependencyVersions.Comparator.GTE, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, null).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
                             for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
@@ -245,7 +259,7 @@ public class ChangeParentPom extends Recipe {
                 return t;
             }
 
-            private boolean mismatches(@Nullable Xml.Tag relativePath, @Nullable String targetRelativePath) {
+            private boolean mismatches(Xml.@Nullable Tag relativePath, @Nullable String targetRelativePath) {
                 if (relativePath == null) {
                     return targetRelativePath != null;
                 }
@@ -266,7 +280,7 @@ public class ChangeParentPom extends Recipe {
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
                             .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) <= 0)
-                            .collect(Collectors.toList());
+                            .collect(toList());
                 }
                 if (Boolean.TRUE.equals(allowVersionDowngrades)) {
                     return availableVersions.stream()
@@ -281,22 +295,28 @@ public class ChangeParentPom extends Recipe {
         });
     }
 
-    private static Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
+    private static @Nullable String determineRelativePath(Xml.Tag tag, ResolvedPom resolvedPom) {
+        Optional<Xml.Tag> relativePath = tag.getChild("relativePath");
+        if (relativePath.isPresent()) {
+            return resolvedPom.getValue(relativePath.get().getValue().orElse(""));
+        }
+        return DEFAULT_RELATIVE_PATH;
+    }
+
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
-        Map<String, String> properties = new HashMap<>();
-        new MavenIsoVisitor<ExecutionContext>() {
-
+        return new MavenIsoVisitor<Map<String, String>>() {
             @Nullable
             ResolvedPom resolvedPom = null;
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
+            public Xml.Tag visitTag(Xml.Tag tag, Map<String, String> properties) {
+                Xml.Tag t = super.visitTag(tag, properties);
+                if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
                     Matcher m = PROPERTY_PATTERN.matcher(text);
-                    while(m.find()) {
-                        if(resolvedPom == null) {
+                    while (m.find()) {
+                        if (resolvedPom == null) {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
@@ -309,28 +329,31 @@ public class ChangeParentPom extends Recipe {
             }
 
             private boolean isGlobalProperty(String propertyName) {
-                return propertyName.startsWith("project.") || propertyName.startsWith("env.")
-                        || propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
+                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
             }
-        }.visit(pomXml, ctx);
-        return properties;
+        }.reduce(pomXml, new HashMap<>());
     }
 
     private List<ResolvedManagedDependency> getDependenciesUnmanagedByNewParent(MavenResolutionResult mrr, ResolvedPom newParent) {
         ResolvedPom resolvedPom = mrr.getPom();
 
         // Dependencies managed by the current pom's own dependency management are irrelevant to parent upgrade
-        List<ManagedDependency> locallyManaged = mrr.getPom().getRequested().getDependencyManagement();
+        List<ManagedDependency> locallyManaged = resolvedPom.getRequested().getDependencyManagement();
 
         Set<GroupArtifactVersion> requestedWithoutExplicitVersion = resolvedPom.getRequested().getDependencies().stream()
                 .filter(dep -> dep.getVersion() == null)
                 // Dependencies explicitly managed by the current pom require no changes
                 .filter(dep -> locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getGroupId()) && localManagedDep.getArtifactId().equals(dep.getArtifactId())))
+                        .noneMatch(it -> {
+                            String groupId = resolvedPom.getValue(it.getGroupId());
+                            String artifactId = resolvedPom.getValue(it.getArtifactId());
+                            return dep.getGroupId().equals(groupId) && dep.getArtifactId().equals(artifactId);
+                        }))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .collect(toCollection(LinkedHashSet::new));
 
-        if(requestedWithoutExplicitVersion.isEmpty()) {
+        if (requestedWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -338,10 +361,14 @@ public class ChangeParentPom extends Recipe {
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
                 // Exclude dependencies managed by a bom imported by the current pom
                 .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
-                .collect(Collectors.toList());
+                        .noneMatch(it -> {
+                            String groupId = resolvedPom.getValue(it.getGroupId());
+                            String artifactId = resolvedPom.getValue(it.getArtifactId());
+                            return dep.getBomGav().getGroupId().equals(groupId) && dep.getBomGav().getArtifactId().equals(artifactId);
+                        }))
+                .collect(toList());
 
-        if(depsWithoutExplicitVersion.isEmpty()) {
+        if (depsWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -350,45 +377,8 @@ public class ChangeParentPom extends Recipe {
                 .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
                 .collect(Collectors.toSet());
 
-        depsWithoutExplicitVersion = depsWithoutExplicitVersion.stream()
+        return depsWithoutExplicitVersion.stream()
                 .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
-                .collect(Collectors.toList());
-        return depsWithoutExplicitVersion;
-    }
-
-
-
-    @Value
-    @EqualsAndHashCode(callSuper = false)
-    private static class UnconditionalAddProperty extends MavenIsoVisitor<ExecutionContext> {
-        String key;
-        String value;
-        @Override
-        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            Xml.Document d = super.visitDocument(document, ctx);
-            Xml.Tag root = d.getRoot();
-            Optional<Xml.Tag> properties = root.getChild("properties");
-            if (!properties.isPresent()) {
-                Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
-                d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-            } else if (!properties.get().getChildValue(key).isPresent()) {
-                Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
-                d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
-            }
-            if (d != document) {
-                maybeUpdateModel();
-            }
-            return d;
-        }
-
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = super.visitTag(tag, ctx);
-            if (isPropertyTag() && key.equals(tag.getName())
-                && !value.equals(tag.getValue().orElse(null))) {
-                t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
-            }
-            return t;
-        }
+                .collect(toList());
     }
 }

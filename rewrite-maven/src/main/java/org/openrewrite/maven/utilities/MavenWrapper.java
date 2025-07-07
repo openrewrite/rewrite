@@ -15,18 +15,21 @@
  */
 package org.openrewrite.maven.utilities;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -50,7 +53,7 @@ public class MavenWrapper {
                                                     "# \"License\"); you may not use this file except in compliance\n" +
                                                     "# with the License.  You may obtain a copy of the License at\n" +
                                                     "# \n" +
-                                                    "#   http://www.apache.org/licenses/LICENSE-2.0\n" +
+                                                    "#   https://www.apache.org/licenses/LICENSE-2.0\n" +
                                                     "# \n" +
                                                     "# Unless required by applicable law or agreed to in writing,\n" +
                                                     "# software distributed under the License is distributed on an\n" +
@@ -78,6 +81,8 @@ public class MavenWrapper {
     String distributionVersion;
     String distributionUri;
     Checksum distributionChecksum;
+
+    private final static Cache<URI, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
 
     public static MavenWrapper create(
             @Nullable String wrapperVersion,
@@ -131,29 +136,31 @@ public class MavenWrapper {
                     .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven distribution version to select from."));
             String resolvedDistributionUri = getDownloadUriFor(repository, distributionGroupArtifact, resolvedDistributionVersion, "bin", "zip");
 
-            Remote wrapperJar = (Remote) Checksum.sha256(Remote.builder(
-                    WRAPPER_JAR_LOCATION,
-                    URI.create(resolvedWrapperUri)
-            ).build(), ctx);
-
-            Remote mavenDistribution = (Remote) Checksum.sha256(Remote.builder(
-                    Paths.get(""),
-                    URI.create(resolvedDistributionUri)
-            ).build(), ctx);
-
+            Checksum wrapperJarChecksum = retrieveChecksumUsingCache(Remote.builder(WRAPPER_JAR_LOCATION).build(URI.create(resolvedWrapperUri)), ctx);
+            Checksum mavenDistributionChecksum = retrieveChecksumUsingCache(Remote.builder(Paths.get("")).build(URI.create(resolvedDistributionUri)), ctx);
             return new MavenWrapper(
                     resolvedWrapperVersion,
                     resolvedWrapperUri,
-                    wrapperJar.getChecksum(),
+                    requireNonNull(wrapperJarChecksum),
                     resolvedWrapperDistributionUri,
                     wrapperDistributionType,
                     resolvedDistributionVersion,
                     resolvedDistributionUri,
-                    mavenDistribution.getChecksum()
+                    requireNonNull(mavenDistributionChecksum)
             );
         } catch (MavenDownloadingException e) {
             throw new RuntimeException("Could not get Maven versions at: " + repository.getUri(), e);
         }
+    }
+
+    private static Checksum retrieveChecksumUsingCache(RemoteFile remote, ExecutionContext ctx) {
+        Checksum ret = artifactChecksumCache.getIfPresent(remote.getUri());
+        if (ret != null) {
+            return ret;
+        }
+        ret = Checksum.sha256(remote, ctx).getChecksum();
+        artifactChecksumCache.put(remote.getUri(), ret);
+        return ret;
     }
 
     public String getWrapperUrl() {
@@ -165,45 +172,33 @@ public class MavenWrapper {
     }
 
     public Remote wrapperJar() {
-        return Remote.builder(
-                WRAPPER_JAR_LOCATION,
-                URI.create(wrapperUri)
-        ).build();
+        return Remote.builder(WRAPPER_JAR_LOCATION)
+                .build(URI.create(wrapperUri));
     }
 
     public Remote wrapperJar(SourceFile previous) {
-        return Remote.builder(
-                previous,
-                URI.create(wrapperUri)
-        ).build();
+        return Remote.builder(previous)
+                .build(URI.create(wrapperUri));
     }
 
     public Remote wrapperDownloader() {
-        return Remote.builder(
-                WRAPPER_DOWNLOADER_LOCATION,
-                URI.create(wrapperDistributionUri)
-        ).build(".mvn/wrapper/MavenWrapperDownloader.java");
+        return Remote.builder(WRAPPER_DOWNLOADER_LOCATION)
+                .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote wrapperDownloader(SourceFile previous) {
-        return Remote.builder(
-                previous,
-                URI.create(wrapperDistributionUri)
-        ).build(".mvn/wrapper/MavenWrapperDownloader.java");
+        return Remote.builder(previous)
+                .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote mvnw() {
-        return Remote.builder(
-                WRAPPER_SCRIPT_LOCATION,
-                URI.create(wrapperDistributionUri)
-        ).build("mvnw");
+        return Remote.builder(WRAPPER_SCRIPT_LOCATION)
+                .build(URI.create(wrapperDistributionUri), "mvnw");
     }
 
     public Remote mvnwCmd() {
-        return Remote.builder(
-                WRAPPER_BATCH_LOCATION,
-                URI.create(wrapperDistributionUri)
-        ).build("mvnw.cmd");
+        return Remote.builder(WRAPPER_BATCH_LOCATION)
+                .build(URI.create(wrapperDistributionUri), "mvnw.cmd");
     }
 
     private static String getDownloadUriFor(MavenRepository repository, GroupArtifact ga, String version, @Nullable String classifier, String extension) {

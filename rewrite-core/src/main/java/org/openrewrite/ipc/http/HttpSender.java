@@ -24,10 +24,9 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
@@ -74,12 +73,16 @@ public interface HttpSender {
         private final byte[] entity;
         private final Method method;
         private final Map<String, String> requestHeaders;
+        private final Duration connectTimeout;
+        private final Duration readTimeout;
 
-        public Request(URL url, byte[] entity, Method method, Map<String, String> requestHeaders) {
+        public Request(URL url, byte[] entity, Method method, Map<String, String> requestHeaders, Duration connectTimeout, Duration readTimeout) {
             this.url = url;
             this.entity = entity;
             this.method = method;
             this.requestHeaders = requestHeaders;
+            this.connectTimeout = connectTimeout;
+            this.readTimeout = readTimeout;
         }
 
         public URL getUrl() {
@@ -96,6 +99,14 @@ public interface HttpSender {
 
         public Map<String, String> getRequestHeaders() {
             return requestHeaders;
+        }
+
+        public Duration getConnectTimeout() {
+            return connectTimeout;
+        }
+
+        public Duration getReadTimeout() {
+            return readTimeout;
         }
 
         public static Builder build(String uri, HttpSender sender) {
@@ -116,15 +127,19 @@ public interface HttpSender {
 
         @SuppressWarnings("UnusedReturnValue")
         public static class Builder {
-            private static final String APPLICATION_JSON = "application/json";
-            private static final String TEXT_PLAIN = "text/plain";
+            public static final String APPLICATION_JSON = "application/json";
+            public static final String TEXT_PLAIN = "text/plain";
+            private static final String CRLF = "\r\n";
 
             private final HttpSender sender;
             private final Map<String, String> requestHeaders = new LinkedHashMap<>();
+            private final String multipartBoundary = UUID.randomUUID().toString();
 
             private URL url;
             private byte[] entity = new byte[0];
             private Method method;
+            private Duration connectTimeout;
+            private Duration readTimeout;
 
             Builder(String url, HttpSender sender) {
                 try {
@@ -205,23 +220,23 @@ public interface HttpSender {
             /**
              * Set the request body.
              *
-             * @param type    The value of the "Content-Type" header to add.
+             * @param contentType    The value of the "Content-Type" header to add.
              * @param content The request body.
              * @return This request builder.
              */
-            public final Builder withContent(String type, String content) {
-                return withContent(type, content.getBytes(StandardCharsets.UTF_8));
+            public final Builder withContent(String contentType, String content) {
+                return withContent(contentType, content.getBytes(StandardCharsets.UTF_8));
             }
 
             /**
              * Set the request body.
              *
-             * @param type    The value of the "Content-Type" header to add.
+             * @param contentType    The value of the "Content-Type" header to add.
              * @param content The request body.
              * @return This request builder.
              */
-            public final Builder withContent(String type, byte[] content) {
-                withHeader("Content-Type", type);
+            public final Builder withContent(String contentType, byte[] content) {
+                withHeader("Content-Type", contentType);
                 entity = content;
                 return this;
             }
@@ -238,11 +253,11 @@ public interface HttpSender {
             /**
              * Add accept header.
              *
-             * @param type The value of the "Accept" header to add.
+             * @param contentType The value of the "Accept" header to add.
              * @return This request builder.
              */
-            public Builder accept(String type) {
-                return withHeader("Accept", type);
+            public Builder accept(String contentType) {
+                return withHeader("Accept", contentType);
             }
 
             /**
@@ -277,36 +292,86 @@ public interface HttpSender {
              * @throws IOException If compression fails.
              */
             public final Builder compressWhen(Supplier<Boolean> when) throws IOException {
-                if (when.get())
+                if (when.get()) {
                     return compress();
+                }
                 return this;
             }
 
-            public final Builder withMultipartFile(File file) throws IOException {
-                String boundary = UUID.randomUUID().toString();
-                String contentType = "multipart/form-data; boundary=" + boundary;
-                byte[] content = multipart(boundary, file);
-                return withContent(contentType, content);
+            /**
+             * Adds a part to a multipart/form-data request body.
+             *
+             * @param contentType      The "Content-Type" of the part.
+             * @param name      The name of the part.
+             * @param content   The part contents.
+             * @return This request builder.
+             */
+            public final Builder withMultipartContent(String contentType, String name, String content) throws IOException {
+                StringBuilder builder = new StringBuilder(1024);
+                builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"").append(CRLF);
+                builder.append("Content-Type: ").append(contentType).append(CRLF).append(CRLF);
+                builder.append(content);
+                return withMultipartContent(builder.toString().getBytes());
             }
 
-            private byte[] multipart(String boundary, File file) throws IOException {
+            /**
+             * @deprecated Use withMultipartFile(Path, String) instead.
+             */
+            @Deprecated
+            public final Builder withMultipartFile(File file) throws IOException {
+                return withMultipartFile(file.toPath(), "file");
+            }
+
+            /**
+             * Adds a file part to a multipart/form-data request body.
+             *
+             * @param path      Path of file to add to part.
+             * @param name      The name of the part.
+             * @return This request builder.
+             * @throws IOException If the file path cannot be read.
+             */
+            public final Builder withMultipartFile(Path path, String name) throws IOException {
+                return withMultipartContent(multipart(path, name));
+            }
+
+            private byte[] multipart(Path path, String name) throws IOException {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                String mimeType = Files.probeContentType(file.toPath());
-                if (mimeType == null) {
-                    mimeType = "application/octet-stream";
+                String mimeType = Optional.ofNullable(Files.probeContentType(path)).orElse("application/octet-stream");
+                StringBuilder builder = new StringBuilder(512);
+                builder.append("Content-Disposition: form-data; name=\"")
+                        .append(name)
+                        .append("\"; filename=\"")
+                        .append(path.getFileName())
+                        .append("\"")
+                        .append(CRLF);
+                builder.append("Content-Type: ").append(mimeType).append(CRLF).append(CRLF);
+                outputStream.write(builder.toString().getBytes());
+
+                try (InputStream inputStream = Files.newInputStream(path)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
                 }
-                outputStream.write(("--" + boundary + "\r\n").getBytes());
-                outputStream.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n").getBytes());
-                outputStream.write(("Content-Type: " + mimeType + "\r\n").getBytes());
-                outputStream.write(("\r\n--" + boundary + "--\r\n").getBytes());
-                FileInputStream fileInputStream = new FileInputStream(file);
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-                fileInputStream.close();
                 return outputStream.toByteArray();
+            }
+
+            private Builder withMultipartContent(byte[] content) throws IOException {
+                withHeader("Content-Type", "multipart/form-data; boundary=" + multipartBoundary);
+
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                if (entity.length == 0) {
+                    outputStream.write(("--" + multipartBoundary + CRLF).getBytes());
+                } else {
+                    outputStream.write(entity, 0, entity.length - 4);
+                    outputStream.write('\r');
+                    outputStream.write('\n');
+                }
+                outputStream.write(content);
+                outputStream.write((CRLF + "--" + multipartBoundary + "--" + CRLF).getBytes());
+                entity = outputStream.toByteArray();
+                return this;
             }
 
             private static byte[] gzip(byte[] data) throws IOException {
@@ -331,7 +396,17 @@ public interface HttpSender {
             }
 
             public Request build() {
-                return new Request(url, entity, method, requestHeaders);
+                return new Request(url, entity, method, requestHeaders, connectTimeout, readTimeout);
+            }
+
+            public Builder withConnectTimeout(Duration connectTimeout) {
+                this.connectTimeout = connectTimeout;
+                return this;
+            }
+
+            public Builder withReadTimeout(Duration readTimeout) {
+                this.readTimeout = readTimeout;
+                return this;
             }
         }
     }

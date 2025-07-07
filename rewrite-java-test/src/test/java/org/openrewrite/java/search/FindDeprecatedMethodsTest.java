@@ -32,6 +32,35 @@ class FindDeprecatedMethodsTest implements RewriteTest {
         spec.recipe(new FindDeprecatedMethods(null, null));
     }
 
+    @DocumentExample
+    @Test
+    void findDeprecations() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          test(n + 1);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          /*~~>*/test(n + 1);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
@@ -63,40 +92,11 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   @Deprecated
                   void test(int n) {
                   }
-                  
+              
                   Test() {
                       int n = 1;
                       if(n == 1) {
                           test(n + 1);
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findDeprecations() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          test(n + 1);
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          /*~~>*/test(n + 1);
                       }
                   }
               }
@@ -234,7 +234,6 @@ class FindDeprecatedMethodsTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-                            
               public class Foo {
                   @Deprecated
                   public void foo() {

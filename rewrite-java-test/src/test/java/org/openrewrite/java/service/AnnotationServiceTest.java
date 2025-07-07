@@ -34,7 +34,7 @@ class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import javax.annotation.processing.Generated;
-                            
+              
               @SuppressWarnings("all")
               public @Generated("foo") class T {}
               """,
@@ -68,7 +68,7 @@ class AnnotationServiceTest implements RewriteTest {
               import java.lang.annotation.*;
               
               import static java.lang.annotation.ElementType.*;
-                            
+              
               class T {
                   public @A1 Integer @A2 [] arg;
               }
@@ -159,9 +159,9 @@ class AnnotationServiceTest implements RewriteTest {
               import java.lang.annotation.*;
               
               import static java.lang.annotation.ElementType.*;
-                            
+              
               class T {
-                  java. lang. @Ann Map arg;
+                  java. lang. @Ann Integer arg;
               }
 
               @Retention(RetentionPolicy.RUNTIME)

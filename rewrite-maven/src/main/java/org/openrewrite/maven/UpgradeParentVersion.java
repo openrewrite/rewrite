@@ -18,8 +18,8 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
 @Getter
@@ -49,6 +49,12 @@ public class UpgradeParentVersion extends Recipe {
             required = false)
     @Nullable
     String versionPattern;
+
+    @Option(displayName = "Only external",
+            description = "Only upgrade `<parent>` if external to the project, i.e. it has an empty `<relativePath>`. Defaults to `false`.",
+            required = false)
+    @Nullable
+    Boolean onlyExternal;
 
     @Override
     public String getDisplayName() {
@@ -82,7 +88,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
+        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, Boolean.TRUE.equals(onlyExternal) ? "" : null, null,
                 versionPattern, false);
     }
 }

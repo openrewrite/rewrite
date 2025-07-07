@@ -33,7 +33,7 @@ package org.openrewrite.java.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
@@ -90,8 +90,7 @@ public class JLeftPadded<T> {
         }
     }
 
-    @Nullable
-    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
+    public static <T> @Nullable JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
         if (element == null) {
             return null;
         }

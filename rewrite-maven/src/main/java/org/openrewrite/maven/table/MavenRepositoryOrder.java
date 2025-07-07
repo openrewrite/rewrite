@@ -23,8 +23,7 @@ import org.openrewrite.Recipe;
 public class MavenRepositoryOrder extends DataTable<MavenRepositoryOrder.Row> {
 
     public MavenRepositoryOrder(Recipe recipe) {
-        super(recipe, MavenRepositoryOrder.Row.class,
-                MavenRepositoryOrder.class.getName(),
+        super(recipe,
                 "Maven repository order",
                 "The order in which dependencies will be resolved for each `pom.xml` based on its defined repositories and effective `settings.xml`.");
     }

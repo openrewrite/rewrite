@@ -16,14 +16,15 @@
 package org.openrewrite.hcl.internal.template;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @RequiredArgsConstructor
@@ -63,7 +64,7 @@ public class Substitutions {
         return ListUtils.map(js, this::unsubstitute);
     }
 
-    public <H extends Hcl> H unsubstitute(H j) {
+    public <H extends Hcl> @Nullable H unsubstitute(H j) {
         if (parameters.length == 0) {
             return j;
         }
@@ -79,8 +80,7 @@ public class Substitutions {
                 return super.visitExpression(expression, integer);
             }
 
-            @Nullable
-            private Hcl maybeParameter(Hcl h) {
+            private @Nullable Hcl maybeParameter(Hcl h) {
                 Integer param = parameterIndex(h.getPrefix());
                 if (param != null) {
                     Hcl h2 = (Hcl) parameters[param];
@@ -89,10 +89,9 @@ public class Substitutions {
                 return null;
             }
 
-            @Nullable
-            private Integer parameterIndex(Space space) {
+            private @Nullable Integer parameterIndex(Space space) {
                 for (Comment comment : space.getComments()) {
-                    java.util.regex.Matcher matcher = PATTERN_COMMENT.matcher(comment.getText());
+                    Matcher matcher = PATTERN_COMMENT.matcher(comment.getText());
                     if (matcher.matches()) {
                         return Integer.valueOf(matcher.group(1));
                     }

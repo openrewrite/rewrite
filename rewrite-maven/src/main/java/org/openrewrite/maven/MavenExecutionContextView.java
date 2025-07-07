@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
@@ -33,8 +33,6 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public class MavenExecutionContextView extends DelegatingExecutionContext {
-    private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
-
     private static final String MAVEN_SETTINGS = "org.openrewrite.maven.settings";
     private static final String MAVEN_ACTIVE_PROFILES = "org.openrewrite.maven.activeProfiles";
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
@@ -60,6 +58,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenExecutionContextView recordResolutionTime(Duration time) {
+        //noinspection DataFlowIssue
         this.computeMessage(MAVEN_RESOLUTION_TIME, time.toMillis(), () -> 0L, Long::sum);
         return this;
     }
@@ -93,7 +92,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && !mavenSettings.equals(getSettings())) {
+        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
             return mapMirrors(mavenSettings);
         }
         return getMirrors();
@@ -132,7 +131,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenPomCache getPomCache() {
-        return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
+        return (MavenPomCache) getMessages().computeIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
     }
 
     public MavenExecutionContextView setLocalRepository(MavenRepository localRepository) {
@@ -141,7 +140,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenRepository getLocalRepository() {
-        return getMessage(MAVEN_LOCAL_REPOSITORY, MAVEN_LOCAL_DEFAULT);
+        MavenRepository configuredProperty = getMessage(MAVEN_LOCAL_REPOSITORY);
+        if (configuredProperty != null) {
+            return configuredProperty;
+        }
+        MavenSettings settings = getSettings();
+        if (settings != null) {
+            return settings.getMavenLocal();
+        }
+        return MAVEN_LOCAL_DEFAULT;
     }
 
     public MavenExecutionContextView setAddLocalRepository(boolean useLocalRepository) {
@@ -149,8 +156,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public Boolean getAddLocalRepository() {
+    public @Nullable Boolean getAddLocalRepository() {
         return getMessage(MAVEN_ADD_LOCAL_REPOSITORY, null);
     }
 
@@ -159,8 +165,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public Boolean getAddCentralRepository() {
+    public @Nullable Boolean getAddCentralRepository() {
         return getMessage(MAVEN_ADD_CENTRAL_REPOSITORY);
     }
 
@@ -228,9 +233,23 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return this;
     }
 
-    @Nullable
-    public MavenSettings getSettings() {
+    public @Nullable MavenSettings getSettings() {
         return getMessage(MAVEN_SETTINGS, null);
+    }
+
+    /**
+     * The maven settings in effect are a combination of the settings defined in the context and the settings that
+     * were in effect when a given pom was parsed.
+     *
+     */
+    public @Nullable MavenSettings effectiveSettings(MavenResolutionResult mrr) {
+        MavenSettings effectiveSettings = getMessage(MAVEN_SETTINGS);
+        if (effectiveSettings == null) {
+            effectiveSettings = mrr.getMavenSettings();
+        } else {
+            effectiveSettings = effectiveSettings.merge(mrr.getMavenSettings());
+        }
+        return effectiveSettings;
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
@@ -256,25 +275,44 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static List<MavenRepositoryMirror> mapMirrors(MavenSettings settings) {
         if (settings.getMirrors() != null) {
             return settings.getMirrors().getMirrors().stream()
-                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
+                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots(), settings.getServers()))
                     .collect(Collectors.toList());
         }
         return emptyList();
     }
 
     private List<MavenRepository> mapRepositories(MavenSettings settings, List<String> activeProfiles) {
+        Map<String, MavenRepository> repositories = this.getRepositories().stream()
+                .collect(Collectors.toMap(MavenRepository::getId, r -> r, (a, b) -> a));
         return settings.getActiveRepositories(activeProfiles).stream()
                 .map(repo -> {
                     try {
-                        return new MavenRepository(
-                                repo.getId(),
-                                repo.getUrl(),
-                                repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
-                                repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
-                                null,
-                                null
-                        );
+                        MavenRepository knownRepo = repositories.get(repo.getId());
+                        if (knownRepo != null) {
+                            return new MavenRepository(
+                                    repo.getId(),
+                                    repo.getUrl(),
+                                    repo.getReleases() != null ? repo.getReleases().getEnabled() : knownRepo.getReleases(),
+                                    repo.getSnapshots() != null ? repo.getSnapshots().getEnabled() : knownRepo.getSnapshots(),
+                                    knownRepo.isKnownToExist() && knownRepo.getUri().equals(repo.getUrl()),
+                                    knownRepo.getUsername(),
+                                    knownRepo.getPassword(),
+                                    knownRepo.getTimeout(),
+                                    knownRepo.getDeriveMetadataIfMissing()
+                            );
+                        } else {
+                            return new MavenRepository(
+                                    repo.getId(),
+                                    repo.getUrl(),
+                                    repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
+                                    repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
+                                    null,
+                                    null,
+                                    null
+                            );
+                        }
                     } catch (Exception exception) {
+                        //noinspection DataFlowIssue
                         this.getOnError().accept(new MavenParsingException(
                                 "Unable to parse URL %s for Maven settings repository id %s",
                                 exception,

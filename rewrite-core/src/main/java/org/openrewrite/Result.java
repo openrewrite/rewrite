@@ -16,12 +16,14 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,7 +32,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.Tree.randomId;
 
 public class Result {
     /**
@@ -50,16 +54,15 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
-    @Getter
-    @Nullable
-    private final Duration timeSavings;
+    private final Duration potentialTimeSavings;
+    private @Nullable Duration timeSavings;
 
     public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<List<Recipe>> recipes) {
         this.before = before;
         this.after = after;
         this.recipes = recipes;
 
-        Duration timeSavings = null;
+        Duration timeSavings = Duration.ZERO;
         for (List<Recipe> recipesStack : recipes) {
             if (recipesStack != null && !recipesStack.isEmpty()) {
                 Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
@@ -69,20 +72,19 @@ public class Result {
                 }
             }
         }
-
-        this.timeSavings = timeSavings;
+        this.potentialTimeSavings = timeSavings;
     }
 
     public Result(@Nullable SourceFile before, SourceFile after) {
         this(before, after, after.getMarkers()
                 .findFirst(RecipesThatMadeChanges.class)
-                .orElseThrow(() -> new IllegalStateException(
-                        String.format(
-                                "Source file changed but no recipe " +
-                                "reported making a change. %s",
+                .orElseGet(() -> after.getMarkers()
+                        .findFirst(DeserializationError.class)
+                        .map(m -> new RecipesThatMadeChanges(randomId(), emptyList()))
+                        .orElseThrow(() -> new UnknownSourceFileChangeException(
+                                after,
                                 explainWhatChanged(before, after)
-                        )
-                ))
+                        )))
                 .getRecipes());
     }
 
@@ -133,6 +135,17 @@ public class Result {
                 return super.visit(tree, changed);
             }
         }.reduce(root, new AtomicBoolean(false)).get();
+    }
+
+    public Duration getTimeSavings() {
+        if (timeSavings == null) {
+            if (potentialTimeSavings.isZero() || isLocalAndHasNoChanges(before, after)) {
+                timeSavings = Duration.ZERO;
+            } else {
+                timeSavings = potentialTimeSavings;
+            }
+        }
+        return timeSavings;
     }
 
     /**
@@ -188,12 +201,12 @@ public class Result {
         return diff(relativeTo, null);
     }
 
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         return diff(relativeTo, markerPrinter, false);
     }
 
     @Incubating(since = "7.34.0")
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -230,8 +243,7 @@ public class Result {
         }
     }
 
-    @Nullable
-    public static String diff(String before, String after, Path path) {
+    public static @Nullable String diff(String before, String after, Path path) {
         String diff = null;
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 path,
@@ -252,5 +264,17 @@ public class Result {
     @Override
     public String toString() {
         return diff();
+    }
+
+    public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
+        try {
+            return (before == after) ||
+                    (before != null && after != null &&
+                            // Remote source files are fetched on `printAll`, let's avoid that cost.
+                            !(before instanceof Remote) && !(after instanceof Remote) &&
+                            before.printAll().equals(after.printAll()));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

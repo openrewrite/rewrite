@@ -18,8 +18,8 @@ package org.openrewrite.yaml;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
@@ -29,7 +29,7 @@ import java.nio.file.Path;
 @EqualsAndHashCode(callSuper = false)
 public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Option(displayName = "Old key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML key/value pair to copy.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML key/value pair to copy.",
             example = "$.source.kind")
     String oldKeyPath;
 
@@ -42,7 +42,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     String oldFilePath;
 
     @Option(displayName = "New key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression defining where the value should be written.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression defining where the value should be written.",
             example = "$.dest.kind")
     String newKey;
 
@@ -97,7 +97,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if(acc.snippet == null) {
+                if (acc.snippet == null) {
                     return super.visitDocuments(documents, ctx);
                 }
                 return documents;
@@ -113,8 +113,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 return source;
             }
         };
-        if(oldFilePath != null) {
-            visitor = Preconditions.check(new FindSourceFiles(oldFilePath).getVisitor(), visitor);
+        if (oldFilePath != null) {
+            visitor = Preconditions.check(new FindSourceFiles(oldFilePath), visitor);
         }
 
         return visitor;
@@ -122,16 +122,10 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if(acc.snippet == null) {
+        if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        TreeVisitor<?, ExecutionContext> visitor = new MergeYaml(newKey, acc.snippet, false, null).getVisitor();
-        if(newFilePath == null) {
-            visitor = Preconditions.check(new FindSourceFiles(acc.path.toString()).getVisitor(), visitor);
-        } else {
-            visitor = Preconditions.check(new FindSourceFiles(newFilePath).getVisitor(), visitor);
-        }
-
-        return visitor;
+        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
+                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, null).getVisitor());
     }
 }

@@ -17,16 +17,13 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -45,18 +42,25 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     String oldArtifactId;
 
     @Option(displayName = "New group ID",
-            description = "The new group ID to use. Defaults to the existing group ID.",
+            description = "The new group ID to use.",
             example = "corp.internal.openrewrite.recipe",
             required = false)
     @Nullable
     String newGroupId;
 
     @Option(displayName = "New artifact ID",
-            description = "The new artifact ID to use. Defaults to the existing artifact ID.",
+            description = "The new artifact ID to use.",
             example = "my-new-maven-plugin",
             required = false)
     @Nullable
-    String newArtifact;
+    String newArtifactId;
+
+    @Option(displayName = "New version",
+            description = "An exact version number.",
+            example = "29.X",
+            required = false)
+    @Nullable
+    String newVersion;
 
     @Override
     public String getDisplayName() {
@@ -65,12 +69,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s`", newGroupId, newArtifact);
+        return String.format("`%s:%s`", newGroupId, newArtifactId);
     }
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version. " +
+                "This recipe does not perform any validation and assumes all values passed are valid.";
     }
 
     @Override
@@ -84,8 +89,11 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     if (newGroupId != null) {
                         t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
-                    if (newArtifact != null) {
-                        t = changeChildTagValue(t, "artifactId", newArtifact, ctx);
+                    if (newArtifactId != null) {
+                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                    }
+                    if (newVersion != null) {
+                        t = changeChildTagValue(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
@@ -93,14 +101,6 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                 }
                 //noinspection ConstantConditions
                 return t;
-            }
-
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-                }
-                return tag;
             }
         };
     }

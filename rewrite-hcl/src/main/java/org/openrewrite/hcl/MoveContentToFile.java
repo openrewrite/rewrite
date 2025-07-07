@@ -17,11 +17,11 @@ package org.openrewrite.hcl;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.Space;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -118,8 +118,9 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
         Path dest = Paths.get(destinationPath);
 
         return Preconditions.check(acc.toMove != null, new HclIsoVisitor<ExecutionContext>() {
+
             @Override
-            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
+            public @Nullable BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
                 BodyContent b = super.visitBodyContent(bodyContent, ctx);
                 Path sourcePath = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class).getSourcePath();
                 if (sourcePath.equals(from) && pathMatcher.matches(getCursor())) {

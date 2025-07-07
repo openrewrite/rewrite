@@ -15,11 +15,13 @@
  */
 package org.openrewrite.xml.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import static org.openrewrite.format.LineBreaks.normalizeNewLines;
 
 public class NormalizeLineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     @Nullable
@@ -36,9 +38,8 @@ public class NormalizeLineBreaksVisitor<P> extends XmlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
-    @Nullable
     @Override
-    public Xml visit(@Nullable Tree tree, P p) {
+    public @Nullable Xml visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Xml) tree;
         }
@@ -52,27 +53,8 @@ public class NormalizeLineBreaksVisitor<P> extends XmlIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private static String normalizeNewLines(String text, boolean useCrlf) {
-        if (!text.contains("\n")) {
-            return text;
-        }
-        StringBuilder normalized = new StringBuilder();
-        char[] charArray = text.toCharArray();
-        for (int i = 0; i < charArray.length; i++) {
-            char c = charArray[i];
-            if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
-                normalized.append('\r').append('\n');
-            } else if (useCrlf || c != '\r') {
-                normalized.append(c);
-            }
-        }
-        return normalized.toString();
-    }
-
-
-    @Nullable
     @Override
-    public Xml postVisit(Xml tree, P p) {
+    public @Nullable Xml postVisit(Xml tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "stop", true);
         }

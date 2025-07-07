@@ -15,10 +15,10 @@
  */
 package org.openrewrite.groovy;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -118,6 +118,22 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, p));
         m = m.withType(visitType(m.getType(), p));
         return m;
+    }
+
+    public J visitUnary(G.Unary unary, P p) {
+        G.Unary u = unary;
+        u = u.withPrefix(visitSpace(u.getPrefix(), GSpace.Location.UNARY_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(u, p);
+        if (!(temp instanceof G.Unary)) {
+            return temp;
+        } else {
+            u = (G.Unary) temp;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, p));
+        u = u.withExpression(visitAndCast(u.getExpression(), p));
+        u = u.withType(visitType(u.getType(), p));
+        return u;
     }
 
     public J visitBinary(G.Binary binary, P p) {

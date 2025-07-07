@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -41,7 +42,8 @@ class ExecutionContextTest implements RewriteTest {
                   cycles.incrementAndGet();
                   return text;
               }
-          }).withCausesAnotherCycle(true)),
+          }).withCausesAnotherCycle(true))
+            .typeValidationOptions(TypeValidation.all().immutableExecutionContext(false)),
           text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);

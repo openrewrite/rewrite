@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import java.io.FileNotFoundException;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
@@ -25,6 +26,9 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
 
     public static final PT<TypeA> parameterizedField = new PT<TypeA>() {
     };
+
+    public static Double PI;
+    public static double PI_PRIMITIVE;
 
     public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
         public InheritedJavaTypeGoat() {
@@ -73,6 +77,9 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
     public abstract <U extends TypeA & PT<U> & C> U genericIntersection(U n);
     public abstract T genericT(T n); // remove after signatures are common.
     public abstract <U extends Extension<U> & Intersection<U>> void recursiveIntersection(U n);
+    public abstract <T> T nameShadow(T t);
+    public abstract void throwsException() throws FileNotFoundException;
+    public abstract <T extends FileNotFoundException> void throwsGenericException() throws T, InterruptedException;
 }
 
 interface C {

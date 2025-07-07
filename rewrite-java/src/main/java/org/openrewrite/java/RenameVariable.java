@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.RenameJavaDocParamNameVisitor;
 import org.openrewrite.java.tree.*;
 
@@ -43,7 +43,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywordUtils.isReservedKeyword(toName) && !JavaKeywordUtils.isReservedLiteral(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
@@ -90,7 +90,12 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             }
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
-                if (parent.getValue() instanceof J.FieldAccess) {
+                if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
+                        TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
+                    parent.putMessage("renamed", true);
+                    return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
+                } else if (parent.getValue() instanceof J.FieldAccess &&
+                        !ident.equals(((J.FieldAccess) parent.getValue()).getTarget())) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         if (ident.getFieldType() != null) {
                             ident = ident.withFieldType(ident.getFieldType().withName(newName));
@@ -149,53 +154,19 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         /**
-         * FieldAccess targets the variable if its target is an Identifier and either
-         * its target FieldType equals variable.Name.FieldType
-         * or its target Type equals variable.Name.FieldType.Owner
-         * or if FieldAccess targets a TypCast and either
-         * its type equals variable.Name.FieldType
-         * or its type equals variable.Name.FieldType.Owner.
-         * In case the FieldAccess targets another FieldAccess, the target is followed
-         * until it is either an Identifier or a TypeCast.
+         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
-            if (renameVariable.getName().getFieldType() != null) {
-                Expression target = getTarget(fieldAccess);
-                JavaType targetType = resolveType(target.getType());
+            if (renameVariable.getName().getFieldType() != null &&
+                    fieldAccess.getTarget().getType() != null) {
+                JavaType targetType = resolveType(fieldAccess.getTarget().getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
-                    return true;
-                }
-                if (target instanceof J.TypeCast) {
-                    return TypeUtils.isOfType(variableNameFieldType, targetType);
-                } else if (target instanceof J.Identifier) {
-                    return TypeUtils.isOfType(variableNameFieldType, ((J.Identifier) target).getFieldType());
-                }
+                return TypeUtils.isOfType(resolveType(variableNameFieldType.getOwner()), targetType);
             }
             return false;
         }
 
-        @Nullable
-        private Expression getTarget(J.FieldAccess fieldAccess) {
-            Expression target = fieldAccess.getTarget();
-            if (target instanceof J.Identifier) {
-                return target;
-            }
-            if (target instanceof J.FieldAccess) {
-                return getTarget((J.FieldAccess) target);
-            }
-            if (target instanceof J.Parentheses<?>) {
-                J tree = ((J.Parentheses<?>) target).getTree();
-                if (tree instanceof J.TypeCast) {
-                    return (J.TypeCast) tree;
-                }
-                return null;
-            }
-            return null;
-        }
-
-        @Nullable
-        private JavaType resolveType(@Nullable JavaType type) {
+        private @Nullable JavaType resolveType(@Nullable JavaType type) {
             return type instanceof JavaType.Parameterized ? ((JavaType.Parameterized) type).getType() : type;
         }
 
@@ -232,9 +203,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitCatch(_catch, p);
         }
 
-        @Nullable
         @Override
-        public J postVisit(J tree, P p) {
+        public @Nullable J postVisit(J tree, P p) {
             maybeChangeNameScope(tree);
             return super.postVisit(tree, p);
         }

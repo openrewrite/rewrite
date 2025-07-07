@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class ChangeDependencyTest implements RewriteTest {
@@ -278,7 +279,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j'
               }
-              """)
+              """
+          )
         );
     }
 
@@ -316,7 +318,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
               }
-              """)
+              """
+          )
         );
     }
 
@@ -354,7 +357,8 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
               }
-              """)
+              """
+          )
         );
     }
 
@@ -391,6 +395,129 @@ class ChangeDependencyTest implements RewriteTest {
                   providedCompile "org.apache.commons:commons-lang3:3.11"
                   providedRuntime "org.apache.commons:commons-lang3:3.11"
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void relocateDependencyInJvmTestSuite() {
+        rewriteRun(
+            spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+            buildGradle(
+                """
+                  plugins {
+                      id "java-library"
+                      id 'jvm-test-suite'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  testing {
+                      suites {
+                          test {
+                              dependencies {
+                                  implementation "commons-lang:commons-lang:2.6"
+                              }
+                          }
+                      }
+                  }
+                  """,
+                """
+                  plugins {
+                      id "java-library"
+                      id 'jvm-test-suite'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  testing {
+                      suites {
+                          test {
+                              dependencies {
+                                  implementation "org.apache.commons:commons-lang3:3.11"
+                              }
+                          }
+                      }
+                  }
+                  """
+            )
+        );
+    }
+
+    @Test
+    void kotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-lang:commons-lang:2.6")
+                  implementation(group = "commons-lang", name = "commons-lang", version = "2.6")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslStringInterpolation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
               }
               """
           )

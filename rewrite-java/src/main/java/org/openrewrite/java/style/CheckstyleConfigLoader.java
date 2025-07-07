@@ -19,7 +19,7 @@ import com.puppycrawl.tools.checkstyle.ConfigurationLoader;
 import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import com.puppycrawl.tools.checkstyle.api.Configuration;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.xml.sax.InputSource;
 
 import java.io.ByteArrayInputStream;
@@ -77,14 +77,15 @@ public class CheckstyleConfigLoader {
                                 noWhitespaceBeforeStyle(conf),
                                 operatorWrapStyle(conf),
                                 typecastParenPadStyle(conf),
-                                unnecessaryParentheses(conf))
+                                unnecessaryParentheses(conf),
+                                customImportOrderStyle(conf),
+                                unusedImportsStyles(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
                         .collect(toSet()));
     }
 
-    @Nullable
-    private static Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
+    private static @Nullable Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("DefaultComesLast");
         if (moduleList == null) {
             return null;
@@ -94,8 +95,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyBlock");
         if (moduleList == null) {
             return null;
@@ -144,8 +144,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyForInitializerPad");
         if (moduleList == null) {
             return null;
@@ -160,8 +159,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EmptyForIteratorPad");
         if (moduleList == null) {
             return null;
@@ -176,8 +174,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<EqualsAvoidsNullStyle> equalsAvoidsNull(Map<String, List<Module>> conf) {
+    private static @Nullable Set<EqualsAvoidsNullStyle> equalsAvoidsNull(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("EqualsAvoidNull");
         if (moduleList == null) {
             return null;
@@ -187,9 +184,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-
-    @Nullable
-    private static Set<FallThroughStyle> fallThrough(Map<String, List<Module>> conf) {
+    private static @Nullable Set<FallThroughStyle> fallThrough(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("FallThrough");
         if (moduleList == null) {
             return null;
@@ -199,8 +194,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<HiddenFieldStyle> hiddenFieldStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<HiddenFieldStyle> hiddenFieldStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("HiddenField");
         if (moduleList == null) {
             return null;
@@ -215,8 +209,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<MethodParamPadStyle> methodParamPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<MethodParamPadStyle> methodParamPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("MethodParamPad");
         if (moduleList == null) {
             return null;
@@ -234,8 +227,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NeedBracesStyle> needBracesStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NeedBracesStyle> needBracesStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NeedBraces");
         if (moduleList == null) {
             return null;
@@ -248,8 +240,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NoWhitespaceAfterStyle> noWhitespaceAfterStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NoWhitespaceAfterStyle> noWhitespaceAfterStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NoWhitespaceAfter");
         if (moduleList == null) {
             return null;
@@ -307,8 +298,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<NoWhitespaceBeforeStyle> noWhitespaceBeforeStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<NoWhitespaceBeforeStyle> noWhitespaceBeforeStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("NoWhitespaceBefore");
         if (moduleList == null) {
             return null;
@@ -352,8 +342,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<OperatorWrapStyle> operatorWrapStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<OperatorWrapStyle> operatorWrapStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("OperatorWrap");
         if (moduleList == null) {
             return null;
@@ -451,8 +440,7 @@ public class CheckstyleConfigLoader {
                 .collect(toSet());
     }
 
-    @Nullable
-    private static Set<TypecastParenPadStyle> typecastParenPadStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<TypecastParenPadStyle> typecastParenPadStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("TypecastParenPad");
         if (moduleList == null) {
             return null;
@@ -468,8 +456,7 @@ public class CheckstyleConfigLoader {
     }
 
     @SuppressWarnings("DuplicatedCode")
-    @Nullable
-    private static Set<UnnecessaryParenthesesStyle> unnecessaryParentheses(Map<String, List<Module>> conf) {
+    private static @Nullable Set<UnnecessaryParenthesesStyle> unnecessaryParentheses(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("UnnecessaryParentheses");
         if (moduleList == null) {
             return null;
@@ -536,8 +523,7 @@ public class CheckstyleConfigLoader {
                 .collect(Collectors.toSet());
     }
 
-    @Nullable
-    private static Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
+    private static @Nullable Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("HiddenField");
         if (moduleList == null) {
             return null;
@@ -545,6 +531,16 @@ public class CheckstyleConfigLoader {
         return moduleList.stream()
                 .map(module -> Checkstyle.hideUtilityClassConstructorStyle())
                 .collect(Collectors.toSet());
+    }
+
+    private static @Nullable Set<UnusedImportsStyle> unusedImportsStyles(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("UnusedImports");
+        if (moduleList == null) {
+            return null;
+        }
+        return moduleList.stream()
+            .map(module -> new UnusedImportsStyle(parseBoolean(module.properties.get("processJavadoc"))))
+            .collect(toSet());
     }
 
     protected static class Module {
@@ -567,8 +563,8 @@ public class CheckstyleConfigLoader {
         }
 
         public boolean prop(String key, boolean defaultValue) {
-            return properties.containsKey(key) ? parseBoolean(properties.get(key))
-                    : defaultValue;
+            return properties.containsKey(key) ? parseBoolean(properties.get(key)) :
+                    defaultValue;
         }
 
         @Override
@@ -579,15 +575,34 @@ public class CheckstyleConfigLoader {
         }
     }
 
-
-    @Nullable
-    private static Set<ExplicitInitializationStyle> explicitInitialization(Map<String, List<Module>> conf) {
+    private static @Nullable Set<ExplicitInitializationStyle> explicitInitialization(Map<String, List<Module>> conf) {
         List<Module> moduleList = conf.get("ExplicitInitialization");
         if (moduleList == null) {
             return null;
         }
         return moduleList.stream()
                 .map(module -> new ExplicitInitializationStyle(module.prop("onlyObjectReferences", false)))
+                .collect(Collectors.toSet());
+    }
+
+    private static @Nullable Set<CustomImportOrderStyle> customImportOrderStyle(Map<String, List<Module>> conf) {
+        List<Module> moduleList = conf.get("CustomImportOrder");
+        if (moduleList == null) {
+            return null;
+        }
+
+        return moduleList.stream()
+                .map(module -> {
+                    boolean separateLineBetweenGroups = parseBoolean(module.properties.get("separateLineBetweenGroups"));
+                    boolean sortImportsInGroupAlphabetically = parseBoolean(module.properties.get("sortImportsInGroupAlphabetically"));
+                    String specialImportsRegExp = module.properties.get("specialImportsRegExp");
+                    String standardPackageRegExp = module.properties.get("standardPackageRegExp");
+                    String thirdPartyPackageRegExp = module.properties.get("thirdPartyPackageRegExp");
+                    List<CustomImportOrderStyle.GroupWithDepth> customImportOrderRules = CustomImportOrderStyle
+                            .parseImportOrder(module.properties.get("customImportOrderRules"));
+                    return new CustomImportOrderStyle(customImportOrderRules, separateLineBetweenGroups, sortImportsInGroupAlphabetically,
+                            specialImportsRegExp, standardPackageRegExp, thirdPartyPackageRegExp);
+                })
                 .collect(Collectors.toSet());
     }
 

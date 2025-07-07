@@ -1,8 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-import org.gradle.internal.impldep.org.junit.platform.launcher.TagFilter.excludeTags
-
-
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -11,9 +8,11 @@ plugins {
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
@@ -25,7 +24,13 @@ dependencies {
     "javaTck"(project(":rewrite-java-tck"))
 }
 
-tasks.withType<JavaCompile> {
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_17.toString()
     targetCompatibility = JavaVersion.VERSION_17.toString()
@@ -44,7 +49,7 @@ tasks.withType<JavaCompile> {
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/ReloadableJava17JavadocVisitor**",
         "**/ReloadableJava17Parser**",
@@ -70,9 +75,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java21")
-                        }
+                        useJUnitPlatform()
                         testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

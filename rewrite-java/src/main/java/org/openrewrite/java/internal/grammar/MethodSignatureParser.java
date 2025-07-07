@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.*;
@@ -28,26 +28,26 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class MethodSignatureParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
+		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7,
+		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
 		Identifier=16;
 	public static final int
-		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
-		RULE_dotDot = 3, RULE_formalsPatternAfterDotDot = 4, RULE_optionalParensTypePattern = 5, 
-		RULE_targetTypePattern = 6, RULE_formalTypePattern = 7, RULE_classNameOrInterface = 8, 
+		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2,
+		RULE_dotDot = 3, RULE_formalsPatternAfterDotDot = 4, RULE_optionalParensTypePattern = 5,
+		RULE_targetTypePattern = 6, RULE_formalTypePattern = 7, RULE_classNameOrInterface = 8,
 		RULE_simpleNamePattern = 9;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot", 
-			"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
+			"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot",
+			"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern",
 			"formalTypePattern", "classNameOrInterface", "simpleNamePattern"
 		};
 	}
@@ -55,15 +55,15 @@ public class MethodSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'<constructor>'", "'('", "')'", "'['", "']'", "','", "'.'", "'!'", 
-			"'*'", "'&&'", "'||'", "'...'", "'..'", "'#'", "' '"
+			null, null, "'('", "')'", "'['", "']'", "','", "'.'", "'!'", "'*'", "'&&'",
+			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", 
-			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", 
+			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA",
+			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND",
 			"SPACE", "Identifier"
 		};
 	}
@@ -102,7 +102,7 @@ public class MethodSignatureParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "MethodSignatureParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -257,7 +257,7 @@ public class MethodSignatureParser extends Parser {
 			setState(36);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 74628L) != 0) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 74628L) != 0)) {
 				{
 				setState(35);
 				formalsPattern();
@@ -370,7 +370,7 @@ public class MethodSignatureParser extends Parser {
 						setState(48);
 						formalsPatternAfterDotDot();
 						}
-						} 
+						}
 					}
 					setState(53);
 					_errHandler.sync(this);
@@ -409,7 +409,7 @@ public class MethodSignatureParser extends Parser {
 						setState(62);
 						formalsPattern();
 						}
-						} 
+						}
 					}
 					setState(67);
 					_errHandler.sync(this);
@@ -564,7 +564,7 @@ public class MethodSignatureParser extends Parser {
 						setState(83);
 						formalsPatternAfterDotDot();
 						}
-						} 
+						}
 					}
 					setState(88);
 					_errHandler.sync(this);
@@ -705,7 +705,6 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		TargetTypePatternContext _localctx = new TargetTypePatternContext(_ctx, _parentState);
-		TargetTypePatternContext _prevctx = _localctx;
 		int _startState = 12;
 		enterRecursionRule(_localctx, 12, RULE_targetTypePattern, _p);
 		try {
@@ -742,7 +741,6 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
-					_prevctx = _localctx;
 					{
 					setState(113);
 					_errHandler.sync(this);
@@ -772,7 +770,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(117);
 				_errHandler.sync(this);
@@ -832,7 +830,6 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		FormalTypePatternContext _localctx = new FormalTypePatternContext(_ctx, _parentState);
-		FormalTypePatternContext _prevctx = _localctx;
 		int _startState = 14;
 		enterRecursionRule(_localctx, 14, RULE_formalTypePattern, _p);
 		try {
@@ -869,7 +866,6 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
-					_prevctx = _localctx;
 					{
 					setState(130);
 					_errHandler.sync(this);
@@ -899,7 +895,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(134);
 				_errHandler.sync(this);
@@ -971,7 +967,7 @@ public class MethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(136); 
+			setState(136);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -981,7 +977,7 @@ public class MethodSignatureParser extends Parser {
 					{
 					setState(135);
 					_la = _input.LA(1);
-					if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 74368L) != 0) ) {
+					if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 74368L) != 0)) ) {
 					_errHandler.recoverInline(this);
 					}
 					else {
@@ -995,7 +991,7 @@ public class MethodSignatureParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(138); 
+				setState(138);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -1011,7 +1007,7 @@ public class MethodSignatureParser extends Parser {
 					setState(141);
 					match(RBRACK);
 					}
-					} 
+					}
 				}
 				setState(146);
 				_errHandler.sync(this);
@@ -1086,7 +1082,7 @@ public class MethodSignatureParser extends Parser {
 						setState(149);
 						match(Identifier);
 						}
-						} 
+						}
 					}
 					setState(154);
 					_errHandler.sync(this);
@@ -1121,7 +1117,7 @@ public class MethodSignatureParser extends Parser {
 						setState(160);
 						match(WILDCARD);
 						}
-						} 
+						}
 					}
 					setState(165);
 					_errHandler.sync(this);

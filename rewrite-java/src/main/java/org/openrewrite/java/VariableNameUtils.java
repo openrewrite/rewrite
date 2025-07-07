@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import java.text.Normalizer;
@@ -50,7 +50,7 @@ public class VariableNameUtils {
         Set<String> namesInScope = findNamesInScope(scope);
         // Generate a new name to prevent namespace shadowing.
         String newName = baseName;
-        if (GenerationStrategy.INCREMENT_NUMBER.equals(strategy)) {
+        if (GenerationStrategy.INCREMENT_NUMBER == strategy) {
             StringBuilder postFix = new StringBuilder();
             char[] charArray = baseName.toCharArray();
             for (int i = charArray.length - 1; i >= 0; i--) {
@@ -64,7 +64,7 @@ public class VariableNameUtils {
 
             baseName = baseName.substring(0, baseName.length() - postFix.length());
             int count = postFix.length() == 0 ? 0 : Integer.parseInt(postFix.reverse().toString());
-            while (namesInScope.contains(newName) || JavaKeywords.isReserved(newName)) {
+            while (namesInScope.contains(newName) || JavaKeywordUtils.isReservedKeyword(newName) || JavaKeywordUtils.isReservedLiteral(newName)) {
                 newName = baseName + (count += 1);
             }
         }
@@ -119,7 +119,7 @@ public class VariableNameUtils {
         return names;
     }
 
-    private static void addInheritedClassFields(J.ClassDeclaration classDeclaration, @Nullable JavaType.FullyQualified superClass, Set<String> names) {
+    private static void addInheritedClassFields(J.ClassDeclaration classDeclaration, JavaType.@Nullable FullyQualified superClass, Set<String> names) {
         if (superClass != null) {
             boolean isSamePackage = classDeclaration.getType() != null && classDeclaration.getType().getPackageName().equals(superClass.getPackageName());
             superClass.getMembers().forEach(m -> {
@@ -263,6 +263,16 @@ public class VariableNameUtils {
             return super.visitVariable(variable, strings);
         }
 
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
+            J.Identifier v = super.visitIdentifier(identifier, namesInScope);
+            if (v.getType() instanceof JavaType.Class &&
+                    ((JavaType.Class) v.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
+                namesInScope.add(v.getSimpleName());
+            }
+            return v;
+        }
+
         private void addImportedStaticFieldNames(@Nullable JavaSourceFile cu, Cursor classCursor) {
             if (cu != null) {
                 List<J.Import> imports = cu.getImports();
@@ -281,70 +291,6 @@ public class VariableNameUtils {
         private boolean isValidImportName(@Nullable JavaType targetType, String name) {
             // Consider the id a valid field if the type is null since it is indistinguishable from a method name or class name.
             return targetType == null || (targetType instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) targetType).getMembers().stream().anyMatch(o -> o.getName().equals(name)));
-        }
-    }
-
-    static final class JavaKeywords {
-        JavaKeywords() {
-        }
-
-        private static final String[] RESERVED_WORDS = new String[]{
-                "abstract",
-                "assert",
-                "boolean",
-                "break",
-                "byte",
-                "case",
-                "catch",
-                "char",
-                "class",
-                "const",
-                "continue",
-                "default",
-                "do",
-                "double",
-                "else",
-                "enum",
-                "extends",
-                "final",
-                "finally",
-                "float",
-                "for",
-                "goto",
-                "if",
-                "implements",
-                "import",
-                "instanceof",
-                "int",
-                "interface",
-                "long",
-                "native",
-                "new",
-                "package",
-                "private",
-                "protected",
-                "public",
-                "return",
-                "short",
-                "static",
-                "strictfp",
-                "super",
-                "switch",
-                "synchronized",
-                "this",
-                "throw",
-                "throws",
-                "transient",
-                "try",
-                "void",
-                "volatile",
-                "while",
-        };
-
-        private static final Set<String> RESERVED_WORDS_SET = new HashSet<>(Arrays.asList(RESERVED_WORDS));
-
-        public static boolean isReserved(String word) {
-            return RESERVED_WORDS_SET.contains(word);
         }
     }
 }

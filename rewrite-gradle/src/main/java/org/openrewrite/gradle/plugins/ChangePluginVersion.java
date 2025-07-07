@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
@@ -27,22 +28,29 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.semver.Semver;
 
 import java.util.List;
 
+/**
+ * @deprecated in favor of {@link org.openrewrite.gradle.plugins.UpgradePluginVersion}.
+ */
 @Value
 @EqualsAndHashCode(callSuper = false)
+@Deprecated
 public class ChangePluginVersion extends Recipe {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -140,7 +148,7 @@ public class ChangePluginVersion extends Recipe {
                 }
 
                 try {
-                    String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
                             .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", selectedNewVersion, versionPattern, ctx);
                     if (resolvedVersion == null) {
                         return m;

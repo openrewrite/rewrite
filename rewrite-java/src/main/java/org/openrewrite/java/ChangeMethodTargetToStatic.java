@@ -18,8 +18,8 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -38,8 +38,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
      * See {@link  MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations. " +
-                          "The original method call may or may not be a static method invocation.",
+            description = "The original method call may or may not be a static method invocation. " + MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "com.google.common.collect.ImmutableSet of(..)")
     String methodPattern;
 
@@ -91,6 +90,11 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Override
     public String getDescription() {
         return "Change method invocations to static method calls.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

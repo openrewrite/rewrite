@@ -19,11 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavadocPrinter;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.marker.Markers;
@@ -44,8 +44,7 @@ public interface Javadoc extends Tree {
         return v instanceof JavadocVisitor;
     }
 
-    @Nullable
-    default <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+    default <P> @Nullable Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -334,8 +333,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J tree;
 
-        @Nullable
-        public Reference getTreeReference() {
+        public @Nullable Reference getTreeReference() {
             if (tree != null && treeReference == null) {
                 treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }
@@ -388,8 +386,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J name;
 
-        @Nullable
-        public Reference getNameReference() {
+        public @Nullable Reference getNameReference() {
             if (name != null && nameReference == null) {
                 nameReference = new Reference(Tree.randomId(), Markers.EMPTY, name, null);
             }
@@ -456,8 +453,7 @@ public interface Javadoc extends Tree {
         @Nullable
         J tree;
 
-        @Nullable
-        public Reference getTreeReference() {
+        public @Nullable Reference getTreeReference() {
             if (tree != null && treeReference == null) {
                 treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }

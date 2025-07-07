@@ -17,18 +17,16 @@ package org.openrewrite.maven.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 @JsonIgnoreType
 public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
 
     public DependenciesInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                DependenciesInUse.class.getName(),
-                "Dependencies in use", "Direct and transitive dependencies in use.");
+        super(recipe, "Dependencies in use", "Direct and transitive dependencies in use.");
     }
 
     @Value

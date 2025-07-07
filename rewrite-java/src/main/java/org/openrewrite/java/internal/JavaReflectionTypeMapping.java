@@ -16,7 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.tree.JavaType;
 
@@ -153,7 +153,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
                 for (Annotation a : clazz.getDeclaredAnnotations()) {
                     JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
-                    annotations.add(type);
+                    annotations.add(new JavaType.Annotation(type, emptyList()));
                 }
             }
 
@@ -248,8 +248,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         return gtv;
     }
 
-    @Nullable
-    private List<JavaType> genericBounds(Type[] bounds) {
+    private @Nullable List<JavaType> genericBounds(Type[] bounds) {
         List<JavaType> mappedBounds = null;
 
         for (Type bound : bounds) {
@@ -299,11 +298,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
             for (Annotation a : field.getDeclaredAnnotations()) {
                 JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(type);
+                annotations.add(new JavaType.Annotation(type, emptyList()));
             }
         }
 
-        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getType()), annotations);
+        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getGenericType()), annotations);
         return mappedVariable;
     }
 
@@ -342,11 +341,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 "<constructor>",
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, mappedMethod);
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if (method.getExceptionTypes().length > 0) {
             thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
             for (Class<?> e : method.getExceptionTypes()) {
@@ -360,7 +359,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
             for (Annotation a : method.getDeclaredAnnotations()) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(fullyQualified);
+                annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
             }
         }
 
@@ -440,6 +439,17 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 defaultValues = Collections.singletonList(method.getDefaultValue().toString());
             }
         }
+
+        List<String> declaredFormalTypeNames = null;
+        for (TypeVariable<?> typeVariable : method.getTypeParameters()) {
+            if (typeVariable.getGenericDeclaration() == method) {
+                if (declaredFormalTypeNames == null) {
+                    declaredFormalTypeNames = new ArrayList<>();
+                }
+                declaredFormalTypeNames.add(typeVariable.getName());
+            }
+        }
+
         JavaType.Method mappedMethod = new JavaType.Method(
                 null,
                 method.getModifiers(),
@@ -448,16 +458,18 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 null,
                 paramNames,
                 null, null, null,
-                defaultValues
+                defaultValues,
+                declaredFormalTypeNames == null ?
+                        null :
+                        declaredFormalTypeNames.toArray(new String[0])
         );
         typeCache.put(signature, mappedMethod);
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if (method.getExceptionTypes().length > 0) {
             thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
-            for (Class<?> e : method.getExceptionTypes()) {
-                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(e);
-                thrownExceptions.add(fullyQualified);
+            for (Type e : method.getGenericExceptionTypes()) {
+                thrownExceptions.add(type(e));
             }
         }
 
@@ -466,20 +478,20 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
             for (Annotation a : method.getDeclaredAnnotations()) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(fullyQualified);
+                annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
             }
         }
 
         List<JavaType> parameterTypes = emptyList();
         if (method.getParameters().length > 0) {
             parameterTypes = new ArrayList<>(method.getParameters().length);
-            for (Parameter parameter : method.getParameters()) {
-                Type parameterizedType = parameter.getParameterizedType();
-                parameterTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
+            for (Type parameter : method.getGenericParameterTypes()) {
+                parameterTypes.add(type(parameter));
             }
         }
 
-        mappedMethod.unsafeSet(declaringType, type(method.getReturnType()), parameterTypes, thrownExceptions, annotations);
+        JavaType returnType = type(method.getGenericReturnType());
+        mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
         return mappedMethod;
     }
 }

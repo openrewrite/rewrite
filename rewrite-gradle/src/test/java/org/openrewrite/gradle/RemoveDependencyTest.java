@@ -26,8 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 
@@ -450,6 +449,167 @@ class RemoveDependencyTest implements RewriteTest {
                   }
                   dependencies {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:2.7.0")
+                  implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
+                  }
+              }
+              dependencies {
+                  implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslString() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:2.7.0")
+                  testImplementation("org.junit.vintage:junit-vintage-engine:5.6.2")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation("org.junit.vintage:junit-vintage-engine:5.6.2")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslMap() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(group = "org.springframework.boot", name = "spring-boot-starter-web", version = "2.7.0")
+                  testImplementation(group = "org.junit.vintage", name = "junit-vintage-engine", version = "5.6.2")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation(group = "org.junit.vintage", name = "junit-vintage-engine", version = "5.6.2")
               }
               """
           )

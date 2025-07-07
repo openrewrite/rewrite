@@ -19,7 +19,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
@@ -49,8 +49,8 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             } catch (Symbol.CompletionFailure ignored) {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
             }
-        } else if (type instanceof Type.CapturedType) {  // CapturedType must be evaluated before TypeVar
-            return signature(((Type.CapturedType) type).wildcard);
+        } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
+            return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
@@ -139,7 +139,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
-        String name = generic.tsym.name.toString();
+        String name = generic instanceof Type.CapturedType ? "?" : generic.tsym.name.toString();
 
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();

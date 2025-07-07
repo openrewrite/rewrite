@@ -17,10 +17,11 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
+import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -46,6 +47,8 @@ public class FindFieldsOfType extends Recipe {
             required = false)
     @Nullable
     Boolean matchInherited;
+
+    private final transient FieldsOfTypeUses fieldsOfTypeUses = new FieldsOfTypeUses(this);
 
     @Override
     public String getDisplayName() {
@@ -74,6 +77,22 @@ public class FindFieldsOfType extends Recipe {
                     hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
                                 Boolean.TRUE.equals(matchInherited)) &&
                     isField(getCursor())) {
+
+                    // Populate the FieldsOfTypeUses DataTable
+                    for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
+                        String varType = variable.getType().toString();
+                        if (variable.getInitializer() != null && variable.getInitializer().getType() != null) {
+                            varType = variable.getInitializer().getType().toString();
+                        }
+                        fieldsOfTypeUses.insertRow(ctx, new FieldsOfTypeUses.Row(
+                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).getSourcePath().toString(),
+                            variable.getSimpleName(),
+                            multiVariable.getTypeExpression().getType().toString(),
+                            varType,
+                            multiVariable.getModifiers().stream().map(J.Modifier::toString).reduce((m1, m2) -> m1 + " " + m2).orElse(""),
+                            multiVariable.printTrimmed(getCursor())
+                        ));
+                    }
                     return SearchResult.found(multiVariable);
                 }
                 return multiVariable;

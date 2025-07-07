@@ -29,7 +29,9 @@
 /** XML lexer derived from ANTLR v4 ref guide book example */
 lexer grammar XMLLexer;
 
+
 // Default "mode": Everything OUTSIDE of a tag
+WS                : [ \t\n\r\u000C]+ -> skip;
 COMMENT           :  '<!--' .*? '-->' ;
 CDATA             :  '<![CDATA[' .*? ']]>' ;
 
@@ -65,7 +67,7 @@ DTD_CLOSE        :  '>'    -> popMode ;
 DTD_SUBSET_OPEN  :  '['    -> pushMode(INSIDE_DTD_SUBSET) ;
 DTD_S            :   S     -> skip ;
 
-DOCTYPE          :  'DOCTYPE' ;
+DOCTYPE options { caseInsensitive = true; }         :  'DOCTYPE' ;
 
 DTD_NAME         :  Name   -> type(Name) ;
 DTD_STRING       :  STRING -> type(STRING) ;

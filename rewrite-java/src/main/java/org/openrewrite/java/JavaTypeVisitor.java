@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.List;
@@ -38,13 +38,11 @@ public class JavaTypeVisitor<P> {
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 
-    @Nullable
-    public JavaType preVisit(JavaType javaType, P p) {
+    public @Nullable JavaType preVisit(JavaType javaType, P p) {
         return javaType;
     }
 
-    @Nullable
-    public JavaType postVisit(JavaType javaType, P p) {
+    public @Nullable JavaType postVisit(JavaType javaType, P p) {
         return javaType;
     }
 
@@ -64,13 +62,15 @@ public class JavaTypeVisitor<P> {
         return t;
     }
 
-    public JavaType visit(@Nullable JavaType javaType, P p) {
+    public @Nullable JavaType visit(@Nullable JavaType javaType, P p) {
         if (javaType != null) {
             cursor = new Cursor(cursor, javaType);
             javaType = preVisit(javaType, p);
 
             if (javaType instanceof JavaType.Array) {
                 javaType = visitArray((JavaType.Array) javaType, p);
+            } else if (javaType instanceof JavaType.Annotation) {
+                javaType = visitAnnotation((JavaType.Annotation) javaType, p);
             } else if (javaType instanceof JavaType.Class) {
                 javaType = visitClass((JavaType.Class) javaType, p);
             } else if (javaType instanceof JavaType.GenericTypeVariable) {
@@ -105,6 +105,12 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
         return multiCatch.withThrowableTypes(ListUtils.map(multiCatch.getThrowableTypes(), tt -> visit(tt, p)));
+    }
+
+    public JavaType visitAnnotation(JavaType.Annotation annotation, P p) {
+        JavaType.Annotation a = annotation;
+        a = a.withType((JavaType.FullyQualified) visit(a.getType(), p));
+        return a;
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {
@@ -150,7 +156,7 @@ public class JavaTypeVisitor<P> {
         m = m.withDeclaringType((JavaType.FullyQualified) visit(m.getDeclaringType(), p));
         m = m.withReturnType(visit(m.getReturnType(), p));
         m = m.withParameterTypes(ListUtils.map(m.getParameterTypes(), pt -> visit(pt, p)));
-        m = m.withThrownExceptions(ListUtils.map(m.getThrownExceptions(), t -> (JavaType.FullyQualified) visit(t, p)));
+        m = m.withThrownExceptions(ListUtils.map(m.getThrownExceptions(), t -> visit(t, p)));
         m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
         return m;
     }

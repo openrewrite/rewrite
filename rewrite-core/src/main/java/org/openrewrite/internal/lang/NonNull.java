@@ -15,6 +15,9 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
 import javax.annotation.Nonnull;
 import javax.annotation.meta.TypeQualifierNickname;
 import java.lang.annotation.*;
@@ -29,14 +32,16 @@ import java.lang.annotation.*;
  * (scope = fields) to set the default behavior to non-nullable in order to avoid annotating
  * your whole codebase with {@code @NonNull}.
  *
- * @see NonNullApi
+ * @see NullMarked
  * @see NonNullFields
  * @see Nullable
+ * @deprecated Use {@link org.jspecify.annotations.NonNull} instead.
  */
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Nonnull
 @TypeQualifierNickname
+@Deprecated
 public @interface NonNull {
 }

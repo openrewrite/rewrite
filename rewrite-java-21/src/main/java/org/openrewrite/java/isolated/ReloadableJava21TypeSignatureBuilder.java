@@ -19,7 +19,7 @@ import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.JCTree;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
@@ -29,6 +29,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+
+import static org.openrewrite.java.isolated.ReloadableJava21TypeMapping.isUnknownType;
 
 class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -40,7 +42,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
+        if (type == null || isUnknownType(type) || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
@@ -51,7 +53,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
             }
         } else if (type instanceof Type.CapturedType) { // CapturedType must be evaluated before TypeVar
-            return signature(((Type.CapturedType) type).wildcard);
+            return genericSignature(type);
         } else if (type instanceof Type.TypeVar) {
             return genericSignature(type);
         } else if (type instanceof Type.JCPrimitiveType) {
@@ -78,6 +80,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         try {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
+            // Ignore
         }
     }
 
@@ -140,7 +143,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Override
     public String genericSignature(Object type) {
         Type.TypeVar generic = (Type.TypeVar) type;
-        String name = generic.tsym.name.toString();
+        String name = generic instanceof Type.CapturedType ? "?" : generic.tsym.name.toString();
 
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new HashSet<>();
@@ -297,7 +300,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
+        } else if (selectType instanceof Type.JCNoType || isUnknownType(selectType)) {
             return "{undefined}";
         }
 

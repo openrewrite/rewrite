@@ -17,8 +17,8 @@ package org.openrewrite.maven;
 
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -29,13 +29,10 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -45,6 +42,7 @@ import static org.openrewrite.Tree.randomId;
 public class MavenParser implements Parser {
 
     private final Collection<String> activeProfiles;
+    private final Map<String, String> properties;
     private final boolean skipDependencyResolution;
 
     @Override
@@ -77,12 +75,10 @@ public class MavenParser implements Parser {
                 Pom pom = RawPom.parse(source.getSource(ctx), null)
                         .toPom(pomPath, null);
 
-                if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
+                if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
-                String baseDir = pomPath.toAbsolutePath().getParent().toString();
-                pom.getProperties().put("project.basedir", baseDir);
-                pom.getProperties().put("basedir", baseDir);
+                pom.getProperties().putAll(properties);
 
                 SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
@@ -107,25 +103,41 @@ public class MavenParser implements Parser {
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
+        List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(Collectors.toList());
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
-                ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
+                ResolvedPom resolvedPom = docToPom.getValue().resolve(effectivelyActiveProfiles, downloader, ctx);
+                MavenResolutionResult model = new MavenResolutionResult(randomId(),
+                        null,
+                        resolvedPom,
+                        emptyList(),
+                        null,
+                        emptyMap(),
+                        sanitizedSettings,
+                        effectivelyActiveProfiles,
+                        properties);
                 if (!skipDependencyResolution) {
                     model = model.resolveDependencies(downloader, ctx);
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
-                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
-                        randomId(),
-                        MavenParser.class.getSimpleName(),
-                        e.getClass().getSimpleName(),
-                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
-                        null);
-                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
+                if (e.getExceptions().size() == 1) {
+                    // If there is only a single MavenDownloadingException, report just that as no additional debugging value is gleaned from its wrapper
+                    MavenDownloadingException e2 = e.getExceptions().get(0);
+                    String message = e2.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e2, message))));
+                    ctx.getOnError().accept(e2);
+                } else {
+                    String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                    parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
+                    ctx.getOnError().accept(e);
+                }
+            } catch (MavenDownloadingException e) {
+                String message = e.warn(docToPom.getKey()).printAll(); // Shows any underlying MavenDownloadingException
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e, message))));
                 ctx.getOnError().accept(e);
-            } catch (MavenDownloadingException | UncheckedIOException e) {
+            } catch (UncheckedIOException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }
@@ -134,7 +146,7 @@ public class MavenParser implements Parser {
         for (int i = 0; i < parsed.size(); i++) {
             SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
-            if(!maybeResolutionResult.isPresent()) {
+            if (!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
@@ -144,7 +156,7 @@ public class MavenParser implements Parser {
                     continue;
                 }
                 Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
-                if(!maybeModuleResolutionResult.isPresent()) {
+                if (!maybeModuleResolutionResult.isPresent()) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
@@ -152,7 +164,7 @@ public class MavenParser implements Parser {
                 if (parent != null &&
                     resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
                     resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                    resolutionResult.getPom().getVersion().equals(resolutionResult.getPom().getValue(parent.getVersion()))) {
+                    Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
@@ -177,6 +189,7 @@ public class MavenParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+        private final Map<String, String> properties = new HashMap<>();
         private boolean skipDependencyResolution;
 
         public Builder() {
@@ -196,26 +209,17 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
-        public Builder mavenConfig(@Nullable Path mavenConfig) {
-            if (mavenConfig != null && mavenConfig.toFile().exists()) {
-                try {
-                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+(\\S+)").matcher(mavenConfigText);
-                    if (matcher.find()) {
-                        String[] profiles = matcher.group(1).split(",");
-                        return activeProfiles(profiles);
-                    }
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+        public Builder property(@Nullable String key, @Nullable String value) {
+            //noinspection ConstantConditions
+            if (key != null && value != null) {
+                this.properties.put(key, value);
             }
             return this;
         }
 
         @Override
         public MavenParser build() {
-            return new MavenParser(activeProfiles, skipDependencyResolution);
+            return new MavenParser(activeProfiles, properties, skipDependencyResolution);
         }
 
         @Override

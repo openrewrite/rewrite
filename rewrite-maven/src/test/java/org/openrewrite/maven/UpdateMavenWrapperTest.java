@@ -16,14 +16,16 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.utilities.MavenWrapper;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteArchive;
+import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -85,7 +87,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -93,8 +95,8 @@ class UpdateMavenWrapperTest implements RewriteTest {
           properties(
             null,
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -120,7 +122,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
               assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
               assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-              var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+              var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
               assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
               assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
               assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -128,8 +130,8 @@ class UpdateMavenWrapperTest implements RewriteTest {
           properties(
             null,
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
               wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
               """),
@@ -156,7 +158,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -167,15 +169,109 @@ class UpdateMavenWrapperTest implements RewriteTest {
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
               """),
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
               .afterRecipe(mavenWrapperProperties ->
                 assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
                     assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
-                    assertThat(buildTool.getVersion()).isEqualTo("3.8.8");
+                    assertThat(buildTool.getVersion()).isEqualTo("3.8.9");
+                }))
+          ),
+          mvnw,
+          mvnwCmd,
+          mvnWrapperJarQuark
+        );
+    }
+
+    @Test
+    @DocumentExample("Update existing Maven wrapper")
+    void updateWrapperWithWrapperJarChecksumDisabledButChecksumAlreadyThere() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
+                assertThat(mvnw.getFileAttributes()).isNotNull();
+                assertThat(mvnw.getFileAttributes().isReadable()).isTrue();
+                assertThat(mvnw.getFileAttributes().isWritable()).isTrue();
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
+
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.1/apache-maven-3.8.1-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              distributionSha256Sum=ba1517f73c5c22cf39afa0d570c998e6e024f37c75569f5c5524a69ff00a7f1b
+              wrapperSha256Sum=46b0acdfe3da08b3f40d25bd135858b6014ee62b92883768995c946a3b446bd6
+              """),
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .afterRecipe(mavenWrapperProperties ->
+                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
+                    assertThat(buildTool.getVersion()).isEqualTo("3.8.9");
+                }))
+          ),
+          mvnw,
+          mvnwCmd,
+          mvnWrapperJarQuark
+        );
+    }
+
+    @Test
+    @DocumentExample("Update existing Maven wrapper with wrapper jar checksum enabled")
+    void updateWrapperWithWrapperJarChecksumEnabled() {
+        rewriteRun(
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
+                assertThat(mvnw.getFileAttributes()).isNotNull();
+                assertThat(mvnw.getFileAttributes().isReadable()).isTrue();
+                assertThat(mvnw.getFileAttributes().isWritable()).isTrue();
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
+
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
+                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
+              """),
+            withLicenseHeader("""
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
+              wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .afterRecipe(mavenWrapperProperties ->
+                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
+                    assertThat(buildTool.getVersion()).isEqualTo("3.8.9");
                 }))
           ),
           mvnw,
@@ -203,109 +299,15 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
                 """),
               withLicenseHeader("""
-                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-                distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+                distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
                 """),
               spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
             ),
             mvnw,
             mvnWrapperJarQuark
           )
-        );
-    }
-
-    @Test
-    @DocumentExample("Update existing Maven wrapper")
-    void updateWrapperWithWrapperJarChecksumDisabledButChecksumAlreadyThere() {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
-            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
-            .afterRecipe(run -> {
-                var mvnw = result(run, PlainText.class, "mvnw");
-                assertThat(mvnw.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
-                assertThat(mvnw.getFileAttributes()).isNotNull();
-                assertThat(mvnw.getFileAttributes().isReadable()).isTrue();
-                assertThat(mvnw.getFileAttributes().isWritable()).isTrue();
-
-                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
-                assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
-
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
-                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
-                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
-            }),
-          properties(
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.1/apache-maven-3.8.1-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
-              distributionSha256Sum=ba1517f73c5c22cf39afa0d570c998e6e024f37c75569f5c5524a69ff00a7f1b
-              wrapperSha256Sum=46b0acdfe3da08b3f40d25bd135858b6014ee62b92883768995c946a3b446bd6
-              """),
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
-              """),
-            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
-              .afterRecipe(mavenWrapperProperties ->
-                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
-                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
-                    assertThat(buildTool.getVersion()).isEqualTo("3.8.8");
-                }))
-          ),
-          mvnw,
-          mvnwCmd,
-          mvnWrapperJarQuark
-        );
-    }
-
-    @Test
-    @DocumentExample("Update existing Maven wrapper with wrapper jar checksum enabled")
-    void updateWrapperWithWrapperJarChecksumEnabled() {
-        rewriteRun(
-          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
-            .afterRecipe(run -> {
-                var mvnw = result(run, PlainText.class, "mvnw");
-                assertThat(mvnw.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-                assertThat(mvnw.getText()).isEqualTo(MVNW_TEXT);
-                assertThat(mvnw.getFileAttributes()).isNotNull();
-                assertThat(mvnw.getFileAttributes().isReadable()).isTrue();
-                assertThat(mvnw.getFileAttributes().isWritable()).isTrue();
-
-                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
-                assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-                assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
-
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
-                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
-                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
-            }),
-          properties(
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
-              """),
-            withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
-              wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
-              wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
-              """),
-            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
-              .afterRecipe(mavenWrapperProperties ->
-                assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
-                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
-                    assertThat(buildTool.getVersion()).isEqualTo("3.8.8");
-                }))
-          ),
-          mvnw,
-          mvnwCmd,
-          mvnWrapperJarQuark
         );
     }
 
@@ -325,7 +327,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   .isInstanceOf(NoSuchElementException.class)
                   .hasMessage("No value present");
 
-                var mvnwDownloaderJava = result(run, Remote.class, "MavenWrapperDownloader.java");
+                var mvnwDownloaderJava = result(run, RemoteArchive.class, "MavenWrapperDownloader.java");
                 assertThat(mvnwDownloaderJava.getSourcePath()).isEqualTo(WRAPPER_DOWNLOADER_LOCATION);
                 assertThat(mvnwDownloaderJava.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip"));
             }),
@@ -335,9 +337,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
               """),
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -378,9 +380,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
               """),
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -420,8 +422,8 @@ class UpdateMavenWrapperTest implements RewriteTest {
               distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
               """),
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
           ),
@@ -456,9 +458,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
                 """),
               withLicenseHeader("""
-                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-                distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+                distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
                 wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
                 """),
               spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -474,9 +476,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
                 """),
               withLicenseHeader("""
-                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+                distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-                distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+                distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
                 wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
                 """),
               spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -509,7 +511,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
     void allowUpdatingDistributionTypeWhenSameVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", "script", "3.8.x", null, null, Boolean.TRUE))
-            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.8")))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.9")))
             .afterRecipe(run -> {
                 var mvnw = result(run, PlainText.class, "mvnw");
                 assertThat(mvnw.getText()).isNotBlank();
@@ -527,9 +529,9 @@ class UpdateMavenWrapperTest implements RewriteTest {
             }),
           properties(
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -566,7 +568,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isNotBlank();
 
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(mavenWrapperJar.getUri().toString());
                 assertThat(wrapperVersionMatcher.find()).isTrue();
@@ -579,7 +581,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
             withLicenseHeader("""
               distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
@@ -630,7 +632,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 recipeList:
                   - org.openrewrite.maven.UpdateMavenWrapper:
                       wrapperVersion: 3.2.0
-                      distributionVersion: 3.8.8
+                      distributionVersion: 3.8.9
                       addIfMissing: false
                       enforceWrapperChecksumVerification: true
                   - org.openrewrite.maven.UpdateMavenWrapper:
@@ -654,7 +656,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
 
-                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -665,16 +667,16 @@ class UpdateMavenWrapperTest implements RewriteTest {
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.0/maven-wrapper-3.1.0.jar
               """),
             withLicenseHeader("""
-              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.8/apache-maven-3.8.8-bin.zip
+              distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar
-              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
               wrapperSha256Sum=e63a53cfb9c4d291ebe3c2b0edacb7622bbc480326beaa5a0456e412f52f066a
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
               .afterRecipe(mavenWrapperProperties ->
                 assertThat(mavenWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
                     assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Maven);
-                    assertThat(buildTool.getVersion()).isEqualTo("3.8.8");
+                    assertThat(buildTool.getVersion()).isEqualTo("3.8.9");
                 }))
           ),
           mvnw,

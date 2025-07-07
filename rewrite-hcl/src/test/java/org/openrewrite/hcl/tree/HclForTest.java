@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
@@ -69,6 +70,23 @@ class HclForTest implements RewriteTest {
               resource "aws_iam_user" "the-accounts" {
                 for_each = toset( ["Todd", "James", "Alice", "Dottie"] )
                 name     = each.key
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4857")
+    void commentInAFor() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+               a = {
+                 # this is some super smart logic here
+                 for i, v in ["a", "b"]: v => i
+               }
               }
               """
           )

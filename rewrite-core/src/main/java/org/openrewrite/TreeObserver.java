@@ -20,7 +20,7 @@ import de.danielbechler.diff.ObjectDifferBuilder;
 import de.danielbechler.diff.inclusion.Inclusion;
 import de.danielbechler.diff.inclusion.InclusionResolver;
 import de.danielbechler.diff.node.DiffNode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.beans.Transient;
 import java.util.ArrayList;

@@ -21,7 +21,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.java.search.FindComments;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -31,7 +31,7 @@ class FindCommentsTest implements RewriteTest {
     @Test
     void findText() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(Arrays.asList("test", "12.*"))),
+          spec -> spec.recipe(new FindComments(List.of("test", "12.*"))),
           java(
             """
               // not this one
@@ -60,6 +60,29 @@ class FindCommentsTest implements RewriteTest {
     }
 
     @Test
+    void findInJavadoc() {
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(List.of("foo"))),
+          java(
+            """
+              /** Example with a {@code foo} in Javadoc.
+              *   Here another foo.
+              */
+              class Test {
+              }
+              """,
+            """
+              /** Example with a {@code ~~>foo} in Javadoc.
+              *~~>   Here another foo.
+              */
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void findSecrets() {
         rewriteRun(
           spec -> spec.recipe(Environment.builder()
@@ -75,6 +98,47 @@ class FindCommentsTest implements RewriteTest {
             """
               class Test {
                   String uhOh = /*~~>*/"-----BEGIN RSA PRIVATE KEY-----";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findInLiteralSource() {
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(List.of("0xff", "254"))),
+          java(
+            """
+              class Test {
+                  int i1 = 0xff;
+                  int i2 = 0xfe;
+              }
+              """,
+            """
+              class Test {
+                  int i1 = /*~~>*/0xff;
+                  int i2 = /*~~>*/0xfe;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findInComment(){
+        rewriteRun(
+          spec -> spec.recipe(new FindComments(List.of("foo"))),
+          java(
+                """
+              // Example comment with foo
+              class Test {
+              }
+              """
+            ,
+                """
+              /*~~>*/// Example comment with foo
+              class Test {
               }
               """
           )

@@ -17,28 +17,24 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.marker.SearchResult;
-
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The first part of a dependency coordinate identifying its publisher.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The second part of a dependency coordinate uniquely identifying it among artifacts from the same publisher.",
             example = "guava")
     String artifactId;
 
@@ -61,35 +57,17 @@ public class FindDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use." +
-                " A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
-                " A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
+        return "Finds dependencies declared in gradle build files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use. " +
+                "A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
+                "A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (dependency.matches(method)) {
-                    if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
-                        List<Expression> depArgs = method.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal) {
-                            String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                            assert gav != null;
-                            String[] parts = gav.split(":");
-                            if(gav.length() >= 2) {
-                                if (StringUtils.matchesGlob(parts[0], groupId) &&
-                                    StringUtils.matchesGlob(parts[1], artifactId)) {
-                                    return SearchResult.found(method);
-                                }
-                            }
-                        }
-                    }
-                }
-                return super.visitMethodInvocation(method, ctx);
-            }
-        });
+        return new GradleDependency.Matcher()
+                .groupId(groupId)
+                .artifactId(artifactId)
+                .configuration(configuration)
+                .asVisitor(gd -> SearchResult.found(gd.getTree()));
     }
 }

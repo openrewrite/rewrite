@@ -17,8 +17,8 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -110,7 +110,7 @@ public class FindDependency extends Recipe {
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
-                                          Supplier<ResolvedDependency> resolvedDependencySupplier) {
+                                          Supplier<@Nullable ResolvedDependency> resolvedDependencySupplier) {
         if (desiredVersion == null) {
             return true;
         }
