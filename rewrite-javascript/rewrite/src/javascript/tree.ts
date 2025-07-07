@@ -83,7 +83,6 @@ export namespace JS {
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
         TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$Span",
-        TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
         TypeInfo: "org.openrewrite.javascript.tree.JS$TypeInfo",
@@ -478,16 +477,6 @@ export namespace JS {
             readonly expression: J;
             readonly tail: J.Literal;
         }
-    }
-
-    /**
-     * Represents a statement ending with a trailing token.
-     * @example function foo(){};
-     */
-    export interface TrailingTokenStatement extends JS, Statement, Expression {
-        readonly kind: typeof Kind.TrailingTokenStatement;
-        readonly expression: J.RightPadded<J>;
-        readonly type?: JavaType;
     }
 
     /**

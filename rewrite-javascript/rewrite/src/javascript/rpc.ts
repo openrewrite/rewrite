@@ -273,12 +273,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return span;
     }
 
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(trailingTokenStatement, el => el.expression, el => this.visitRightPadded(el, q));
-        await q.getAndSend(trailingTokenStatement, el => asRef(el.type), el => this.visitType(el, q));
-        return trailingTokenStatement;
-    }
-
     override async visitTuple(tuple: JS.Tuple, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(tuple, el => el.elements, el => this.visitContainer(el, q));
         await q.getAndSend(tuple, el => asRef(el.type), el => this.visitType(el, q));
@@ -837,13 +831,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         const draft = createDraft(span);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<J>(el, q));
         draft.tail = await q.receive(draft.tail, el => this.visitDefined<J.Literal>(el, q));
-        return finishDraft(draft);
-    }
-
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(trailingTokenStatement);
-        draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 
