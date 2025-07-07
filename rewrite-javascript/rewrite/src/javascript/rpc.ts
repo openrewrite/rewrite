@@ -305,6 +305,13 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return typeTreeExpression;
     }
 
+    override async visitAs(as_: JS.As, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(as_, el => el.left, el => this.visitRightPadded(el, q));
+        await q.getAndSend(as_, el => el.right, el => this.visit(el, q));
+        await q.getAndSend(as_, el => asRef(el.type), el => this.visitType(el, q));
+        return as_;
+    }
+
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(assignmentOperation, el => el.variable, el => this.visit(el, q));
         await q.getAndSend(assignmentOperation, el => el.operator, el => this.visitLeftPadded(el, q));
@@ -867,6 +874,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(typeTreeExpression);
         draft.expression = await q.receive(draft.expression, el => this.visitDefined<Expression>(el, q));
+        return finishDraft(draft);
+    }
+
+    override async visitAs(as_: JS.As, q: RpcReceiveQueue): Promise<J | undefined> {
+        const draft = createDraft(as_);
+        draft.left = await q.receive(draft.left, el => this.visitRightPadded<Expression>(el, q));
+        draft.right = await q.receive(draft.right, el => this.visitDefined<Expression>(el, q));
+        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
         return finishDraft(draft);
     }
 

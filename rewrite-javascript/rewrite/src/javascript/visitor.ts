@@ -103,6 +103,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.As>(as_, p, async draft => {
+            draft.left = await this.visitRightPadded<Expression>(as_.left, p);
+            draft.right = await this.visitDefined<Expression>(as_.right, p);
+            draft.type = as_.type && await this.visitType(as_.type, p);
+        });
+    }
+
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(await_, p);
            if (!expression?.kind || expression.kind !== JS.Kind.Await) {
@@ -905,6 +913,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitAlias(tree as unknown as JS.Alias, p);
                 case JS.Kind.ArrowFunction:
                     return this.visitArrowFunction(tree as unknown as JS.ArrowFunction, p);
+                case JS.Kind.As:
+                    return this.visitAs(tree as unknown as JS.As, p);
                 case JS.Kind.Await:
                     return this.visitAwait(tree as unknown as JS.Await, p);
                 case JS.Kind.CompilationUnit:

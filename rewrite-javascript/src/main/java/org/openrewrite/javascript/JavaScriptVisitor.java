@@ -1020,6 +1020,22 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
+    public J visitAs(JS.As as_, P p) {
+        JS.As b = as_;
+        b = b.withPrefix(visitSpace(b.getPrefix(), JsSpace.Location.AS_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof JS.As)) {
+            return temp;
+        } else {
+            b = (JS.As) temp;
+        }
+        b = b.getPadding().withLeft(requireNonNull(visitRightPadded(b.getPadding().getLeft(), JsRightPadded.Location.AS_LEFT, p)));
+        b = b.withRight(requireNonNull(visitAndCast(b.getRight(), p)));
+        b = b.withType(visitType(b.getType(), p));
+        return b;
+    }
+
     public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
         JS.AssignmentOperation a = assignOp;
         a = a.withPrefix(visitSpace(a.getPrefix(), JsSpace.Location.ASSIGNMENT_OPERATION_PREFIX, p));

@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Asterisk, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
+import {Generator, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -715,7 +715,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("function");
         }
 
-        const asterisk = findMarker<Asterisk>(method, JS.Markers.Asterisk);
+        const asterisk = findMarker<Generator>(method, JS.Markers.Generator);
         if (asterisk) {
             await this.visitSpace(asterisk.prefix, p);
             p.append("*");
@@ -750,6 +750,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitNodes(method.leadingAnnotations, p);
         for (const it of method.modifiers) {
             await this.visitModifier(it, p);
+        }
+
+        const generator = findMarker<Generator>(method, JS.Markers.Generator);
+        if (generator) {
+            await this.visitSpace(generator.prefix, p);
+            p.append("*");
         }
 
         await this.visit(method.name, p);
@@ -1367,6 +1373,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return type;
     }
 
+    override async visitAs(as_: JS.As, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(as_, p);
+        await this.visitRightPadded(as_.left, p);
+        p.append("as");
+        await this.visit(as_.right, p);
+        await this.afterSyntax(as_, p);
+
+        return as_;
+    }
+
     override async visitAssignment(assignment: J.Assignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(assignment, p);
         await this.visit(assignment.variable, p);
@@ -1582,9 +1598,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         let keyword = "";
 
         switch (binary.operator.element) {
-            case JS.Binary.Type.As:
-                keyword = "as";
-                break;
             case JS.Binary.Type.IdentityEquals:
                 keyword = "===";
                 break;

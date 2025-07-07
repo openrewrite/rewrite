@@ -343,6 +343,14 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitAs(JS.As as_, RpcSendQueue q) {
+        q.getAndSend(as_, el -> el.getPadding().getLeft(), el -> visitRightPadded(el, q));
+        q.getAndSend(as_, JS.As::getRight, el -> visit(el, q));
+        q.getAndSend(as_, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return as_;
+    }
+
+    @Override
     public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, RpcSendQueue q) {
         q.getAndSend(assignmentOperation, JS.AssignmentOperation::getVariable, el -> visit(el, q));
         q.getAndSend(assignmentOperation, el -> el.getPadding().getOperator(), el -> visitLeftPadded(el, q));

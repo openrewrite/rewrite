@@ -212,7 +212,6 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(intersectionType, i => i.bounds, bounds => this.visitContainer(bounds, q));
-        await q.getAndSend(intersectionType, i => asRef(i.type), type => this.visitType(type, q));
         return intersectionType;
     }
 
@@ -421,7 +420,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitWildcard(wildcard: J.Wildcard, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(wildcard, w => w.bound);
+        await q.getAndSend(wildcard, w => w.bound, b => this.visitLeftPadded(b, q));
         await q.getAndSend(wildcard, w => w.boundedType, type => this.visit(type, q));
         return wildcard;
     }
@@ -862,7 +861,6 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(intersectionType);
 
         draft.bounds = await q.receive(intersectionType.bounds, bounds => this.visitContainer(bounds, q));
-        draft.type = await q.receive(intersectionType.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }
