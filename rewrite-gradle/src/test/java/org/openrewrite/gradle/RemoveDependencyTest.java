@@ -146,7 +146,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
                   // and more
                   /* and more */ implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
-                  def someStatementWithinDepBlock = 33
+                  def someStatementWithinDepBlock = 33  // some other comment
                   implementation "com.google.guava:guava:29.0-jre"
               }
               """,
@@ -161,7 +161,7 @@ class RemoveDependencyTest implements RewriteTest {
               
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
-                  def someStatementWithinDepBlock = 33
+                  def someStatementWithinDepBlock = 33  // some other comment
                   implementation "com.google.guava:guava:29.0-jre"
               }
               """
@@ -187,7 +187,8 @@ class RemoveDependencyTest implements RewriteTest {
                   // Comment 1
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" /* comment 2 */ /* comment 3 */ // comment 4
                   // and more
-                  implementation "com.google.guava:guava:29.0-jre"
+                  implementation "com.google.guava:guava:29.0-jre" // some other comment
+                  implementation "org.yaml:snakeyaml:latest.release"
               }
               """,
             """
@@ -202,7 +203,8 @@ class RemoveDependencyTest implements RewriteTest {
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
                   // and more
-                  implementation "com.google.guava:guava:29.0-jre"
+                  implementation "com.google.guava:guava:29.0-jre" // some other comment
+                  implementation "org.yaml:snakeyaml:latest.release"
               }
               """
           )

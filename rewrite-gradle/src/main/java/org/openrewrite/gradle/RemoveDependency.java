@@ -76,7 +76,7 @@ public class RemoveDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes a single dependency from the dependencies section of the `build.gradle`.";
+        return "Removes a single dependency from the dependencies section of the `build.gradle`. Comments before or after the removed dependencies will be removed as well.";
     }
 
     @Override
@@ -120,36 +120,40 @@ public class RemoveDependency extends Recipe {
                 J.Block b = super.visitBlock(block, executionContext);
 
                 if (withinDependenciesBlock(getCursor())) {
-                    AtomicReference<String> whitespace = new AtomicReference<>();
-                    List<Comment> comments = new ArrayList<>();
-                    AtomicBoolean lastStatementRemoved = new AtomicBoolean(false);
-                    
+                    AtomicReference<String> whitespaceAfterPrevDep = new AtomicReference<>();
+                    List<Comment> commentsAfterPrevDep = new ArrayList<>();
+                    AtomicBoolean cleanupNextStatement = new AtomicBoolean(false);
                     b = b.withStatements(ListUtils.map(b.getStatements(), (i, stmt) -> {
-                        if (comments.isEmpty()) {
-                            if ((stmt instanceof J.MethodInvocation && gradleDependencyMatcher.get(stmt, getCursor()).isPresent()) ||
-                                    ((stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation && gradleDependencyMatcher.get(((J.Return) stmt).getExpression(), getCursor()).isPresent()))) {
-                                if (i != 0 && !stmt.getPrefix().getComments().isEmpty() && !hasLineBreak(stmt.getPrefix().getWhitespace())) {
-                                    whitespace.set(substringOfBeforeFirstLineBreak(stmt.getPrefix().getWhitespace()));
-                                    comments.addAll(getCommentsUntilLineBreak(stmt.getComments()));
-                                }
-                                if (stmt instanceof J.Return) {
-                                    lastStatementRemoved.set(true);
-                                }
-                                return null;
+                        if ((stmt instanceof J.MethodInvocation && gradleDependencyMatcher.get(stmt, getCursor()).isPresent()) ||
+                                ((stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation && gradleDependencyMatcher.get(((J.Return) stmt).getExpression(), getCursor()).isPresent()))) {
+                            if (i != 0 && !stmt.getPrefix().getComments().isEmpty() && !hasLineBreak(stmt.getPrefix().getWhitespace())) {
+                                whitespaceAfterPrevDep.set(substringOfBeforeFirstLineBreak(stmt.getPrefix().getWhitespace()));
+                                commentsAfterPrevDep.addAll(getCommentsUntilLineBreak(stmt.getComments()));
                             }
-                        } else {
-                            stmt = stmt.withPrefix(stmt.getPrefix().withWhitespace(whitespace.get()))
-                                    .withComments(ListUtils.concatAll(new ArrayList<>(comments), stmt.getComments()));
-                            whitespace.set("");
-                            comments.clear();
+                            cleanupNextStatement.set(true);
+                            return null;
+                        }
+                        if (cleanupNextStatement.get()) {
+                            if (!commentsAfterPrevDep.isEmpty()) {
+                                stmt = stmt.withPrefix(stmt.getPrefix().withWhitespace(whitespaceAfterPrevDep.get()))
+                                        .withComments(ListUtils.concatAll(new ArrayList<>(commentsAfterPrevDep), stmt.getComments()));
+                                whitespaceAfterPrevDep.set("");
+                                commentsAfterPrevDep.clear();
+                            } else if (!stmt.getPrefix().getComments().isEmpty() && !hasLineBreak(stmt.getPrefix().getWhitespace())) {
+                                List<Comment> comments = getCommentsFromFirstLineBreak(stmt.getPrefix().getComments());
+                                List<Comment> commentsAfterFirstLineBreak = comments.subList(1, comments.size());
+                                String whitespace = comments.get(0).getSuffix() + substringOfAfterFirstLineBreak(stmt.getPrefix().getWhitespace());
+                                stmt = stmt.withPrefix(Space.build(whitespace, commentsAfterFirstLineBreak));
+                            }
+                            cleanupNextStatement.set(false);
                         }
                         return stmt;
                     }));
-                    if (!comments.isEmpty()) {
-                        List<Comment> commentsExceptLast = comments.subList(0, comments.size() - 1);
-                        Comment lastComment = comments.get(comments.size() - 1).withSuffix("\n");
-                        b = b.withEnd(Space.build(whitespace.get(), ListUtils.concat(commentsExceptLast, lastComment)));
-                    } else if (lastStatementRemoved.get() && !b.getEnd().getComments().isEmpty()) {
+                    if (!commentsAfterPrevDep.isEmpty()) {
+                        List<Comment> commentsExceptLast = commentsAfterPrevDep.subList(0, commentsAfterPrevDep.size() - 1);
+                        Comment lastComment = commentsAfterPrevDep.get(commentsAfterPrevDep.size() - 1).withSuffix("\n");
+                        b = b.withEnd(Space.build(whitespaceAfterPrevDep.get(), ListUtils.concat(commentsExceptLast, lastComment)));
+                    } else if (cleanupNextStatement.get() && !b.getEnd().getComments().isEmpty()) {
                         b = b.withEnd(Space.build("\n", emptyList()));
                     }
                 }
@@ -190,28 +194,46 @@ public class RemoveDependency extends Recipe {
         });
     }
 
-    private static boolean withinDependenciesBlock(Cursor cursor) {
-        try {
-            cursor.dropParentWhile(it -> it instanceof J.MethodInvocation && ((J.MethodInvocation) it).getSimpleName().equals("dependencies"));
-            return true;
-        } catch (IllegalStateException __) {
-            return false;
+    private boolean withinDependenciesBlock(Cursor cursor) {
+        Cursor parentCursor = cursor.getParent();
+        while (parentCursor != null) {
+            if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                J.MethodInvocation m = parentCursor.getValue();
+                if (m.getSimpleName().equals("dependencies")) {
+                    return true;
+                }
+            }
+            parentCursor = parentCursor.getParent();
         }
+
+        return false;
     }
 
     private static List<Comment> getCommentsUntilLineBreak(List<Comment> comments) {
-        List<Comment> Comments = new ArrayList<>();
-        for (Comment comment : comments) {
-            Comments.add(comment);
-            if (hasLineBreak(comment.getSuffix())) {
-                return Comments;
+        for (int i = 0; i < comments.size(); i ++) {
+            if (hasLineBreak(comments.get(i).getSuffix())) {
+                return comments.subList(0, i + 1);
             }
         }
-        return Comments;
+        return comments;
+    }
+
+    private static List<Comment> getCommentsFromFirstLineBreak(List<Comment> comments) {
+        for (int i = 0; i < comments.size(); i ++) {
+            if (hasLineBreak(comments.get(i).getSuffix())) {
+                return comments.subList(i, comments.size());
+            }
+        }
+        return emptyList();
     }
 
     private String substringOfBeforeFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s);
         return lines.length > 0 ? lines[0] : "";
+    }
+
+    private String substringOfAfterFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s, -1);
+        return lines.length > 1 ? String.join("\n", Arrays.copyOfRange(lines, 1, lines.length)) : "";
     }
 }
