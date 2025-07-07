@@ -137,13 +137,12 @@ public class RemoveDependency extends Recipe {
                                 }
                                 return null;
                             }
-                        } else if (stmt instanceof J.MethodInvocation || stmt instanceof J.Return) {
+                        } else {
                             stmt = stmt.withPrefix(stmt.getPrefix().withWhitespace(whitespace.get()))
                                     .withComments(ListUtils.concatAll(new ArrayList<>(comments), stmt.getComments()));
                             whitespace.set("");
                             comments.clear();
                         }
-
                         return stmt;
                     }));
                     if (!comments.isEmpty()) {
