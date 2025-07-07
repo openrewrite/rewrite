@@ -295,13 +295,11 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
-            // let last = n.getLastToken(this.sourceFile);
             let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
             if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
                 last = last.getLastToken(this.sourceFile);
             }
-            const sp = this.semicolonPrefix(n);
-            return this.rightPadded(j, sp, (n => {
+            return this.rightPadded(j, this.semicolonPrefix(n), (n => {
                 return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
@@ -2863,20 +2861,14 @@ export class JavaScriptParserVisitor {
     }
 
     visitLabeledStatement(node: ts.LabeledStatement): J.Label {
-        const ret = {
+        return {
             kind: J.Kind.Label,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
             label: this.rightPadded(this.visit(node.label), this.suffix(node.label)),
             statement: this.visit(node.statement),
-                    // this.semicolonPrefix(node.statement),
-                    // node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                    //     kind: J.Markers.Semicolon,
-                    //     id: randomId()
-                    // })
         };
-        return ret;
     }
 
     visitThrowStatement(node: ts.ThrowStatement): J.Throw {
