@@ -77,7 +77,7 @@ public class AnnotationTemplateGenerator {
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
 
                     int level = 1;
-                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Annotation) {
+                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Assignment || annotationParent instanceof J.Annotation) {
                         level += 1;
                         if (cursor.getParent(level) == null) {
                             break;
