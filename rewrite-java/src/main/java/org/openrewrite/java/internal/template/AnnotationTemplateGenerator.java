@@ -97,10 +97,6 @@ public class AnnotationTemplateGenerator {
                         } else {
                             after.insert(0, "static class $Clazz {}");
                         }
-                    } else if (j instanceof J.Annotation && annotationParent == null) {
-                        // Fallback for annotations that couldn't find a typical target
-                        // This handles cases like nested annotations in annotation arrays
-                        after.insert(0, "@interface $Placeholder {}");
                     }
                     return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
                 });
