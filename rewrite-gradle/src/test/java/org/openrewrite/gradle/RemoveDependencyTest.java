@@ -130,7 +130,7 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
-    void removeGradleDependencyWithCommentAfterDependency() {
+    void removeGradleDependencyWithCommentAfterPreviousDependency() {
         rewriteRun(
           buildGradle(
             """
