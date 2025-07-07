@@ -36,12 +36,12 @@ infoBroker {
     )
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
 }
 
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }
 

@@ -250,4 +250,102 @@ describe('for mapping', () => {
             //language=typescript
             typescript('for(   let j=1 ;j<=5 ;j++ ){}')
         ));
+
+    test('using `ExpressionStatement(Identifier())` in a for-of loop which declares variable outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`let i; for (i of [1,2,3]) {}`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = <JS.ExpressionStatement>forOfLoop.loop.control.variable.element;
+                expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
+            }
+        }));
+
+    test('using `ExpressionStatement(Identifier())` in a for-in loop which declares variable outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`let i; for (i in [1,2,3]) {}`),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forInLoop = <JS.ForInLoop>cu.statements[1].element;
+                expect(forInLoop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = <JS.ExpressionStatement>forInLoop.control.variable.element;
+                expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
+            }
+        }));
+
+    test('a for-of loop which uses array deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                const pairs: [string, number][] = [
+                    ["Alice", 25],
+                    ["Bob", 30],
+                    ["Carol", 28],
+                ];
+                let firstName;
+                let age;
+                for ([firstName, age] of pairs) {
+                    console.log(firstName, age);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[3].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
+                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("firstName");
+                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("age");
+            }
+        }));
+
+    test('a for-of loop which uses class deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                const users = [
+                    {name: 'Alice', age: 30, city: 'NYC'},
+                    {name: 'Bob', age: 25, city: 'LA'},
+                    {name: 'Carol', age: 35, city: 'Chicago'}
+                ];
+
+                let n, a, c;
+                for ({name: n, age: a, city: c} of users) {
+                    console.log("" + n + " is " + a + " years old and lives in " + c);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[2].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ObjectBindingPattern);
+                const objectBinding = <JS.ObjectBindingPattern>forOfLoop.loop.control.variable.element;
+                expect(objectBinding.bindings.elements.length).toBe(3);
+                for (let i = 0; i < 3; i++) {
+                    expect(objectBinding.bindings.elements[i].element.kind).toBe(JS.Kind.PropertyAssignment);
+                }
+            }
+        }));
+
+    test('a for-of loop which uses array spread deconstruction with variables defined outside of the loop', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript(`
+                let first, rest;
+                for ([first, ...rest] of [[1,2],[3,4]]) {
+                    console.log(first, rest);
+                }
+            `),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
+                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("first");
+                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("rest");
+            }
+        }));
 });

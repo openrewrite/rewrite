@@ -36,7 +36,6 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -175,7 +174,7 @@ class RecipeLifecycleTest implements RewriteTest {
 
         @Override
         public List<Recipe> getRecipeList() {
-            return Arrays.asList(
+            return List.of(
               new DeleteSourceFiles("test.txt"),
               new FindAndReplace("test", "", null, null, null, null, null, null));
         }
