@@ -297,7 +297,7 @@ export class JavaScriptParserVisitor {
             }
             // let last = n.getLastToken(this.sourceFile);
             let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
-            if (last && last.kind === ts.SyntaxKind.ExpressionStatement && n.kind === ts.SyntaxKind.LabeledStatement) {
+            if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
                 last = last.getLastToken(this.sourceFile);
             }
             const sp = this.semicolonPrefix(n);
@@ -469,7 +469,7 @@ export class JavaScriptParserVisitor {
 
     private semicolonPrefix = (node: ts.Node) => {
         let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
-        if (last && last.kind === ts.SyntaxKind.ExpressionStatement) {
+        if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement)) {
            last = last.getLastToken(this.sourceFile);
         }
         return last?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(last) : emptySpace;
