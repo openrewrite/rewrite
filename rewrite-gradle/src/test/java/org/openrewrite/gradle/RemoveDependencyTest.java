@@ -170,6 +170,46 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeCommentsOfDependencyWhenDependencyIsRemoved() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  // Comment 1
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" /* comment 2 */ /* comment 3 */ // comment 4
+                  // and more
+                  implementation "com.google.guava:guava:29.0-jre"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  // and more
+                  implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeGradleDependencyWithCommentAfterSecondToLastDependency() {
         rewriteRun(
           buildGradle(
