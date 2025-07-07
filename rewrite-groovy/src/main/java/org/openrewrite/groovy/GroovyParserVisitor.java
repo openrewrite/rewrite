@@ -789,17 +789,30 @@ public class GroovyParserVisitor {
                 boolean lastArgumentsAreAllClosures = endsWithClosures(expression.getExpressions());
                 for (int i = 0; i < unparsedArgs.size(); i++) {
                     org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
-                    Expression arg = visit(rawArg);
+                    Expression exp = visit(rawArg);
                     if (!hasParentheses) {
-                        arg = arg.withMarkers(arg.getMarkers().add(new OmitParentheses(randomId())));
+                        exp = exp.withMarkers(exp.getMarkers().add(new OmitParentheses(randomId())));
                     }
 
                     Space after = EMPTY;
                     if (i == unparsedArgs.size() - 1) {
                         if (hasParentheses) {
-                            after = sourceBefore(")");
+                            saveCursor = cursor;
+                            Space before = whitespace();
+                            if (source.charAt(cursor) == ',') {
+                                skip(",");
+                                JRightPadded<Expression> arg = JRightPadded.build(exp)
+                                        .withMarkers(exp.getMarkers().add(new TrailingComma(randomId(), sourceBefore(")"))))
+                                        .withAfter(before);
+
+                                args.add(arg);
+                                continue;
+                            } else {
+                                cursor = saveCursor;
+                                after = sourceBefore(")");
+                            }
                         }
-                    } else if (!(arg instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
+                    } else if (!(exp instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
                             // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
@@ -808,7 +821,7 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
 
-                    args.add(JRightPadded.build(arg).withAfter(after));
+                    args.add(JRightPadded.build(exp).withAfter(after));
                 }
             }
 
