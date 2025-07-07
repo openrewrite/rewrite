@@ -65,7 +65,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         MavenRepository ossSonatype = MavenRepository.builder()
           .id("oss")
-          .uri("https://oss.sonatype.org/content/repositories/snapshots/")
+          .uri("https://central.sonatype.com/repository/maven-snapshots/")
           .snapshots(true)
           .build();
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
@@ -78,7 +78,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
       http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
       
-      https://oss.sonatype.org/content/repositories/snapshots/, https://oss.sonatype.org/content/repositories/snapshots/
+      https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
       https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
       https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
       https://jitpack.io/, https://jitpack.io/
@@ -298,11 +298,11 @@ class MavenPomDownloaderTest implements RewriteTest {
         void normalizeOssSnapshots() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             MavenRepository oss = downloader.normalizeRepository(
-              MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
+              MavenRepository.builder().id("oss").uri("https://central.sonatype.com/repository/maven-snapshots").build(),
               MavenExecutionContextView.view(ctx), null);
 
             assertThat(oss).isNotNull();
-            assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
+            assertThat(oss.getUri()).isEqualTo("https://central.sonatype.com/repository/maven-snapshots/");
         }
 
         @ParameterizedTest
@@ -597,7 +597,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         void deriveMetaDataFromFileRepository(@TempDir Path repoPath) throws IOException, MavenDownloadingException {
             Path fred = repoPath.resolve("fred/fred");
 
-            for (String version : Arrays.asList("1.0.0", "1.1.0", "2.0.0")) {
+            for (String version : List.of("1.0.0", "1.1.0", "2.0.0")) {
                 Path versionPath = fred.resolve(version);
                 Files.createDirectories(versionPath);
                 Files.writeString(versionPath.resolve("fred-" + version + ".pom"), "");
@@ -611,7 +611,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
             MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
               .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
-            assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
+            assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(List.of("1.0.0", "1.1.0", "2.0.0"));
         }
 
         @SuppressWarnings("ConstantConditions")

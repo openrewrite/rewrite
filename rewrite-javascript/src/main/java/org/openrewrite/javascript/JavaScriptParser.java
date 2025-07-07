@@ -19,10 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
@@ -43,26 +43,27 @@ public class JavaScriptParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         // Registering `RewriteRpc` due to print-idempotence check
-            RewriteRpc.Scope scope = RewriteRpc.current().withClient(rewriteRpc).attach();
-            try {
-                JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-                return rewriteRpc.parse(sources, relativeTo, this, ctx)
-                        .map(source -> {
-                            try {
-                                validator.visit(source, 0);
-                                return source;
-                            } catch (Exception e) {
-                                Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
-                                        .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
-                                        .findFirst();
-                                return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
-                            }
-                        })
-                        .onClose(scope::close);
-            } catch (Exception e) {
-                scope.close();
-                throw e;
-            }
+        // Scope is closed using `Stream#onClose()`
+        ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
+        try {
+            JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
+            return rewriteRpc.parse(sources, relativeTo, this, ctx)
+                    .map(source -> {
+                        try {
+                            validator.visit(source, 0);
+                            return source;
+                        } catch (Exception e) {
+                            Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
+                                    .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
+                                    .findFirst();
+                            return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                        }
+                    })
+                    .onClose(scope::close);
+        } catch (Exception e) {
+            scope.close();
+            throw e;
+        }
     }
 
     private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
