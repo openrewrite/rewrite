@@ -66,7 +66,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                                         substitutedTemplate +
                                                         "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
                     }
-                    return autoFormat(gen.get(0).withPrefix(annotation.getPrefix()), p, getCursor().getParentOrThrow());
+                    return gen.get(0).withPrefix(annotation.getPrefix());
                 } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
