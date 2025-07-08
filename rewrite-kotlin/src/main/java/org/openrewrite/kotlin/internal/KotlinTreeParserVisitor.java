@@ -311,7 +311,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 receiverExp = new J.NullableType(randomId(),
                         receiverExp.getPrefix(),
                         Markers.EMPTY,
-                        Collections.emptyList(),
+                        emptyList(),
                         padRight(receiverExp.withPrefix(Space.EMPTY), prefix(questionMark))
                 );
             }
@@ -879,7 +879,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return new J.NullableType(randomId(),
                 merge(deepPrefix(nullableType), j.getPrefix()),
                 Markers.EMPTY,
-                Collections.emptyList(),
+                emptyList(),
                 padRight(j, prefix(findFirstChild(nullableType, c -> c.getNode().getElementType() == KtTokens.QUEST)))
         );
     }
@@ -900,7 +900,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (valOrVarOffset < modifierOffset) {
             if (parameter.getValOrVarKeyword() != null) {
-                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList(), consumedSpaces));
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), emptyList(), consumedSpaces));
             }
 
             if (parameter.getModifierList() != null) {
@@ -952,7 +952,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 typeExpression,
                 null,
-                emptyList(),
                 vars
         );
     }
@@ -978,7 +977,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (constructor.getConstructorKeyword() != null) {
-            modifiers.add(mapModifier(constructor.getConstructorKeyword(), Collections.emptyList(), consumedSpaces));
+            modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList(), consumedSpaces));
         }
 
         JavaType.Method type = methodDeclarationType(constructor);
@@ -2353,7 +2352,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Markers.EMPTY,
                 multiDeclaration.isVar() ? "var" : null,
                 multiDeclaration.isVar() ? J.Modifier.Type.LanguageExtension : J.Modifier.Type.Final,
-                Collections.emptyList()
+                emptyList()
         );
         modifiers.add(modifier);
 
@@ -2412,7 +2411,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     emptyList(),
                     typeExpression,
                     null,
-                    emptyList(),
                     singletonList(padRight(namedVariable, prefix(entry.getColon())))
             );
 
@@ -2438,7 +2436,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 null,
                 null,
-                emptyList(),
                 singletonList(padRight(emptyWithInitializer, Space.EMPTY))
         );
 
@@ -2701,7 +2698,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     emptyList(),
                     null,
                     null,
-                    emptyList(),
                     singletonList(infixReceiver)
             );
             implicitParam = implicitParam.withMarkers(implicitParam.getMarkers().addIfAbsent(new TypeReferencePrefix(randomId(), Space.EMPTY)));
@@ -2974,7 +2970,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 typeExpression,
                 null,
-                Collections.emptyList(),
                 variables
         );
 
@@ -3996,7 +3991,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(),
                 null,
                 null,
-                emptyList(),
                 variables
         );
 

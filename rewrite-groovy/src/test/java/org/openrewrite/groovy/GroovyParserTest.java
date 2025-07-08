@@ -117,4 +117,31 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void variableDeclarationWithArrayInstantiationAsTheLastStatement() {
+        rewriteRun(
+          groovy(
+            """
+            def arr = new String[2]
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    void trailingCommaInMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              System.out.println("Hello World with no extra space",)
+              System.out.println("Hello World with space before comma" ,)
+              System.out.println("Hello World with space after comma", )
+              System.out.println("Hello World with space before & after comma" , )
+              """
+          )
+        );
+    }
+
 }

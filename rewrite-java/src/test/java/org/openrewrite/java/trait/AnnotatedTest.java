@@ -20,7 +20,6 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.trait.Traits.annotated;
 
 class AnnotatedTest implements RewriteTest {
 
@@ -28,7 +27,7 @@ class AnnotatedTest implements RewriteTest {
     void attributes() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            annotated("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+            new Annotated.Matcher("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
               a.getDefaultAttribute("name")
                 .map(lit -> lit.getValue(String.class))
                 .orElse("unknown"))
@@ -68,7 +67,7 @@ class AnnotatedTest implements RewriteTest {
         rewriteRun(
           spec ->
             spec.recipe(RewriteTest.toRecipe(() ->
-              annotated("@Example(other=\"World\")")
+              new Annotated.Matcher("@Example(other=\"World\")")
                 .asVisitor(a -> SearchResult.found(a.getTree()))
             )),
           java(

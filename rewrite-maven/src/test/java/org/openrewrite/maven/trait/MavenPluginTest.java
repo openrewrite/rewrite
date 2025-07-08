@@ -22,13 +22,12 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.maven.trait.Traits.mavenPlugin;
 
 class MavenPluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.toRecipe(() -> mavenPlugin().asVisitor(plugin ->
+        spec.recipe(RewriteTest.toRecipe(() -> new MavenPlugin.Matcher().asVisitor(plugin ->
           SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId()))));
     }
 

@@ -19,7 +19,7 @@ dependencies {
     testImplementation(project(":rewrite-xml"))
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
 }
@@ -31,7 +31,7 @@ tasks.named<JavaCompile>("compileTestJava") {
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }
 
-tasks.withType<Test> {
+tasks.withType<Test>().configureEach {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 

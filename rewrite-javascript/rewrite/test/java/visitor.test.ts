@@ -39,8 +39,7 @@ describe('visitor', () => {
         );
 
         // test
-        // TODO I am not sure about the FieldAccess - what is it doing here?
-        expect(global).toEqual("/org.openrewrite.java.tree.J$ClassDeclaration/org.openrewrite.java.tree.J$Empty/org.openrewrite.java.tree.J$MethodInvocation/org.openrewrite.java.tree.J$FieldAccess");
+        expect(global).toEqual("/org.openrewrite.java.tree.J$ClassDeclaration/org.openrewrite.java.tree.J$Empty/org.openrewrite.java.tree.J$MethodInvocation");
     });
 
     test('call visitExpression for subclasses', async () => {

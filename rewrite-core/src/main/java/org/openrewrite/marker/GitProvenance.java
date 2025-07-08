@@ -32,6 +32,7 @@ import org.openrewrite.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.IncompleteGitConfigException;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
+import org.openrewrite.rpc.Reference;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,7 +50,7 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @AllArgsConstructor(access = AccessLevel.PACKAGE) // required for @With and tests
 @With
-public class GitProvenance implements Marker {
+public class GitProvenance extends Reference implements Marker {
     UUID id;
 
     /**
@@ -96,6 +97,11 @@ public class GitProvenance implements Marker {
         this.autocrlf = autocrlf;
         this.eol = eol;
         this.committers = committers;
+    }
+
+    @Override
+    public Object getValue() {
+        return this;
     }
 
     public @Nullable GitRemote getGitRemote() {
