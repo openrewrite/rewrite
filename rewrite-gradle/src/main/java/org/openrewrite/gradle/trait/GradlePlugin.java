@@ -141,26 +141,20 @@ public class GradlePlugin implements Trait<J> {
 
                         return maybeGradlePlugin(cursor, null, null, null, true);
                     } else if (APPLY_DSL_MATCHER.matches(m, true)) {
-                        if (!(m.getArguments().get(0) instanceof J.Literal)) {
-                            return null;
-                        }
-
-                        if (!(m.getSelect() instanceof J.MethodInvocation && PLUGIN_VERSION_DSL_MATCHER.matches((J.MethodInvocation) m.getSelect(), true))) {
+                        if (!(m.getArguments().get(0) instanceof J.Literal) || !(m.getSelect() instanceof J.MethodInvocation)) {
                             return null;
                         }
 
                         J.MethodInvocation versionSelect = (J.MethodInvocation) m.getSelect();
-                        if (!(versionSelect.getArguments().get(0) instanceof J.Literal)) {
-                            return null;
-                        }
-
-                        if (!(versionSelect.getSelect() instanceof J.MethodInvocation &&
-                                (PLUGIN_ID_DSL_MATCHER.matches((J.MethodInvocation) versionSelect.getSelect(), true) || KOTLIN_PLUGIN_DSL_MATCHER.matches((J.MethodInvocation) versionSelect.getSelect(), true)))) {
+                        if (!PLUGIN_VERSION_DSL_MATCHER.matches(versionSelect, true) ||
+                                !(versionSelect.getArguments().get(0) instanceof J.Literal) ||
+                                !(versionSelect.getSelect() instanceof J.MethodInvocation)) {
                             return null;
                         }
 
                         J.MethodInvocation idSelect = (J.MethodInvocation) versionSelect.getSelect();
-                        if (!(idSelect.getArguments().get(0) instanceof J.Literal)) {
+                        if (!(PLUGIN_ID_DSL_MATCHER.matches(idSelect, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(idSelect, true)) ||
+                                !(idSelect.getArguments().get(0) instanceof J.Literal)) {
                             return null;
                         }
 
@@ -209,21 +203,15 @@ public class GradlePlugin implements Trait<J> {
                         }
 
                         if (entry.getValue() instanceof J.Literal) {
-                            J.Literal literal = (J.Literal) entry.getValue();
-                            String pluginId = (String) literal.getValue();
+                            String pluginId = (String) ((J.Literal) entry.getValue()).getValue();
                             return maybeGradlePlugin(cursor, pluginId, null, null, true);
-                        } else if (entry.getValue() instanceof J.FieldAccess) {
-                            return maybeGradlePlugin(cursor, null, null, null, true);
-                        } else if (entry.getValue() instanceof J.Identifier) {
+                        } else if (entry.getValue() instanceof J.FieldAccess || entry.getValue() instanceof J.Identifier) {
                             return maybeGradlePlugin(cursor, null, null, null, true);
                         }
                     } else if (e instanceof J.Assignment) {
                         J.Assignment assignment = (J.Assignment) e;
-                        if (!(assignment.getVariable() instanceof J.Identifier && ((J.Identifier) assignment.getVariable()).getSimpleName().equals("plugin"))) {
-                            return null;
-                        }
-
-                        if (!(assignment.getAssignment() instanceof J.Literal)) {
+                        if (!(assignment.getVariable() instanceof J.Identifier && ((J.Identifier) assignment.getVariable()).getSimpleName().equals("plugin")) ||
+                                !(assignment.getAssignment() instanceof J.Literal)) {
                             return null;
                         }
 
@@ -231,9 +219,7 @@ public class GradlePlugin implements Trait<J> {
                         String pluginId = (String) literal.getValue();
                         return maybeGradlePlugin(cursor, pluginId, null, null, true);
                     } else if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
-                        if (m.getTypeParameters().get(0) instanceof J.FieldAccess) {
-                            return maybeGradlePlugin(cursor, null, null, null, true);
-                        } else if (m.getTypeParameters().get(0) instanceof J.Identifier) {
+                        if (m.getTypeParameters().get(0) instanceof J.FieldAccess || m.getTypeParameters().get(0) instanceof J.Identifier) {
                             return maybeGradlePlugin(cursor, null, null, null, true);
                         }
                     }
@@ -304,9 +290,8 @@ public class GradlePlugin implements Trait<J> {
         }
 
         private @Nullable GradlePlugin maybeGradlePlugin(Cursor cursor, @Nullable String pluginId, @Nullable String pluginClass, @Nullable String version, boolean applied) {
-            if (!StringUtils.isBlank(pluginIdPattern) && !matchesGlob(pluginId, pluginIdPattern)) {
-                return null;
-            } else if (!StringUtils.isBlank(this.pluginClass) && !matchesGlob(pluginClass, this.pluginClass)) {
+            if (!StringUtils.isBlank(pluginIdPattern) && !matchesGlob(pluginId, pluginIdPattern) ||
+                    !StringUtils.isBlank(this.pluginClass) && !matchesGlob(pluginClass, this.pluginClass)) {
                 return null;
             }
 
