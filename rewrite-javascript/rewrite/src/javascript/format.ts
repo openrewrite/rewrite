@@ -1030,7 +1030,11 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 
     private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
         if (node.prefix && !node.prefix.whitespace.includes("\n")) {
-            node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            if (node.kind === JS.Kind.ExpressionStatement) {
+                this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
+            } else {
+                node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            }
         }
     }
 
