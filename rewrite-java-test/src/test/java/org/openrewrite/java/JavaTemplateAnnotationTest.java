@@ -164,7 +164,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5712")
     @Nested
-    class NestedAnnotations {
+    class NestedAnnotationsTests {
         @Language("java")
         private final String annotations = """
           package foo;
