@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.maven.tree.Scope;
 
 import static org.openrewrite.Validated.notBlank;
 
@@ -38,12 +37,11 @@ public class DoesNotIncludeDependency extends Recipe {
     String artifactId;
 
     @Option(displayName = "Scope",
-            description = "Default any. If specified, only the requested scope's classpaths will be checked.",
-            required = false,
-            valid = {"compile", "test", "runtime", "provided"},
-            example = "compile")
+            description = "Match dependencies with the specified scope. If not specified, all configurations will be searched.",
+            example = "compileClasspath",
+            required = false)
     @Nullable
-    String scope;
+    String configuration;
 
     @Override
     public String getDisplayName() {
@@ -64,9 +62,7 @@ public class DoesNotIncludeDependency extends Recipe {
     @Override
     public Validated<Object> validate() {
         return super.validate()
-                .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
-                .and(Validated.test("scope", "scope is a valid Maven scope", scope,
-                        s -> Scope.fromName(s) != Scope.Invalid));
+                .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)));
     }
 
     @Override
@@ -76,11 +72,11 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @SuppressWarnings("unchecked")
     private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
-        if (scope == null) {
+        if (configuration == null) {
             return new TreeVisitor[] {
-                    new org.openrewrite.gradle.search.DependencyInsight(groupId, artifactId, null, null).getVisitor(),
+                    new DependencyInsight(groupId, artifactId, null, null).getVisitor(),
             };
         }
-        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, null).getVisitor() };
+        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, null, configuration).getVisitor() };
     }
 }
