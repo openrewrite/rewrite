@@ -30,6 +30,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
     @Nested
     class CheckTransitive {
+
         @Test
         void dependencyPresentFailsApplicability() {
             rewriteRun(
@@ -286,6 +287,48 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     @Nested
     class DontCheckTransitive {
 
+        @DocumentExample
+        @Test
+        void dependencyPresentTransitivelyPassesApplicability() {
+            rewriteRun(
+              spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
+              pomXml(
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-actuator</artifactId>
+                        <version>3.0.0</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                """
+                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-actuator</artifactId>
+                        <version>3.0.0</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided", "compile", "runtime"})
         void dependencyPresentSpecificScopeFailsApplicability(String scope) {
@@ -454,48 +497,6 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """, scope),
                 spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
-              )
-            );
-        }
-
-        @DocumentExample
-        @Test
-        void dependencyPresentTransitivelyPassesApplicability() {
-            rewriteRun(
-              spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
-              pomXml(
-                """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-actuator</artifactId>
-                        <version>3.0.0</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                """
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-actuator</artifactId>
-                        <version>3.0.0</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """
               )
             );
         }
