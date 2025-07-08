@@ -32,7 +32,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     class CheckTransitive {
 
         @Test
-        void dependencyPresentFailsApplicability() {
+        void dependencyPresentNotMarked() {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
@@ -56,7 +56,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         }
 
         @Test
-        void dependencyPresentTransitivelyFailsApplicability() {
+        void dependencyPresentTransitivelyNotMarked() {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
@@ -81,7 +81,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-        void dependencyPresentTransitivelyWithSpecificScopeFailsApplicability(String scope) {
+        void dependencyPresentTransitivelyWithSpecificScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
@@ -107,7 +107,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-        void dependencyPresentWithSpecificScopeFailsApplicability(String scope) {
+        void dependencyPresentWithSpecificScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
@@ -133,7 +133,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided"})
-        void dependencyPresentButNotInSpecifiedCompileScopePassesApplicability(String scope) {
+        void dependencyPresentButNotInSpecifiedCompileScopeMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe((new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "compile"))),
               pomXml(
@@ -175,7 +175,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"compile", "runtime"})
-        void dependencyPresentSpecifiedCompileScopeFailsApplicability(String scope) {
+        void dependencyPresentSpecifiedCompileScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "compile")),
               pomXml(
@@ -201,7 +201,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"provided"})
-        void dependencyPresentButNotInSpecifiedTestScopePassesApplicability(String scope) {
+        void dependencyPresentButNotInSpecifiedTestScopeMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "test")),
               pomXml(
@@ -243,7 +243,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"compile", "runtime", "test"})
-        void dependencyPresentSpecifiedTestScopeFailsApplicability(String scope) {
+        void dependencyPresentSpecifiedTestScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "test")),
               pomXml(
@@ -273,7 +273,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @DocumentExample
         @Test
-        void dependencyPresentTransitivelyPassesApplicability() {
+        void dependencyPresentTransitivelyMarked() {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
               pomXml(
@@ -313,7 +313,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-        void dependencyPresentSpecificScopeFailsApplicability(String scope) {
+        void dependencyPresentSpecificScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
               pomXml(
@@ -339,7 +339,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided"})
-        void dependencyPresentButNotInSpecifiedCompileScopePassesApplicability(String scope) {
+        void dependencyPresentButNotInSpecifiedCompileScopeMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "compile")),
               pomXml(
@@ -381,7 +381,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"compile", "runtime"})
-        void dependencyPresentSpecifiedCompileScopeFailsApplicability(String scope) {
+        void dependencyPresentSpecifiedCompileScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "compile")),
               pomXml(
@@ -407,7 +407,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"provided"})
-        void dependencyPresentButNotInSpecifiedTestScopePassesApplicability(String scope) {
+        void dependencyPresentButNotInSpecifiedTestScopeMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "test")),
               pomXml(
@@ -449,7 +449,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
         @ParameterizedTest
         @ValueSource(strings = {"compile", "runtime", "test"})
-        void dependencyPresentSpecifiedTestScopeFailsApplicability(String scope) {
+        void dependencyPresentSpecifiedTestScopeNotMarked(String scope) {
             rewriteRun(
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "test")),
               pomXml(
@@ -475,12 +475,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void multimodule() {
+    void multimoduleMarksOnlyCorrectModule() {
         rewriteRun(
           spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
@@ -500,7 +499,6 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           ),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
@@ -509,8 +507,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               </project>
               """,
             """
-              <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-              <project>
+              <!--~~>--><project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>b</artifactId>
@@ -523,12 +520,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void dependencyNotPresentPassesApplicability() {
+    void dependencyNotPresentMarked() {
         rewriteRun(
           spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
@@ -537,8 +533,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               </project>
               """,
             """
-              <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-              <project>
+              <!--~~>--><project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
