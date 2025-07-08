@@ -37,8 +37,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -51,8 +50,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """,
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """
               )
             );
         }
@@ -63,8 +61,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -77,8 +74,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """,
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """
               )
             );
         }
@@ -90,8 +86,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -105,8 +100,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -118,8 +112,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, null)),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -133,8 +126,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -146,8 +138,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe((new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "compile"))),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -163,8 +154,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """, scope),
                 String.format("""
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <!--~~>--><project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -190,8 +180,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "compile")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -205,8 +194,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -218,8 +206,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "test")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -235,8 +222,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """, scope),
                 String.format("""
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <!--~~>--><project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -262,8 +248,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null, "test")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -277,8 +262,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -294,8 +278,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -310,8 +293,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <!--~~>--><project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -336,8 +318,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -351,8 +332,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -364,8 +344,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "compile")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -381,8 +360,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """, scope),
                 String.format("""
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <!--~~>--><project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -408,8 +386,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "compile")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -423,8 +400,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -436,8 +412,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "test")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -453,8 +428,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </project>
                   """, scope),
                 String.format("""
-                  <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <!--~~>--><project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -480,8 +454,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, "test")),
               pomXml(
                 String.format("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>org.sample</groupId>
                     <artifactId>sample</artifactId>
@@ -495,8 +468,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                       </dependency>
                     </dependencies>
                   </project>
-                  """, scope),
-                spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
+                  """, scope)
               )
             );
         }
@@ -509,7 +481,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>a</artifactId>
@@ -529,7 +501,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>b</artifactId>
@@ -538,7 +510,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               """,
             """
               <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>b</artifactId>
@@ -557,7 +529,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -566,7 +538,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
               """,
             """
               <!--~~>--><?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
