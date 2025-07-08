@@ -285,6 +285,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
     @Nested
     class DontCheckTransitive {
+
         @ParameterizedTest
         @ValueSource(strings = {"test", "provided", "compile", "runtime"})
         void dependencyPresentSpecificScopeFailsApplicability(String scope) {
