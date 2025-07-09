@@ -71,18 +71,18 @@ public class AnnotationTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-            J j = cursor.getValue();
+                    J j = cursor.getValue();
 
-            template(next(cursor), j, before, after, newSetFromMap(new IdentityHashMap<>()));
+                    template(next(cursor), j, before, after, newSetFromMap(new IdentityHashMap<>()));
 
-            int level            = 1;
-            J   annotationParent = getEnclosingClass(cursor.getParent(level));
-            if (j instanceof J.Annotation) {
-                while (isNotAnnotationTarget(annotationParent)) {
-                    level++;
-                    annotationParent = getEnclosingClass(cursor.getParent(level));
-                }
-            }
+                    int level            = 1;
+                    J   annotationParent = getEnclosingClass(cursor.getParent(level));
+                    if (j instanceof J.Annotation) {
+                        while (isNotAnnotationTarget(annotationParent)) {
+                            level++;
+                            annotationParent = getEnclosingClass(cursor.getParent(level));
+                        }
+                    }
 
                     if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
                         after.insert(0, " void $method() {}");
