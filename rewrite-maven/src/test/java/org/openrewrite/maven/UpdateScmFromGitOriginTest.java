@@ -88,13 +88,13 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <scm>
-                  <url>http://new-server.example.com/username/repo</url>
-                  <connection>scm:git:http://new-server.example.com/username/repo.git</connection>
-                  <developerConnection>scm:git:git@new-server.example.com:username/repo.git</developerConnection>
+                  <url>https://new-server.example.com/username/new-path/repo</url>
+                  <connection>scm:git:https://new-server.example.com/username/new-path/repo.git</connection>
+                  <developerConnection>scm:git:git@new-server.example.com:username/new-path/repo.git</developerConnection>
                 </scm>
               </project>
               """,
-            spec -> spec.markers(gitProvenance("http://new-server.example.com/username/repo.git"))
+            spec -> spec.markers(gitProvenance("http://new-server.example.com/username/new-path/repo.git"))
           )
         );
     }
@@ -124,13 +124,180 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <scm>
-                  <url>https://new-server.example.com/username/repo</url>
-                  <connection>scm:git:https://new-server.example.com/username/repo.git</connection>
-                  <developerConnection>scm:git:git@new-server.example.com:username/repo.git</developerConnection>
+                  <url>https://new-server.example.com/username/new-path/repo</url>
+                  <connection>scm:git:https://new-server.example.com/username/new-path/repo.git</connection>
+                  <developerConnection>scm:git:git@new-server.example.com:username/new-path/repo.git</developerConnection>
                 </scm>
               </project>
               """,
-            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
+            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/new-path/repo.git"))
+          )
+        );
+    }
+
+    @Test
+    void updatesScmFromGitOriginApache() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <url>https://github.com/apache/hugegraph-commons</url>
+                  <connection>scm:git:https://github.com/apache/hugegraph-commons.git</connection>
+                  <developerConnection>scm:git:https://github.com/apache/hugegraph-commons.git</developerConnection>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <url>https://github.com/apache/incubator-hugegraph-commons</url>
+                  <connection>scm:git:https://github.com/apache/incubator-hugegraph-commons.git</connection>
+                  <developerConnection>scm:git:https://github.com/apache/incubator-hugegraph-commons.git</developerConnection>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("ssh://git@github.com/apache/incubator-hugegraph-commons.git"))
+          )
+        );
+    }
+
+    @Test
+    void updatesScmFromGitlab() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <url>https://gitlab.com/old-repo/old-path</url>
+                  <connection>scm:git:https://gitlab.com/old-repo/old-path.git</connection>
+                  <developerConnection>scm:git:https://gitlab.com/old-repo/old-path.git</developerConnection>
+                  <tag>HEAD</tag>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <url>https://gitlab.com/new-repo/new-path</url>
+                  <connection>scm:git:https://gitlab.com/new-repo/new-path.git</connection>
+                  <developerConnection>scm:git:https://gitlab.com/new-repo/new-path.git</developerConnection>
+                  <tag>HEAD</tag>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://gitlab.com/new-repo/new-path.git"))
+          )
+        );
+    }
+
+    @Test
+    void updatesScmFromGitOriginWithScm() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <connection>scm:git:https://open.med.harvard.edu/stash/scm/old-path/repo.git</connection>
+                  <developerConnection>scm:git:https://open.med.harvard.edu/stash/scm/old-path/repo.git</developerConnection>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <connection>scm:git:https://open.med.harvard.edu/stash/scm/new-path/repo.git</connection>
+                  <developerConnection>scm:git:https://open.med.harvard.edu/stash/scm/new-path/repo.git</developerConnection>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://open.med.harvard.edu/stash/scm/new-path/repo.git"))
+          )
+        );
+    }
+
+    @Test
+    void updatesScmFromGitOriginWithUser() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <connection>scm:git:https://username@old-server.example.com/username/repository.git</connection>
+                  <developerConnection>scm:git:https://username@old-server.example.com/username/repository.git</developerConnection>
+                  <url>https://old-server.example.com/username/repository</url>
+                </scm>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <connection>scm:git:https://username@new-server.example.com/username/repository.git</connection>
+                  <developerConnection>scm:git:https://username@new-server.example.com/username/repository.git</developerConnection>
+                  <url>https://new-server.example.com/username/repository</url>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("https://username@new-server.example.com/username/repository.git"))
+          )
+        );
+    }
+
+    @Test
+    void shouldNotUpdateWhenGitOriginIsTheSame() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <scm>
+                  <url>https://github.com/apache/roller</url>
+                  <connection>scm:git:https://github.com/apache/roller.git</connection>
+                  <developerConnection>scm:git:https://github.com/apache/roller.git</developerConnection>
+                </scm>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance("ssh://git@github.com/apache/roller.git"))
           )
         );
     }
@@ -149,6 +316,24 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
               </project>
               """,
             spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
+          )
+        );
+    }
+
+    @Test
+    void doesNothingWhenGitOriginIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            spec -> spec.markers(gitProvenance(null))
           )
         );
     }
