@@ -45,22 +45,18 @@ public class AnnotationTemplateGenerator {
         J j = cursor.getValue();
         if (j instanceof J.MethodDeclaration) {
             after.insert(0, " void $method() {}");
-        }
-        else if (j instanceof J.VariableDeclarations) {
+        } else if (j instanceof J.VariableDeclarations) {
             after.insert(0, " int $variable;");
-        }
-        else if (j instanceof J.ClassDeclaration) {
+        } else if (j instanceof J.ClassDeclaration) {
             if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
                 after.insert(0, "class $Clazz {}");
-            }
-            else {
+            } else {
                 after.insert(0, "static class $Clazz {}");
             }
         }
 
-        if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration && cursor.getParentOrThrow()
-                                                                                        .getParentOrThrow()
-                                                                                        .getValue() instanceof JavaSourceFile) {
+        if (cursor.getParentOrThrow().getValue() instanceof J.ClassDeclaration &&
+                cursor.getParentOrThrow().getParentOrThrow().getValue() instanceof JavaSourceFile) {
             after.append("class $Template {}");
         }
 
@@ -69,9 +65,11 @@ public class AnnotationTemplateGenerator {
 
     public String template(Cursor cursor, String template) {
         //noinspection ConstantConditions
-        return Timer.builder("rewrite.template.generate.statement").register(Metrics.globalRegistry).record(() -> {
-            StringBuilder before = new StringBuilder();
-            StringBuilder after  = new StringBuilder();
+        return Timer.builder("rewrite.template.generate.statement")
+                .register(Metrics.globalRegistry)
+                .record(() -> {
+                    StringBuilder before = new StringBuilder();
+                    StringBuilder after = new StringBuilder();
 
             J j = cursor.getValue();
 
@@ -86,24 +84,21 @@ public class AnnotationTemplateGenerator {
                 }
             }
 
-            if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
-                after.insert(0, " void $method() {}");
-            }
-            else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
-                after.insert(0, " int $variable;");
-            }
-            else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
-                // Check if this is a top-level class or nested class
-                Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
-                if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
-                    after.insert(0, "class $Clazz {}");
-                }
-                else {
-                    after.insert(0, "static class $Clazz {}");
-                }
-            }
-            return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
-        });
+                    if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
+                        after.insert(0, " void $method() {}");
+                    } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
+                        after.insert(0, " int $variable;");
+                    } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
+                        // Check if this is a top-level class or nested class
+                        Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
+                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                            after.insert(0, "class $Clazz {}");
+                        } else {
+                            after.insert(0, "static class $Clazz {}");
+                        }
+                    }
+                    return before + "/*" + TEMPLATE_COMMENT + "*/" + template + "\n" + after;
+                });
     }
 
     public List<J.Annotation> listAnnotations(JavaSourceFile cu) {
@@ -112,18 +107,15 @@ public class AnnotationTemplateGenerator {
         new JavaIsoVisitor<Integer>() {
 
             private @Nullable Comment filterTemplateComment(Comment comment) {
-                return comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)
-                       ? null
-                       : comment;
+                return comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT) ?
+                        null : comment;
             }
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
                 List<Comment> combinedComments = ListUtils.concatAll(
-                        getCursor().getParentOrThrow()
-                                   .<J>getValue()
-                                   .getComments(), annotation.getComments()
-                                                                    );
+                        getCursor().getParentOrThrow().<J>getValue().getComments(),
+                        annotation.getComments());
                 List<Comment> filteredComments = ListUtils.map(combinedComments, this::filterTemplateComment);
                 if (combinedComments != filteredComments) {
                     annotations.add(annotation.withComments(filteredComments));
@@ -155,11 +147,9 @@ public class AnnotationTemplateGenerator {
                 after.append("\n@interface $Placeholder {}");
             }
             return;
-        }
-        else if (j instanceof J.ClassDeclaration) {
+        } else if (j instanceof J.ClassDeclaration) {
             classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, prior);
-        }
-        else if (j instanceof J.Block) {
+        } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
@@ -169,36 +159,32 @@ public class AnnotationTemplateGenerator {
                 for (Statement statement : m.getBody().getStatements()) {
                     if (statement == prior) {
                         break;
-                    }
-                    else if (statement instanceof J.VariableDeclarations) {
-                        before.insert(0, "\n" + variable((J.VariableDeclarations) statement, cursor) + ";\n");
+                    } else if (statement instanceof J.VariableDeclarations) {
+                        before.insert(0, "\n" +
+                                variable((J.VariableDeclarations) statement, cursor) +
+                                ";\n");
                     }
                 }
 
-                if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression()
-                                                                                       .getType()) {
-                    after.append("return ").append(valueOfType(m.getReturnTypeExpression().getType())).append(";\n");
+                if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression().getType()) {
+                    after.append("return ")
+                            .append(valueOfType(m.getReturnTypeExpression().getType()))
+                            .append(";\n");
                 }
 
-                before.insert(
-                        0,
-                        m.withBody(null)
-                         .withLeadingAnnotations(emptyList())
-                         .withPrefix(Space.EMPTY)
-                         .printTrimmed(cursor)
-                         .trim() + '{'
-                             );
+                before.insert(0, m.withBody(null)
+                        .withLeadingAnnotations(emptyList())
+                        .withPrefix(Space.EMPTY)
+                        .printTrimmed(cursor).trim() + '{');
                 after.append('}');
-            }
-            else if (parent instanceof J.Block) {
+            } else if (parent instanceof J.Block) {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
                 for (Statement statement : b.getStatements()) {
                     if (statement == prior) {
                         break;
-                    }
-                    else if (statement instanceof J.VariableDeclarations) {
+                    } else if (statement instanceof J.VariableDeclarations) {
                         J.VariableDeclarations v = (J.VariableDeclarations) statement;
                         if (v.hasModifier(J.Modifier.Type.Final)) {
                             before.insert(0, "\n" + variable(v, cursor) + ";\n");
@@ -212,8 +198,7 @@ public class AnnotationTemplateGenerator {
                 }
                 after.append('}');
             }
-        }
-        else if (j instanceof J.NewClass) {
+        } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             n = n.withBody(null).withPrefix(Space.EMPTY);
             before.insert(0, '{');
@@ -224,16 +209,9 @@ public class AnnotationTemplateGenerator {
         template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(
-            StringBuilder before,
-            StringBuilder after,
-            J.ClassDeclaration parent,
-            Set<J> templated,
-            Cursor cursor,
-            J prior
-                                 ) {
-        J.ClassDeclaration c         = parent;
-        boolean            annotated = isAnnotated(cursor, prior);
+    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J prior) {
+        J.ClassDeclaration c = parent;
+        boolean annotated = isAnnotated(cursor, prior);
         if (!annotated) {
             for (Statement statement : c.getBody().getStatements()) {
                 if (templated.contains(statement)) {
@@ -245,8 +223,7 @@ public class AnnotationTemplateGenerator {
                     if (v.hasModifier(J.Modifier.Type.Final) && v.hasModifier(J.Modifier.Type.Static)) {
                         before.insert(0, variable((J.VariableDeclarations) statement, cursor) + ";\n");
                     }
-                }
-                else if (statement instanceof J.ClassDeclaration) {
+                } else if (statement instanceof J.ClassDeclaration) {
                     // this is a sibling class. we need declarations for all variables and methods.
                     // setting prior to null will cause them all to be written.
                     before.insert(0, '}');
@@ -255,16 +232,15 @@ public class AnnotationTemplateGenerator {
             }
         }
         c = c.withBody(J.Block.createEmptyBlock())
-             .withLeadingAnnotations(null)
-             .withPrefix(Space.EMPTY)
-             .withKind(J.ClassDeclaration.Kind.Type.Class)
-             .withPrimaryConstructor(null);
-        String printed    = c.printTrimmed(cursor);
-        int    braceIndex = printed.lastIndexOf('{');
+                .withLeadingAnnotations(null)
+                .withPrefix(Space.EMPTY)
+                .withKind(J.ClassDeclaration.Kind.Type.Class)
+                .withPrimaryConstructor(null);
+        String printed = c.printTrimmed(cursor);
+        int braceIndex = printed.lastIndexOf('{');
         if (annotated) {
             after.append(braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
-        }
-        else {
+        } else {
             before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
         }
         after.append('}');
@@ -274,9 +250,8 @@ public class AnnotationTemplateGenerator {
         if (!(maybeAnnotation instanceof J.Annotation)) {
             return false;
         }
-        Cursor            sourceFileCursor  = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
-        AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue()
-                                                              .service(AnnotationService.class);
+        Cursor sourceFileCursor = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
+        AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue().service(AnnotationService.class);
         return annotationService.getAllAnnotations(cursor).contains(maybeAnnotation);
     }
 
@@ -286,7 +261,8 @@ public class AnnotationTemplateGenerator {
             for (J.Modifier modifier : variable.getModifiers()) {
                 varBuilder.append(modifier.getType().toString().toLowerCase()).append(' ');
             }
-            varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor)).append(' ');
+            varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor))
+                    .append(' ');
         }
 
         List<J.VariableDeclarations.NamedVariable> variables = variable.getVariables();
