@@ -62,7 +62,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 element.acceptChildren(this, data)
                 if (element is FirResolvedTypeRef) {
                     // Do not visit FirUserTypeRef, since it's not mappable to a type.
-                    if (element.delegatedTypeRef != null && element.delegatedTypeRef !is FirUserTypeRef) {
+                    if (element.delegatedTypeRef !is FirUserTypeRef) {
                         // not sure why this isn't taken care of by `FirResolvedTypeRefImpl#acceptChildren()`
                         element.delegatedTypeRef?.accept(this, data)
                     }
