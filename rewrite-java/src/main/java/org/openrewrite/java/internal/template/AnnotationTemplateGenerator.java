@@ -341,8 +341,7 @@ public class AnnotationTemplateGenerator {
         return !isAnnotationTarget(candidate);
     }
 
-    @Nullable
-    private J getEnclosingClass(@Nullable Cursor cursor) {
+    private @Nullable J getEnclosingClass(@Nullable Cursor cursor) {
         return cursor == null ? null : cursor.firstEnclosing(J.class);
     }
 }

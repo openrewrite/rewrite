@@ -218,7 +218,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               })
               class Test {
               }
-              """, """
+              """,
+                """
               import foo.*;
               
               @NestedAnnotations({
@@ -289,7 +290,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               })
               class Test {
               }
-              """, """
+              """,
+                """
               import foo.*;
               
               @NestedAnnotations( value = {
