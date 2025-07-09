@@ -2318,7 +2318,7 @@ public interface JS extends J {
             for (J.Modifier modifier : modifiers) {
                 allAnnotations.addAll(modifier.getAnnotations());
             }
-            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
+            if (typeExpression instanceof J.AnnotatedType) {
                 allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
             }
             return allAnnotations;
