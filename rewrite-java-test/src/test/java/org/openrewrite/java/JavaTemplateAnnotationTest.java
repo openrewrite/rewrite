@@ -164,7 +164,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5712")
     @Nested
-    class NestedAnnotations {
+    class NestedAnnotationsTests {
         @Language("java")
         private final String annotations = """
           package foo;
@@ -195,11 +195,11 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                         J.Literal value = (J.Literal) arg.getAssignment();
 
                         // Replace 'a' with 'b' in the annotation
-                        return JavaTemplate.builder("@NestedAnnotation(b = #{any(java.lang.String)})")
+                        return JavaTemplate.builder("@NestedAnnotation(b = \"#{}\")")
                           .javaParser(JavaParser.fromJavaVersion().dependsOn(annotations))
                           .imports("foo.*")
                           .build()
-                          .apply(getCursor(), annotation.getCoordinates().replace(), value);
+                          .apply(getCursor(), annotation.getCoordinates().replace(), value.getValue());
                     }
                 }
                 return super.visitAnnotation(annotation, ctx);
@@ -219,8 +219,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations({
-                            @NestedAnnotation(a = "first"),
-                            @NestedAnnotation(a = "second")
+                      @NestedAnnotation(a = "first"),
+                      @NestedAnnotation(a = "second")
                     })
                     String field;
                     void method() {}
@@ -231,8 +231,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations({
-                            @NestedAnnotation(b = "first"),
-                            @NestedAnnotation(b = "second")
+                      @NestedAnnotation(b = "first"),
+                      @NestedAnnotation(b = "second")
                     })
                     String field;
                     void method() {}
@@ -255,8 +255,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations(value = {
-                            @NestedAnnotation(a = "first"),
-                            @NestedAnnotation(a = "second")
+                      @NestedAnnotation(a = "first"),
+                      @NestedAnnotation(a = "second")
                     })
                     String field;
                     void method() {}
@@ -267,8 +267,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations(value = {
-                            @NestedAnnotation(b = "first"),
-                            @NestedAnnotation(b = "second")
+                      @NestedAnnotation(b = "first"),
+                      @NestedAnnotation(b = "second")
                     })
                     String field;
                     void method() {}
@@ -291,8 +291,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations({
-                            @NestedAnnotation(a = "first"),
-                            @NestedAnnotation(a = "second")
+                      @NestedAnnotation(a = "first"),
+                      @NestedAnnotation(a = "second")
                     })
                     void method() {}
                   }
@@ -302,8 +302,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations({
-                            @NestedAnnotation(b = "first"),
-                            @NestedAnnotation(b = "second")
+                      @NestedAnnotation(b = "first"),
+                      @NestedAnnotation(b = "second")
                     })
                     void method() {}
                   }
@@ -325,8 +325,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations(value = {
-                            @NestedAnnotation(a = "first"),
-                            @NestedAnnotation(a = "second")
+                      @NestedAnnotation(a = "first"),
+                      @NestedAnnotation(a = "second")
                     })
                     void method() {}
                   }
@@ -336,8 +336,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                     @NestedAnnotations(value = {
-                            @NestedAnnotation(b = "first"),
-                            @NestedAnnotation(b = "second")
+                      @NestedAnnotation(b = "first"),
+                      @NestedAnnotation(b = "second")
                     })
                     void method() {}
                   }
@@ -358,8 +358,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   import foo.*;
                   
                   @NestedAnnotations({
-                          @NestedAnnotation(a = "first"),
-                          @NestedAnnotation(a = "second")
+                    @NestedAnnotation(a = "first"),
+                    @NestedAnnotation(a = "second")
                   })
                   class A {
                     void method() {}
@@ -369,8 +369,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   import foo.*;
                   
                   @NestedAnnotations({
-                          @NestedAnnotation(b = "first"),
-                          @NestedAnnotation(b = "second")
+                    @NestedAnnotation(b = "first"),
+                    @NestedAnnotation(b = "second")
                   })
                   class A {
                     void method() {}
@@ -392,8 +392,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   import foo.*;
                   
                   @NestedAnnotations(value = {
-                          @NestedAnnotation(a = "first"),
-                          @NestedAnnotation(a = "second")
+                    @NestedAnnotation(a = "first"),
+                    @NestedAnnotation(a = "second")
                   })
                   class A {
                     void method() {}
@@ -403,8 +403,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   import foo.*;
                   
                   @NestedAnnotations(value = {
-                          @NestedAnnotation(b = "first"),
-                          @NestedAnnotation(b = "second")
+                    @NestedAnnotation(b = "first"),
+                    @NestedAnnotation(b = "second")
                   })
                   class A {
                     void method() {}
@@ -427,8 +427,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                       @NestedAnnotations({
-                              @NestedAnnotation(a = "first"),
-                              @NestedAnnotation(a = "second")
+                        @NestedAnnotation(a = "first"),
+                        @NestedAnnotation(a = "second")
                       })
                       class B {
                           void method() {}
@@ -440,8 +440,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                       @NestedAnnotations({
-                              @NestedAnnotation(b = "first"),
-                              @NestedAnnotation(b = "second")
+                        @NestedAnnotation(b = "first"),
+                        @NestedAnnotation(b = "second")
                       })
                       class B {
                           void method() {}
@@ -465,8 +465,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                       @NestedAnnotations(value = {
-                              @NestedAnnotation(a = "first"),
-                              @NestedAnnotation(a = "second")
+                        @NestedAnnotation(a = "first"),
+                        @NestedAnnotation(a = "second")
                       })
                       class B {
                           void method() {}
@@ -478,8 +478,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   
                   class A {
                       @NestedAnnotations(value = {
-                              @NestedAnnotation(b = "first"),
-                              @NestedAnnotation(b = "second")
+                        @NestedAnnotation(b = "first"),
+                        @NestedAnnotation(b = "second")
                       })
                       class B {
                           void method() {}
