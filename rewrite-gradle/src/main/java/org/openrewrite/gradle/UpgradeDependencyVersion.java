@@ -801,6 +801,21 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     } else if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
                         replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
+                    } else if (versionExp instanceof K.StringTemplate) {
+                        K.StringTemplate kString = (K.StringTemplate) versionExp;
+
+                        if (kString.getStrings().size() != 1) {
+                            return m;
+                        }
+
+                        K.StringTemplate.Expression versionLiteral = (K.StringTemplate.Expression) kString.getStrings().get(0);
+                        String versionVariableName = versionLiteral.printTrimmed(getCursor());
+
+                        if (versionVariableName.startsWith("$")) {
+                            versionVariableName = versionVariableName.replaceAll("^\\$\\{?|}?$", "");
+                        }
+
+                        replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
                     }
                 }
             }

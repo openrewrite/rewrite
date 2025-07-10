@@ -409,7 +409,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               def guavaVersion = '29.0-jre'
               
               dependencies {
-                implementation (group: "com.google.guava", name: "guava", version: "%s")
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
               }
               """, stringInterpolationReference),
             String.format("""
@@ -424,7 +424,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               def guavaVersion = '30.1.1-jre'
               
               dependencies {
-                implementation (group: "com.google.guava", name: "guava", version: "%s")
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
+              }
+              """, stringInterpolationReference)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
+    void mapNotationKStringTemplateInterpolation(String stringInterpolationReference) {
+        rewriteRun(
+          buildGradleKts(
+            String.format("""
+              plugins {
+                `java-library`
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              val guavaVersion = "29.0-jre"
+              
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
+              }
+              """, stringInterpolationReference),
+            String.format("""
+              plugins {
+                `java-library`
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              val guavaVersion = "30.1.1-jre"
+              
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
               }
               """, stringInterpolationReference)
           )
