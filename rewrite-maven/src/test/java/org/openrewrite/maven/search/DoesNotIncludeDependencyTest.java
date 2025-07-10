@@ -402,6 +402,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, ""),
+                    String.format(marker + transitiveDependencyTemplate, ""),
                     spec -> spec.path("a/pom.xml")
                   ),
                   pomXml(
