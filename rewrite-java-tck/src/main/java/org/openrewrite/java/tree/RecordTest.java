@@ -79,7 +79,8 @@ class RecordTest implements RewriteTest {
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
               public @interface A {}
-              """, SourceSpec::skip
+              """,
+            SourceSpec::skip
           ),
           java(
             """
