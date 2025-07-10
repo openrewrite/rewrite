@@ -290,7 +290,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitMethodInvocation(methodInv, p) as J.MethodInvocation;
         return produceAsync(ret, async draft => {
             if (draft.select) {
-                draft.select = await this.spaceAfterRightPadded(draft.select, this.style.beforeParentheses.functionCallParentheses);
+                draft.arguments = await this.spaceBeforeContainer(draft.arguments, this.style.beforeParentheses.functionCallParentheses);
             }
             if (ret.arguments.elements.length > 0 && ret.arguments.elements[0].element.kind != J.Kind.Empty) {
                 draft.arguments.elements = await Promise.all(draft.arguments.elements.map(async (arg, index) => {
@@ -1030,7 +1030,11 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 
     private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
         if (node.prefix && !node.prefix.whitespace.includes("\n")) {
-            node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            if (node.kind === JS.Kind.ExpressionStatement) {
+                this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
+            } else {
+                node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            }
         }
     }
 

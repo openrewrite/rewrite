@@ -3581,7 +3581,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private J.NewClass mapType(J.NewClass tree) {
         J.NewClass n = tree;
-        if (n.getClazz() != null && n.getClazz() instanceof J.Identifier) {
+        if (n.getClazz() instanceof J.Identifier) {
             if (n.getClazz().getType() instanceof JavaType.Parameterized) {
                 J.Identifier clazz = (J.Identifier) n.getClazz();
                 n = n.withClazz(clazz.withType(((JavaType.Parameterized) clazz.getType()).getType()));
