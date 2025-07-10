@@ -1216,7 +1216,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitPrimitiveType(PrimitiveTypeTree node, Space fmt) {
-        cursor(endPos(node));
+        cursor += ((JCPrimitiveTypeTree) node).type.tsym.name.length();
 
         JavaType.Primitive primitiveType;
         switch (node.getPrimitiveTypeKind()) {

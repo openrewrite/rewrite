@@ -1243,7 +1243,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitPrimitiveType(PrimitiveTypeTree node, Space fmt) {
-        cursor(endPos(node));
+        cursor += ((JCPrimitiveTypeTree) node).type.tsym.name.length();
 
         JavaType.Primitive primitiveType;
         switch (node.getPrimitiveTypeKind()) {
@@ -2070,12 +2070,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private static @Nullable Symbol extractSymbol(Tree tree) {
         if (tree instanceof JCIdent) {
             return ((JCIdent) tree).sym;
-        } else if (tree instanceof JCTree.JCMethodDecl) {
-            return ((JCTree.JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCClassDecl) {
-            return ((JCTree.JCClassDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCVariableDecl) {
-            return ((JCTree.JCVariableDecl) tree).sym;
+        } else if (tree instanceof JCMethodDecl) {
+            return ((JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCClassDecl) {
+            return ((JCClassDecl) tree).sym;
+        } else if (tree instanceof JCVariableDecl) {
+            return ((JCVariableDecl) tree).sym;
         }
         return null;
     }
