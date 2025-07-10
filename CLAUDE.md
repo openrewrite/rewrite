@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Active Development Plans
+
+- **Scala Language Support**: See [Scala.md](./Scala.md) for the implementation plan and progress tracking.
+- **Language Support Documentation**: As we implement Scala support, we're documenting the process in [Contributing Additional Language Support](./rewrite-docs/docs/authoring-recipes/contributing-language-support.md). This guide should be continuously updated with lessons learned during implementation.
+
 ## Project Overview
 
 OpenRewrite is an automated refactoring ecosystem for source code that eliminates technical debt through AST-based transformations. The project uses a visitor pattern architecture where **Recipes** define transformations and **TreeVisitors** traverse and modify Abstract Syntax Trees (ASTs).

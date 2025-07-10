@@ -1,0 +1,3 @@
+[submodule "rewrite-docs"]
+	path = rewrite-docs
+	url = https://github.com/openrewrite/rewrite-docs.git
