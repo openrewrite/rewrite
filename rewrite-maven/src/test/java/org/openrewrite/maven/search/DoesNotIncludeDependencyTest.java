@@ -30,6 +30,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "<!--~~>-->";
+    
     @Language("xml")
     private static final String missingDependencyTemplate = """
       <project>
