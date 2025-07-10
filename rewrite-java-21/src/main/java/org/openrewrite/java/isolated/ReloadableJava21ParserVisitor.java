@@ -427,10 +427,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             List<Tree> stateVector = new ArrayList<>();
             for (Tree member : node.getMembers()) {
-                if (member instanceof VariableTree vt) {
-                    if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        stateVector.add(vt);
-                    }
+                if (member instanceof JCMethodDecl method && method.getName().contentEquals("<init>")) {
+                    stateVector.addAll(method.getParameters());
+                    break;
                 }
             }
             primaryConstructor = JContainer.build(
@@ -1648,8 +1647,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         TypeTree typeExpr;
         if (vartype == null) {
             typeExpr = null;
-        } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
+        } else if (endPos(vartype) < 0 && (node.sym.flags() & Flags.RECORD) == 0) {
+            if ((node.sym.flags() & Flags.PARAMETER) != 0) {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {

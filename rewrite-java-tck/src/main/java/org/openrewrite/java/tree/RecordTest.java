@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -64,4 +65,30 @@ class RecordTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4473")
+    @Test
+    void annotationOnConstructorParameter() {
+        rewriteRun(
+          java(
+            """
+              package a;
+
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
+              public @interface A {}
+              """, SourceSpec::skip
+          ),
+          java(
+            """
+              package b;
+
+              record B(@a.A String a) {}
+              """
+          )
+        );
+    }
+
 }
