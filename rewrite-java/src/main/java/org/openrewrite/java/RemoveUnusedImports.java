@@ -48,7 +48,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove unused imports";
+        return "Remove unused imports fix";
     }
 
     @Override
