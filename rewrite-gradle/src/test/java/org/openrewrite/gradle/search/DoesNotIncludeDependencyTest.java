@@ -15,25 +15,34 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.Recipe;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
-    @ParameterizedTest
-    @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
-    void dependencyPresentWithoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null)),
-          buildGradle(String.format("""
+    private static final String marker = "/*~~>*/";
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
+
+    private Recipe defaultRecipeWithConfiguration(@Nullable String configuration) {
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", configuration);
+    }
+
+    @Nested
+    class DirectDependencyPresent {
+        //language=groovy
+        private static final String directDependencyTemplate = """
             plugins {
                 id 'java-library'
             }
@@ -43,20 +52,53 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             dependencies {
                 %s 'org.springframework:spring-beans:6.0.0'
             }
-            """, configuration),
-            spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
-          )
-        );
+            """;
+
+        @ParameterizedTest
+        @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
+        void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
+              buildGradle(String.format(directDependencyTemplate, configuration))
+            );
+        }
+
+        @ParameterizedTest
+        @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
+        @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
+        @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
+        @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
+        @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
+              buildGradle(
+                String.format(directDependencyTemplate, existingConfiguration),
+                String.format(marker + directDependencyTemplate, existingConfiguration)
+              )
+            );
+        }
+
+        @ParameterizedTest
+        @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
+        @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
+        @CsvSource({"compileOnly,compileClasspath"})
+        @CsvSource({"runtimeOnly,runtimeClasspath", "runtimeOnly,testRuntimeClasspath"})
+        @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
+        @CsvSource({"testCompileOnly,testCompileClasspath"})
+        @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
+              buildGradle(String.format(directDependencyTemplate, existingConfiguration))
+            );
+        }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
-    void dependencyPresentTransitivelyWithoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", null)),
-          buildGradle(String.format("""
+    @Nested
+    class TransitiveDependencyPresent {
+        //language=groovy
+        private static final String transitiveDependencyTemplate = """
             plugins {
                 id 'java-library'
             }
@@ -66,145 +108,46 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             dependencies {
                 %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
             }
-            """, configuration),
-            spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
-          )
-        );
-    }
+            """;
 
-    @ParameterizedTest
-    @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
-    @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
-    @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
-    @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
-    @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
-    void dependencyPresentButNotInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", searchingConfiguration)),
-          buildGradle(
-            String.format("""
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework:spring-beans:6.0.0'
-              }
-              """, existingConfiguration),
-            String.format("""
-              /*~~>*/plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework:spring-beans:6.0.0'
-              }
-              """, existingConfiguration)
-          )
-        );
-    }
+        @ParameterizedTest
+        @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
+        void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
+              buildGradle(String.format(transitiveDependencyTemplate, configuration))
+            );
+        }
 
-    @ParameterizedTest
-    @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
-    @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
-    @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
-    @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
-    @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
-    void dependencyPresentTransitivelyButNotInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", searchingConfiguration)),
-          buildGradle(
-            String.format("""
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
-              }
-              """, existingConfiguration),
-            String.format("""
-              /*~~>*/plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
-              }
-              """, existingConfiguration)
-          )
-        );
-    }
+        @ParameterizedTest
+        @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
+        @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
+        @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
+        @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
+        @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
+              buildGradle(
+                String.format(transitiveDependencyTemplate, existingConfiguration),
+                String.format(marker + transitiveDependencyTemplate, existingConfiguration)
+              )
+            );
+        }
 
-    @ParameterizedTest
-    @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
-    @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
-    @CsvSource({"compileOnly,compileClasspath"})
-    @CsvSource({"runtimeOnly,runtimeClasspath", "runtimeOnly,testRuntimeClasspath"})
-    @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
-    @CsvSource({"testCompileOnly,testCompileClasspath"})
-    @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
-    void dependencyPresentInDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", searchingConfiguration)),
-          buildGradle(
-            String.format("""
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework:spring-beans:6.0.0'
-              }
-              """, existingConfiguration),
-            spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
-          )
-        );
-    }
-
-    @ParameterizedTest
-    @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
-    @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
-    @CsvSource({"compileOnly,compileClasspath"})
-    @CsvSource({"runtimeOnly,runtimeClasspath", "runtimeOnly,testRuntimeClasspath"})
-    @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
-    @CsvSource({"testCompileOnly,testCompileClasspath"})
-    @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
-    void dependencyPresentTransitivelyInDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
-        rewriteRun(
-          spec -> spec
-            .beforeRecipe(withToolingApi())
-            .recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", searchingConfiguration)),
-          buildGradle(
-            String.format("""
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
-              }
-              """, existingConfiguration),
-            spec -> spec.afterRecipe(doc -> assertThat(doc.getMarkers().getMarkers()).noneMatch(marker -> marker instanceof SearchResult))
-          )
-        );
+        @ParameterizedTest
+        @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
+        @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
+        @CsvSource({"compileOnly,compileClasspath"})
+        @CsvSource({"runtimeOnly,runtimeClasspath", "runtimeOnly,testRuntimeClasspath"})
+        @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
+        @CsvSource({"testCompileOnly,testCompileClasspath"})
+        @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
+              buildGradle(String.format(transitiveDependencyTemplate, existingConfiguration))
+            );
+        }
     }
 }
