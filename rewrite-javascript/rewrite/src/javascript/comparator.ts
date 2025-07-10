@@ -1532,27 +1532,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Overrides the visitTrailingTokenStatement method to compare trailing token statements.
-     * 
-     * @param trailingTokenStatement The trailing token statement to visit
-     * @param other The other trailing token statement to compare with
-     * @returns The visited trailing token statement, or undefined if the visit was aborted
-     */
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TrailingTokenStatement) {
-            this.abort();
-            return trailingTokenStatement;
-        }
-
-        const otherTrailingTokenStatement = other as JS.TrailingTokenStatement;
-
-        // Visit expression
-        await this.visit(trailingTokenStatement.expression.element, otherTrailingTokenStatement.expression.element);
-
-        return trailingTokenStatement;
-    }
-
-    /**
      * Overrides the visitTuple method to compare tuples.
      * 
      * @param tuple The tuple to visit

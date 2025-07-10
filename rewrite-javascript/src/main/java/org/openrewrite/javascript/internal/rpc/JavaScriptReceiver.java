@@ -315,13 +315,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, RpcReceiveQueue q) {
-        return trailingTokenStatement
-                .getPadding().withExpression(q.receive(trailingTokenStatement.getPadding().getExpression(), el -> visitRightPadded(el, q)))
-                .withType(q.receive(trailingTokenStatement.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitTuple(JS.Tuple tuple, RpcReceiveQueue q) {
         return tuple
                 .getPadding().withElements(q.receive(tuple.getPadding().getElements(), el -> visitContainer(el, q)))
