@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -582,6 +582,68 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         }
 
         return expressionWithTypeArguments;
+    }
+
+    /**
+     * Overrides the visitFunctionCall method to compare method invocations.
+     *
+     * @param functionCall The function call to visit
+     * @param other The other function call to compare with
+     * @returns The visited function call, or undefined if the visit was aborted
+     */
+    override async visitFunctionCall(functionCall: JS.FunctionCall, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== JS.Kind.FunctionCall) {
+            this.abort();
+            return functionCall;
+        }
+
+        const otherFunctionCall = other as JS.FunctionCall;
+
+        // Compare function
+        if ((functionCall.function === undefined) !== (otherFunctionCall.function === undefined)) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit function if present
+        if (functionCall.function && otherFunctionCall.function) {
+            await this.visit(functionCall.function.element, otherFunctionCall.function.element);
+            if (!this.match) return functionCall;
+        }
+
+        // Compare typeParameters
+        if ((functionCall.typeParameters === undefined) !== (otherFunctionCall.typeParameters === undefined)) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit typeParameters if present
+        if (functionCall.typeParameters && otherFunctionCall.typeParameters) {
+            if (functionCall.typeParameters.elements.length !== otherFunctionCall.typeParameters.elements.length) {
+                this.abort();
+                return functionCall;
+            }
+
+            // Visit each type parameter in lock step
+            for (let i = 0; i < functionCall.typeParameters.elements.length; i++) {
+                await this.visit(functionCall.typeParameters.elements[i].element, otherFunctionCall.typeParameters.elements[i].element);
+                if (!this.match) return functionCall;
+            }
+        }
+
+        // Compare arguments
+        if (functionCall.arguments.elements.length !== otherFunctionCall.arguments.elements.length) {
+            this.abort();
+            return functionCall;
+        }
+
+        // Visit each argument in lock step
+        for (let i = 0; i < functionCall.arguments.elements.length; i++) {
+            await this.visit(functionCall.arguments.elements[i].element, otherFunctionCall.arguments.elements[i].element);
+            if (!this.match) return functionCall;
+        }
+
+        return functionCall;
     }
 
     /**
@@ -1470,27 +1532,6 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     }
 
     /**
-     * Overrides the visitTrailingTokenStatement method to compare trailing token statements.
-     * 
-     * @param trailingTokenStatement The trailing token statement to visit
-     * @param other The other trailing token statement to compare with
-     * @returns The visited trailing token statement, or undefined if the visit was aborted
-     */
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, other: J): Promise<J | undefined> {
-        if (!this.match || other.kind !== JS.Kind.TrailingTokenStatement) {
-            this.abort();
-            return trailingTokenStatement;
-        }
-
-        const otherTrailingTokenStatement = other as JS.TrailingTokenStatement;
-
-        // Visit expression
-        await this.visit(trailingTokenStatement.expression.element, otherTrailingTokenStatement.expression.element);
-
-        return trailingTokenStatement;
-    }
-
-    /**
      * Overrides the visitTuple method to compare tuples.
      * 
      * @param tuple The tuple to visit
@@ -1608,6 +1649,29 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
         await this.visit(typeTreeExpression.expression, otherTypeTreeExpression.expression);
 
         return typeTreeExpression;
+    }
+
+    /**
+     * Overrides the visitAs method to compare as expressions.
+     *
+     * @param as_ The as expression to visit
+     * @param other The other as expression to compare with
+     * @returns The visited as expression, or undefined if the visit was aborted
+     */
+    override async visitAs(as_: JS.As, other: J): Promise<J | undefined> {
+        if (!this.match || other.kind !== JS.Kind.As) {
+            this.abort();
+            return as_;
+        }
+
+        const otherAs = other as JS.As;
+
+        // Visit left and right operands in lock step
+        await this.visit(as_.left.element, otherAs.left.element);
+        if (!this.match) return as_;
+
+        await this.visit(as_.right, otherAs.right);
+        return as_;
     }
 
     /**

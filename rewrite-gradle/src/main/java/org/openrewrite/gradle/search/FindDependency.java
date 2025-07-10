@@ -18,17 +18,12 @@ package org.openrewrite.gradle.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.marker.SearchResult;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -67,56 +62,12 @@ public class FindDependency extends Recipe {
                 "A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
     }
 
-    private static final List<String> DEPENDENCY_MANAGEMENT_METHODS = Arrays.asList(
-            "api",
-            "implementation",
-            "compileOnly",
-            "runtimeOnly",
-            "testImplementation",
-            "testCompileOnly",
-            "testRuntimeOnly",
-            "debugImplementation",
-            "releaseImplementation",
-            "androidTestImplementation",
-            "featureImplementation",
-            "annotationProcessor",
-            "kapt",
-            "ksp",
-            "compile", // deprecated
-            "runtime", // deprecated
-            "testCompile", // deprecated
-            "testRuntime" // deprecated
-    );
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (DEPENDENCY_MANAGEMENT_METHODS.contains(method.getSimpleName())) {
-                    if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
-                        List<Expression> depArgs = method.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal &&
-                                groupArtifactMatches((J.Literal) depArgs.get(0))) {
-                            return SearchResult.found(method);
-                        } else if (depArgs.get(0) instanceof G.GString &&
-                                groupArtifactMatches((J.Literal) ((G.GString) depArgs.get(0)).getStrings().get(0))) {
-                            return SearchResult.found(method);
-                        }
-                    }
-                }
-                return super.visitMethodInvocation(method, ctx);
-            }
-
-            boolean groupArtifactMatches(J.Literal gavValue) {
-                String gav = (String) gavValue.getValue();
-                assert gav != null;
-                String[] parts = gav.split(":");
-                if (parts.length >= 2) {
-                    return StringUtils.matchesGlob(parts[0], groupId) && StringUtils.matchesGlob(parts[1], artifactId);
-                }
-                return false;
-            }
-        });
+        return new GradleDependency.Matcher()
+                .groupId(groupId)
+                .artifactId(artifactId)
+                .configuration(configuration)
+                .asVisitor(gd -> SearchResult.found(gd.getTree()));
     }
 }

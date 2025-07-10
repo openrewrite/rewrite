@@ -292,8 +292,9 @@ describe('for mapping', () => {
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const forOfLoop = <JS.ForOfLoop>cu.statements[3].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ArrayBindingPattern);
-                const arrayBinding = <JS.ArrayBindingPattern>forOfLoop.loop.control.variable.element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
                 expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
                 expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("firstName");
                 expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
@@ -338,8 +339,9 @@ describe('for mapping', () => {
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ArrayBindingPattern);
-                const arrayBinding = <JS.ArrayBindingPattern>forOfLoop.loop.control.variable.element;
+                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
                 expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
                 expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("first");
                 expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);

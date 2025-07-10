@@ -19,7 +19,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -62,7 +61,7 @@ public class DependencyUseMapNotation extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+            GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
             if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 return m;
@@ -94,7 +93,7 @@ public class DependencyUseMapNotation extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+            GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
             if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 return m;

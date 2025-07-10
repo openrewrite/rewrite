@@ -99,16 +99,18 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, P p) {
-        visitAndValidateNonNull(trailingTokenStatement.getExpression(), J.class, p);
-        return trailingTokenStatement;
-    }
-
-    @Override
     public JS.ExpressionWithTypeArguments visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, P p) {
         visitAndValidateNonNull(expressionWithTypeArguments.getClazz(), J.class, p);
         visitAndValidate(expressionWithTypeArguments.getTypeArguments(), Expression.class, p);
         return expressionWithTypeArguments;
+    }
+
+    @Override
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        visitAndValidate(functionCall.getFunction(), Expression.class, p);
+        visitAndValidate(functionCall.getTypeParameters(), Expression.class, p);
+        visitAndValidate(functionCall.getArguments(), Expression.class, p);
+        return functionCall;
     }
 
     @Override
@@ -136,6 +138,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     @Override
     public JS.Import visitImportDeclaration(JS.Import import_, P p) {
+        visitAndValidate(import_.getModifiers(), J.Modifier.class, p);
         visitAndValidate(import_.getImportClause(), JS.ImportClause.class, p);
         visitAndValidate(import_.getModuleSpecifier(), Expression.class, p);
         visitAndValidate(import_.getAttributes(), JS.ImportAttributes.class, p);
@@ -454,6 +457,13 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     public JS.IndexedAccessType.IndexType visitIndexedAccessTypeIndexType(JS.IndexedAccessType.IndexType indexType, P p) {
         visitAndValidateNonNull(indexType.getElement(), TypeTree.class, p);
         return indexType;
+    }
+
+    @Override
+    public JS.As visitAs(JS.As as_, P p) {
+        visitAndValidateNonNull(as_.getLeft(), Expression.class, p);
+        visitAndValidateNonNull(as_.getRight(), Expression.class, p);
+        return as_;
     }
 
     @Override

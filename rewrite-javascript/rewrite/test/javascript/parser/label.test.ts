@@ -14,28 +14,30 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {JS, typescript} from "../../../src/javascript";
-import {J, JavaType} from "../../../src/java";
+import {typescript} from "../../../src/javascript";
 
-describe('this mapping', () => {
+describe('label mapping', () => {
     const spec = new RecipeSpec();
 
-    test('simple', () => spec.rewriteRun(
-        typescript('this')
-    ));
-
-    test('this type mapping', () => spec.rewriteRun(
-        typescript(
-           `
-            class A {
-               m(): A { return this; }
-            }
-            class B {
-               m(): B { return this; }
-            }
-            const aa = new A().m();
-            const bb = new B().m();
+    test('with trailing semicolon', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function f() {
+                    /*1*/label/*2*/:/*3*/console.log("A")/*4*/;
+                }
+                /*1*/alsoLabel/*2*/:/*3*/console.log("A")/*4*/;
             `)
-        )
-    );
+        ));
+
+    test('without trailing semicolon', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                function f() {
+                    /*1*/label/*2*/:/*3*/console.log("A")/*4*/
+                }
+                /*1*/alsoLabel/*2*/:/*3*/console.log("A")/*4*/
+            `)
+        ));
 });

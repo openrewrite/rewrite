@@ -23,7 +23,6 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -85,7 +84,7 @@ public class ChangeDependencyExtension extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .configuration(configuration)
                         .groupId(groupId)
                         .artifactId(artifactId);
