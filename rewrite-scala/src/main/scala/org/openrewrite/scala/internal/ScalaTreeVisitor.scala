@@ -303,7 +303,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     if (adjustedTreeStart > cursor && adjustedTreeStart <= source.length) {
       cursor = adjustedTreeStart
-      Space.build(source.substring(start, adjustedTreeStart), Collections.emptyList())
+      // Use Space.format to properly extract comments from whitespace
+      Space.format(source.substring(start, adjustedTreeStart))
     } else {
       Space.EMPTY
     }
