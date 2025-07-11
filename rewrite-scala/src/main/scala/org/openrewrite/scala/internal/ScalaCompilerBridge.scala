@@ -83,7 +83,9 @@ class ScalaCompilerBridge {
       pkgDef.stats.collectFirst {
         case mod: untpd.ModuleDef if mod.name.toString == "ExprWrapper" =>
           mod.impl.body.collectFirst {
-            case vd: untpd.ValDef if vd.name.toString == "result" => vd.rhs
+            case vd: untpd.ValDef if vd.name.toString == "result" => 
+              // The rhs (right-hand side) is the expression we want
+              vd.rhs
           }
       }.flatten
     case _ => None

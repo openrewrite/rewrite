@@ -21,7 +21,7 @@ import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Names.*
 import dotty.tools.dotc.util.{SourcePosition, Spans}
-import org.openrewrite.java.tree.{J, JavaType, JLeftPadded, JRightPadded, Space, Statement}
+import org.openrewrite.java.tree.{J, JavaType, JLeftPadded, JRightPadded, Space, Statement, Expression}
 import org.openrewrite.marker.Markers
 import org.openrewrite.Tree
 import java.util.{ArrayList, Collections, List => JList, UUID}
@@ -39,6 +39,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case lit: untpd.Literal => visitLiteral(lit)
     case num: untpd.Number => visitNumber(num)
     case id: untpd.Ident => visitIdent(id)
+    case app: untpd.Apply => visitApply(app)
+    case sel: untpd.Select => visitSelect(sel)
     case _ => visitUnknown(tree)
   }
   
@@ -118,6 +120,103 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     )
   }
   
+  private def visitApply(app: untpd.Apply): J = {
+    // In Scala, binary operations like "1 + 2" are parsed as Apply(Select(1, +), List(2))
+    app.fun match {
+      case sel: untpd.Select if app.args.length == 1 && isBinaryOperator(sel.name.toString) =>
+        // This is likely a binary operation (infix notation)
+        visitBinary(sel, app.args.head)
+      case sel: untpd.Select =>
+        // Method call with dot notation like "1.+(2)"
+        visitMethodInvocation(app)
+      case _ =>
+        // Other kinds of applications - for now treat as unknown
+        visitUnknown(app)
+    }
+  }
+  
+  private def visitMethodInvocation(app: untpd.Apply): J = {
+    // For method invocations, we need to handle the entire expression
+    // Check if the span is reasonable
+    val adjustedStart = Math.max(0, app.span.start - offsetAdjustment)
+    val adjustedEnd = Math.min(source.length, app.span.end - offsetAdjustment)
+    
+    // For now, just use Unknown to capture the whole expression correctly
+    visitUnknown(app)
+  }
+  
+  private def isBinaryOperator(name: String): Boolean = {
+    // Check if this is a known binary operator
+    Set("+", "-", "*", "/", "%", "==", "!=", "<", ">", "<=", ">=", 
+        "&&", "||", "&", "|", "^", "<<", ">>", ">>>", "::", "++").contains(name)
+  }
+  
+  private def visitBinary(sel: untpd.Select, right: untpd.Tree): J.Binary = {
+    val left = visitTree(sel.qualifier).asInstanceOf[Expression]
+    val operator = mapOperator(sel.name.toString)
+    val rightExpr = visitTree(right).asInstanceOf[Expression]
+    
+    new J.Binary(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      left,
+      JLeftPadded.build(operator),
+      rightExpr,
+      null // type will be set later
+    )
+  }
+  
+  private def mapOperator(op: String): J.Binary.Type = op match {
+    case "+" => J.Binary.Type.Addition
+    case "-" => J.Binary.Type.Subtraction
+    case "*" => J.Binary.Type.Multiplication
+    case "/" => J.Binary.Type.Division
+    case "%" => J.Binary.Type.Modulo
+    case "==" => J.Binary.Type.Equal
+    case "!=" => J.Binary.Type.NotEqual
+    case "<" => J.Binary.Type.LessThan
+    case ">" => J.Binary.Type.GreaterThan
+    case "<=" => J.Binary.Type.LessThanOrEqual
+    case ">=" => J.Binary.Type.GreaterThanOrEqual
+    case "&&" => J.Binary.Type.And
+    case "||" => J.Binary.Type.Or
+    case "&" => J.Binary.Type.BitAnd
+    case "|" => J.Binary.Type.BitOr
+    case "^" => J.Binary.Type.BitXor
+    case "<<" => J.Binary.Type.LeftShift
+    case ">>" => J.Binary.Type.RightShift
+    case ">>>" => J.Binary.Type.UnsignedRightShift
+    case _ => 
+      // For custom operators or method calls, we'll need a different approach
+      // For now, treat as method reference
+      J.Binary.Type.Addition // placeholder
+  }
+  
+  private def visitSelect(sel: untpd.Select): J = {
+    // For now, treat Select as a field access or method reference
+    // This handles cases like "obj.field" or method references
+    val target = visitTree(sel.qualifier).asInstanceOf[Expression]
+    val name = new J.Identifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      sel.name.toString,
+      null,
+      null
+    )
+    
+    new J.FieldAccess(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      target,
+      JLeftPadded.build(name),
+      null
+    )
+  }
+  
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
@@ -163,7 +262,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedEnd > adjustedStart) {
       cursor = adjustedEnd
-      source.substring(adjustedStart, adjustedEnd)
+      val result = source.substring(adjustedStart, adjustedEnd)
+      // Debug output
+      // println(s"extractSource: span=(${span.start}, ${span.end}), adjusted=($adjustedStart, $adjustedEnd), result='$result'")
+      result
     } else {
       ""
     }
@@ -185,7 +287,20 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   
   def getRemainingSource: String = {
     if (cursor < source.length) {
-      source.substring(cursor)
+      val remaining = source.substring(cursor)
+      // If we have offset adjustment (wrapped expression), we might have extra wrapper code
+      // Check if remaining is just whitespace or closing braces from the wrapper
+      if (offsetAdjustment > 0) {
+        val trimmed = remaining.trim
+        // Check if it's just the closing brace from the wrapper
+        if (trimmed == "}" || trimmed.isEmpty) {
+          ""
+        } else {
+          remaining
+        }
+      } else {
+        remaining
+      }
     } else {
       ""
     }
