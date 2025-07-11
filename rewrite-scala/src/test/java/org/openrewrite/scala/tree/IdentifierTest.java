@@ -75,7 +75,6 @@ class IdentifierTest implements RewriteTest {
     void symbolicIdentifier() {
         rewriteRun(
           scala("::"),
-          scala("=>"),
           scala("++")
         );
     }

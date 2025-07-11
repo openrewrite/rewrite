@@ -91,7 +91,8 @@ public class ScalaParserVisitor {
         }
         
         // Get remaining source for EOF
-        Space eof = EMPTY;
+        String remainingSource = converter.getRemainingSource(parseResult, source);
+        Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
 
         return new S.CompilationUnit(
             randomId(),

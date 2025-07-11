@@ -35,6 +35,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   private var cursor = 0
   
   def visitTree(tree: untpd.Tree): J = tree match {
+    case _ if tree.isEmpty => visitUnknown(tree)
     case lit: untpd.Literal => visitLiteral(lit)
     case num: untpd.Number => visitNumber(num)
     case id: untpd.Ident => visitIdent(id)
@@ -103,6 +104,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   
   private def visitIdent(id: untpd.Ident): J.Identifier = {
     val prefix = extractPrefix(id.span)
+    val sourceText = extractSource(id.span) // Extract source to move cursor
     val simpleName = id.name.toString
     
     new J.Identifier(

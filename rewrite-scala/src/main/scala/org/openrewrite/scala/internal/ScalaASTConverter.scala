@@ -45,6 +45,12 @@ class ScalaASTConverter {
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment)
     val tree = parseResult.tree
     
+    // Check if tree is empty (parse error case)
+    if (tree.isEmpty) {
+      // Return empty list for parse errors
+      return statements
+    }
+    
     // Handle different types of top-level trees
     tree match {
       case pkgDef: untpd.PackageDef =>
@@ -71,6 +77,13 @@ class ScalaASTConverter {
    */
   def getRemainingSource(parseResult: ScalaParseResult, source: String): String = {
     given Context = dotty.tools.dotc.core.Contexts.NoContext
+    
+    // If tree is empty (parse error), don't return any remaining source
+    // The Unknown node will handle the entire source
+    if (parseResult.tree.isEmpty) {
+      return ""
+    }
+    
     val offsetAdjustment = if (parseResult.wasWrapped) {
       "object ExprWrapper { val result = ".length
     } else {
