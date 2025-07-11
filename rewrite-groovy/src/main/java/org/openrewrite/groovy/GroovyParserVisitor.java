@@ -1706,14 +1706,23 @@ public class GroovyParserVisitor {
                 }
 
                 Space prefix = whitespace();
-                if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                    skip(methodNameExpression);
-                    name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
-                } else if (select != null && select.getElement() instanceof J.Identifier) {
-                    name = (J.Identifier) select.getElement();
-                    select = null;
+                boolean implicitCall = (methodNameExpression != null && cursor < source.length() &&
+                        source.charAt(cursor) == '(' && (cursor + methodNameExpression.length() > source.length() ||
+                        !methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length())))
+                );
+                if (implicitCall) {
+                    // This is an implicit call() method - create identifier but it doesn't get printed
+                    name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), "", null, null);
                 } else {
-                    throw new IllegalArgumentException("Unable to parse method call");
+                    if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
+                        skip(methodNameExpression);
+                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
+                    } else if (select != null && select.getElement() instanceof J.Identifier) {
+                        name = (J.Identifier) select.getElement();
+                        select = null;
+                    } else {
+                        throw new IllegalArgumentException("Unable to parse method call");
+                    }
                 }
 
                 if (call.isSpreadSafe()) {
