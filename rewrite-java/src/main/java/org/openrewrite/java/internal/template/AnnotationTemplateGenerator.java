@@ -71,18 +71,17 @@ public class AnnotationTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
-
                     J j = cursor.getValue();
-                    J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
 
-                    int level = 1;
-                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Assignment || annotationParent instanceof J.Annotation) {
-                        level += 1;
-                        if (cursor.getParent(level) == null) {
-                            break;
+                    template(next(cursor), j, before, after, newSetFromMap(new IdentityHashMap<>()));
+
+                    int level            = 1;
+                    J   annotationParent = getEnclosingClass(cursor.getParent(level));
+                    if (j instanceof J.Annotation) {
+                        while (isNotAnnotationTarget(annotationParent)) {
+                            level++;
+                            annotationParent = getEnclosingClass(cursor.getParent(level));
                         }
-                        annotationParent = cursor.getParent(level).firstEnclosing(J.class);
                     }
 
                     if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
@@ -308,5 +307,17 @@ public class AnnotationTemplateGenerator {
 
     private Cursor next(Cursor c) {
         return c.getParentTreeCursor();
+    }
+
+    private boolean isAnnotationTarget(@Nullable J candidate) {
+        return candidate == null || candidate instanceof J.MethodDeclaration || candidate instanceof J.ClassDeclaration || candidate instanceof J.VariableDeclarations;
+    }
+
+    private boolean isNotAnnotationTarget(@Nullable J candidate) {
+        return !isAnnotationTarget(candidate);
+    }
+
+    private @Nullable J getEnclosingClass(@Nullable Cursor cursor) {
+        return cursor == null ? null : cursor.firstEnclosing(J.class);
     }
 }

@@ -22,8 +22,11 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Optional;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -490,4 +493,132 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             );
         }
     }
+
+    @Test
+    void renameAttributeInSubAnnotationDefaultAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(this::getSubAnnotationVisitor)),
+          java(
+            """
+              package com.test.annotation;
+              public @interface InnerA {
+                  Class changeme() default Object.class;
+              }
+              """
+          ),
+          java(
+            """
+              package com.test.annotation;
+              public @interface OuterA {
+                  InnerA[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import com.test.annotation.OuterA;
+              import com.test.annotation.InnerA;
+              
+              class A {
+                  @OuterA({@InnerA(changeme = com.example.class)})
+                  void method(){}
+              }
+              """,
+            """
+              import com.test.annotation.OuterA;
+              import com.test.annotation.InnerA;
+              
+              class A {
+                  @OuterA({@InnerA(iamchanged = com.example.class)})
+                  void method(){}
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void renameAttributeInSubAnnotationWithAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(this::getSubAnnotationVisitor)),
+          java(
+            """
+              package com.test.annotation;
+              public @interface InnerA {
+                  Class changeme() default Object.class;
+              }
+              """
+          ),
+          java(
+            """
+              package com.test.annotation;
+              public @interface OuterA {
+                  InnerA[] value() default {};
+              }
+              """
+          ),
+          java(
+            """
+              import com.test.annotation.OuterA;
+              import com.test.annotation.InnerA;
+              
+              class A {
+                  @OuterA(value = {@InnerA(changeme = com.example.class)})
+                  void method(){}
+              }
+              """,
+            """
+              import com.test.annotation.OuterA;
+              import com.test.annotation.InnerA;
+              
+              class A {
+                  @OuterA(value = {@InnerA(iamchanged = com.example.class)})
+                  void method(){}
+              }
+              """
+          )
+        );
+    }
+
+    private JavaIsoVisitor<ExecutionContext> getSubAnnotationVisitor() {
+
+        return new JavaIsoVisitor<>() {
+            final String annotationType = "com.test.annotation.InnerA";
+            final String origAttributeName = "changeme";
+            final String newAttributeName = "iamchanged";
+
+            final AnnotationMatcher ANNOTATION_MATCHER = new AnnotationMatcher("@" + annotationType);
+
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+
+                if (!ANNOTATION_MATCHER.matches(annotation)) {
+                    return super.visitAnnotation(annotation, executionContext);
+                }
+
+                Optional<Expression> mayBeResponse = findArgumentByName(annotation, origAttributeName);
+                if (mayBeResponse.isPresent()) {
+                    Object[] templateArgs = mayBeResponse.map(expression -> new Object[]{
+                      newAttributeName, ((J.Assignment) expression).getAssignment()
+                    }).orElseGet(() -> new Object[]{newAttributeName});
+
+
+                    return maybeAutoFormat(annotation, JavaTemplate.apply(
+                      "#{} = #{any()}",
+                      getCursor(), annotation.getCoordinates().replaceArguments(), templateArgs), executionContext);
+                }
+                return super.visitAnnotation(annotation, executionContext);
+            }
+
+            private Optional<Expression> findArgumentByName(J.Annotation an, String name) {
+                return an.getArguments().stream()
+                  .filter(arg -> arg instanceof J.Assignment &&
+                    ((J.Identifier) ((J.Assignment) arg).getVariable()).getSimpleName().equalsIgnoreCase(name))
+                  .findFirst();
+            }
+        };
+
+    }
+
 }
