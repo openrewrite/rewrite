@@ -82,4 +82,40 @@ public class ScalaParserTest {
         S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
         assertThat(cu.getPackageDeclaration()).isNotNull();
     }
+
+    @Test
+    void testPackageDuplicationIssue() {
+        ScalaParser parser = ScalaParser.builder().build();
+        
+        String source = "package com.example\n\nval x = 42";
+        
+        List<SourceFile> parsed = parser.parse(source).collect(Collectors.toList());
+        
+        assertThat(parsed).hasSize(1);
+        assertThat(parsed.get(0)).isInstanceOf(S.CompilationUnit.class);
+        
+        S.CompilationUnit cu = (S.CompilationUnit) parsed.get(0);
+        
+        // Check the package declaration
+        assertThat(cu.getPackageDeclaration()).isNotNull();
+        assertThat(cu.getPackageDeclaration().getExpression().toString())
+            .as("Package expression should be 'com.example'")
+            .isEqualTo("com.example");
+        
+        // Check the statements
+        assertThat(cu.getStatements())
+            .as("Should have exactly 1 statement (the val declaration)")
+            .hasSize(1);
+        
+        // Print diagnostics to see what's happening
+        System.out.println("Package: " + cu.getPackageDeclaration().getExpression());
+        System.out.println("Number of statements: " + cu.getStatements().size());
+        for (int i = 0; i < cu.getStatements().size(); i++) {
+            System.out.println("Statement " + i + ": " + cu.getStatements().get(i).getClass().getSimpleName());
+        }
+        
+        // Print the full source to see if there's duplication
+        System.out.println("\nFull printed source:");
+        System.out.println(cu.printTrimmed());
+    }
 }

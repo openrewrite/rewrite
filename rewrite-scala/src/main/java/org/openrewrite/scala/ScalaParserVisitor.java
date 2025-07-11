@@ -70,8 +70,34 @@ public class ScalaParserVisitor {
         List<J.Import> imports = result.getImports();
         List<Statement> statements = result.getStatements();
         
+        
+        // Filter out any Unknown statements that contain the entire source with package
+        if (packageDecl != null) {
+            final String packageName = packageDecl.getPackageName();
+            statements = statements.stream()
+                .filter(stmt -> {
+                    if (stmt instanceof J.Unknown) {
+                        String text = ((J.Unknown) stmt).getSource().getText().trim();
+                        // Skip if this Unknown contains the same package declaration
+                        boolean shouldFilter = text.startsWith("package " + packageName);
+                        return !shouldFilter;
+                    }
+                    return true;
+                })
+                .collect(java.util.stream.Collectors.toList());
+        }
+        
+        // Don't include empty package declarations
+        if (packageDecl != null && packageDecl.getExpression() instanceof J.Identifier) {
+            J.Identifier id = (J.Identifier) packageDecl.getExpression();
+            if (id.getSimpleName().isEmpty() || id.getSimpleName().equals("<empty>")) {
+                packageDecl = null;
+            }
+        }
+        
         // If we didn't get any statements and have source content, create an Unknown node
-        if (statements.isEmpty() && !source.trim().isEmpty()) {
+        // But skip if we already have a package declaration (to avoid duplication)
+        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null) {
             J.Unknown.Source unknownSource = new J.Unknown.Source(
                 randomId(),
                 EMPTY,

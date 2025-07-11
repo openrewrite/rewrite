@@ -20,9 +20,12 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.tree.S;
+
+import java.util.List;
 
 /**
  * ScalaPrinter is responsible for converting the Scala LST back to source code.
@@ -43,21 +46,43 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
         if (scu.getPackageDeclaration() != null) {
             visit(scu.getPackageDeclaration(), p);
-            p.append(';');
+            // In Scala, package declarations are followed by a newline
+            // Check if the next element has a newline in its prefix, if not add one
+            if (!scu.getImports().isEmpty()) {
+                J.Import firstImport = scu.getImports().get(0);
+                if (!firstImport.getPrefix().getWhitespace().startsWith("\n")) {
+                    p.append("\n");
+                }
+            } else if (!scu.getStatements().isEmpty()) {
+                Statement firstStatement = scu.getStatements().get(0);
+                if (!firstStatement.getPrefix().getWhitespace().startsWith("\n")) {
+                    p.append("\n");
+                }
+            }
         }
 
         for (J.Import anImport : scu.getImports()) {
             visit(anImport, p);
-            p.append(';');
         }
 
-        for (Statement statement : scu.getStatements()) {
+        for (int i = 0; i < scu.getStatements().size(); i++) {
+            Statement statement = scu.getStatements().get(i);
             visit(statement, p);
         }
 
         visitSpace(scu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         afterSyntax(scu, p);
         return scu;
+    }
+
+    @Override
+    public J visitPackage(J.Package pkg, PrintOutputCapture<P> p) {
+        beforeSyntax(pkg, Space.Location.PACKAGE_PREFIX, p);
+        p.append("package");
+        visit(pkg.getExpression(), p);
+        // Note: No semicolon in Scala package declarations
+        afterSyntax(pkg, p);
+        return pkg;
     }
 
     // Override additional methods here for Scala-specific syntax as needed

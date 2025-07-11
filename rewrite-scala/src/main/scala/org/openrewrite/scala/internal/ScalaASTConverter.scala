@@ -17,8 +17,9 @@ package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.core.Contexts.*
-import org.openrewrite.java.tree.{J, Space, Statement}
+import org.openrewrite.java.tree.{Expression, J, Space, Statement, TypeTree}
 import org.openrewrite.Tree
+import org.openrewrite.marker.Markers
 
 import java.util.{ArrayList, Collections, List as JList}
 
@@ -70,17 +71,38 @@ class ScalaASTConverter {
     // Handle different types of top-level trees
     tree match {
       case pkgDef: untpd.PackageDef =>
-        // For now, just preserve the entire package as Unknown
-        // Proper package/import extraction will be implemented later
-        val converted = visitor.visitTree(tree)
-        if (converted.isInstanceOf[Statement]) {
-          statements.add(converted.asInstanceOf[Statement])
+        // Extract package declaration and create J.Package using the visitor
+        // This ensures the cursor is properly updated
+        val packageName = extractPackageName(pkgDef)
+        if (packageName.nonEmpty && packageName != "<empty>") {
+          // Create package with proper prefix tracking
+          packageDecl = createPackageDeclaration(pkgDef, visitor)
+        }
+        
+        // Process the statements within the package
+        pkgDef.stats.foreach { stat =>
+          // Skip nested packages - they should not be added as statements
+          stat match {
+            case _: untpd.PackageDef =>
+            case _ =>
+              val converted = visitor.visitTree(stat)
+              converted match {
+                case null => 
+                case _: J.Empty => 
+                case stmt: Statement => 
+                  statements.add(stmt)
+                case other => 
+              }
+          }
         }
       case _ =>
         // Single statement
         val converted = visitor.visitTree(tree)
-        if (converted.isInstanceOf[Statement]) {
-          statements.add(converted.asInstanceOf[Statement])
+        converted match {
+          case null => // Skip null returns
+          case _: J.Empty => // Skip empty nodes
+          case stmt: Statement => statements.add(stmt)
+          case _ => // Skip non-statements
         }
     }
     
@@ -91,30 +113,29 @@ class ScalaASTConverter {
    * Creates a J.Package from a Scala PackageDef.
    */
   private def createPackageDeclaration(pkgDef: untpd.PackageDef, visitor: ScalaTreeVisitor): J.Package = {
-    // For now, create a simple package declaration
-    // The package name is in pkgDef.pid (package identifier)
-    val packageName = pkgDef.pid match {
-      case id: untpd.Ident => id.name.toString
-      case sel: untpd.Select => extractQualifiedName(sel)
-      case _ => ""
-    }
+    // Extract the prefix (whitespace before 'package' keyword)
+    val prefix = visitor.extractPrefix(pkgDef.span)
     
-    // Create a simple identifier for now - proper package expression building will be added later
-    val expr = new J.Identifier(
-      Tree.randomId(),
-      Space.EMPTY,
-      org.openrewrite.marker.Markers.EMPTY,
-      Collections.emptyList(),
-      packageName,
-      null,
-      null
-    )
+    // Extract the package name
+    val packageName = extractPackageName(pkgDef)
+    
+    // Find the end of the package declaration in the source
+    // This includes "package" keyword + package name
+    val packageEndPos = pkgDef.pid.span.end
+    
+    // Update the visitor's cursor to after the package declaration
+    // This is crucial to prevent the package text from being included
+    // in the prefix of subsequent statements
+    visitor.updateCursor(packageEndPos)
+    
+    // Create package expression
+    val packageExpr: Expression = TypeTree.build(packageName)
     
     new J.Package(
       Tree.randomId(),
-      visitor.extractPrefix(pkgDef.span),
-      org.openrewrite.marker.Markers.EMPTY,
-      expr,
+      prefix,
+      Markers.EMPTY,
+      packageExpr.withPrefix(Space.build(" ", Collections.emptyList())),
       Collections.emptyList()
     )
   }
@@ -127,6 +148,17 @@ class ScalaASTConverter {
       case id: untpd.Ident => s"${id.name}.${sel.name}"
       case innerSel: untpd.Select => s"${extractQualifiedName(innerSel)}.${sel.name}"
       case _ => sel.name.toString
+    }
+  }
+  
+  /**
+   * Extracts the package name from a PackageDef.
+   */
+  private def extractPackageName(pkg: untpd.PackageDef): String = {
+    pkg.pid match {
+      case id: untpd.Ident => id.name.toString
+      case sel: untpd.Select => extractQualifiedName(sel)
+      case _ => ""
     }
   }
   
@@ -155,7 +187,18 @@ class ScalaASTConverter {
       0
     }
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment)
-    visitor.visitTree(parseResult.tree)
+    
+    // For package definitions, we need to handle them specially
+    // to avoid visiting the package itself
+    parseResult.tree match {
+      case pkgDef: untpd.PackageDef =>
+        // Visit only the statements within the package
+        pkgDef.stats.foreach(visitor.visitTree)
+      case tree =>
+        // For other trees, visit normally
+        visitor.visitTree(tree)
+    }
+    
     visitor.getRemainingSource
   }
 }

@@ -90,8 +90,8 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            \"\"\"hello
-            world\"\"\"
+            \"""hello
+            world\"""
             """
           )
         );
@@ -112,6 +112,7 @@ class LiteralTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("ScalaUnnecessaryParentheses")
     @Test
     void insideParentheses() {
         rewriteRun(

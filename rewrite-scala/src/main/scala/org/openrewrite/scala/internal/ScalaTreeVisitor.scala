@@ -15,17 +15,15 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
-import dotty.tools.dotc.core.Names.*
-import dotty.tools.dotc.util.{SourcePosition, Spans}
-import org.openrewrite.java.tree.{J, JavaType, JLeftPadded, JRightPadded, Space, Statement, Expression}
-import org.openrewrite.marker.Markers
+import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
-import java.util.{ArrayList, Collections, List => JList, UUID}
-import scala.jdk.CollectionConverters.*
+import org.openrewrite.java.tree.*
+import org.openrewrite.marker.Markers
+
+import java.util.{ArrayList, Collections}
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -34,19 +32,27 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   
   private var cursor = 0
   
+  def updateCursor(position: Int): Unit = {
+    val adjustedPosition = Math.max(0, position - offsetAdjustment)
+    if (adjustedPosition > cursor && adjustedPosition <= source.length) {
+      cursor = adjustedPosition
+    }
+  }
+  
   def visitTree(tree: untpd.Tree): J = tree match {
-    case _ if tree.isEmpty => visitUnknown(tree)
-    case lit: untpd.Literal => visitLiteral(lit)
-    case num: untpd.Number => visitNumber(num)
-    case id: untpd.Ident => visitIdent(id)
-    case app: untpd.Apply => visitApply(app)
-    case sel: untpd.Select => visitSelect(sel)
-    case parens: untpd.Parens => visitParentheses(parens)
-    case imp: untpd.Import => visitImport(imp)
-    case _ => 
-      // Debug: print unknown tree types
-      // println(s"Unknown tree type: ${tree.getClass.getSimpleName}, source: ${extractSource(tree.span)}")
-      visitUnknown(tree)
+      case _ if tree.isEmpty => visitUnknown(tree)
+      case lit: untpd.Literal => visitLiteral(lit)
+      case num: untpd.Number => visitNumber(num)
+      case id: untpd.Ident => visitIdent(id)
+      case app: untpd.Apply => visitApply(app)
+      case sel: untpd.Select => visitSelect(sel)
+      case parens: untpd.Parens => visitParentheses(parens)
+      case imp: untpd.Import => visitImport(imp)
+      case pkg: untpd.PackageDef => visitPackageDef(pkg)
+      case vd: untpd.ValDef => visitValDef(vd)
+      case md: untpd.ModuleDef => visitModuleDef(md)
+      case asg: untpd.Assign => visitAssign(asg)
+      case _ => visitUnknown(tree)
   }
   
   private def visitLiteral(lit: untpd.Literal): J.Literal = {
@@ -128,14 +134,18 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   private def visitApply(app: untpd.Apply): J = {
     // In Scala, binary operations like "1 + 2" are parsed as Apply(Select(1, +), List(2))
     // Unary operations like "-x" are parsed as Apply(Select(x, unary_-), List())
+    // In Scala, binary operations like "1 + 2" are parsed as Apply(Select(1, +), List(2))
+    // Unary operations like "-x" are parsed as Apply(Select(x, unary_-), List())
     app.fun match {
       case sel: untpd.Select if app.args.isEmpty && isUnaryOperator(sel.name.toString) =>
         // This is a unary operation
         visitUnary(sel)
       case sel: untpd.Select if app.args.length == 1 && isBinaryOperator(sel.name.toString) =>
         // This is likely a binary operation (infix notation)
-        visitBinary(sel, app.args.head)
+        // This is likely a binary operation (infix notation)
+        visitBinary(sel, app.args.head, Some(app.span))
       case sel: untpd.Select =>
+        // Method call with dot notation like "1.+(2)"
         // Method call with dot notation like "1.+(2)"
         visitMethodInvocation(app)
       case _ =>
@@ -179,6 +189,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val adjustedStart = Math.max(0, app.span.start - offsetAdjustment)
     val adjustedEnd = Math.min(source.length, app.span.end - offsetAdjustment)
     
+    // Debug output
+    // For method invocations, we need to handle the entire expression
+    // Check if the span is reasonable
+    
     // For now, just use Unknown to capture the whole expression correctly
     visitUnknown(app)
   }
@@ -189,14 +203,30 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         "&&", "||", "&", "|", "^", "<<", ">>", ">>>", "::", "++").contains(name)
   }
   
-  private def visitBinary(sel: untpd.Select, right: untpd.Tree): J.Binary = {
+  private def visitBinary(sel: untpd.Select, right: untpd.Tree, appSpan: Option[Spans.Span] = None): J.Binary = {
+    // For method calls like "1.+(2)", we need to handle the full span from the Apply node
+    val prefix = appSpan match {
+      case Some(span) if span.exists => extractPrefix(span)
+      case _ => Space.EMPTY
+    }
+    
     val left = visitTree(sel.qualifier).asInstanceOf[Expression]
     val operator = mapOperator(sel.name.toString)
     val rightExpr = visitTree(right).asInstanceOf[Expression]
     
+    // Extract any remaining source from the Apply span if provided
+    appSpan.foreach { span =>
+      if (span.exists) {
+        val adjustedEnd = Math.max(0, span.end - offsetAdjustment)
+        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+          cursor = adjustedEnd
+        }
+      }
+    }
+    
     new J.Binary(
       Tree.randomId(),
-      Space.EMPTY,
+      prefix,
       Markers.EMPTY,
       left,
       JLeftPadded.build(operator),
@@ -274,6 +304,31 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     visitUnknown(imp)
   }
   
+  private def visitPackageDef(pkg: untpd.PackageDef): J = {
+    // Package definitions at the statement level should not be converted to statements
+    // They are handled at the compilation unit level
+    // Return null to indicate this node should be skipped
+    null
+  }
+  
+  private def visitValDef(vd: untpd.ValDef): J = {
+    // For now, preserve val/var declarations as Unknown to maintain exact formatting
+    // This will be replaced with proper S.ValDeclaration or similar in the future
+    visitUnknown(vd)
+  }
+  
+  private def visitModuleDef(md: untpd.ModuleDef): J = {
+    // For now, preserve object declarations as Unknown to maintain exact formatting
+    // This will be replaced with proper object support in the future
+    visitUnknown(md)
+  }
+  
+  private def visitAssign(asg: untpd.Assign): J = {
+    // For now, preserve assignments as Unknown to maintain exact formatting
+    // This will be replaced with proper assignment support in the future
+    visitUnknown(asg)
+  }
+  
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
@@ -322,7 +377,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       cursor = adjustedEnd
       val result = source.substring(adjustedStart, adjustedEnd)
       // Debug output
-      // println(s"extractSource: span=(${span.start}, ${span.end}), adjusted=($adjustedStart, $adjustedEnd), result='$result'")
+      // Debug output removed
       result
     } else {
       ""
