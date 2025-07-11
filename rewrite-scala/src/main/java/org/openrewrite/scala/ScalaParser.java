@@ -35,11 +35,9 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class ScalaParser implements Parser {
@@ -70,7 +68,7 @@ public class ScalaParser implements Parser {
                             Path path = Paths.get(pkg + className);
                             return Input.fromString(path, sourceFile);
                         })
-                        .collect(toList()),
+                        .collect(Collectors.toList()),
                 null,
                 new InMemoryExecutionContext()
         );

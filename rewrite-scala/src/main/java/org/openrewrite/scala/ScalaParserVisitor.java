@@ -33,18 +33,15 @@ import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * Converts Scala AST to OpenRewrite's LST model.
- * This visitor implements the SimpleTreeVisitor to traverse the Scala AST.
+ * This visitor delegates to ScalaTreeVisitor for the actual AST traversal.
  */
-public class ScalaParserVisitor implements SimpleTreeVisitor {
+public class ScalaParserVisitor {
     private final Path sourcePath;
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final JavaTypeCache typeCache;
     private final ExecutionContext context;
-
-    // Track current position in source for formatting preservation
-    private int cursor = 0;
 
     public ScalaParserVisitor(Path sourcePath,
                               @Nullable FileAttributes fileAttributes,
@@ -61,24 +58,40 @@ public class ScalaParserVisitor implements SimpleTreeVisitor {
         this.context = context;
     }
 
-    // Result holders
-    private J.Package packageDecl = null;
-    private final List<J.Import> imports = new ArrayList<>();
-    private final List<Statement> statements = new ArrayList<>();
-    
     /**
      * Entry point for converting a Scala AST to an S.CompilationUnit.
      */
-    public S.CompilationUnit visitCompilationUnit(SimpleParseResult parseResult) {
-        // Reset state
-        packageDecl = null;
-        imports.clear();
-        statements.clear();
+    public S.CompilationUnit visitCompilationUnit(ScalaParseResult parseResult) {
+        // Package declaration, imports, and statements will be populated by the Scala tree visitor
+        J.Package packageDecl = null;
+        List<J.Import> imports = new ArrayList<>();
+        List<Statement> statements;
         
-        // Visit the tree
-        parseResult.tree().accept(this);
+        // Use the Scala AST converter to convert the parsed tree
+        ScalaASTConverter converter = new ScalaASTConverter();
+        statements = converter.convertToStatements(parseResult, source);
         
-        Space eof = Space.build(source.substring(cursor), Collections.emptyList());
+        // If we didn't get any statements and have source content, create an Unknown node
+        if (statements.isEmpty() && !source.trim().isEmpty()) {
+            J.Unknown.Source unknownSource = new J.Unknown.Source(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                source
+            );
+            
+            J.Unknown unknown = new J.Unknown(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                unknownSource
+            );
+            
+            statements.add(unknown);
+        }
+        
+        // Get remaining source for EOF
+        Space eof = EMPTY;
 
         return new S.CompilationUnit(
             randomId(),
@@ -94,112 +107,5 @@ public class ScalaParserVisitor implements SimpleTreeVisitor {
             statements,
             eof
         );
-    }
-
-    // SimpleTreeVisitor implementation
-    
-    @Override
-    public void visitPlaceholder(SimplePlaceholderTree tree) {
-        // For now, just create a simple literal statement from the content
-        // This is a placeholder implementation
-        String content = tree.content().trim();
-        
-        if (content.isEmpty()) {
-            return;
-        }
-        
-        // For now, create an Unknown node to preserve the source
-        // TODO: Parse actual Scala content  
-        J.Unknown.Source unknownSource = new J.Unknown.Source(
-            randomId(),
-            EMPTY,
-            Markers.EMPTY,
-            content
-        );
-        
-        J.Unknown unknown = new J.Unknown(
-            randomId(),
-            EMPTY,
-            Markers.EMPTY,
-            unknownSource
-        );
-        
-        statements.add(unknown);
-        
-        // Advance cursor to end of source
-        cursor = source.length();
-    }
-
-    // Utility methods
-    
-    private Expression buildQualifiedName(String qualifiedName) {
-        String[] parts = qualifiedName.split("\\.");
-        Expression expr = null;
-        
-        for (String part : parts) {
-            if (expr == null) {
-                expr = new J.Identifier(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    Collections.emptyList(),
-                    part,
-                    null,
-                    null
-                );
-            } else {
-                expr = new J.FieldAccess(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    expr,
-                    JLeftPadded.build(new J.Identifier(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        Collections.emptyList(),
-                        part,
-                        null,
-                        null
-                    )),
-                    null
-                );
-            }
-        }
-        
-        return expr;
-    }
-
-    private Space whitespace() {
-        int start = cursor;
-        while (cursor < source.length() && Character.isWhitespace(source.charAt(cursor))) {
-            cursor++;
-        }
-        return Space.build(source.substring(start, cursor), Collections.emptyList());
-    }
-
-    private void skip(String text) {
-        if (source.startsWith(text, cursor)) {
-            cursor += text.length();
-        }
-    }
-
-    private JavaType.@Nullable Primitive primitiveType(Object value) {
-        if (value instanceof Boolean) {
-            return JavaType.Primitive.Boolean;
-        } else if (value instanceof Integer) {
-            return JavaType.Primitive.Int;
-        } else if (value instanceof Long) {
-            return JavaType.Primitive.Long;
-        } else if (value instanceof Float) {
-            return JavaType.Primitive.Float;
-        } else if (value instanceof Double) {
-            return JavaType.Primitive.Double;
-        } else if (value instanceof Character) {
-            return JavaType.Primitive.Char;
-        } else if (value instanceof String) {
-            return JavaType.Primitive.String;
-        }
-        return null;
     }
 }

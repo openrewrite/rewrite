@@ -15,27 +15,20 @@
  */
 package org.openrewrite.scala.tree;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.scala.ScalaPrinter;
-import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.scala.ScalaVisitor;
-import org.openrewrite.Checksum;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-
-import static java.util.Collections.emptyList;
 
 /**
  * The Scala language-specific AST types extend the J interface and its sub-types.
@@ -122,7 +115,7 @@ public interface S extends J {
         @Override
         public List<J.ClassDeclaration> getClasses() {
             // TODO: Extract class declarations from statements
-            return emptyList();
+            return Collections.emptyList();
         }
 
         @Override
@@ -145,6 +138,7 @@ public interface S extends J {
                     sourcePath, checksum, packageDeclaration, imports, statements, eof);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public S.CompilationUnit withSourcePath(Path sourcePath) {
             return this.sourcePath.equals(sourcePath) ? this : new S.CompilationUnit(
@@ -186,7 +180,7 @@ public interface S extends J {
             @Override
             public List<JRightPadded<Import>> getImports() {
                 // TODO: Return properly padded imports
-                return emptyList();
+                return Collections.emptyList();
             }
 
             @Override  

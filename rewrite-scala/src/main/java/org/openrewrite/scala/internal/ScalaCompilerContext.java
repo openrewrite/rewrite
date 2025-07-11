@@ -17,10 +17,9 @@ package org.openrewrite.scala.internal;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
 import org.openrewrite.ParseWarning;
+import org.openrewrite.Parser;
 import org.openrewrite.Tree;
-import org.openrewrite.scala.ScalaParsingException;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -33,7 +32,7 @@ import java.util.List;
  * This class delegates to the Scala bridge for compiler interaction.
  */
 public class ScalaCompilerContext {
-    private final SimpleScalaCompilerBridge bridge;
+    private final ScalaCompilerBridge bridge;
     private final ExecutionContext executionContext;
 
     public ScalaCompilerContext(@Nullable Collection<Path> classpath, 
@@ -44,8 +43,8 @@ public class ScalaCompilerContext {
         // Convert classpath to Java list
         List<Path> classpathList = classpath != null ? new ArrayList<>(classpath) : new ArrayList<>();
         
-        // Initialize the simple Scala compiler bridge
-        this.bridge = new SimpleScalaCompilerBridge();
+        // Initialize the Scala compiler bridge
+        this.bridge = new ScalaCompilerBridge();
     }
 
     /**
@@ -56,13 +55,13 @@ public class ScalaCompilerContext {
         String content = input.getSource(executionContext).readFully();
         String path = input.getPath().toString();
         
-        // Parse using the simple Scala bridge
-        SimpleParseResult result = bridge.parse(path, content);
+        // Parse using the Scala bridge
+        ScalaParseResult result = bridge.parse(path, content);
         
         // Convert warnings
         List<ParseWarning> warnings = new ArrayList<>();
         for (int i = 0; i < result.warnings().size(); i++) {
-            SimpleWarning w = result.warnings().get(i);
+            ScalaWarning w = result.warnings().get(i);
             warnings.add(new ParseWarning(Tree.randomId(), 
                 input.getPath().toString() + " at line " + w.line() + ":" + w.column() + " " + w.message()));
         }
@@ -75,15 +74,15 @@ public class ScalaCompilerContext {
      * Result of parsing a Scala source file.
      */
     public static class ParseResult {
-        private final SimpleParseResult parseResult;
+        private final ScalaParseResult parseResult;
         private final List<ParseWarning> warnings;
 
-        public ParseResult(SimpleParseResult parseResult, List<ParseWarning> warnings) {
+        public ParseResult(ScalaParseResult parseResult, List<ParseWarning> warnings) {
             this.parseResult = parseResult;
             this.warnings = warnings;
         }
 
-        public SimpleParseResult getParseResult() {
+        public ScalaParseResult getParseResult() {
             return parseResult;
         }
 
