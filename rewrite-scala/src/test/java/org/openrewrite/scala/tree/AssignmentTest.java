@@ -27,8 +27,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var x = 1
-            x = 5
+            object Test {
+              var x = 1
+              x = 5
+            }
             """
           )
         );
@@ -39,8 +41,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var x = 1
-            x += 1
+            object Test {
+              var x = 1
+              x += 1
+            }
             """
           )
         );
@@ -51,8 +55,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var x = 10
-            x -= 5
+            object Test {
+              var x = 10
+              x -= 5
+            }
             """
           )
         );
@@ -63,8 +69,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var x = 2
-            x *= 3
+            object Test {
+              var x = 2
+              x *= 3
+            }
             """
           )
         );
@@ -75,8 +83,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var x = 10
-            x /= 2
+            object Test {
+              var x = 10
+              x /= 2
+            }
             """
           )
         );
@@ -87,7 +97,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            obj.field = 42
+            object Test {
+              obj.field = 42
+            }
             """
           )
         );
@@ -98,7 +110,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            arr(0) = 10
+            object Test {
+              arr(0) = 10
+            }
             """
           )
         );
@@ -109,8 +123,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           scala(
             """
-            var (a, b) = (1, 2)
-            (a, b) = (3, 4)
+            object Test {
+              var (a, b) = (1, 2)
+              (a, b) = (3, 4)
+            }
             """
           )
         );

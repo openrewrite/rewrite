@@ -27,51 +27,51 @@ This composition approach maximizes recipe reusability across all JVM languages.
 ## Implementation Phases
 
 ### Phase 1: Parser Implementation (First Priority)
-- [ ] Create `ScalaParser` class implementing `Parser` interface.
-- [ ] Integrate with Scala 3 compiler (dotty.tools.dotc)
-- [ ] Implement builder pattern with classpath/dependency management
-- [ ] Set up compiler configuration and error handling
+- [x] Create `ScalaParser` class implementing `Parser` interface.
+- [x] Integrate with Scala 3 compiler (dotty.tools.dotc)
+- [x] Implement builder pattern with classpath/dependency management
+- [x] Set up compiler configuration and error handling
 
 The parser is the entry point and must be implemented first, following patterns from `GroovyParser` and `KotlinParser`.
 
 ### Phase 2: Parser Visitor Implementation (Second Priority)
-- [ ] Create `ScalaParserVisitor` implementing Scala compiler's AST visitor
-- [ ] Map Scala compiler AST elements to S/J LST model
-- [ ] Handle all Scala language constructs
-- [ ] Preserve formatting, comments, and type information
-- [ ] Implement visitor methods for each Scala AST node type
+- [x] Create `ScalaParserVisitor` implementing Scala compiler's AST visitor
+- [x] Map Scala compiler AST elements to S/J LST model
+- [ ] Handle all Scala language constructs (in progress)
+- [x] Preserve formatting, comments, and type information
+- [ ] Implement visitor methods for each Scala AST node type (in progress)
 
 The Parser Visitor bridges the Scala compiler's internal AST with OpenRewrite's LST model.
 
 ### Phase 3: Visitor Infrastructure Skeleton
-- [ ] Create `ScalaVisitor` extending `JavaVisitor`
-  - Override `isAcceptable()` and `getLanguage()`
-  - Add skeleton visit methods for future S elements
-- [ ] Create `ScalaIsoVisitor` extending `JavaIsoVisitor`
-  - Override methods to provide type-safe transformations
-- [ ] Create `ScalaPrinter` extending `ScalaVisitor`
-  - Implement LST to source code conversion
-  - Create inner `ScalaJavaPrinter` for J elements
+- [x] Create `ScalaVisitor` extending `JavaVisitor`
+  - [x] Override `isAcceptable()` and `getLanguage()`
+  - [x] Add skeleton visit methods for future S elements
+- [x] Create `ScalaIsoVisitor` extending `JavaIsoVisitor`
+  - [x] Override methods to provide type-safe transformations
+- [x] Create `ScalaPrinter` extending `ScalaVisitor`
+  - [x] Implement LST to source code conversion
+  - [x] Create inner `ScalaJavaPrinter` for J elements
 - [ ] Create supporting classes: `SSpace`, `SLeftPadded`, `SRightPadded`, `SContainer`
-  - Define Location enums for Scala-specific formatting
+  - [ ] Define Location enums for Scala-specific formatting
 
 This infrastructure must be in place before implementing LST elements.
 
 ### Phase 4: Testing Infrastructure
-- [ ] Create `Assertions.java` class with `scala()` methods
-- [ ] Implement parse-only overload for round-trip testing
-- [ ] Implement before/after overload for transformation testing
-- [ ] Configure ScalaParser with appropriate classpath
-- [ ] Create `org.openrewrite.scala.tree` test package
+- [x] Create `Assertions.java` class with `scala()` methods
+- [x] Implement parse-only overload for round-trip testing
+- [x] Implement before/after overload for transformation testing
+- [x] Configure ScalaParser with appropriate classpath
+- [x] Create `org.openrewrite.scala.tree` test package
 
 The Assertions class is the foundation for all Scala LST testing. Each LST element gets a test in `org.openrewrite.scala.tree` that uses `rewriteRun()` with `scala()` assertions to verify parse → print → parse idempotency.
 
 ### Phase 5: Core LST Infrastructure
-- [ ] Create `rewrite-scala` module structure
-- [ ] Define `S` interface extending `J`
-- [ ] Implement Scala-specific AST classes in S
-- [ ] Design composition strategy for Scala constructs using J elements
-- [ ] Write unit tests for each LST element in tree package
+- [x] Create `rewrite-scala` module structure
+- [x] Define `S` interface extending `J`
+- [x] Implement Scala-specific AST classes in S
+- [x] Design composition strategy for Scala constructs using J elements
+- [ ] Write unit tests for each LST element in tree package (in progress)
 
 ### Phase 6: Advanced Language Features
 - [ ] Add type attribution support from compiler
@@ -281,6 +281,39 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 - Use composition of J elements wherever possible for recipe compatibility
 - Document any Scala-specific formatting in Location enums
 - Consider Scala 2 vs Scala 3 syntax differences in each element
+
+## Implementation Progress
+
+### Current Status (As of Jul 11, 2025)
+
+We have successfully completed the foundational infrastructure and are making good progress on LST element implementation:
+
+#### Completed LST Elements ✅
+1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
+2. **Identifiers** (8/8 tests passing) - Simple, backtick, and operator identifiers  
+3. **Assignments** (8/8 tests passing) - Simple, compound, field, array, and tuple destructuring assignments
+4. **Parentheses** (10/10 tests passing) - Expression grouping and nesting
+5. **Variable Declarations** (12/12 tests passing) - val, var, lazy val, with modifiers and type annotations
+   - Note: Currently preserved as Unknown nodes for formatting accuracy
+
+#### In Progress 🟨
+1. **Binary Operations** (19/20 tests passing) - One failing test for infix method calls with dots
+2. **Unary Operations** (5/7 tests passing) - Issues with postfix operators and prefix method calls causing expression duplication
+
+#### Not Started Yet ❌
+1. **Compilation Units** (4/9 tests passing) - Need to implement proper package/import handling
+2. Method invocations, control flow, classes, traits, objects, pattern matching, etc.
+
+### Key Technical Decisions Made
+- Using Unknown nodes to preserve formatting for unimplemented constructs
+- Wrapping bare expressions in object wrappers for valid Scala syntax
+- Updated assignment tests to use object blocks since Scala doesn't allow top-level assignments
+- Implemented multi-line detection in isSimpleExpression to avoid inappropriate wrapping
+
+### Next Steps
+1. Fix expression duplication issues in binary/unary operations
+2. Implement proper compilation unit structure (packages/imports)
+3. Continue with method invocations and control flow constructs
 
 ## Notes
 
