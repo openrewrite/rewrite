@@ -30,6 +30,7 @@ val allProjects = listOf(
         "rewrite-maven",
         "rewrite-properties",
         "rewrite-protobuf",
+        "rewrite-scala",
         "rewrite-test",
         "rewrite-toml",
         "rewrite-xml",
