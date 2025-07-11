@@ -62,14 +62,13 @@ public class ScalaParserVisitor {
      * Entry point for converting a Scala AST to an S.CompilationUnit.
      */
     public S.CompilationUnit visitCompilationUnit(ScalaParseResult parseResult) {
-        // Package declaration, imports, and statements will be populated by the Scala tree visitor
-        J.Package packageDecl = null;
-        List<J.Import> imports = new ArrayList<>();
-        List<Statement> statements;
-        
         // Use the Scala AST converter to convert the parsed tree
         ScalaASTConverter converter = new ScalaASTConverter();
-        statements = converter.convertToStatements(parseResult, source);
+        CompilationUnitResult result = converter.convertToCompilationUnit(parseResult, source);
+        
+        J.Package packageDecl = result.getPackageDecl();
+        List<J.Import> imports = result.getImports();
+        List<Statement> statements = result.getStatements();
         
         // If we didn't get any statements and have source content, create an Unknown node
         if (statements.isEmpty() && !source.trim().isEmpty()) {

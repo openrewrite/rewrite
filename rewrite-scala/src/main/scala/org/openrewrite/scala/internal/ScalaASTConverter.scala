@@ -17,9 +17,23 @@ package org.openrewrite.scala.internal
 
 import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.core.Contexts.*
-import org.openrewrite.java.tree.Statement
+import org.openrewrite.java.tree.{J, Space, Statement}
+import org.openrewrite.Tree
 
-import java.util.{ArrayList, List as JList}
+import java.util.{ArrayList, Collections, List as JList}
+
+/**
+ * Result of converting a Scala AST to compilation unit components.
+ */
+class CompilationUnitResult(
+  val packageDecl: J.Package,
+  val imports: JList[J.Import],
+  val statements: JList[Statement]
+) {
+  def getPackageDecl: J.Package = packageDecl
+  def getImports: JList[J.Import] = imports
+  def getStatements: JList[Statement] = statements
+}
 
 /**
  * Java-callable wrapper for converting Scala AST to OpenRewrite LST.
@@ -27,10 +41,12 @@ import java.util.{ArrayList, List as JList}
 class ScalaASTConverter {
   
   /**
-   * Converts a Scala parse result to a list of statements.
+   * Converts a Scala parse result to compilation unit components.
    */
-  def convertToStatements(parseResult: ScalaParseResult, source: String): JList[Statement] = {
+  def convertToCompilationUnit(parseResult: ScalaParseResult, source: String): CompilationUnitResult = {
+    val imports = new ArrayList[J.Import]()
     val statements = new ArrayList[Statement]()
+    var packageDecl: J.Package = null
     
     // Get the implicit context from the parse result's tree
     given Context = dotty.tools.dotc.core.Contexts.NoContext
@@ -47,19 +63,18 @@ class ScalaASTConverter {
     
     // Check if tree is empty (parse error case)
     if (tree.isEmpty) {
-      // Return empty list for parse errors
-      return statements
+      // Return empty result for parse errors
+      return CompilationUnitResult(packageDecl, imports, statements)
     }
     
     // Handle different types of top-level trees
     tree match {
       case pkgDef: untpd.PackageDef =>
-        // Package definition contains multiple statements
-        pkgDef.stats.foreach { stat =>
-          val converted = visitor.visitTree(stat)
-          if (converted.isInstanceOf[Statement]) {
-            statements.add(converted.asInstanceOf[Statement])
-          }
+        // For now, just preserve the entire package as Unknown
+        // Proper package/import extraction will be implemented later
+        val converted = visitor.visitTree(tree)
+        if (converted.isInstanceOf[Statement]) {
+          statements.add(converted.asInstanceOf[Statement])
         }
       case _ =>
         // Single statement
@@ -69,7 +84,57 @@ class ScalaASTConverter {
         }
     }
     
-    statements
+    new CompilationUnitResult(packageDecl, imports, statements)
+  }
+  
+  /**
+   * Creates a J.Package from a Scala PackageDef.
+   */
+  private def createPackageDeclaration(pkgDef: untpd.PackageDef, visitor: ScalaTreeVisitor): J.Package = {
+    // For now, create a simple package declaration
+    // The package name is in pkgDef.pid (package identifier)
+    val packageName = pkgDef.pid match {
+      case id: untpd.Ident => id.name.toString
+      case sel: untpd.Select => extractQualifiedName(sel)
+      case _ => ""
+    }
+    
+    // Create a simple identifier for now - proper package expression building will be added later
+    val expr = new J.Identifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      org.openrewrite.marker.Markers.EMPTY,
+      Collections.emptyList(),
+      packageName,
+      null,
+      null
+    )
+    
+    new J.Package(
+      Tree.randomId(),
+      visitor.extractPrefix(pkgDef.span),
+      org.openrewrite.marker.Markers.EMPTY,
+      expr,
+      Collections.emptyList()
+    )
+  }
+  
+  /**
+   * Extracts a qualified name from a Select tree.
+   */
+  private def extractQualifiedName(sel: untpd.Select): String = {
+    sel.qualifier match {
+      case id: untpd.Ident => s"${id.name}.${sel.name}"
+      case innerSel: untpd.Select => s"${extractQualifiedName(innerSel)}.${sel.name}"
+      case _ => sel.name.toString
+    }
+  }
+  
+  /**
+   * Converts a Scala parse result to a list of statements (backward compatibility).
+   */
+  def convertToStatements(parseResult: ScalaParseResult, source: String): JList[Statement] = {
+    convertToCompilationUnit(parseResult, source).statements
   }
   
   /**

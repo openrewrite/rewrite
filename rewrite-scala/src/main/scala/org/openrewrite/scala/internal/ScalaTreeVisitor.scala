@@ -42,6 +42,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case app: untpd.Apply => visitApply(app)
     case sel: untpd.Select => visitSelect(sel)
     case parens: untpd.Parens => visitParentheses(parens)
+    case imp: untpd.Import => visitImport(imp)
     case _ => 
       // Debug: print unknown tree types
       // println(s"Unknown tree type: ${tree.getClass.getSimpleName}, source: ${extractSource(tree.span)}")
@@ -267,6 +268,12 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     visitUnknown(parens)
   }
   
+  private def visitImport(imp: untpd.Import): J = {
+    // For now, preserve imports as Unknown to maintain formatting
+    // This will be improved later
+    visitUnknown(imp)
+  }
+  
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
@@ -286,7 +293,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     )
   }
   
-  private def extractPrefix(span: Spans.Span): Space = {
+  def extractPrefix(span: Spans.Span): Space = {
     if (!span.exists) {
       return Space.EMPTY
     }
