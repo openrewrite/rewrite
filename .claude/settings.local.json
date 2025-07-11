@@ -31,7 +31,9 @@
       "Bash(cat:*)",
       "Bash(mkdir:*)",
       "Bash(javac:*)",
-      "Bash(java:*)"
+      "Bash(java:*)",
+      "Bash(scalac:*)",
+      "Bash(scala:*)"
     ],
     "deny": []
   }

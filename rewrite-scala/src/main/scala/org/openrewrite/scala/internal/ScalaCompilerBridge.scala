@@ -94,6 +94,10 @@ class ScalaCompilerBridge {
   private def isSimpleExpression(content: String): Boolean = {
     val trimmed = content.trim
     // Check if it's likely a simple expression (doesn't start with keywords that indicate declarations)
+    // Also check if it contains multiple lines, which would indicate a block of statements
+    val hasMultipleLines = trimmed.contains('\n')
+    
+    !hasMultipleLines &&
     !trimmed.startsWith("package") && 
     !trimmed.startsWith("import") &&
     !trimmed.startsWith("class") &&
@@ -103,6 +107,12 @@ class ScalaCompilerBridge {
     !trimmed.startsWith("val") &&
     !trimmed.startsWith("var") &&
     !trimmed.startsWith("type") &&
+    !trimmed.startsWith("private") &&
+    !trimmed.startsWith("protected") &&
+    !trimmed.startsWith("public") &&
+    !trimmed.startsWith("final") &&
+    !trimmed.startsWith("lazy") &&
+    !trimmed.startsWith("implicit") &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty
