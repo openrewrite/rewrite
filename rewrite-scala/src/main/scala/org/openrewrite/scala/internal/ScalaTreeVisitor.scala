@@ -44,7 +44,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case parens: untpd.Parens => visitParentheses(parens)
     case _ => 
       // Debug: print unknown tree types
-      // println(s"Unknown tree type: ${tree.getClass.getSimpleName}")
+      // println(s"Unknown tree type: ${tree.getClass.getSimpleName}, source: ${extractSource(tree.span)}")
       visitUnknown(tree)
   }
   
@@ -231,27 +231,33 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitSelect(sel: untpd.Select): J = {
-    // For now, treat Select as a field access or method reference
-    // This handles cases like "obj.field" or method references
-    val target = visitTree(sel.qualifier).asInstanceOf[Expression]
-    val name = new J.Identifier(
-      Tree.randomId(),
-      Space.EMPTY,
-      Markers.EMPTY,
-      Collections.emptyList(),
-      sel.name.toString,
-      null,
-      null
-    )
-    
-    new J.FieldAccess(
-      Tree.randomId(),
-      Space.EMPTY,
-      Markers.EMPTY,
-      target,
-      JLeftPadded.build(name),
-      null
-    )
+    // Check if this is a unary operator method reference without application
+    if (isUnaryOperator(sel.name.toString)) {
+      // This is something like "x.unary_-" without parentheses - preserve as Unknown
+      visitUnknown(sel)
+    } else {
+      // For now, treat Select as a field access or method reference
+      // This handles cases like "obj.field" or method references
+      val target = visitTree(sel.qualifier).asInstanceOf[Expression]
+      val name = new J.Identifier(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        Collections.emptyList(),
+        sel.name.toString,
+        null,
+        null
+      )
+      
+      new J.FieldAccess(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        target,
+        JLeftPadded.build(name),
+        null
+      )
+    }
   }
   
   private def visitParentheses(parens: untpd.Parens): J = {

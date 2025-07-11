@@ -97,7 +97,11 @@ class ScalaCompilerBridge {
     // Also check if it contains multiple lines, which would indicate a block of statements
     val hasMultipleLines = trimmed.contains('\n')
     
+    // Check for postfix operators - they need special handling
+    val hasPostfixOperator = trimmed.matches(".*[a-zA-Z0-9_)]\\s*[!?]\\s*$")
+    
     !hasMultipleLines &&
+    !hasPostfixOperator &&
     !trimmed.startsWith("package") && 
     !trimmed.startsWith("import") &&
     !trimmed.startsWith("class") &&
