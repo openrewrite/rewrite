@@ -18,11 +18,10 @@ package org.openrewrite.gradle.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
 
 @Value
@@ -44,6 +43,8 @@ public class FindDependency extends Recipe {
             required = false)
     @Nullable
     String configuration;
+
+    transient FoundDependencyReport foundDependencyTable = new FoundDependencyReport(this);
 
     @Override
     public String getDisplayName() {
@@ -68,6 +69,46 @@ public class FindDependency extends Recipe {
                 .groupId(groupId)
                 .artifactId(artifactId)
                 .configuration(configuration)
-                .asVisitor(gd -> SearchResult.found(gd.getTree()));
+                .asVisitor((gd, ctx) -> {
+                    foundDependencyTable.insertRow(ctx, new Row(getDeclaringFilePath(gd), gd.getResolvedDependency().getGroupId(), gd.getResolvedDependency().getArtifactId(), gd.getResolvedDependency().getVersion()));
+                    return SearchResult.found(gd.getTree());
+                });
+    }
+
+    private String getDeclaringFilePath(GradleDependency gd) {
+        G.CompilationUnit gcu = gd.getCursor().firstEnclosing(G.CompilationUnit.class);
+        if (gcu != null) {
+            return gcu.getSourcePath().toString();
+        }
+        K.CompilationUnit kcu = gd.getCursor().firstEnclosing(K.CompilationUnit.class);
+        if (kcu != null) {
+            return kcu.getSourcePath().toString();
+        }
+        return "";
+    }
+
+    private static class FoundDependencyReport extends DataTable<Row> {
+        public FoundDependencyReport(Recipe recipe) {
+            super(recipe, "Dependencies found", "Dependencies found matching the groupId and artifactId");
+        }
+    }
+
+    @Value
+    public static class Row {
+        @Column(displayName = "Source path",
+                description = "Full path to the file declaring the dependency.")
+        String sourcePath;
+
+        @Column(displayName = "GroupId",
+                description = "The groupId of the dependency.")
+        String groupId;
+
+        @Column(displayName = "ArtifactId",
+                description = "The artifactId of the dependency.")
+        String artifactId;
+
+        @Column(displayName = "Version",
+                description = "The version of the dependency.")
+        String version;
     }
 }
