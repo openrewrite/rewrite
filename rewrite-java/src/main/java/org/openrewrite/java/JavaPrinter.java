@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
@@ -556,6 +557,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
         visitContainer("permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", null, p);
         visit(classDecl.getBody(), p);
+        // Check for trailing semicolon marker and print it
+        for (Marker marker : classDecl.getMarkers().getMarkers()) {
+            if (marker instanceof Semicolon) {
+                p.append(";");
+                break;
+            }
+        }
         afterSyntax(classDecl, p);
         return classDecl;
     }
