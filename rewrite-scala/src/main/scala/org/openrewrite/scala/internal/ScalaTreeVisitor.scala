@@ -41,7 +41,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case id: untpd.Ident => visitIdent(id)
     case app: untpd.Apply => visitApply(app)
     case sel: untpd.Select => visitSelect(sel)
-    case _ => visitUnknown(tree)
+    case _ => 
+      // Debug: print unknown tree types
+      // println(s"Unknown tree type: ${tree.getClass.getSimpleName}")
+      visitUnknown(tree)
   }
   
   private def visitLiteral(lit: untpd.Literal): J.Literal = {
@@ -122,7 +125,11 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   
   private def visitApply(app: untpd.Apply): J = {
     // In Scala, binary operations like "1 + 2" are parsed as Apply(Select(1, +), List(2))
+    // Unary operations like "-x" are parsed as Apply(Select(x, unary_-), List())
     app.fun match {
+      case sel: untpd.Select if app.args.isEmpty && isUnaryOperator(sel.name.toString) =>
+        // This is a unary operation
+        visitUnary(sel)
       case sel: untpd.Select if app.args.length == 1 && isBinaryOperator(sel.name.toString) =>
         // This is likely a binary operation (infix notation)
         visitBinary(sel, app.args.head)
@@ -133,6 +140,35 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         // Other kinds of applications - for now treat as unknown
         visitUnknown(app)
     }
+  }
+  
+  private def visitUnary(sel: untpd.Select): J.Unary = {
+    val expr = visitTree(sel.qualifier).asInstanceOf[Expression]
+    val operator = mapUnaryOperator(sel.name.toString)
+    
+    new J.Unary(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      JLeftPadded.build(operator),
+      expr,
+      null // type will be set later
+    )
+  }
+  
+  private def isUnaryOperator(name: String): Boolean = {
+    name match {
+      case "unary_-" | "unary_+" | "unary_!" | "unary_~" => true
+      case _ => false
+    }
+  }
+  
+  private def mapUnaryOperator(op: String): J.Unary.Type = op match {
+    case "unary_-" => J.Unary.Type.Negative
+    case "unary_+" => J.Unary.Type.Positive
+    case "unary_!" => J.Unary.Type.Not
+    case "unary_~" => J.Unary.Type.Complement
+    case _ => J.Unary.Type.Not // default
   }
   
   private def visitMethodInvocation(app: untpd.Apply): J = {

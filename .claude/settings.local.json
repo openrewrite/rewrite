@@ -28,7 +28,10 @@
       "mcp__idea__replace_selected_text",
       "mcp__idea__replace_specific_text",
       "mcp__idea__search_in_files_content",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(javac:*)",
+      "Bash(java:*)"
     ],
     "deny": []
   }

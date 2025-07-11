@@ -15,11 +15,11 @@
  */
 package org.openrewrite.scala.internal
 
-import dotty.tools.dotc.ast.Trees.*
 import dotty.tools.dotc.ast.untpd
 import dotty.tools.dotc.core.Contexts.*
-import org.openrewrite.java.tree.{J, Statement}
-import java.util.{List => JList, ArrayList}
+import org.openrewrite.java.tree.Statement
+
+import java.util.{ArrayList, List as JList}
 
 /**
  * Java-callable wrapper for converting Scala AST to OpenRewrite LST.
