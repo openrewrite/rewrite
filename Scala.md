@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 11, 2025)
 
-We have successfully completed the foundational infrastructure and are making good progress on LST element implementation:
+We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **95% test passing rate (86/90 tests)**.
 
 #### Completed LST Elements ✅
 1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
@@ -295,24 +295,31 @@ We have successfully completed the foundational infrastructure and are making go
 4. **Parentheses** (10/10 tests passing) - Expression grouping and nesting
 5. **Variable Declarations** (12/12 tests passing) - val, var, lazy val, with modifiers and type annotations
    - Note: Currently preserved as Unknown nodes for formatting accuracy
+6. **Unary Operations** (7/7 tests passing) - Prefix and postfix operators, unary method calls
 
-#### In Progress 🟨
+#### Nearly Complete 🟨
 1. **Binary Operations** (19/20 tests passing) - One failing test for infix method calls with dots
-2. **Unary Operations** (5/7 tests passing) - Issues with postfix operators and prefix method calls causing expression duplication
+2. **Compilation Units** (7/9 tests passing) - Basic structure working, issues with comment handling
 
 #### Not Started Yet ❌
-1. **Compilation Units** (4/9 tests passing) - Need to implement proper package/import handling
-2. Method invocations, control flow, classes, traits, objects, pattern matching, etc.
+1. Method invocations, control flow (if/while/for), classes, traits, objects, pattern matching, etc.
 
 ### Key Technical Decisions Made
 - Using Unknown nodes to preserve formatting for unimplemented constructs
 - Wrapping bare expressions in object wrappers for valid Scala syntax
 - Updated assignment tests to use object blocks since Scala doesn't allow top-level assignments
 - Implemented multi-line detection in isSimpleExpression to avoid inappropriate wrapping
+- Fixed expression duplication by excluding postfix operators from wrapping and handling unary operators in Select nodes
+- Simplified compilation unit handling to preserve everything as Unknown nodes temporarily
+
+### Remaining Issues
+1. **Comment Handling** (2 tests) - Comments appearing as non-whitespace in whitespace
+2. **infixWithDot** (1 test) - Extra closing parenthesis in `1.+(2)`
+3. **parseWithPackage** (1 test) - Related to compilation unit handling
 
 ### Next Steps
-1. Fix expression duplication issues in binary/unary operations
-2. Implement proper compilation unit structure (packages/imports)
+1. Fix comment handling in compilation units
+2. Fix the infixWithDot parenthesis duplication
 3. Continue with method invocations and control flow constructs
 
 ## Notes
