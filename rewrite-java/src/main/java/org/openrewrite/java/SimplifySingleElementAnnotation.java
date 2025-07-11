@@ -54,7 +54,7 @@ public class SimplifySingleElementAnnotation extends Recipe {
                             if (assignment instanceof J.NewArray) {
                                 J.NewArray na = (J.NewArray) assignment;
                                 List<Expression> initializer = na.getInitializer();
-                                if (initializer != null && initializer.size() == 1) {
+                                if (initializer != null && initializer.size() == 1 && !(initializer.get(0) instanceof J.Empty)) {
                                     return initializer.get(0).withPrefix(Space.EMPTY);
                                 }
                             }
