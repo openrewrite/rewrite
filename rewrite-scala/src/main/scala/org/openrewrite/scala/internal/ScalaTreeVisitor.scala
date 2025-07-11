@@ -41,6 +41,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case id: untpd.Ident => visitIdent(id)
     case app: untpd.Apply => visitApply(app)
     case sel: untpd.Select => visitSelect(sel)
+    case parens: untpd.Parens => visitParentheses(parens)
     case _ => 
       // Debug: print unknown tree types
       // println(s"Unknown tree type: ${tree.getClass.getSimpleName}")
@@ -251,6 +252,13 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       JLeftPadded.build(name),
       null
     )
+  }
+  
+  private def visitParentheses(parens: untpd.Parens): J = {
+    // Since we know Parens exist but couldn't find the direct accessor,
+    // let's handle it through the Unknown mechanism for now
+    // This preserves the parentheses in the output
+    visitUnknown(parens)
   }
   
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
