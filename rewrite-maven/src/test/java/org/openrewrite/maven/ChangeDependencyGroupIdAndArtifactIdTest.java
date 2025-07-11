@@ -1248,7 +1248,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               "quarkus-core",
               "io.quarkus",
               "quarkus-arc",
-              null,
+              "2.8.3.Final",
               null
             )
           ),
@@ -1285,42 +1285,42 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             mavenProject("subchild",
               pomXml(
                 """
-                      <project>
-                          <parent>
-                              <groupId>com.mycompany.app</groupId>
-                              <artifactId>child</artifactId>
-                              <version>1</version>
-                          </parent>
+                  <project>
+                      <parent>
                           <groupId>com.mycompany.app</groupId>
-                          <artifactId>subchild</artifactId>
+                          <artifactId>child</artifactId>
                           <version>1</version>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>io.quarkus</groupId>
-                                  <artifactId>quarkus-core</artifactId>
-                                  <version>2.8.0.Final</version>
-                              </dependency>
-                          </dependencies>
-                      </project>
+                      </parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>subchild</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-core</artifactId>
+                              <version>2.8.0.Final</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
                   """,
                 """
-                      <project>
-                          <parent>
-                              <groupId>com.mycompany.app</groupId>
-                              <artifactId>child</artifactId>
-                              <version>1</version>
-                          </parent>
+                  <project>
+                      <parent>
                           <groupId>com.mycompany.app</groupId>
-                          <artifactId>subchild</artifactId>
+                          <artifactId>child</artifactId>
                           <version>1</version>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>io.quarkus</groupId>
-                                  <artifactId>quarkus-arc</artifactId>
-                                  <version>2.8.0.Final</version>
-                              </dependency>
-                          </dependencies>
-                      </project>
+                      </parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>subchild</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-arc</artifactId>
+                              <version>2.8.3.Final</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
                   """
               )
             )
@@ -1673,6 +1673,110 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyGroupIdAndArtifactIdWithDeepHierarchydWithVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+              "io.quarkus",
+              "quarkus-core",
+              "io.quarkus",
+              "quarkus-arc",
+              "2.8.3.Final",
+              null
+            )
+          ),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <properties>
+                      <quarkus.version>2.8.0.Final</quarkus.version>
+                  </properties>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <properties>
+                      <quarkus.version>2.8.3.Final</quarkus.version>
+                  </properties>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>child</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>subchild</module>
+                    </modules>
+                </project>
+                """
+            ),
+            mavenProject("subchild",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>child</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>subchild</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-core</artifactId>
+                              <version>${quarkus.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>child</artifactId>
+                          <version>1</version>
+                      </parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>subchild</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-arc</artifactId>
+                              <version>${quarkus.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }
