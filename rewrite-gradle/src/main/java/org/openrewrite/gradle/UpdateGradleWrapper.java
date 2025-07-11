@@ -139,7 +139,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return gradleWrapper = GradleWrapper.create(URI.create(wrapperUri), ctx);
             }
             try {
-                gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+                gradleWrapper = GradleWrapper.create(distribution, version, ctx);
             } catch (Exception e) {
                 // services.gradle.org is unreachable
                 // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version

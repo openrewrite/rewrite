@@ -28,6 +28,7 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.remote.RemoteArchive;
 import org.openrewrite.remote.RemoteResource;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -47,6 +48,9 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
+    private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
+    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_SERVICES_URL + "/distributions";
+    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
     public static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
@@ -60,7 +64,11 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, ExecutionContext ctx) {
+    /**
+     * Construct a Gradle wrapper from a distribution type and version.
+     * Used in contexts where services.gradle.org is available.
+     */
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
@@ -68,12 +76,7 @@ public class GradleWrapper {
         VersionComparator versionComparator = StringUtils.isBlank(version) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
-
-        List<GradleVersion> allVersions = listAllVersions(repositoryUrl, ctx);
-        GradleVersion gradleVersion = allVersions.stream()
-                .filter(v -> versionComparator.isValid(null, v.version))
-                .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
+        GradleVersion gradleVersion = determineGradleVersion(version, versionComparator, distributionType, ctx);
 
         try {
             DistributionInfos infos = DistributionInfos.fetch(distributionType, gradleVersion, ctx);
@@ -83,10 +86,27 @@ public class GradleWrapper {
         }
     }
 
-    public static List<GradleVersion> listAllVersions(@Nullable String repositoryUrl, ExecutionContext ctx) {
+    private static GradleVersion determineGradleVersion(@Nullable String version, VersionComparator versionComparator,
+                                                        DistributionType distributionType, ExecutionContext ctx) {
+        // Only list all versions via services endpoint if a wildcard notation was requested or null, e.g. 8.x
+        if (!(versionComparator instanceof ExactVersion)) {
+            List<GradleVersion> allVersions = listAllVersions(ctx);
+            return allVersions.stream()
+                    .filter(v -> versionComparator.isValid(null, v.version))
+                    .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
+                    .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
+        }
+
+        return new GradleVersion(version,
+                GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip",
+                GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip.sha256",
+                GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-wrapper.jar.sha256"
+        );
+    }
+
+    public static List<GradleVersion> listAllVersions(ExecutionContext ctx) {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        String gradleVersionsUrl = StringUtils.isBlank(repositoryUrl) ? "https://services.gradle.org/versions/all" : repositoryUrl;
-        try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
+        try (HttpSender.Response resp = httpSender.send(httpSender.get(GRADLE_VERSIONS_ALL_URL).build())) {
             if (resp.isSuccessful()) {
                 return new ObjectMapper()
                         .registerModule(new ParameterNamesModule())
@@ -148,8 +168,18 @@ public class GradleWrapper {
     }
 
     public enum DistributionType {
-        Bin,
-        All
+        Bin("bin"),
+        All("all");
+
+        private final String fileSuffix;
+
+        DistributionType(String fileSuffix) {
+            this.fileSuffix = fileSuffix;
+        }
+
+        public String getFileSuffix() {
+            return fileSuffix;
+        }
     }
 
     @Value
