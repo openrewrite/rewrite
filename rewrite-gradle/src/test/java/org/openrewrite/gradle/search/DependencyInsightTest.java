@@ -15,11 +15,19 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -63,6 +71,71 @@ class DependencyInsightTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class ConfigurationChecks {
+        private static Stream<Arguments> configurationsAndMatches() {
+            /*
+            "annotationProcessor", "api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"
+            */
+            return Stream.of(
+              Arguments.of("annotationProcessor", true, false, false, false, false, false, false, false),
+              Arguments.of("compileClasspath", false, true, true, true, false, false, false, false),
+              Arguments.of("runtimeClasspath", false, true, true, false, true, false, false, false),
+              Arguments.of("testCompileClasspath", false, true, true, false, false, true, true, false),
+              Arguments.of("testRuntimeClasspath", false, true, true, false, true, true, false, true)
+            );
+        }
+
+        private SourceSpecs expectationHelper(String configuration, String template, String matchComment, boolean matched) {
+            @Language("groovy")
+            final String before = String.format(template, configuration);
+            if (matched) {
+                @Language("groovy")
+                final String after = String.format(template, matchComment + configuration);
+                return buildGradle(before, after);
+            }
+            return buildGradle(before);
+        }
+
+        private void rewriteRunHelper(String existingConfiguration, String checkingConfiguration, boolean matched) {
+            final String matchComment = "/*~~(com.google.guava:guava:31.1-jre)~~>*/";
+            @Language("groovy")
+            final String gradleTemplate = """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  %s 'com.google.guava:guava:31.1-jre'
+              }
+              """;
+            rewriteRun(
+              spec -> spec.recipe(new DependencyInsight("com.google.guava", "guava", null, checkingConfiguration)),
+              expectationHelper(existingConfiguration, gradleTemplate, matchComment, matched)
+            );
+        }
+
+        @ParameterizedTest
+        @MethodSource("configurationsAndMatches")
+        void configurationsAreMatched(
+          String configuration,
+          boolean annotationProcessorMatch,
+          boolean apiMatch, boolean implementationMatch, boolean compileOnlyMatch, boolean runtimeOnlyMatch,
+          boolean testImplementationMatch, boolean testCompileOnlyMatch, boolean testRuntimeOnlyMatch
+        ) {
+            rewriteRunHelper("annotationProcessor", configuration, annotationProcessorMatch);
+            rewriteRunHelper("api", configuration, apiMatch);
+            rewriteRunHelper("implementation", configuration, implementationMatch);
+            rewriteRunHelper("compileOnly", configuration, compileOnlyMatch);
+            rewriteRunHelper("runtimeOnly", configuration, runtimeOnlyMatch);
+            rewriteRunHelper("testImplementation", configuration, testImplementationMatch);
+            rewriteRunHelper("testCompileOnly", configuration, testCompileOnlyMatch);
+            rewriteRunHelper("testRuntimeOnly", configuration, testRuntimeOnlyMatch);
+        }
     }
 
     @Test
