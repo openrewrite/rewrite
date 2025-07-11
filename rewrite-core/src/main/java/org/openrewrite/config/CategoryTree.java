@@ -66,7 +66,7 @@ public class CategoryTree<G> {
     public static class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
                 "ε", "", "", emptySet(), true,
-                CategoryDescriptor.LOWEST_PRECEDENCE, true);
+                CategoryDescriptor.LOWEST_PRECEDENCE, true, emptySet());
 
         private Root() {
             super();
@@ -96,9 +96,13 @@ public class CategoryTree<G> {
         }
 
         public synchronized CategoryTree.Root<G> putCategories(G group, CategoryDescriptor... categories) {
+
             synchronized (lock) {
+                List<String> rootGroups = Arrays.stream(categories).filter(CategoryDescriptor::isRoot)
+                        .map(CategoryDescriptor::getSubPackageName)
+                        .collect(toList());
                 for (CategoryDescriptor category : categories) {
-                    findOrAddCategory(group, category);
+                    findOrAddCategory(group, category, rootGroups);
                 }
             }
             return this;
@@ -165,11 +169,11 @@ public class CategoryTree<G> {
     }
 
     public @Nullable CategoryTree<G> getCategory(String subcategory) {
-        String packageName = getDescriptor().getPackageName();
+        String packageName = getDescriptor().getSubPackageName();
         synchronized (lock) {
             String[] split = subcategory.split("\\.", 2);
             for (CategoryTree<G> t : getCategories(false, true)) {
-                String tPackage = t.getDescriptor().getPackageName();
+                String tPackage = t.getDescriptor().getSubPackageName();
                 int endIndex = tPackage.indexOf('.', packageName.length() + 1);
                 String test = tPackage.substring(
                         packageName.isEmpty() ? 0 : packageName.length() + 1,
@@ -202,7 +206,7 @@ public class CategoryTree<G> {
         CategoryTree<G> subtree = getCategory(subcategory);
         if (subtree == null) {
             throw new IllegalArgumentException("No subcategory of " +
-                                               getDescriptor().getPackageName() + " named '" + subcategory + "'");
+                                               getDescriptor().getSubPackageName() + " named '" + subcategory + "'");
         }
         return subtree;
     }
@@ -249,9 +253,36 @@ public class CategoryTree<G> {
         return null;
     }
 
-    CategoryTree<G> findOrAddCategory(G group, CategoryDescriptor category) {
-        String packageName = getDescriptor().getPackageName();
-        String categoryPackage = category.getPackageName();
+    CategoryTree<G> findOrAddCategory(G group, CategoryDescriptor category, List<String> rootGroups) {
+        String packageName = getDescriptor().getSubPackageName();
+        String categoryPackage = category.getSubPackageName();
+        Set<String> roots = new HashSet<>();
+        if (category.isRoot()) {
+            return this;
+        } else {
+            List<String> possibleRoots = rootGroups.stream()
+                    .filter(categoryPackage::startsWith).collect(toList());
+            int elementCount = possibleRoots
+                    .stream().map(s -> s.length() - s.replace(".", "").length())
+                    .max(Comparator.comparingInt(s -> s)).orElse(0);
+
+            possibleRoots.stream().filter(s -> s.length() - s.replace(".", "").length() == elementCount)
+                    .forEach(s -> roots.add(s));
+
+            if (!possibleRoots.isEmpty()) {
+                String rootPrefix = possibleRoots.get(0);
+                categoryPackage = categoryPackage.replace(rootPrefix, "");
+
+                if (categoryPackage.startsWith(".")) {
+                    categoryPackage = categoryPackage.substring(1);
+                }
+                category = category.withSubPackageName(categoryPackage);
+
+                String finalCategoryPackage = categoryPackage;
+                subtrees.stream().filter(t -> finalCategoryPackage.startsWith(t.getDescriptor().getSubPackageName())).collect(toList())
+                        .forEach(s -> roots.addAll(s.getDescriptor().getRootPackages()));
+            }
+        }
 
         // same category with a potentially different descriptor coming from this group
         if (categoryPackage.equals(packageName)) {
@@ -272,7 +303,7 @@ public class CategoryTree<G> {
         if (packageName.isEmpty() || (categoryPackage.startsWith(packageName + ".") &&
                                       categoryPackage.charAt(packageName.length()) == '.')) {
             for (CategoryTree<G> subtree : subtrees) {
-                String subtreePackage = subtree.getDescriptor().getPackageName();
+                String subtreePackage = subtree.getDescriptor().getSubPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
                     if (!subtree.groups.contains(group)) {
                         subtree.groups.add(0, group);
@@ -283,16 +314,23 @@ public class CategoryTree<G> {
                                 emptySet(),
                                 false,
                                 CategoryDescriptor.LOWEST_PRECEDENCE,
-                                true
+                                true,
+                                roots
                         ));
+                    } else {
+                        CategoryDescriptor groupCategoryDescriptor = subtree.descriptorsByGroup.get(group);
+                        Set<String> knownRootPackages = groupCategoryDescriptor.getRootPackages();
+                        knownRootPackages.addAll(roots);
+                        groupCategoryDescriptor.withRootPackages(knownRootPackages);
+                        subtree.descriptorsByGroup.put(group, groupCategoryDescriptor);
                     }
-                    return subtree.findOrAddCategory(group, category);
+                    return subtree.findOrAddCategory(group, category, rootGroups);
                 }
             }
 
             String subpackage = packageName.isEmpty() ?
-                    category.getPackageName() :
-                    category.getPackageName().substring(packageName.length() + 1);
+                    category.getSubPackageName() :
+                    category.getSubPackageName().substring(packageName.length() + 1);
             if (subpackage.contains(".")) {
                 String displayName = subpackage.substring(0, subpackage.indexOf('.'));
 
@@ -309,8 +347,9 @@ public class CategoryTree<G> {
                         emptySet(),
                         false,
                         CategoryDescriptor.LOWEST_PRECEDENCE,
-                        true
-                )).findOrAddCategory(group, category);
+                        true,
+                        roots
+                ), rootGroups).findOrAddCategory(group, category, rootGroups);
             }
 
             // a direct subcategory of this category
@@ -319,7 +358,7 @@ public class CategoryTree<G> {
             return subtree;
         } else {
             throw new IllegalStateException("Attempted to add a category with package '" +
-                                            category.getPackageName() + "' as a subcategory of '" +
+                                            category.getSubPackageName() + "' as a subcategory of '" +
                                             packageName + "'. This represents a bug in CategoryTree, as " +
                                             "it should not be possible to add a category to a CategoryTree root " +
                                             "that cannot be placed somewhere in the tree.");
@@ -335,6 +374,7 @@ public class CategoryTree<G> {
                                                "a package, but it did not.");
         }
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
+        List<String> rootPackageNames = this.getRootPackageNames();
         CategoryTree<G> categoryTree = findOrAddCategory(group, new CategoryDescriptor(
                 StringUtils.capitalize(category.substring(category.lastIndexOf('.') + 1)),
                 category,
@@ -342,8 +382,9 @@ public class CategoryTree<G> {
                 emptySet(),
                 false,
                 CategoryDescriptor.LOWEST_PRECEDENCE,
-                true
-        ));
+                true,
+                emptySet()
+        ), rootPackageNames);
         categoryTree.recipesByGroup.computeIfAbsent(group, g -> new CopyOnWriteArrayList<>()).add(recipe);
     }
 
@@ -382,6 +423,13 @@ public class CategoryTree<G> {
 
     public Collection<CategoryTree<G>> getCategories() {
         return getCategories(true, true);
+    }
+
+    public List<String> getRootPackageNames() {
+        return getCategories(false, false)
+                .stream().map(i -> i.getDescriptor().getRootPackages())
+                .flatMap(Set::stream)
+                .collect(toList());
     }
 
     /**
@@ -423,12 +471,13 @@ public class CategoryTree<G> {
             public CategoryDescriptor getDescriptor() {
                 return new CategoryDescriptor(
                         "Core",
-                        parent.getPackageName() + "." + CORE,
+                        parent.getSubPackageName() + "." + CORE,
                         "",
                         emptySet(),
                         false,
                         CategoryDescriptor.LOWEST_PRECEDENCE,
-                        true
+                        true,
+                        emptySet()
                 );
             }
 
@@ -441,7 +490,7 @@ public class CategoryTree<G> {
 
     @Override
     public String toString() {
-        return "CategoryTree{packageName=" + getDescriptor().getPackageName() + "}";
+        return "CategoryTree{subPackageName=" + getDescriptor().getSubPackageName() + "}";
     }
 
     void toString(StringJoiner out,
@@ -460,7 +509,7 @@ public class CategoryTree<G> {
                 line.append("|-");
             }
             line.append(descriptor.isRoot() ? "√" : "\uD83D\uDCC1");
-            String packageName = descriptor.getPackageName().isEmpty() ? "ε" : descriptor.getPackageName();
+            String packageName = descriptor.getSubPackageName().isEmpty() ? "ε" : descriptor.getSubPackageName();
             switch (printOptions.getNameStyle()) {
                 case DISPLAY_NAME:
                     line.append(descriptor.getDisplayName());
@@ -469,7 +518,7 @@ public class CategoryTree<G> {
                     line.append(packageName);
                     break;
                 case BOTH:
-                    if (descriptor.getPackageName().isEmpty()) {
+                    if (descriptor.getSubPackageName().isEmpty()) {
                         line.append(packageName);
                     } else {
                         line.append(descriptor.getDisplayName()).append(" (").append(packageName).append(')');
