@@ -30,7 +30,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "<!--~~>-->";
-    
+
     @Language("xml")
     private static final String missingDependencyTemplate = """
       <project>
@@ -47,6 +47,45 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
     private String wrappedScope(String scope) {
         return "\n<scope>" + scope + "</scope>";
+    }
+
+    @DocumentExample
+    @Test
+    void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedMarked() {
+        rewriteRun(
+          spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
+          pomXml("""
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                    <version>3.0.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <!--~~>--><project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                    <version>3.0.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
     }
 
     @Nested
@@ -68,12 +107,17 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           </project>
           """;
 
-        @Nested
-        class OnlyDirectNull {
+        abstract class SharedTests {
+            private final @Nullable Boolean onlyDirect;
+
+            public SharedTests(@Nullable Boolean onlyDirect) {
+                this.onlyDirect = onlyDirect;
+            }
+
             @Test
             void withoutScopeOrDesiredScopeSpecifiedNotMarked() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(String.format(directDependencyTemplate, ""))
                 );
             }
@@ -82,7 +126,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @ValueSource(strings = {"test", "provided", "compile", "runtime"})
             void withScopeButDesiredScopeNotSpecifiedNotMarked(String scope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(String.format(directDependencyTemplate, wrappedScope(scope)))
                 );
             }
@@ -92,7 +136,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"provided,compile", "provided,test"})
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
                     String.format(directDependencyTemplate, wrappedScope(existingScope)),
                     String.format(marker + directDependencyTemplate, wrappedScope(existingScope))
@@ -106,7 +150,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"test,test"})
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(String.format(directDependencyTemplate, wrappedScope(existingScope)))
                 );
             }
@@ -114,7 +158,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @Test
             void multimoduleMarksOnlyCorrectModule() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
                     String.format(directDependencyTemplate, ""),
                     spec -> spec.path("a/pom.xml")
@@ -133,130 +177,23 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         }
 
         @Nested
-        class OnlyDirectTrue {
-            @Test
-            void withoutScopeOrDesiredScopeSpecifiedNotMarked() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
-                  pomXml(String.format(directDependencyTemplate, ""))
-                );
-            }
-
-            @ParameterizedTest
-            @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-            void withScopeButDesiredScopeNotSpecifiedNotMarked(String scope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
-                  pomXml(String.format(directDependencyTemplate, wrappedScope(scope)))
-                );
-            }
-
-            @ParameterizedTest
-            @CsvSource({"test,compile"})
-            @CsvSource({"provided,compile", "provided,test"})
-            void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, desiredScope)),
-                  pomXml(
-                    String.format(directDependencyTemplate, wrappedScope(existingScope)),
-                    String.format(marker + directDependencyTemplate, wrappedScope(existingScope))
-                  )
-                );
-            }
-
-            @ParameterizedTest
-            @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
-            @CsvSource({"test,test"})
-            void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, desiredScope)),
-                  pomXml(String.format(directDependencyTemplate, wrappedScope(existingScope)))
-                );
-            }
-
-            @Test
-            void multimoduleMarksOnlyCorrectModule() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
-                  pomXml(
-                    String.format(directDependencyTemplate, ""),
-                    spec -> spec.path("a/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate,
-                    spec -> spec.path("b/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate
-                  )
-                );
+        class OnlyDirectNull extends SharedTests{
+            public OnlyDirectNull() {
+                super(null);
             }
         }
 
         @Nested
-        class OnlyDirectFalse {
-            @Test
-            void withoutScopeOrDesiredScopeSpecifiedNotMarked() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(String.format(directDependencyTemplate, ""))
-                );
+        class OnlyDirectTrue extends SharedTests {
+            public OnlyDirectTrue() {
+                super(true);
             }
+        }
 
-            @ParameterizedTest
-            @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-            void withScopeButDesiredScopeNotSpecifiedNotMarked(String scope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(String.format(directDependencyTemplate, wrappedScope(scope)))
-                );
-            }
-
-            @ParameterizedTest
-            @CsvSource({"test,compile"})
-            @CsvSource({"provided,compile", "provided,test"})
-            void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, desiredScope)),
-                  pomXml(
-                    String.format(directDependencyTemplate, wrappedScope(existingScope)),
-                    String.format(marker + directDependencyTemplate, wrappedScope(existingScope))
-                  )
-                );
-            }
-
-            @ParameterizedTest
-            @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
-            @CsvSource({"test,test"})
-            void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, desiredScope)),
-                  pomXml(String.format(directDependencyTemplate, wrappedScope(existingScope)))
-                );
-            }
-
-            @Test
-            void multimoduleMarksOnlyCorrectModule() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(
-                    String.format(directDependencyTemplate, ""),
-                    spec -> spec.path("a/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate,
-                    spec -> spec.path("b/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate
-                  )
-                );
+        @Nested
+        class OnlyDirectFalse extends SharedTests {
+            public OnlyDirectFalse() {
+                super(false);
             }
         }
     }
@@ -280,12 +217,17 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
           </project>
           """;
 
-        @Nested
-        class OnlyDirectNull {
+        abstract class SharedOnlyDirectDisabledTests {
+            private final @Nullable Boolean onlyDirect;
+
+            public SharedOnlyDirectDisabledTests(@Nullable Boolean onlyDirect) {
+                this.onlyDirect = onlyDirect;
+            }
+
             @Test
             void withoutScopeOrDesiredScopeSpecifiedNotMarked() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(String.format(transitiveDependencyTemplate, ""))
                 );
             }
@@ -294,7 +236,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @ValueSource(strings = {"test", "provided", "compile", "runtime"})
             void withScopeButDesiredScopeNotSpecifiedNotMarked(String scope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(String.format(transitiveDependencyTemplate, wrappedScope(scope)))
                 );
             }
@@ -304,7 +246,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"provided,compile", "provided,test"})
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
@@ -318,7 +260,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"test,test"})
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(String.format(transitiveDependencyTemplate, wrappedScope(existingScope)))
                 );
             }
@@ -326,7 +268,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @Test
             void multimoduleMarksOnlyCorrectModule() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, ""),
                     spec -> spec.path("a/pom.xml")
@@ -344,13 +286,17 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             }
         }
 
-        @Nested
-        class OnlyDirectTrue {
-            @DocumentExample
+        abstract class SharedOnlyDirectEnabledTests {
+            private final @Nullable Boolean onlyDirect;
+
+            public SharedOnlyDirectEnabledTests(@Nullable Boolean onlyDirect) {
+                this.onlyDirect = onlyDirect;
+            }
+
             @Test
             void withoutScopeOrDesiredScopeSpecifiedMarked() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, ""),
                     String.format(marker + transitiveDependencyTemplate, "")
@@ -362,7 +308,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @ValueSource(strings = {"test", "provided", "compile", "runtime"})
             void withScopeButDesiredScopeNotSpecifiedMarked(String scope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, wrappedScope(scope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(scope))
@@ -375,7 +321,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"provided,compile", "provided,test"})
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
@@ -389,7 +335,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @CsvSource({"test,test"})
             void withScopeInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, desiredScope)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, wrappedScope(existingScope)),
                     String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
@@ -400,7 +346,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             @Test
             void multimoduleMarksOnlyCorrectModule() {
                 rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(true, null)),
+                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, null)),
                   pomXml(
                     String.format(transitiveDependencyTemplate, ""),
                     String.format(marker + transitiveDependencyTemplate, ""),
@@ -420,66 +366,23 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         }
 
         @Nested
-        class OnlyDirectFalse {
-            @Test
-            void withoutScopeOrDesiredScopeSpecifiedNotMarked() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(String.format(transitiveDependencyTemplate, ""))
-                );
+        class OnlyDirectNull extends SharedOnlyDirectDisabledTests {
+            public OnlyDirectNull() {
+                super(null);
             }
+        }
 
-            @ParameterizedTest
-            @ValueSource(strings = {"test", "provided", "compile", "runtime"})
-            void withScopeButDesiredScopeNotSpecifiedNotMarked(String scope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(String.format(transitiveDependencyTemplate, wrappedScope(scope)))
-                );
+        @Nested
+        class OnlyDirectTrue extends SharedOnlyDirectEnabledTests {
+            public OnlyDirectTrue() {
+                super(true);
             }
+        }
 
-            @ParameterizedTest
-            @CsvSource({"test,compile"})
-            @CsvSource({"provided,compile", "provided,test"})
-            void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, desiredScope)),
-                  pomXml(
-                    String.format(transitiveDependencyTemplate, wrappedScope(existingScope)),
-                    String.format(marker + transitiveDependencyTemplate, wrappedScope(existingScope))
-                  )
-                );
-            }
-
-            @ParameterizedTest
-            @CsvSource({"compile,compile", "compile,test"})
-            @CsvSource({"runtime,compile", "runtime,test",})
-            @CsvSource({"test,test"})
-            void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, desiredScope)),
-                  pomXml(String.format(transitiveDependencyTemplate, wrappedScope(existingScope)))
-                );
-            }
-
-            @Test
-            void multimoduleMarksOnlyCorrectModule() {
-                rewriteRun(
-                  spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(false, null)),
-                  pomXml(
-                    String.format(transitiveDependencyTemplate, ""),
-                    spec -> spec.path("a/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate,
-                    spec -> spec.path("b/pom.xml")
-                  ),
-                  pomXml(
-                    missingDependencyTemplate,
-                    marker + missingDependencyTemplate
-                  )
-                );
+        @Nested
+        class OnlyDirectFalse extends SharedOnlyDirectDisabledTests {
+            public OnlyDirectFalse() {
+                super(false);
             }
         }
     }

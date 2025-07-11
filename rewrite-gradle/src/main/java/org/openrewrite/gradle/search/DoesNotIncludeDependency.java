@@ -62,21 +62,12 @@ public class DoesNotIncludeDependency extends Recipe {
     @Override
     public Validated<Object> validate() {
         return super.validate()
-                .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)));
+                .and(notBlank("groupId", groupId))
+                .and(notBlank("artifactId", artifactId));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.not(Preconditions.or(dependencyInsightVisitors()));
-    }
-
-    @SuppressWarnings("unchecked")
-    private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
-        if (configuration == null) {
-            return new TreeVisitor[] {
-                    new DependencyInsight(groupId, artifactId, null, null).getVisitor(),
-            };
-        }
-        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, null, configuration).getVisitor() };
+        return Preconditions.not(new DependencyInsight(groupId, artifactId, null, configuration).getVisitor());
     }
 }
