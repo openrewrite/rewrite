@@ -54,7 +54,8 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedMarked() {
         rewriteRun(
           spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
-          pomXml("""
+          pomXml(
+            """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample</groupId>
