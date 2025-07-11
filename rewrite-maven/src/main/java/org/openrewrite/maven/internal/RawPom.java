@@ -158,7 +158,7 @@ public class RawPom {
             }
             return pom;
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse pom", e);
+            throw new UncheckedIOException("Failed to parse pom: " + e.getMessage(), e);
         }
     }
 
