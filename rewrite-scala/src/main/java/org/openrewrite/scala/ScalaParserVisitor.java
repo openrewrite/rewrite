@@ -119,19 +119,20 @@ public class ScalaParserVisitor {
         String remainingSource = converter.getRemainingSource(parseResult, source);
         Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
 
+        // Build S.CompilationUnit - the @RequiredArgsConstructor creates a constructor with all final fields
         return new S.CompilationUnit(
-            randomId(),
-            EMPTY,
-            Markers.EMPTY,
-            charset.name(),
-            charsetBomMarked,
-            null,
-            sourcePath,
-            null, // checksum
-            packageDecl,
-            imports,
-            statements,
-            eof
+            randomId(),                     // UUID id
+            EMPTY,                         // Space prefix
+            Markers.EMPTY,                 // Markers markers
+            sourcePath,                    // Path sourcePath
+            null,                          // FileAttributes fileAttributes
+            charset.name(),                // String charsetName (will be stored internally)
+            charsetBomMarked,              // boolean charsetBomMarked
+            null,                          // Checksum checksum
+            packageDecl == null ? null : JRightPadded.build(packageDecl),  // JRightPadded<J.Package> packageDeclaration
+            JRightPadded.withElements(Collections.emptyList(), imports),    // List<JRightPadded<J.Import>> imports
+            JRightPadded.withElements(Collections.emptyList(), statements), // List<JRightPadded<Statement>> statements
+            eof                            // Space eof
         );
     }
 }

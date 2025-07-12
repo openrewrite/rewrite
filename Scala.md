@@ -372,6 +372,42 @@ This reinforced the importance of:
 4. Eventually create S.Import for Scala-specific import syntax (multi-select, aliases)
 5. Create S.ForComprehension for Scala's complex for loops with generators and guards
 
+## Important Design Decisions
+
+### LST Model Language Choice (Java vs Scala)
+
+During implementation, we made a critical decision to implement the LST model classes in Java rather than Scala, following the established pattern used by Kotlin (K.java) and Groovy (G.java).
+
+#### Initial Approach
+We initially implemented S.scala and S.CompilationUnit in Scala, thinking it would be more idiomatic for Scala support.
+
+#### Issues Encountered
+1. **Non-idiomatic Scala code**: The LST pattern requires many getters, setters, and wither methods that look unnatural in Scala
+2. **Lombok-style patterns**: The immutability pattern with `@With` annotations and builder methods is Java-centric
+3. **Cross-language complexity**: Mixed Java/Scala compilation added unnecessary complexity
+
+#### Final Decision: Move to Java
+We migrated S interface and S.CompilationUnit to Java for the following reasons:
+
+1. **Consistency**: Follows the proven pattern of K.java (Kotlin) and G.java (Groovy)
+2. **Simplicity**: Avoids mixed-language compilation issues
+3. **Lombok support**: Can use `@RequiredArgsConstructor`, `@With`, `@Getter` for cleaner code
+4. **Cross-language compatibility**: Java beans work well from both Java and Scala
+
+#### Key Implementation Details
+- Used `@RequiredArgsConstructor` to generate constructor with all final fields
+- Maintained `@Nullable` annotations instead of Scala Options for cross-language compatibility  
+- Used JRightPadded for lists to preserve formatting
+- Followed exact field ordering from K.CompilationUnit as a template
+
+#### Benefits of This Approach
+1. **Java developers** get familiar Java code with standard patterns
+2. **Scala developers** can still use the classes idiomatically through `@BeanProperty` and implicit conversions
+3. **Performance** is optimal with no wrapper overhead
+4. **Maintainability** is improved by following established patterns
+
+This decision reinforces that the LST model is language-agnostic infrastructure that should be implemented in Java, while language-specific visitor logic can still be implemented in the target language where it makes sense.
+
 ## Notes
 
 This plan will evolve as we progress through the implementation.
