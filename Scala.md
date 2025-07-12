@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 11, 2025)
 
-We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (120/120 tests)**.
+We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (127/127 tests)**.
 
 #### Completed LST Elements ✅
 1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
@@ -307,9 +307,16 @@ We have successfully completed the foundational infrastructure and are making go
     - Chained calls: `"hello".toUpperCase().substring(1)`
     - Field access calls: `System.out.println("test")`
     - Named arguments, infix calls, apply methods, curried calls all supported
+12. **Control Flow** (7/7 tests passing) - Basic control flow constructs
+    - If statements: `if (cond) expr`
+    - If-else statements: `if (cond) expr1 else expr2`
+    - Nested if statements and if-else-if chains
+    - While loops: `while (cond) { body }`
+    - Blocks: `{ statement1; statement2 }`
+    - For comprehensions preserved as Unknown (complex Scala-specific syntax)
 
 #### Not Started Yet ❌
-1. Control flow (if/while/for), classes, traits, objects, pattern matching, etc.
+1. Classes, traits, objects, pattern matching, etc.
 
 ### Key Technical Decisions Made
 - Using Unknown nodes to preserve formatting for unimplemented constructs
@@ -346,10 +353,11 @@ This reinforced the importance of:
 3. Ensure the J.Import properly captures the complete field access without duplication
 
 ### Next Steps
-1. Implement control flow constructs (if/while/for)
-2. Circle back to imports once we better understand the cursor management patterns
-3. Eventually create S.Import for Scala-specific import syntax (multi-select, aliases)
-4. Continue with classes, traits, and objects
+1. Implement classes, traits, and objects
+2. Add pattern matching support
+3. Circle back to imports once we better understand the cursor management patterns
+4. Eventually create S.Import for Scala-specific import syntax (multi-select, aliases)
+5. Create S.ForComprehension for Scala's complex for loops with generators and guards
 
 ## Notes
 

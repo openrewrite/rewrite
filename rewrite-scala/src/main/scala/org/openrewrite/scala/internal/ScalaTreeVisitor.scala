@@ -53,6 +53,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       case vd: untpd.ValDef => visitValDef(vd)
       case md: untpd.ModuleDef => visitModuleDef(md)
       case asg: untpd.Assign => visitAssign(asg)
+      case ifTree: untpd.If => visitIf(ifTree)
+      case whileTree: untpd.WhileDo => visitWhileDo(whileTree)
+      case forTree: untpd.ForDo => visitForDo(forTree)
+      case block: untpd.Block => visitBlock(block)
       case _ => visitUnknown(tree)
   }
   
@@ -483,6 +487,150 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // For now, preserve assignments as Unknown to maintain exact formatting
     // This will be replaced with proper assignment support in the future
     visitUnknown(asg)
+  }
+  
+  private def visitIf(ifTree: untpd.If): J.If = {
+    val prefix = extractPrefix(ifTree.span)
+    
+    // Visit the condition expression
+    val condition = visitTree(ifTree.cond) match {
+      case expr: Expression => expr
+      case _ => return visitUnknown(ifTree).asInstanceOf[J.If]
+    }
+    
+    // Visit the then branch
+    val thenPart = visitTree(ifTree.thenp) match {
+      case stmt: Statement => JRightPadded.build(stmt)
+      case _ => return visitUnknown(ifTree).asInstanceOf[J.If]
+    }
+    
+    // Handle optional else branch
+    val elsePart = if (ifTree.elsep.isEmpty) {
+      null
+    } else {
+      visitTree(ifTree.elsep) match {
+        case stmt: Statement => 
+          new J.If.Else(
+            Tree.randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            JRightPadded.build(stmt)
+          )
+        case _ => return visitUnknown(ifTree).asInstanceOf[J.If]
+      }
+    }
+    
+    // Update cursor to end of the if expression
+    if (ifTree.span.exists) {
+      val adjustedEnd = Math.max(0, ifTree.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.If(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      new J.ControlParentheses(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        JRightPadded.build(condition)
+      ),
+      thenPart,
+      elsePart
+    )
+  }
+  
+  private def visitWhileDo(whileTree: untpd.WhileDo): J.WhileLoop = {
+    val prefix = extractPrefix(whileTree.span)
+    
+    // Visit the condition expression
+    val condition = visitTree(whileTree.cond) match {
+      case expr: Expression => expr
+      case _ => return visitUnknown(whileTree).asInstanceOf[J.WhileLoop]
+    }
+    
+    // Visit the body
+    val body = visitTree(whileTree.body) match {
+      case stmt: Statement => JRightPadded.build(stmt)
+      case _ => return visitUnknown(whileTree).asInstanceOf[J.WhileLoop]
+    }
+    
+    // Update cursor to end of the while loop
+    if (whileTree.span.exists) {
+      val adjustedEnd = Math.max(0, whileTree.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.WhileLoop(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      new J.ControlParentheses(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        JRightPadded.build(condition)
+      ),
+      body
+    )
+  }
+  
+  private def visitForDo(forTree: untpd.ForDo): J = {
+    // For loops in Scala are quite complex with generators, guards, and definitions
+    // For now, preserve them as Unknown nodes until we can properly model them
+    // This will be replaced with proper S.ForComprehension support in the future
+    visitUnknown(forTree)
+  }
+  
+  private def visitBlock(block: untpd.Block): J.Block = {
+    val prefix = extractPrefix(block.span)
+    val statements = new util.ArrayList[JRightPadded[Statement]]()
+    
+    // Visit all statements in the block
+    for (stat <- block.stats) {
+      visitTree(stat) match {
+        case null => // Skip null statements (e.g., package declarations)
+        case stmt: Statement => 
+          statements.add(JRightPadded.build(stmt))
+        case unknown: J.Unknown =>
+          // For now, skip unknown nodes in blocks
+          // In the future we could wrap them in a statement
+        case _ => // Skip non-statement nodes
+      }
+    }
+    
+    // Handle the expression part of the block (if any)
+    if (!block.expr.isEmpty) {
+      visitTree(block.expr) match {
+        case stmt: Statement => 
+          statements.add(JRightPadded.build(stmt))
+        case unknown: J.Unknown =>
+          // For now, skip unknown nodes in blocks
+        case _ => // Skip
+      }
+    }
+    
+    // Update cursor to end of the block
+    if (block.span.exists) {
+      val adjustedEnd = Math.max(0, block.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.Block(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      JRightPadded.build(false), // not static
+      statements,
+      Space.EMPTY
+    )
   }
   
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
