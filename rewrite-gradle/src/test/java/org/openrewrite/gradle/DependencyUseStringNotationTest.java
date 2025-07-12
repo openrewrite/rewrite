@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -436,6 +437,43 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   id("java")
               }
               apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5702")
+    void handleClassifierWithNoVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }  
+                
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier')
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+                
+              dependencies {
+                  api("org.openrewrite:rewrite-core::classifier")
+                  implementation "org.openrewrite:rewrite-core::classifier"
+              }
               """
           )
         );

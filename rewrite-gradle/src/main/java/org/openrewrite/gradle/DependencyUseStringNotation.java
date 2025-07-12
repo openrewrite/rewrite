@@ -148,27 +148,39 @@ public class DependencyUseStringNotation extends Recipe {
             }
 
             private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
-                if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
-                    String stringNotation = "";
-
+                //Name is the only required key in a dependency map.
+                if (mapNotation.containsKey("name")) {
                     String group = coerceToStringNotation(mapNotation.get("group"));
-                    if (group != null) {
-                        stringNotation += group;
-                    }
-
                     String name = coerceToStringNotation(mapNotation.get("name"));
-                    if (name != null) {
-                        stringNotation += ":" + name;
+                    String version = coerceToStringNotation(mapNotation.get("version"));
+                    String classifier = coerceToStringNotation(mapNotation.get("classifier"));
+                    String extension = coerceToStringNotation(mapNotation.get("extension"));
+
+                    StringBuilder sb = new StringBuilder();
+                    //Build against spec from gradle docs, all options are optional apart from name
+                    //configurationName "group:name:version:classifier@extension"
+                    if (group != null) {
+                        sb.append(group);
+                    }
+                    sb.append(":").append(name);
+
+                    if (version != null) {
+                        sb.append(":").append(version);
+                    } else if (classifier != null || extension != null) {
+                        sb.append(":");
                     }
 
-                    String version = coerceToStringNotation(mapNotation.get("version"));
-                    if (version != null) {
-                        stringNotation += ":" + version;
-                        String classifier = coerceToStringNotation(mapNotation.get("classifier"));
-                        if (classifier != null) {
-                            stringNotation += ":" + classifier;
-                        }
+                    if (classifier != null) {
+                        sb.append(":").append(classifier);
+                    } else if (extension != null) {
+                        sb.append(":");
                     }
+
+                    if (extension != null) {
+                        sb.append("@").append(extension);
+                    }
+
+                    String stringNotation = sb.toString();
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
                 }
