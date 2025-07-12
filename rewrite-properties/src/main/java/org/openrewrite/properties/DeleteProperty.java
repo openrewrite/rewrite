@@ -56,6 +56,12 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
+    @Option(displayName = "Remove property comments",
+            description = "Remove all comments found before the property to removed. By convention, empty line is used to indicate start of property comments",
+            required = false)
+    @Nullable
+    Boolean removePropertyComments;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
@@ -66,18 +72,32 @@ public class DeleteProperty extends Recipe {
                 String prefix = null;
                 List<Properties.Content> contents = f.getContent();
                 List<Properties.Content> newContents = new ArrayList<>();
+                List<Properties.Content> currentEntryContents = new ArrayList<>();
                 for (int i = 0; i < contents.size(); i++) {
                     Properties.Content content = contents.get(i);
                     if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
-                        if (i == 0) {
-                            prefix = ((Properties.Entry) content).getPrefix();
+                        if (Boolean.TRUE.equals(removePropertyComments)) {
+                            if (!currentEntryContents.isEmpty()) {
+                                prefix = currentEntryContents.get(0).getPrefix();
+                            }
+                            currentEntryContents.clear();
+                        } else if (i == 0) {
+                            prefix = content.getPrefix();
                         }
+                    } else if (! (content instanceof Properties.Entry) && i != contents.size() - 1) {
+                        if (content.getPrefix().matches("\\s{2,}")) {
+                            newContents.addAll(currentEntryContents);
+                            currentEntryContents.clear();
+                        }
+                        currentEntryContents.add(content);
                     } else {
+                        currentEntryContents.add(content);
                         if (prefix != null) {
-                            content = (Properties.Content) content.withPrefix(prefix);
+                            currentEntryContents.set(0, (Properties.Content) currentEntryContents.get(0).withPrefix(prefix));
                             prefix = null;
                         }
-                        newContents.add(content);
+                        newContents.addAll(currentEntryContents);
+                        currentEntryContents.clear();
                     }
                 }
 
