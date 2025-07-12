@@ -17,24 +17,18 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markers;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTaskToTasksRegister extends Recipe {
-
-    private static final GradleParser GRADLE_PARSER = GradleParser.builder().build();
 
     @Override
     public String getDisplayName() {
@@ -49,99 +43,80 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
-                    @Override
-                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                        if (tree == null) {
-                            return null;
-                        }
-                        if (tree instanceof G.CompilationUnit) {
-                            return new GroovyVisitor().visit(tree, ctx);
-                        }
-                        if (tree instanceof K.CompilationUnit) {
-                            return new KotlinVisitor().visit(tree, ctx);
-                        }
-                        return tree;
-                    }
-                }
-        );
+        return Preconditions.check(new IsBuildGradle<>(), new ChangeTaskToTasksRegisterVisitor());
     }
 
-    private static class GroovyVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class ChangeTaskToTasksRegisterVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!isTaskDeclaration(m)) {
+            if (!isTaskDeclaration(m, getCursor())) {
                 return m;
             }
 
-            List<Expression> args = m.getArguments();
-            if (args.isEmpty() || !(args.get(0) instanceof J.MethodInvocation)) {
-                return m;
+            Expression select = m.getSelect();
+            Expression newSelect;
+            J.Identifier tasks = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null, "tasks", null, null);
+            if (select == null) {
+                newSelect = tasks.withPrefix(m.getPrefix());
+                m = m.withPrefix(Space.EMPTY);
+            } else {
+                newSelect = new J.FieldAccess(
+                  Tree.randomId(),
+                  select.getPrefix(),
+                  Markers.EMPTY,
+                  select.withPrefix(Space.EMPTY),
+                  JLeftPadded.build(tasks),
+                  null
+                );
             }
 
-            J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
-            List<Expression> innerArgs = inner.getArguments();
-            if(innerArgs.isEmpty()) {
-                return m;
-            }
+            J.Identifier register = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null, "register", null, null);
+            if (getCursor().firstEnclosing(G.CompilationUnit.class) != null) {
+                List<Expression> args = m.getArguments();
+                if (args.isEmpty() || !(args.get(0) instanceof J.MethodInvocation)) {
+                    return m;
+                }
 
-            Expression taskType = null;
-            J.Lambda taskLambda = null;
-            if (innerArgs.get(0) instanceof G.MapEntry) {
-                G.MapEntry mapEntry = (G.MapEntry) innerArgs.get(0);
-                Expression key = mapEntry.getKey();
-                String keyName = null;
-                if (key instanceof G.Literal) {
-                    Object value = ((G.Literal) key).getValue();
-                    if (value instanceof String) {
-                        keyName = (String) value;
+                J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
+                String taskName = inner.getSimpleName();
+                List<Expression> registerArgs = new ArrayList<>();
+                registerArgs.add(new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, taskName, "\"" + taskName + "\"", null, JavaType.Primitive.String));
+                List<Expression> innerArgs = inner.getArguments();
+                if (!innerArgs.isEmpty()) {
+                    if (innerArgs.get(0) instanceof G.MapEntry) {
+                        G.MapEntry mapEntry = (G.MapEntry) innerArgs.get(0);
+                        if ("type".equals(getMapEntryKey(mapEntry))) {
+                            registerArgs.add(mapEntry.getValue().withPrefix(Space.SINGLE_SPACE));
+                        }
+                        if (innerArgs.size() > 1 && innerArgs.get(1) instanceof J.Lambda) {
+                            registerArgs.add(((J.Lambda) innerArgs.get(1)).withPrefix(Space.SINGLE_SPACE));
+                        }
+                    } else if (innerArgs.get(0) instanceof J.Lambda) {
+                        registerArgs.add(((J.Lambda) innerArgs.get(0)).withPrefix(Space.SINGLE_SPACE));
                     }
                 }
-
-                if ("type".equals(keyName)) {
-                    taskType = mapEntry.getValue();
-                }
-
-                if (innerArgs.size() > 1 && innerArgs.get(1) instanceof J.Lambda) {
-                    taskLambda = (J.Lambda) innerArgs.get(1);
-                }
-            } else if (innerArgs.get(0) instanceof J.Lambda) {
-                taskLambda = (J.Lambda) innerArgs.get(0);
-            }
-
-            String template;
-            Expression select = m.getSelect();
-            String prefix = select == null ? "" : select.print(getCursor()) + ".";
-            String name = inner.getSimpleName();
-            String lambda = taskLambda != null ? taskLambda.print(getCursor().getParentOrThrow()) : "";
-            if (taskType != null) {
-                String type = taskType.withPrefix(Space.EMPTY).print(getCursor().getParentOrThrow());
-                template = prefix + "tasks.register(\"" + name + "\", " + type + ")" + lambda;
+                return m.withSelect(newSelect).withName(register).withArguments(registerArgs);
             } else {
-                template = prefix + "tasks.register(\"" + name + "\")" + lambda;
+                return m.withSelect(newSelect).withName(register);
             }
-
-            SourceFile parsed = GRADLE_PARSER.parse(ctx, template)
-                    .findFirst()
-                    .orElse(null);
-            if (!(parsed instanceof G.CompilationUnit)) {
-                return m;
-            }
-
-            G.CompilationUnit cu = (G.CompilationUnit) parsed;
-            if (cu.getStatements().isEmpty() || !(cu.getStatements().get(0) instanceof J.MethodInvocation)) {
-                return m;
-            }
-            return cu.getStatements().get(0).withPrefix(m.getPrefix()).withMarkers(m.getMarkers());
         }
 
-        private boolean isTaskDeclaration(J.MethodInvocation method) {
+        private boolean isTaskDeclaration(J.MethodInvocation method, Cursor cursor) {
             if (!"task".equals(method.getSimpleName())) {
                 return false;
             }
 
+            if (cursor.firstEnclosing(G.CompilationUnit.class) != null) {
+                return isGroovyTaskDeclaration(method, cursor);
+            } else if (cursor.firstEnclosing(K.CompilationUnit.class) != null) {
+                return isKotlinTaskDeclaration(method);
+            }
+            return false;
+        }
+
+        private boolean isGroovyTaskDeclaration(J.MethodInvocation method, Cursor cursor) {
             Expression select = method.getSelect();
             if (select == null) {
                 return true;
@@ -149,12 +124,11 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
             if (select instanceof J.Identifier) {
                 String selectName = ((J.Identifier) select).getSimpleName();
-
                 if ("project".equals(selectName) || "it".equals(selectName)) {
                     return true;
                 }
 
-                J.Lambda enclosingLambda = getCursor().firstEnclosing(J.Lambda.class);
+                J.Lambda enclosingLambda = cursor.firstEnclosing(J.Lambda.class);
                 if (enclosingLambda != null) {
                     for (J param : enclosingLambda.getParameters().getParameters()) {
                         if (param instanceof J.VariableDeclarations) {
@@ -166,85 +140,27 @@ public class ChangeTaskToTasksRegister extends Recipe {
                         }
                     }
                 }
-
-                return false;
             }
-
             return false;
         }
-    }
 
-    private static class KotlinVisitor extends KotlinIsoVisitor<ExecutionContext> {
-
-        @Override
-        public K.MethodInvocation visitMethodInvocation(K.MethodInvocation method, ExecutionContext ctx) {
-            K.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!"task".equals(m.getSimpleName())) {
-                return m;
-            }
-
+        private boolean isKotlinTaskDeclaration(J.MethodInvocation method) {
             Expression select = method.getSelect();
-            if (select != null) {
-                if (select instanceof J.Identifier) {
-                    String selectName = ((J.Identifier) select).getSimpleName();
-                    if (!"project".equals(selectName)) {
-                        return m;
-                    }
-                } else {
-                    return m;
+            if (select == null) {
+                return true;
+            }
+            return select instanceof J.Identifier && "project".equals(((J.Identifier) select).getSimpleName());
+        }
+
+        private String getMapEntryKey(G.MapEntry mapEntry) {
+            Expression expression = mapEntry.getKey();
+            if (expression instanceof J.Literal) {
+                Object key = ((J.Literal) expression).getValue();
+                if (key instanceof String) {
+                    return (String) key;
                 }
             }
-
-            List<Expression> args = m.getArguments();
-            if (args.isEmpty() || !(args.get(0) instanceof J.Literal)) {
-                return m;
-            }
-
-            J.Literal taskName = (J.Literal) args.get(0);
-            if (!TypeUtils.isString(taskName.getType())) {
-                return m;
-            }
-
-            Expression taskType = null;
-            if(m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
-                taskType = m.getTypeParameters().get(0);
-            }
-
-            J.Lambda taskLambda = null;
-            if (args.size() == 2 && args.get(1) instanceof J.Lambda) {
-                taskLambda = (J.Lambda) args.get(1);
-            }
-
-            String template;
-            String prefix = select == null ? "" : select.print(getCursor()) + ".";
-            String name = (String) taskName.getValue();
-            String lambda = taskLambda != null ? taskLambda.print(getCursor().getParentOrThrow()) : "";
-            if (taskType != null) {
-                String type = taskType.print(getCursor().getParentOrThrow());
-                template = prefix + "tasks.register<" + type + ">(\"" + name + "\")" + lambda;
-            } else {
-                template = prefix + "tasks.register(\"" + name + "\")" + lambda;
-            }
-
-            GradleParser.Input input = new GradleParser.Input(
-                    Paths.get("build.gradle.kts"),
-                    () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8))
-            );
-
-            SourceFile parsed = GRADLE_PARSER.parseInputs(Collections.singletonList(input), null, ctx)
-                    .findFirst()
-                    .orElse(null);
-            if (!(parsed instanceof K.CompilationUnit)) {
-                return m;
-            }
-
-            K.CompilationUnit cu = (K.CompilationUnit) parsed;
-            if (cu.getStatements().isEmpty() || !(cu.getStatements().get(0) instanceof J.Block)) {
-                return m;
-            }
-
-            J.Block block = (J.Block) cu.getStatements().get(0);
-            return block.getStatements().get(0).withPrefix(m.getPrefix()).withMarkers(m.getMarkers());
+            return null;
         }
     }
 }
