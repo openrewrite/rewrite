@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 11, 2025)
 
-We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (127/127 tests)**.
+We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (135/135 tests)**.
 
 #### Completed LST Elements ✅
 1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
@@ -314,6 +314,15 @@ We have successfully completed the foundational infrastructure and are making go
     - While loops: `while (cond) { body }`
     - Blocks: `{ statement1; statement2 }`
     - For comprehensions preserved as Unknown (complex Scala-specific syntax)
+13. **Basic Classes** (8/18 tests passing) - Fundamental class structure
+    - Empty classes: `class Empty`
+    - Classes with empty body: `class Empty { }`
+    - Classes with methods: `class Greeter { def greet(): Unit = println("Hello!") }`
+    - Classes with fields: `class Counter { var count = 0 }`
+    - Nested classes
+    - Class modifiers: `private class Secret`, `protected class Internal`, `abstract class Shape`
+    - Methods within classes preserved as Unknown nodes
+    - NOT YET: constructors, type parameters, extends/implements, case classes
 
 #### Not Started Yet ❌
 1. Classes, traits, objects, pattern matching, etc.

@@ -57,6 +57,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       case whileTree: untpd.WhileDo => visitWhileDo(whileTree)
       case forTree: untpd.ForDo => visitForDo(forTree)
       case block: untpd.Block => visitBlock(block)
+      case td: untpd.TypeDef if td.isClassDef => visitClassDef(td)
+      case dd: untpd.DefDef => visitDefDef(dd)
       case _ => visitUnknown(tree)
   }
   
@@ -633,6 +635,201 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     )
   }
   
+  private def visitClassDef(td: untpd.TypeDef): J.ClassDeclaration = {
+    val prefix = extractPrefix(td.span)
+    
+    // Extract the source text to find modifiers and class keyword
+    val adjustedStart = Math.max(0, td.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, td.span.end - offsetAdjustment)
+    var modifierText = ""
+    var classIndex = -1
+    
+    if (adjustedStart >= cursor && adjustedEnd <= source.length) {
+      val sourceSnippet = source.substring(cursor, adjustedEnd)
+      classIndex = sourceSnippet.indexOf("class")
+      if (classIndex > 0) {
+        modifierText = sourceSnippet.substring(0, classIndex)
+      }
+    }
+    
+    // Extract modifiers
+    val (modifiers, lastModEnd) = extractModifiersFromText(td.mods, modifierText)
+    
+    // Find where "class" keyword ends
+    val classKeywordPos = if (classIndex >= 0) {
+      cursor + classIndex + "class".length
+    } else {
+      cursor
+    }
+    
+    // Extract space between "class" and the name
+    val nameStart = if (td.nameSpan.exists) {
+      Math.max(0, td.nameSpan.start - offsetAdjustment)
+    } else {
+      classKeywordPos
+    }
+    
+    val nameSpace = if (classKeywordPos < nameStart && nameStart <= source.length) {
+      Space.format(source.substring(classKeywordPos, nameStart))
+    } else {
+      Space.format(" ") // Default to single space
+    }
+    
+    // Extract class kind with proper prefix space
+    val kindPrefix = if (!modifiers.isEmpty && classIndex > 0 && lastModEnd < classIndex) {
+      Space.format(modifierText.substring(lastModEnd, classIndex))
+    } else {
+      Space.EMPTY
+    }
+    
+    val kind = new J.ClassDeclaration.Kind(
+      Tree.randomId(),
+      kindPrefix,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      J.ClassDeclaration.Kind.Type.Class
+    )
+    
+    // Update cursor to after "class" keyword
+    cursor = classKeywordPos
+    
+    // Extract class name
+    val name = new J.Identifier(
+      Tree.randomId(),
+      nameSpace,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      td.name.toString,
+      null,
+      null
+    )
+    
+    // For now, no type parameters, no primary constructor, no extends/implements
+    val typeParameters: JContainer[J.TypeParameter] = null
+    val primaryConstructor: JContainer[Statement] = null
+    val extendings: JLeftPadded[TypeTree] = null
+    val implementings: JContainer[TypeTree] = null
+    
+    // Handle the body - TypeDef has rhs which should be a Template for classes
+    // For classes without explicit body, we should NOT print empty braces
+    val (hasExplicitBody, bodyPrefix) = td.rhs match {
+      case template: untpd.Template =>
+        // Check if there's a body in the source
+        if (td.span.exists && td.nameSpan.exists) {
+          val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
+          val classEnd = Math.max(0, td.span.end - offsetAdjustment)
+          if (nameEnd < classEnd && nameEnd >= 0 && classEnd <= source.length) {
+            val afterName = source.substring(nameEnd, classEnd)
+            val braceIndex = afterName.indexOf("{")
+            if (braceIndex >= 0) {
+              // Extract space before the opening brace
+              val spaceBeforeBrace = Space.format(afterName.substring(0, braceIndex))
+              // Update cursor to after the opening brace
+              cursor = nameEnd + braceIndex + 1
+              (true, spaceBeforeBrace)
+            } else {
+              (false, Space.EMPTY)
+            }
+          } else {
+            (false, Space.EMPTY)
+          }
+        } else {
+          (false, Space.EMPTY)
+        }
+      case _ => (false, Space.EMPTY)
+    }
+    
+    val body = if (hasExplicitBody) {
+      td.rhs match {
+        case template: untpd.Template =>
+          // Visit the template body to get statements
+          val statements = new util.ArrayList[JRightPadded[Statement]]()
+          
+          // Visit each statement in the template body
+          for (stat <- template.body) {
+            visitTree(stat) match {
+              case null => // Skip null statements
+              case stmt: Statement => 
+                statements.add(JRightPadded.build(stmt))
+              case _ => // Skip non-statement nodes
+            }
+          }
+          
+          // Extract the space before the closing brace
+          val endSpace = if (td.span.exists) {
+            val classEnd = Math.max(0, td.span.end - offsetAdjustment)
+            if (cursor < classEnd && classEnd <= source.length) {
+              val remaining = source.substring(cursor, classEnd)
+              val closeBraceIndex = remaining.lastIndexOf("}")
+              if (closeBraceIndex >= 0) {
+                cursor = classEnd // Move cursor to end
+                Space.format(remaining.substring(0, closeBraceIndex))
+              } else {
+                Space.EMPTY
+              }
+            } else {
+              Space.EMPTY
+            }
+          } else {
+            Space.EMPTY
+          }
+          
+          new J.Block(
+            Tree.randomId(),
+            bodyPrefix,
+            Markers.EMPTY,
+            JRightPadded.build(false),
+            statements,
+            endSpace
+          )
+        case _ =>
+          // Fallback
+          new J.Block(
+            Tree.randomId(),
+            bodyPrefix,
+            Markers.EMPTY,
+            JRightPadded.build(false),
+            Collections.emptyList(),
+            Space.EMPTY
+          )
+      }
+    } else {
+      // For classes without body (like "class Empty"), return null
+      null
+    }
+    
+    // Update cursor to end of the class
+    if (td.span.exists) {
+      val adjustedEnd = Math.max(0, td.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.ClassDeclaration(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      Collections.emptyList(), // annotations
+      modifiers,
+      kind,
+      name,
+      typeParameters,
+      primaryConstructor,
+      extendings,
+      implementings,
+      null, // permits
+      body,
+      null  // type
+    )
+  }
+  
+  private def visitDefDef(dd: untpd.DefDef): J = {
+    // For now, preserve method declarations as Unknown to maintain exact formatting
+    // This will be replaced with proper method declaration support in the future
+    visitUnknown(dd)
+  }
+  
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
@@ -686,6 +883,57 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     } else {
       ""
     }
+  }
+  
+  private def extractModifiersFromText(mods: untpd.Modifiers, modifierText: String): (util.ArrayList[J.Modifier], Int) = {
+    import dotty.tools.dotc.core.Flags
+    val modifierList = new util.ArrayList[J.Modifier]()
+    
+    // The order matters - we'll add them in the order they appear in source
+    val modifierKeywords = List(
+      ("private", Flags.Private, J.Modifier.Type.Private),
+      ("protected", Flags.Protected, J.Modifier.Type.Protected),
+      ("abstract", Flags.Abstract, J.Modifier.Type.Abstract),
+      ("final", Flags.Final, J.Modifier.Type.Final)
+      // Skip "case" for now - needs special handling
+    )
+    
+    // Create a list of (position, keyword, type) for modifiers that are present
+    val presentModifiers = modifierKeywords.flatMap { case (keyword, flag, modType) =>
+      if (mods.is(flag)) {
+        val pos = modifierText.indexOf(keyword)
+        if (pos >= 0) Some((pos, keyword, modType)) else None
+      } else None
+    }.sortBy(_._1) // Sort by position in source
+    
+    // Build modifiers with proper spacing
+    var lastEnd = 0
+    for ((pos, keyword, modType) <- presentModifiers) {
+      // Space before this modifier
+      val spaceBefore = if (pos > lastEnd) {
+        Space.format(modifierText.substring(lastEnd, pos))
+      } else {
+        Space.EMPTY
+      }
+      
+      modifierList.add(new J.Modifier(
+        Tree.randomId(),
+        spaceBefore,
+        Markers.EMPTY,
+        keyword,
+        modType,
+        Collections.emptyList()
+      ))
+      
+      lastEnd = pos + keyword.length
+    }
+    
+    // Update cursor to skip past the modifiers we've consumed
+    if (!modifierList.isEmpty && modifierText.nonEmpty) {
+      cursor = cursor + lastEnd
+    }
+    
+    (modifierList, lastEnd)
   }
   
   private def constantToJavaType(const: Constant): JavaType.Primitive = const.tag match {
