@@ -76,7 +76,7 @@ public class DeleteProperty extends Recipe {
                 for (int i = 0; i < contents.size(); i++) {
                     Properties.Content content = contents.get(i);
                     if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
-                        if (removePropertyComments) {
+                        if (Boolean.TRUE.equals(removePropertyComments)) {
                             if (!currentEntryContents.isEmpty()) {
                                 prefix = currentEntryContents.getFirst().getPrefix();
                             }
