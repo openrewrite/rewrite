@@ -20,6 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
@@ -122,5 +123,74 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(qualid.getTarget(), p);
     }
 
+    @Override  
+    public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+        // For Scala classes with primary constructors, we need special handling
+        // Check if this class has a primary constructor
+        if (classDecl.getPadding().getPrimaryConstructor() != null) {
+            // Custom handling for Scala classes with primary constructors
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visit(classDecl.getLeadingAnnotations(), p);
+            for (J.Modifier m : classDecl.getModifiers()) {
+                visit(m, p);
+            }
+            visit(classDecl.getPadding().getKind().getAnnotations(), p);
+            visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+            
+            // Print the class keyword
+            String kind = "";
+            switch (classDecl.getKind()) {
+                case Class:
+                    kind = "class";
+                    break;
+                case Enum:
+                    kind = "enum";
+                    break;
+                case Interface:
+                    kind = "interface";
+                    break;
+                case Annotation:
+                    kind = "@interface";
+                    break;
+                case Record:
+                    kind = "record";
+                    break;
+            }
+            p.append(kind);
+
+            visit(classDecl.getName(), p);
+            visit(classDecl.getTypeParameters(), p);
+            
+            // For Scala: print primaryConstructor WITHOUT adding parentheses
+            // The primaryConstructor container already includes parentheses in its content
+            for (JRightPadded<Statement> statement : classDecl.getPadding().getPrimaryConstructor().getPadding().getElements()) {
+                visit(statement.getElement(), p);
+                visitSpace(statement.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+            }
+            
+            if (classDecl.getPadding().getExtends() != null) {
+                visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
+                p.append("extends");
+                visit(classDecl.getPadding().getExtends().getElement(), p);
+            }
+
+            if (classDecl.getPadding().getImplements() != null) {
+                visitContainer(classDecl.getPadding().getImplements().getBefore() != null ? " with" : " extends", 
+                              classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, " with", "", p);
+            }
+
+            if (classDecl.getPadding().getPermits() != null) {
+                visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
+            }
+
+            visit(classDecl.getBody(), p);
+            afterSyntax(classDecl, p);
+            return classDecl;
+        } else {
+            // For classes without primary constructors, use the default Java printing
+            return super.visitClassDeclaration(classDecl, p);
+        }
+    }
+    
     // Override additional methods here for Scala-specific syntax as needed
 }

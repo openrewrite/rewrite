@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 11, 2025)
 
-We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (135/135 tests)**.
+We have successfully completed the foundational infrastructure and are making excellent progress on LST element implementation. Currently at **96% test passing rate (145/151 tests)**.
 
 #### Completed LST Elements ✅
 1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
@@ -314,15 +314,19 @@ We have successfully completed the foundational infrastructure and are making go
     - While loops: `while (cond) { body }`
     - Blocks: `{ statement1; statement2 }`
     - For comprehensions preserved as Unknown (complex Scala-specific syntax)
-13. **Basic Classes** (8/18 tests passing) - Fundamental class structure
-    - Empty classes: `class Empty`
-    - Classes with empty body: `class Empty { }`
-    - Classes with methods: `class Greeter { def greet(): Unit = println("Hello!") }`
-    - Classes with fields: `class Counter { var count = 0 }`
-    - Nested classes
-    - Class modifiers: `private class Secret`, `protected class Internal`, `abstract class Shape`
-    - Methods within classes preserved as Unknown nodes
-    - NOT YET: constructors, type parameters, extends/implements, case classes
+13. **Basic Classes** (12/18 tests passing) - Fundamental class structure working
+    - ✅ Empty classes: `class Empty`
+    - ✅ Classes with empty body: `class Empty { }`
+    - ✅ Classes with fields: `class Counter { var count = 0 }`
+    - ✅ Class modifiers: `private class Secret`, `protected class Internal`, `abstract class Shape`
+    - ✅ Constructor parameters: `class Person(name: String, age: Int)`
+    - ✅ Val/var constructor parameters: `class Person(val name: String, var age: Int)`
+    - ✅ Mixed constructor parameters with access modifiers
+    - ❌ Classes without parameters showing empty `()` 
+    - ❌ Type parameters: `class Box[T]`
+    - ❌ Extends clause: `class Dog extends Animal`
+    - ❌ Case classes: `case class Point(x: Int, y: Int)`
+    - Note: Methods and nested statements within classes preserved as Unknown nodes
 
 #### Not Started Yet ❌
 1. Classes, traits, objects, pattern matching, etc.

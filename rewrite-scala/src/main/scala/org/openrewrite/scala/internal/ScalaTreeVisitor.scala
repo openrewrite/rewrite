@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 
 import java.util
-import java.util.Collections
+import java.util.{Collections, Arrays}
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -704,16 +704,52 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       null
     )
     
-    // For now, no type parameters, no primary constructor, no extends/implements
+    // Update cursor to after name
+    if (td.nameSpan.exists) {
+      val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
+      if (nameEnd > cursor && nameEnd <= source.length) {
+        cursor = nameEnd
+      }
+    }
+    
+    // For now, no type parameters
     val typeParameters: JContainer[J.TypeParameter] = null
-    val primaryConstructor: JContainer[Statement] = null
+    
+    // Handle constructor parameters - preserve them as J.Unknown
+    val constructorParamsSource = extractConstructorParametersSource(td)
+    val primaryConstructor = if (constructorParamsSource.nonEmpty) {
+      // Create Unknown node to preserve constructor parameters
+      val unknown = new J.Unknown(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        new J.Unknown.Source(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          constructorParamsSource
+        )
+      )
+      // Wrap in a container
+      JContainer.build(
+        Space.EMPTY,
+        Collections.singletonList(JRightPadded.build(unknown.asInstanceOf[Statement])),
+        Markers.EMPTY
+      )
+    } else {
+      null
+    }
+    
+    // Extract extends/implements
     val extendings: JLeftPadded[TypeTree] = null
     val implementings: JContainer[TypeTree] = null
     
     // Handle the body - TypeDef has rhs which should be a Template for classes
     // For classes without explicit body, we should NOT print empty braces
-    val (hasExplicitBody, bodyPrefix) = td.rhs match {
-      case template: untpd.Template =>
+    val (hasExplicitBody, bodyPrefix, template) = td.rhs match {
+      case tmpl: untpd.Template =>
+        // Constructor parameters are handled separately
+        
         // Check if there's a body in the source
         if (td.span.exists && td.nameSpan.exists) {
           val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
@@ -726,17 +762,17 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               val spaceBeforeBrace = Space.format(afterName.substring(0, braceIndex))
               // Update cursor to after the opening brace
               cursor = nameEnd + braceIndex + 1
-              (true, spaceBeforeBrace)
+              (true, spaceBeforeBrace, tmpl)
             } else {
-              (false, Space.EMPTY)
+              (false, Space.EMPTY, tmpl)
             }
           } else {
-            (false, Space.EMPTY)
+            (false, Space.EMPTY, tmpl)
           }
         } else {
-          (false, Space.EMPTY)
+          (false, Space.EMPTY, tmpl)
         }
-      case _ => (false, Space.EMPTY)
+      case _ => (false, Space.EMPTY, null)
     }
     
     val body = if (hasExplicitBody) {
@@ -948,6 +984,94 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case StringTag => JavaType.Primitive.String
     case NullTag => JavaType.Primitive.Null
     case _ => null
+  }
+  
+  private def extractConstructorParametersSource(td: untpd.TypeDef): String = {
+    // Extract constructor parameters from source
+    if (td.span.exists && td.nameSpan.exists) {
+      val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
+      val classEnd = Math.max(0, td.span.end - offsetAdjustment)
+      
+      if (nameEnd < classEnd && nameEnd >= cursor && classEnd <= source.length) {
+        val afterName = source.substring(nameEnd, classEnd)
+        
+        // Look for opening parenthesis
+        val parenStart = afterName.indexOf("(")
+        if (parenStart >= 0) {
+          // Find matching closing parenthesis
+          var depth = 1
+          var i = parenStart + 1
+          while (i < afterName.length && depth > 0) {
+            afterName(i) match {
+              case '(' => depth += 1
+              case ')' => depth -= 1
+              case _ =>
+            }
+            i += 1
+          }
+          
+          if (depth == 0) {
+            // Extract the parameters including parentheses
+            val params = afterName.substring(parenStart, i)
+            // Update cursor to after the parameters
+            cursor = nameEnd + i
+            return params
+          }
+        }
+      }
+    }
+    ""
+  }
+  
+  private def createPrimaryConstructor(constructorParams: List[untpd.ValDef], template: untpd.Template): J.MethodDeclaration = {
+    // Create method name with Implicit marker (similar to Kotlin)
+    val name = new J.Identifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY, // TODO: Add Scala implicit marker
+      Collections.emptyList(),
+      "<constructor>",
+      null,
+      null
+    )
+    
+    // Visit constructor parameters
+    val params = new util.ArrayList[JRightPadded[Statement]]()
+    for (param <- constructorParams) {
+      // For now, preserve constructor parameters as Unknown
+      val paramTree = visitUnknown(param)
+      params.add(JRightPadded.build(paramTree.asInstanceOf[Statement]))
+    }
+    
+    // Build parameter container
+    val paramContainer = if (params.isEmpty) {
+      JContainer.empty[Statement]()
+    } else {
+      JContainer.build(
+        Space.EMPTY,
+        params,
+        Markers.EMPTY
+      )
+    }
+    
+    new J.MethodDeclaration(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY, // TODO: Add Scala PrimaryConstructor marker
+      Collections.emptyList(), // annotations
+      Collections.emptyList(), // modifiers
+      null, // type parameters
+      null, // return type
+      new J.MethodDeclaration.IdentifierWithAnnotations(
+        name,
+        Collections.emptyList()
+      ),
+      paramContainer,
+      null, // throws
+      null, // body
+      null, // default value
+      null  // method type
+    )
   }
   
   def getRemainingSource: String = {
