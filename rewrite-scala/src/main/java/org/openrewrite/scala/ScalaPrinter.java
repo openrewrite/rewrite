@@ -35,6 +35,54 @@ import java.util.List;
 public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, 
+                                  JContainer.Location location, String suffixBetween, 
+                                  @Nullable String after, PrintOutputCapture<P> p) {
+        if (location == JContainer.Location.TYPE_PARAMETERS) {
+            // Use Scala-style square brackets for type parameters
+            if (container != null) {
+                visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+                p.append('['); // Use [ instead of <
+                visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+                p.append(']'); // Use ] instead of >
+            }
+        } else {
+            // Delegate to superclass for other container types
+            super.visitContainer(before, container, location, suffixBetween, after, p);
+        }
+    }
+    
+    @Override
+    public J visitTypeParameters(J.TypeParameters typeParams, PrintOutputCapture<P> p) {
+        // Use Scala-style square brackets instead of angle brackets
+        visitSpace(typeParams.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+        visit(typeParams.getAnnotations(), p);
+        p.append('[');
+        visitRightPadded(typeParams.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+        p.append(']');
+        return typeParams;
+    }
+    
+    @Override
+    public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
+        // Print type parameter, but bounds use Scala syntax
+        beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
+        visit(typeParam.getAnnotations(), p);
+        visit(typeParam.getName(), p);
+        
+        // Print bounds if present using Scala syntax
+        if (typeParam.getPadding().getBounds() != null) {
+            visitSpace(typeParam.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
+            p.append(":");  // Scala uses : instead of extends for bounds
+            visitRightPadded(typeParam.getPadding().getBounds().getPadding().getElements(), 
+                JRightPadded.Location.TYPE_BOUND, " with", p);  // Scala uses "with" instead of "&"
+        }
+        
+        afterSyntax(typeParam, p);
+        return typeParam;
+    }
+
+    @Override
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
             return visitScalaCompilationUnit((S.CompilationUnit) tree, p);

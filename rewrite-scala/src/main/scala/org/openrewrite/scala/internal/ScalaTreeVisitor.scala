@@ -712,11 +712,88 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       }
     }
     
-    // For now, no type parameters
-    val typeParameters: JContainer[J.TypeParameter] = null
+    // Extract template early to access type parameters
+    val template = td.rhs match {
+      case tmpl: untpd.Template => tmpl
+      case _ => null
+    }
     
-    // Handle constructor parameters - preserve them as J.Unknown
-    val constructorParamsSource = extractConstructorParametersSource(td)
+    // Extract type parameters from the template  
+    val typeParameters: JContainer[J.TypeParameter] = if (template != null && template.constr.paramss.nonEmpty) {
+      // Check if the first param list contains type parameters (TypeDef nodes)
+      val firstParamList = template.constr.paramss.head
+      val typeParams = firstParamList.collect { case tparam: untpd.TypeDef => tparam }
+      
+      if (typeParams.nonEmpty) {
+        // Extract the source for the opening bracket
+        val typeParamsSource = extractTypeParametersSource(td)
+        val openingBracketSpace = if (typeParamsSource.startsWith("[")) {
+          Space.EMPTY
+        } else {
+          Space.format(" ")
+        }
+        
+        // Convert TypeDef nodes to J.TypeParameter
+        val jTypeParams = new util.ArrayList[JRightPadded[J.TypeParameter]]()
+        typeParams.zipWithIndex.foreach { case (tparam, idx) =>
+          val jTypeParam = visitTypeParameter(tparam)
+          val isLast = idx == typeParams.size - 1
+          
+          // Determine trailing space/comma
+          val trailingSpace = if (!isLast) {
+            // Look for comma in source between this param and next
+            if (idx + 1 < typeParams.size && tparam.span.exists && typeParams(idx + 1).span.exists) {
+              val thisEnd = tparam.span.end - offsetAdjustment
+              val nextStart = typeParams(idx + 1).span.start - offsetAdjustment
+              if (thisEnd < nextStart && nextStart <= source.length) {
+                val between = source.substring(thisEnd, nextStart)
+                val commaIdx = between.indexOf(',')
+                if (commaIdx >= 0) {
+                  Space.format(between.substring(commaIdx + 1))
+                } else {
+                  Space.EMPTY
+                }
+              } else {
+                Space.EMPTY
+              }
+            } else {
+              Space.EMPTY
+            }
+          } else {
+            Space.EMPTY
+          }
+          
+          if (!isLast && trailingSpace != Space.EMPTY) {
+            jTypeParams.add(new JRightPadded(jTypeParam, trailingSpace, Markers.EMPTY))
+          } else {
+            jTypeParams.add(JRightPadded.build(jTypeParam))
+          }
+        }
+        
+        JContainer.build(openingBracketSpace, jTypeParams, Markers.EMPTY)
+      } else {
+        null
+      }
+    } else {
+      null
+    }
+    
+    // Handle constructor parameters - extract only value parameters
+    val constructorParamsSource = if (template != null && template.constr.paramss.size > 1) {
+      // If we have type parameters, constructor params are in the second list
+      extractConstructorParametersSource(td)
+    } else if (template != null && template.constr.paramss.nonEmpty) {
+      // Check if the first list has only value parameters
+      val firstList = template.constr.paramss.head
+      if (firstList.forall(_.isInstanceOf[untpd.ValDef])) {
+        extractConstructorParametersSource(td)
+      } else {
+        ""
+      }
+    } else {
+      ""
+    }
+    
     val primaryConstructor = if (constructorParamsSource.nonEmpty) {
       // Create Unknown node to preserve constructor parameters
       val unknown = new J.Unknown(
@@ -738,12 +815,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       )
     } else {
       null
-    }
-    
-    // Extract template early to access parents
-    val template = td.rhs match {
-      case tmpl: untpd.Template => tmpl
-      case _ => null
     }
     
     // Extract extends/implements from Template
@@ -1162,27 +1233,85 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case _ => null
   }
   
+  private def visitTypeParameter(tparam: untpd.TypeDef): J.TypeParameter = {
+    val prefix = extractPrefix(tparam.span)
+    
+    // Extract the type parameter name
+    val name = new J.Identifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      tparam.name.toString,
+      null,
+      null
+    )
+    
+    // Handle bounds if present
+    val bounds: JContainer[TypeTree] = tparam.rhs match {
+      case bounds: untpd.TypeBoundsTree if !bounds.lo.isEmpty || !bounds.hi.isEmpty =>
+        // TODO: Implement bounds properly
+        null
+      case _ => null
+    }
+    
+    new J.TypeParameter(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      Collections.emptyList(), // annotations
+      Collections.emptyList(), // modifiers
+      name,
+      bounds
+    )
+  }
+  
+  private def extractTypeParametersSource(td: untpd.TypeDef): String = {
+    // This method is not actually used anymore since we get type params from the AST
+    // We only need to update the cursor position correctly
+    ""
+  }
+  
   private def extractConstructorParametersSource(td: untpd.TypeDef): String = {
     // Extract constructor parameters from source
     if (td.span.exists && td.nameSpan.exists) {
-      val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
+      // First check if we have type parameters and skip past them
+      var searchStart = Math.max(0, td.nameSpan.end - offsetAdjustment)
+      
+      // Skip type parameters if present
+      if (searchStart < source.length && source.charAt(searchStart) == '[') {
+        var depth = 1
+        var i = searchStart + 1
+        while (i < source.length && depth > 0) {
+          source.charAt(i) match {
+            case '[' => depth += 1
+            case ']' => depth -= 1
+            case _ =>
+          }
+          i += 1
+        }
+        if (depth == 0) {
+          searchStart = i // Start looking for constructor params after type params
+        }
+      }
+      
       val classEnd = Math.max(0, td.span.end - offsetAdjustment)
       
-      if (nameEnd < classEnd && nameEnd >= cursor && classEnd <= source.length) {
-        val afterName = source.substring(nameEnd, classEnd)
+      if (searchStart < classEnd && searchStart >= 0 && classEnd <= source.length) {
+        val afterNameAndTypeParams = source.substring(searchStart, classEnd)
         
-        // Look for opening parenthesis immediately after class name
+        // Look for opening parenthesis after class name and type parameters
         // Check if it starts with parenthesis (possibly with whitespace)
-        val trimmed = afterName.trim()
+        val trimmed = afterNameAndTypeParams.trim()
         if (trimmed.startsWith("(")) {
           // Find the position of the opening parenthesis
-          val parenStart = afterName.indexOf("(")
+          val parenStart = afterNameAndTypeParams.indexOf("(")
           
           // Find matching closing parenthesis
           var depth = 1
           var i = parenStart + 1
-          while (i < afterName.length && depth > 0) {
-            afterName(i) match {
+          while (i < afterNameAndTypeParams.length && depth > 0) {
+            afterNameAndTypeParams(i) match {
               case '(' => depth += 1
               case ')' => depth -= 1
               case _ =>
@@ -1192,9 +1321,9 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
           
           if (depth == 0) {
             // Extract the parameters including parentheses
-            val params = afterName.substring(parenStart, i)
+            val params = afterNameAndTypeParams.substring(parenStart, i)
             // Update cursor to after the parameters
-            cursor = nameEnd + i
+            cursor = searchStart + i
             return params
           }
         }
