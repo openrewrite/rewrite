@@ -22,6 +22,9 @@ import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
+import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.OmitBraces
+import org.openrewrite.scala.marker.SObject
 
 import java.util
 import java.util.{Collections, Arrays}
@@ -479,10 +482,288 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     visitUnknown(vd)
   }
   
-  private def visitModuleDef(md: untpd.ModuleDef): J = {
-    // For now, preserve object declarations as Unknown to maintain exact formatting
-    // This will be replaced with proper object support in the future
-    visitUnknown(md)
+  private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
+    val prefix = extractPrefix(md.span)
+    
+    // Extract the source text to find modifiers  
+    val adjustedStart = Math.max(0, md.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, md.span.end - offsetAdjustment)
+    var modifierText = ""
+    var objectIndex = -1
+    
+    if (adjustedStart >= cursor && adjustedEnd <= source.length) {
+      val sourceSnippet = source.substring(cursor, adjustedEnd)
+      objectIndex = sourceSnippet.indexOf("object")
+      if (objectIndex > 0) {
+        modifierText = sourceSnippet.substring(0, objectIndex)
+      }
+    }
+    
+    // Extract modifiers from text
+    val (modifiers, lastModEnd) = extractModifiersFromText(md.mods, modifierText)
+    
+    // Check for case modifier (special handling as it's not a traditional modifier)
+    if (modifierText.contains("case")) {
+      val caseIndex = modifierText.indexOf("case")
+      if (caseIndex >= 0) {
+        // Add case modifier in the correct position
+        val caseSpace = if (caseIndex > lastModEnd) {
+          Space.format(modifierText.substring(lastModEnd, caseIndex))
+        } else {
+          Space.EMPTY
+        }
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          caseSpace,
+          Markers.EMPTY,
+          "case",
+          J.Modifier.Type.LanguageExtension,
+          Collections.emptyList()
+        ))
+      }
+    }
+    
+    // Objects are implicitly final
+    modifiers.add(new J.Modifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      null, // No keyword for implicit final
+      J.Modifier.Type.Final,
+      Collections.emptyList()
+    ).withMarkers(Markers.build(Collections.singletonList(new Implicit(Tree.randomId())))))
+    
+    // Find where "object" keyword ends
+    val objectKeywordPos = if (objectIndex >= 0) {
+      cursor + objectIndex + "object".length
+    } else {
+      cursor
+    }
+    
+    // Extract space between modifiers and "object" keyword
+    val kindPrefix = if (!modifiers.isEmpty && objectIndex > 0) {
+      val afterModifiers = if (modifierText.contains("case")) {
+        modifierText.indexOf("case") + "case".length
+      } else {
+        lastModEnd
+      }
+      Space.format(modifierText.substring(afterModifiers, objectIndex))
+    } else {
+      Space.EMPTY
+    }
+    
+    // Update cursor to after "object" keyword
+    cursor = objectKeywordPos
+    
+    // Create the class kind (object instead of class)
+    val kind = new J.ClassDeclaration.Kind(
+      Tree.randomId(),
+      kindPrefix,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      J.ClassDeclaration.Kind.Type.Class // We use Class type but mark with SObject
+    )
+    
+    // Extract space between "object" and the name
+    val nameStart = if (md.nameSpan.exists) {
+      Math.max(0, md.nameSpan.start - offsetAdjustment)
+    } else {
+      objectKeywordPos
+    }
+    
+    val nameSpace = if (objectKeywordPos < nameStart && nameStart <= source.length) {
+      Space.format(source.substring(objectKeywordPos, nameStart))
+    } else {
+      Space.format(" ") // Default to single space
+    }
+    
+    // Extract object name
+    val name = new J.Identifier(
+      Tree.randomId(),
+      nameSpace,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      md.name.toString,
+      null,
+      null
+    )
+    
+    // Update cursor to after the name
+    if (md.nameSpan.exists) {
+      cursor = Math.max(0, md.nameSpan.end - offsetAdjustment)
+    }
+    
+    // Objects cannot have type parameters
+    val typeParameters: JContainer[J.TypeParameter] = null
+    
+    // Objects cannot have constructor parameters  
+    val primaryConstructor: JContainer[Statement] = null
+    
+    // Extract extends/with clauses from the implementation template
+    var extendings: JLeftPadded[TypeTree] = null
+    var implementings: JContainer[TypeTree] = null
+    
+    md.impl match {
+      case tmpl: untpd.Template if tmpl.parents.nonEmpty =>
+        // Handle extends/with clauses similar to classes
+        // Look for "extends" keyword and extract space before it
+        var extendsSpace = Space.format(" ")
+        if (cursor < source.length && tmpl.parents.head.span.exists) {
+          val parentStart = Math.max(0, tmpl.parents.head.span.start - offsetAdjustment)
+          if (cursor < parentStart && parentStart <= source.length) {
+            val beforeParent = source.substring(cursor, parentStart)
+            val extendsIdx = beforeParent.indexOf("extends")
+            if (extendsIdx >= 0) {
+              // Space is only the whitespace before "extends"
+              extendsSpace = Space.format(beforeParent.substring(0, extendsIdx))
+              // Update cursor to after "extends" keyword
+              cursor = cursor + extendsIdx + "extends".length
+            } else {
+              // No "extends" found, use full space
+              extendsSpace = Space.format(beforeParent)
+              cursor = parentStart
+            }
+          }
+        }
+        
+        // Now visit the parent with cursor positioned correctly
+        val firstParent = tmpl.parents.head
+        val extendsType = visitTree(firstParent) match {
+          case typeTree: TypeTree => typeTree
+          case _ => visitUnknown(firstParent).asInstanceOf[TypeTree]
+        }
+        
+        extendings = new JLeftPadded(extendsSpace, extendsType, Markers.EMPTY)
+        
+        // Handle additional parents as implements (with clauses)
+        if (tmpl.parents.size > 1) {
+          val implementsList = new util.ArrayList[JRightPadded[TypeTree]]()
+          
+          // Find space before first "with"
+          var containerSpace = Space.format(" ")
+          if (cursor < source.length && tmpl.parents(1).span.exists) {
+            val firstWithParentStart = Math.max(0, tmpl.parents(1).span.start - offsetAdjustment)
+            if (cursor < firstWithParentStart) {
+              val beforeFirstWith = source.substring(cursor, firstWithParentStart)
+              val withIdx = beforeFirstWith.indexOf("with")
+              if (withIdx >= 0) {
+                containerSpace = Space.format(beforeFirstWith.substring(0, withIdx))
+                cursor = cursor + withIdx + "with".length
+              }
+            }
+          }
+          
+          for (i <- 1 until tmpl.parents.size) {
+            val parent = tmpl.parents(i)
+            val implType = visitTree(parent) match {
+              case typeTree: TypeTree => typeTree
+              case _ => visitUnknown(parent).asInstanceOf[TypeTree]
+            }
+            
+            // For subsequent traits, extract space between them
+            var trailingSpace = Space.EMPTY
+            if (i < tmpl.parents.size - 1 && parent.span.exists && tmpl.parents(i + 1).span.exists) {
+              val thisEnd = Math.max(0, parent.span.end - offsetAdjustment)
+              val nextStart = Math.max(0, tmpl.parents(i + 1).span.start - offsetAdjustment)
+              if (thisEnd < nextStart && nextStart <= source.length) {
+                val between = source.substring(thisEnd, nextStart)
+                val withIdx = between.indexOf("with")
+                if (withIdx >= 0) {
+                  trailingSpace = Space.format(between.substring(0, withIdx))
+                  // Update cursor past "with"
+                  cursor = thisEnd + withIdx + "with".length
+                } else {
+                  trailingSpace = Space.format(between)
+                }
+              }
+            }
+            
+            implementsList.add(new JRightPadded(implType, trailingSpace, Markers.EMPTY))
+          }
+          implementings = JContainer.build(containerSpace, implementsList, Markers.EMPTY)
+        }
+        
+      case _ =>
+    }
+    
+    // Extract body
+    val body = md.impl match {
+      case tmpl: untpd.Template if tmpl.body.nonEmpty =>
+        // Find the opening brace
+        var bodyPrefix = Space.EMPTY
+        if (cursor < source.length && md.span.exists) {
+          val remaining = source.substring(cursor, Math.min(md.span.end - offsetAdjustment, source.length))
+          val braceIdx = remaining.indexOf('{')
+          if (braceIdx >= 0) {
+            bodyPrefix = Space.format(remaining.substring(0, braceIdx))
+            cursor = cursor + braceIdx + 1 // Skip past the opening brace
+          }
+        }
+        
+        // Create a block from the template body
+        val statements = new util.ArrayList[JRightPadded[Statement]]()
+        tmpl.body.foreach { stat =>
+          visitTree(stat) match {
+            case stmt: Statement => statements.add(JRightPadded.build(stmt))
+            case _ => // Skip non-statements
+          }
+        }
+        
+        // Find the closing brace to get the end space
+        var endSpace = Space.EMPTY
+        if (cursor < source.length && md.span.exists) {
+          val endPos = Math.max(0, md.span.end - offsetAdjustment) 
+          val remaining = source.substring(cursor, Math.min(endPos, source.length))
+          val closeBraceIdx = remaining.lastIndexOf('}')
+          if (closeBraceIdx >= 0) {
+            endSpace = Space.format(remaining.substring(0, closeBraceIdx))
+            cursor = endPos // Update to end of object
+          }
+        }
+        
+        new J.Block(
+          Tree.randomId(),
+          bodyPrefix,
+          Markers.EMPTY,
+          JRightPadded.build(false),
+          statements,
+          endSpace
+        )
+        
+      case _ =>
+        // Empty body - object without braces
+        new J.Block(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          JRightPadded.build(false),
+          Collections.emptyList(),
+          Space.EMPTY
+        ).withMarkers(Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))))
+    }
+    
+    // Update cursor to end of module def
+    if (md.span.exists) {
+      cursor = Math.max(cursor, md.span.end - offsetAdjustment)
+    }
+    
+    // Create the class declaration with SObject marker
+    new J.ClassDeclaration(
+      Tree.randomId(),
+      prefix,
+      Markers.build(Collections.singletonList(SObject.create())),
+      Collections.emptyList(), // annotations
+      modifiers,
+      kind,
+      name,
+      typeParameters,
+      primaryConstructor,
+      extendings,
+      implementings,
+      null, // permits
+      body,
+      null // type
+    )
   }
   
   private def visitAssign(asg: untpd.Assign): J = {

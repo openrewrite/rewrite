@@ -100,23 +100,13 @@ class ScalaCompilerBridge {
     // Check for postfix operators - they need special handling
     val hasPostfixOperator = trimmed.matches(".*[a-zA-Z0-9_)]\\s*[!?]\\s*$")
     
+    // Check for declaration keywords with regex to handle arbitrary spacing
+    val declarationPattern = """^\s*(package|import|class|object|trait|def|val|var|type|private|protected|public|final|lazy|implicit|case\s+class|case\s+object)\s""".r
+    val startsWithDeclaration = declarationPattern.findFirstIn(trimmed).isDefined
+    
     !hasMultipleLines &&
     !hasPostfixOperator &&
-    !trimmed.startsWith("package") && 
-    !trimmed.startsWith("import") &&
-    !trimmed.startsWith("class") &&
-    !trimmed.startsWith("object") &&
-    !trimmed.startsWith("trait") &&
-    !trimmed.startsWith("def") &&
-    !trimmed.startsWith("val") &&
-    !trimmed.startsWith("var") &&
-    !trimmed.startsWith("type") &&
-    !trimmed.startsWith("private") &&
-    !trimmed.startsWith("protected") &&
-    !trimmed.startsWith("public") &&
-    !trimmed.startsWith("final") &&
-    !trimmed.startsWith("lazy") &&
-    !trimmed.startsWith("implicit") &&
+    !startsWithDeclaration &&
     !trimmed.startsWith("//") &&
     !trimmed.startsWith("/*") &&
     trimmed.nonEmpty

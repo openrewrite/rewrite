@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
@@ -173,9 +174,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override  
     public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+        // Check if this is a Scala object declaration
+        boolean isObject = classDecl.getMarkers().findFirst(SObject.class).isPresent();
+        
         // For Scala classes, we need special handling for extends/with clauses
         // Use custom handling only if this is actually a Scala class
-        boolean needsScalaHandling = false;
+        boolean needsScalaHandling = isObject;
         
         // Check if we have Scala-style "with" clauses
         if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
@@ -192,30 +196,40 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // Custom handling for Scala classes
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visit(classDecl.getLeadingAnnotations(), p);
+            
+            // For objects, skip the final modifier (it's implicit)
             for (J.Modifier m : classDecl.getModifiers()) {
-                visit(m, p);
+                if (!(isObject && m.getType() == J.Modifier.Type.Final)) {
+                    visit(m, p);
+                }
             }
+            
             visit(classDecl.getPadding().getKind().getAnnotations(), p);
             visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
             
-            // Print the class keyword
+            // Print the appropriate keyword
             String kind = "";
-            switch (classDecl.getKind()) {
-                case Class:
-                    kind = "class";
-                    break;
-                case Enum:
-                    kind = "enum";
-                    break;
-                case Interface:
-                    kind = "interface";
-                    break;
-                case Annotation:
-                    kind = "@interface";
-                    break;
-                case Record:
-                    kind = "record";
-                    break;
+            if (isObject) {
+                // For objects, we print "object" - the "case" modifier is printed separately
+                kind = "object";
+            } else {
+                switch (classDecl.getKind()) {
+                    case Class:
+                        kind = "class";
+                        break;
+                    case Enum:
+                        kind = "enum";
+                        break;
+                    case Interface:
+                        kind = "interface";
+                        break;
+                    case Annotation:
+                        kind = "@interface";
+                        break;
+                    case Record:
+                        kind = "record";
+                        break;
+                }
             }
             p.append(kind);
 
@@ -242,7 +256,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
 
             if (classDecl.getPadding().getImplements() != null) {
-                visitContainer(classDecl.getPadding().getImplements().getBefore() != null ? " with" : " extends", 
+                visitContainer(classDecl.getPadding().getExtends() != null ? " with" : " extends", 
                               classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, " with", "", p);
             }
 
@@ -294,6 +308,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 return super.visitClassDeclaration(classDecl, p);
             }
         }
+    }
+    
+    @Override
+    public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
+        // Check if this block has the OmitBraces marker (for objects without body)
+        if (block.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent()) {
+            // Don't print the block at all
+            return block;
+        }
+        return super.visitBlock(block, p);
     }
     
     // Override additional methods here for Scala-specific syntax as needed
