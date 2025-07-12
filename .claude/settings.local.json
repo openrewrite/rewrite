@@ -33,7 +33,8 @@
       "Bash(javac:*)",
       "Bash(java:*)",
       "Bash(scalac:*)",
-      "Bash(scala:*)"
+      "Bash(scala:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

@@ -125,10 +125,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override  
     public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
-        // For Scala classes with primary constructors, we need special handling
-        // Check if this class has a primary constructor
-        if (classDecl.getPadding().getPrimaryConstructor() != null) {
-            // Custom handling for Scala classes with primary constructors
+        // For Scala classes, we need special handling for extends/with clauses
+        // Use custom handling only if this is actually a Scala class
+        boolean needsScalaHandling = false;
+        
+        // Check if we have Scala-style "with" clauses
+        if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
+            needsScalaHandling = true;
+        }
+        
+        // Or if we have a primary constructor with actual parameters
+        if (classDecl.getPadding().getPrimaryConstructor() != null && 
+            !classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
+            needsScalaHandling = true;
+        }
+        
+        if (needsScalaHandling) {
+            // Custom handling for Scala classes
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visit(classDecl.getLeadingAnnotations(), p);
             for (J.Modifier m : classDecl.getModifiers()) {
@@ -161,11 +174,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(classDecl.getName(), p);
             visit(classDecl.getTypeParameters(), p);
             
-            // For Scala: print primaryConstructor WITHOUT adding parentheses
-            // The primaryConstructor container already includes parentheses in its content
-            for (JRightPadded<Statement> statement : classDecl.getPadding().getPrimaryConstructor().getPadding().getElements()) {
-                visit(statement.getElement(), p);
-                visitSpace(statement.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+            // For Scala: print primaryConstructor only if it has elements
+            // The primaryConstructor container includes the parentheses and parameters
+            if (classDecl.getPadding().getPrimaryConstructor() != null) {
+                JContainer<Statement> primaryConstructor = classDecl.getPadding().getPrimaryConstructor();
+                if (!primaryConstructor.getElements().isEmpty()) {
+                    // Visit each element in the primary constructor
+                    for (JRightPadded<Statement> statement : primaryConstructor.getPadding().getElements()) {
+                        visit(statement.getElement(), p);
+                        visitSpace(statement.getAfter(), Space.Location.RECORD_STATE_VECTOR_SUFFIX, p);
+                    }
+                }
             }
             
             if (classDecl.getPadding().getExtends() != null) {
@@ -187,8 +206,45 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             afterSyntax(classDecl, p);
             return classDecl;
         } else {
-            // For classes without primary constructors, use the default Java printing
-            return super.visitClassDeclaration(classDecl, p);
+            // For classes without Scala features, use Java printing but skip empty primary constructors
+            // The Java printer would print empty parentheses for primary constructors
+            if (classDecl.getPadding().getPrimaryConstructor() != null && 
+                classDecl.getPadding().getPrimaryConstructor().getElements().isEmpty()) {
+                // We have an empty primary constructor that shouldn't be printed
+                // Use the default Java printer logic but without the primary constructor
+                beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+                visit(classDecl.getLeadingAnnotations(), p);
+                for (J.Modifier m : classDecl.getModifiers()) {
+                    visit(m, p);
+                }
+                visit(classDecl.getPadding().getKind().getAnnotations(), p);
+                visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+                p.append(classDecl.getKind().name().toLowerCase());
+                visit(classDecl.getName(), p);
+                visit(classDecl.getTypeParameters(), p);
+                // Skip the empty primary constructor
+                
+                if (classDecl.getPadding().getExtends() != null) {
+                    visitSpace(classDecl.getPadding().getExtends().getBefore(), Space.Location.EXTENDS, p);
+                    p.append("extends");
+                    visit(classDecl.getPadding().getExtends().getElement(), p);
+                }
+
+                if (classDecl.getPadding().getImplements() != null) {
+                    visitContainer(" implements", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", "", p);
+                }
+
+                if (classDecl.getPadding().getPermits() != null) {
+                    visitContainer(" permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", "", p);
+                }
+
+                visit(classDecl.getBody(), p);
+                afterSyntax(classDecl, p);
+                return classDecl;
+            } else {
+                // Use the default Java printing
+                return super.visitClassDeclaration(classDecl, p);
+            }
         }
     }
     

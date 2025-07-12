@@ -800,29 +800,14 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         // Convert to TypeTree
         val extendsType: TypeTree = extendsTypeExpr match {
           case id: J.Identifier =>
-            // Extract space between "extends" and the type
-            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
-              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
-            } else {
-              Space.format(" ")
-            }
-            TypeTree.build(id.getSimpleName).asInstanceOf[Expression].withPrefix(typeSpace).asInstanceOf[TypeTree]
+            // The identifier already has the correct prefix from visitIdent, just use it as is
+            id
           case fieldAccess: J.FieldAccess =>
-            // Extract space between "extends" and the type
-            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
-              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
-            } else {
-              Space.format(" ")
-            }
-            fieldAccess.withPrefix(typeSpace)
+            // The field access already has the correct prefix from visitSelect
+            fieldAccess
           case unknown: J.Unknown =>
-            // Extract space between "extends" and the type
-            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
-              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
-            } else {
-              Space.format(" ")
-            }
-            unknown.withPrefix(typeSpace)
+            // The unknown already has the correct prefix
+            unknown
           case other =>
             // This shouldn't happen but let's be safe
             val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
@@ -935,38 +920,47 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     // Handle the body - TypeDef has rhs which should be a Template for classes
     // For classes without explicit body, we should NOT print empty braces
-    val (hasExplicitBody, bodyPrefix) = td.rhs match {
+    val hasExplicitBody = td.rhs match {
       case tmpl: untpd.Template =>
-        // Constructor parameters are handled separately
-        
         // Check if there's a body in the source
-        if (td.span.exists && td.nameSpan.exists) {
-          val nameEnd = Math.max(0, td.nameSpan.end - offsetAdjustment)
+        if (td.span.exists) {
           val classEnd = Math.max(0, td.span.end - offsetAdjustment)
-          if (nameEnd < classEnd && nameEnd >= 0 && classEnd <= source.length) {
-            val afterName = source.substring(nameEnd, classEnd)
-            val braceIndex = afterName.indexOf("{")
-            if (braceIndex >= 0) {
-              // Extract space before the opening brace
-              val spaceBeforeBrace = Space.format(afterName.substring(0, braceIndex))
-              // Update cursor to after the opening brace
-              cursor = nameEnd + braceIndex + 1
-              (true, spaceBeforeBrace)
-            } else {
-              (false, Space.EMPTY)
-            }
+          if (cursor < classEnd && classEnd <= source.length) {
+            val afterCursor = source.substring(cursor, classEnd)
+            afterCursor.contains("{")
           } else {
-            (false, Space.EMPTY)
+            false
           }
         } else {
-          (false, Space.EMPTY)
+          false
         }
-      case _ => (false, Space.EMPTY)
+      case _ => false
     }
     
     val body = if (hasExplicitBody) {
       td.rhs match {
         case template: untpd.Template =>
+          // Extract space before the opening brace
+          val bodyPrefix = if (td.span.exists) {
+            val classEnd = Math.max(0, td.span.end - offsetAdjustment)
+            if (cursor < classEnd && classEnd <= source.length) {
+              val afterCursor = source.substring(cursor, classEnd)
+              val braceIndex = afterCursor.indexOf("{")
+              if (braceIndex >= 0) {
+                val prefix = Space.format(afterCursor.substring(0, braceIndex))
+                // Update cursor to after the opening brace
+                cursor = cursor + braceIndex + 1
+                prefix
+              } else {
+                Space.EMPTY
+              }
+            } else {
+              Space.EMPTY
+            }
+          } else {
+            Space.EMPTY
+          }
+          
           // Visit the template body to get statements
           val statements = new util.ArrayList[JRightPadded[Statement]]()
           
@@ -1008,15 +1002,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
             endSpace
           )
         case _ =>
-          // Fallback
-          new J.Block(
-            Tree.randomId(),
-            bodyPrefix,
-            Markers.EMPTY,
-            JRightPadded.build(false),
-            Collections.emptyList(),
-            Space.EMPTY
-          )
+          // Fallback - shouldn't happen if hasExplicitBody is true
+          null
       }
     } else {
       // For classes without body (like "class Empty"), return null
@@ -1184,9 +1171,13 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       if (nameEnd < classEnd && nameEnd >= cursor && classEnd <= source.length) {
         val afterName = source.substring(nameEnd, classEnd)
         
-        // Look for opening parenthesis
-        val parenStart = afterName.indexOf("(")
-        if (parenStart >= 0) {
+        // Look for opening parenthesis immediately after class name
+        // Check if it starts with parenthesis (possibly with whitespace)
+        val trimmed = afterName.trim()
+        if (trimmed.startsWith("(")) {
+          // Find the position of the opening parenthesis
+          val parenStart = afterName.indexOf("(")
+          
           // Find matching closing parenthesis
           var depth = 1
           var i = parenStart + 1
