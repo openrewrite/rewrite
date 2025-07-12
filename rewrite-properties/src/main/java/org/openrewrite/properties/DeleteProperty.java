@@ -64,7 +64,7 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PropertiesVisitor<>() {
+        return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                 Properties.File f = (Properties.File) super.visitFile(file, ctx);
