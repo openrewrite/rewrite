@@ -740,13 +740,202 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       null
     }
     
-    // Extract extends/implements
-    val extendings: JLeftPadded[TypeTree] = null
-    val implementings: JContainer[TypeTree] = null
+    // Extract template early to access parents
+    val template = td.rhs match {
+      case tmpl: untpd.Template => tmpl
+      case _ => null
+    }
+    
+    // Extract extends/implements from Template
+    var extendings: JLeftPadded[TypeTree] = null
+    var implementings: JContainer[TypeTree] = null
+    
+    if (template != null && template.parents.nonEmpty) {
+        // In Scala, the first parent after the primary constructor is the extends clause
+        // Additional parents are the with clauses (implements in Java)
+        
+        // First, we need to find where "extends" keyword starts in the source
+        val extendsKeywordPos = if (td.nameSpan.exists && constructorParamsSource.nonEmpty) {
+          // After constructor parameters
+          cursor
+        } else if (td.nameSpan.exists) {
+          // After class name (no constructor params)
+          Math.max(0, td.nameSpan.end - offsetAdjustment)
+        } else {
+          cursor
+        }
+        
+        // Look for "extends" keyword in source
+        var extendsSpace = Space.EMPTY
+        if (extendsKeywordPos < source.length && template.parents.head.span.exists) {
+          val firstParentStart = Math.max(0, template.parents.head.span.start - offsetAdjustment)
+          if (extendsKeywordPos < firstParentStart && firstParentStart <= source.length) {
+            val betweenText = source.substring(extendsKeywordPos, firstParentStart)
+            val extendsIndex = betweenText.indexOf("extends")
+            if (extendsIndex >= 0) {
+              extendsSpace = Space.format(betweenText.substring(0, extendsIndex))
+              // Update cursor to after "extends" keyword
+              cursor = extendsKeywordPos + extendsIndex + "extends".length
+            }
+          }
+        }
+        
+        // First parent is the extends clause
+        val firstParent = template.parents.head
+        val extendsTypeExpr = visitTree(firstParent) match {
+          case id: J.Identifier =>
+            // Simple type like "Animal" - already has the right prefix from visiting
+            id
+          case fieldAccess: J.FieldAccess =>
+            // Qualified type like "com.example.Animal"
+            fieldAccess
+          case unknown: J.Unknown =>
+            // Complex type we can't handle yet (like generics)
+            unknown
+          case _ =>
+            // Fallback to Unknown
+            visitUnknown(firstParent)
+        }
+        
+        // Convert to TypeTree
+        val extendsType: TypeTree = extendsTypeExpr match {
+          case id: J.Identifier =>
+            // Extract space between "extends" and the type
+            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
+              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
+            } else {
+              Space.format(" ")
+            }
+            TypeTree.build(id.getSimpleName).asInstanceOf[Expression].withPrefix(typeSpace).asInstanceOf[TypeTree]
+          case fieldAccess: J.FieldAccess =>
+            // Extract space between "extends" and the type
+            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
+              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
+            } else {
+              Space.format(" ")
+            }
+            fieldAccess.withPrefix(typeSpace)
+          case unknown: J.Unknown =>
+            // Extract space between "extends" and the type
+            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
+              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
+            } else {
+              Space.format(" ")
+            }
+            unknown.withPrefix(typeSpace)
+          case other =>
+            // This shouldn't happen but let's be safe
+            val typeSpace = if (cursor < firstParent.span.start - offsetAdjustment) {
+              Space.format(source.substring(cursor, firstParent.span.start - offsetAdjustment))
+            } else {
+              Space.format(" ")
+            }
+            new J.Unknown(
+              Tree.randomId(),
+              typeSpace,
+              Markers.EMPTY,
+              new J.Unknown.Source(
+                Tree.randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                other.toString
+              )
+            )
+        }
+        
+        extendings = new JLeftPadded(extendsSpace, extendsType, Markers.EMPTY)
+        
+        // Update cursor to after first parent
+        if (firstParent.span.exists) {
+          cursor = Math.max(cursor, firstParent.span.end - offsetAdjustment)
+        }
+        
+        // Handle additional parents as implements (with clauses)
+        if (template.parents.size > 1) {
+          val implementsList = new util.ArrayList[JRightPadded[TypeTree]]()
+          
+          for (i <- 1 until template.parents.size) {
+            val parent = template.parents(i)
+            
+            // Look for "with" keyword before this parent
+            var withSpace = Space.EMPTY
+            if (parent.span.exists && i > 0) {
+              val prevParentEnd = template.parents(i - 1).span.end - offsetAdjustment
+              val thisParentStart = parent.span.start - offsetAdjustment
+              if (prevParentEnd < thisParentStart && thisParentStart <= source.length) {
+                val betweenText = source.substring(prevParentEnd, thisParentStart)
+                val withIndex = betweenText.indexOf("with")
+                if (withIndex >= 0) {
+                  withSpace = Space.format(betweenText.substring(0, withIndex))
+                  // Update cursor past "with"
+                  cursor = prevParentEnd + withIndex + "with".length
+                }
+              }
+            }
+            
+            val implTypeExpr = visitTree(parent) match {
+              case id: J.Identifier =>
+                id
+              case fieldAccess: J.FieldAccess =>
+                fieldAccess
+              case unknown: J.Unknown =>
+                unknown
+              case _ =>
+                visitUnknown(parent)
+            }
+            
+            // Extract space between "with" and the type
+            val implTypeSpace = if (cursor < parent.span.start - offsetAdjustment) {
+              Space.format(source.substring(cursor, parent.span.start - offsetAdjustment))
+            } else {
+              Space.format(" ")
+            }
+            
+            // Convert to TypeTree
+            val implType: TypeTree = implTypeExpr match {
+              case id: J.Identifier =>
+                TypeTree.build(id.getSimpleName).asInstanceOf[Expression].withPrefix(implTypeSpace).asInstanceOf[TypeTree]
+              case fieldAccess: J.FieldAccess =>
+                fieldAccess.withPrefix(implTypeSpace)
+              case unknown: J.Unknown =>
+                unknown.withPrefix(implTypeSpace)
+              case other =>
+                new J.Unknown(
+                  Tree.randomId(),
+                  implTypeSpace,
+                  Markers.EMPTY,
+                  new J.Unknown.Source(
+                    Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    other.toString
+                  )
+                )
+            }
+            
+            implementsList.add(
+              JRightPadded.build(implType)
+            )
+            
+            // Update cursor
+            if (parent.span.exists) {
+              cursor = Math.max(cursor, parent.span.end - offsetAdjustment)
+            }
+          }
+          
+          if (!implementsList.isEmpty) {
+            implementings = JContainer.build(
+              Space.EMPTY, // No space before implements in Scala
+              implementsList,
+              Markers.EMPTY
+            )
+          }
+        }
+    }
     
     // Handle the body - TypeDef has rhs which should be a Template for classes
     // For classes without explicit body, we should NOT print empty braces
-    val (hasExplicitBody, bodyPrefix, template) = td.rhs match {
+    val (hasExplicitBody, bodyPrefix) = td.rhs match {
       case tmpl: untpd.Template =>
         // Constructor parameters are handled separately
         
@@ -762,17 +951,17 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               val spaceBeforeBrace = Space.format(afterName.substring(0, braceIndex))
               // Update cursor to after the opening brace
               cursor = nameEnd + braceIndex + 1
-              (true, spaceBeforeBrace, tmpl)
+              (true, spaceBeforeBrace)
             } else {
-              (false, Space.EMPTY, tmpl)
+              (false, Space.EMPTY)
             }
           } else {
-            (false, Space.EMPTY, tmpl)
+            (false, Space.EMPTY)
           }
         } else {
-          (false, Space.EMPTY, tmpl)
+          (false, Space.EMPTY)
         }
-      case _ => (false, Space.EMPTY, null)
+      case _ => (false, Space.EMPTY)
     }
     
     val body = if (hasExplicitBody) {
