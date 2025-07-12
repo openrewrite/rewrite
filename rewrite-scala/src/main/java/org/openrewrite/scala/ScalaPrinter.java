@@ -84,6 +84,43 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         afterSyntax(pkg, p);
         return pkg;
     }
+    
+    @Override
+    public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+        beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
+        p.append("import ");
+        
+        // Visit the import expression
+        // Need to handle wildcard imports specially for Scala (_ instead of *)
+        J.FieldAccess qualid = import_.getQualid();
+        if (isWildcardImport(qualid)) {
+            // Print the package part
+            visitFieldAccessUpToWildcard(qualid, p);
+            p.append("._");
+        } else {
+            visit(qualid, p);
+        }
+        
+        // Handle aliases if present (for future use)
+        if (import_.getAlias() != null) {
+            p.append(" => ");
+            visit(import_.getAlias(), p);
+        }
+        
+        // Note: No semicolon in Scala import declarations
+        afterSyntax(import_, p);
+        return import_;
+    }
+    
+    private boolean isWildcardImport(J.FieldAccess qualid) {
+        J.Identifier name = qualid.getName();
+        return "*".equals(name.getSimpleName());
+    }
+    
+    private void visitFieldAccessUpToWildcard(J.FieldAccess qualid, PrintOutputCapture<P> p) {
+        // Visit the target part (everything before the wildcard)
+        visit(qualid.getTarget(), p);
+    }
 
     // Override additional methods here for Scala-specific syntax as needed
 }
