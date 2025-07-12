@@ -34,7 +34,7 @@ class DeletePropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DeleteProperty("delete.me", null, false));
+        spec.recipe(new DeleteProperty("delete.me", null, null));
     }
 
     @DocumentExample
