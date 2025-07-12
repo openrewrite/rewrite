@@ -78,7 +78,7 @@ public class DeleteProperty extends Recipe {
                     if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
                         if (Boolean.TRUE.equals(removePropertyComments)) {
                             if (!currentEntryContents.isEmpty()) {
-                                prefix = currentEntryContents.getFirst().getPrefix();
+                                prefix = currentEntryContents.get(0).getPrefix();
                             }
                             currentEntryContents.clear();
                         } else if (i == 0) {
@@ -93,7 +93,7 @@ public class DeleteProperty extends Recipe {
                     } else {
                         currentEntryContents.add(content);
                         if (prefix != null) {
-                            currentEntryContents.set(0, (Properties.Content) currentEntryContents.getFirst().withPrefix(prefix));
+                            currentEntryContents.set(0, (Properties.Content) currentEntryContents.get(0).withPrefix(prefix));
                             prefix = null;
                         }
                         newContents.addAll(currentEntryContents);
