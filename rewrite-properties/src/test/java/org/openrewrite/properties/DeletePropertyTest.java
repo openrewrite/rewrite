@@ -17,11 +17,15 @@ package org.openrewrite.properties;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.stream.Stream;
 
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -30,37 +34,46 @@ class DeletePropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DeleteProperty("delete.me", null));
+        spec.recipe(new DeleteProperty("delete.me", null, false));
     }
 
     @DocumentExample
     @Test
     void deleteOnlyProperty() {
         rewriteRun(
-          properties(
-            """
-              delete.me = baz
-              """,
-            """
-              """
-          )
+                properties(
+                        """
+                          delete.me = baz
+                          """,
+                        """
+                          """
+                )
         );
     }
 
     @Test
     void basic() {
         rewriteRun(
-          properties(
-            """
-              preserve = foo
-              delete.me = baz
-              delete.me.not = bar
-              """,
-            """
-              preserve = foo
-              delete.me.not = bar
-              """
-          )
+                properties(
+                        """
+                          preserve = foo
+                          delete.me = baz
+                          delete.me.not = bar
+                          """,
+                        """
+                          preserve = foo
+                          delete.me.not = bar
+                          """
+                )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("basicWithCommentParameters")
+    void basicWithComment(String before, String after) {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("delete.me", true, true)),
+          properties(before, after)
         );
     }
 
@@ -73,7 +86,7 @@ class DeletePropertyTest implements RewriteTest {
     })
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, true)),
+          spec -> spec.recipe(new DeleteProperty(propertyKey, true, false)),
           properties(
             """
               spring.datasource.schema=classpath*:db/database/schema.sql
@@ -90,7 +103,7 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false)),
           properties(
             """
               spring.datasource.schema=classpath*:db/database/schema.sql
@@ -111,10 +124,11 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void updatePrefix() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false)),
           properties(
             """
               acme.my-project.person.first-name=example
+              
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
@@ -130,7 +144,7 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void matchesGlob() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("management.metrics.export.dynatrace.*", false)),
+          spec -> spec.recipe(new DeleteProperty("management.metrics.export.dynatrace.*", false, false)),
           properties(
             """
               management.metrics.export.dynatrace.api-token=YOUR_TOKEN
@@ -155,7 +169,7 @@ class DeletePropertyTest implements RewriteTest {
     })
     void matchesGlobWithRelaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, true)),
+          spec -> spec.recipe(new DeleteProperty(propertyKey, true, false)),
             properties(
               """
                 acme.notMyProject.person=example
@@ -168,5 +182,53 @@ class DeletePropertyTest implements RewriteTest {
                 """
             )
           );
+    }
+
+
+    private static Stream<Arguments> basicWithCommentParameters() {
+        return Stream.of(
+                Arguments.of("""
+                                # Heading comment
+
+                                # Another heading comment
+                                
+                                # delete.me comment (previous empty line indicate property comment starts)
+                                # on
+                                # multiple line
+                                delete.me = baz
+                                # After comment 1
+                                
+                                # After comment 2
+                                """,
+                        """
+                                # Heading comment
+                                
+                                # Another heading comment
+
+                                # After comment 1
+                                
+                                # After comment 2
+                                """
+                ),
+                Arguments.of(
+                        """
+                                # Preserve comment
+                                preserve = foo
+                                # Another comment preserved
+                                
+                                # delete.me comment
+                                delete.me = baz
+                                delete.me.not = bar
+                                """,
+                        """
+                                # Preserve comment
+                                preserve = foo
+                                # Another comment preserved
+                                
+                                delete.me.not = bar
+                                """
+
+                )
+        );
     }
 }
