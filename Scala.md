@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 11, 2025)
 
-We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **95% test passing rate (86/90 tests)**.
+We have successfully completed the foundational infrastructure and are making good progress on LST element implementation. Currently at **100% test passing rate (120/120 tests)**.
 
 #### Completed LST Elements ✅
 1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
@@ -296,13 +296,20 @@ We have successfully completed the foundational infrastructure and are making go
 5. **Variable Declarations** (12/12 tests passing) - val, var, lazy val, with modifiers and type annotations
    - Note: Currently preserved as Unknown nodes for formatting accuracy
 6. **Unary Operations** (7/7 tests passing) - Prefix and postfix operators, unary method calls
-
-#### Nearly Complete 🟨
-1. **Binary Operations** (19/20 tests passing) - One failing test for infix method calls with dots
-2. **Compilation Units** (7/9 tests passing) - Basic structure working, issues with comment handling
+7. **Binary Operations** (20/20 tests passing) - All binary operations including infix method calls
+8. **Compilation Units** (12/12 tests passing) - Package declarations, imports, and statements
+9. **Imports** (8/8 tests passing) - All import variations currently preserved as Unknown nodes
+10. **Field Access** (8/8 tests passing) - Select nodes now properly map to J.FieldAccess
+11. **Method Invocations** (12/12 tests passing) - Apply nodes now properly map to J.MethodInvocation
+    - Simple method calls: `println("Hello")`
+    - No-arg method calls: `s.length()`
+    - Multiple arguments: `Math.max(10, 20)`
+    - Chained calls: `"hello".toUpperCase().substring(1)`
+    - Field access calls: `System.out.println("test")`
+    - Named arguments, infix calls, apply methods, curried calls all supported
 
 #### Not Started Yet ❌
-1. Method invocations, control flow (if/while/for), classes, traits, objects, pattern matching, etc.
+1. Control flow (if/while/for), classes, traits, objects, pattern matching, etc.
 
 ### Key Technical Decisions Made
 - Using Unknown nodes to preserve formatting for unimplemented constructs
@@ -310,17 +317,39 @@ We have successfully completed the foundational infrastructure and are making go
 - Updated assignment tests to use object blocks since Scala doesn't allow top-level assignments
 - Implemented multi-line detection in isSimpleExpression to avoid inappropriate wrapping
 - Fixed expression duplication by excluding postfix operators from wrapping and handling unary operators in Select nodes
-- Simplified compilation unit handling to preserve everything as Unknown nodes temporarily
+- Fixed comment handling by updating Space.format to properly extract comments from whitespace
+- Fixed infixWithDot issue by preserving parentheses as Unknown nodes
+- Fixed package duplication by properly updating cursor position after package declaration
+- Decided to keep imports as Unknown nodes for now after encountering double printing issues with J.Import
 
-### Remaining Issues
-1. **Comment Handling** (2 tests) - Comments appearing as non-whitespace in whitespace
-2. **infixWithDot** (1 test) - Extra closing parenthesis in `1.+(2)`
-3. **parseWithPackage** (1 test) - Related to compilation unit handling
+### Incremental Implementation Lessons Learned
+When attempting to implement import mapping to J.Import, we encountered issues with imports being processed twice (once as J.Import and once as J.Unknown), resulting in double printing. Investigation revealed:
+
+1. **Multiple visitor calls**: The Scala compiler's AST structure for imports causes the visitor to be called multiple times for the same import statement
+2. **Incomplete field access**: When parsing `import scala.collection.mutable`, only `scala.collection` was being captured in the J.Import
+3. **Cursor management complexity**: Managing the cursor position to prevent duplicate source consumption proved challenging
+4. **Debug findings**:
+   - Import expression was a Select node with name "collection" and qualifier "scala"
+   - The full path "mutable" was not being captured in the field access construction
+   - Both J.Import and J.Unknown were being added, causing double printing
+
+This reinforced the importance of:
+1. Understanding the compiler's AST structure thoroughly before implementation
+2. Starting with simple cases that clearly map to existing LST elements
+3. Using J.Unknown for complex cases to preserve formatting while keeping tests passing
+4. Adding support gradually as patterns emerge and issues are understood
+5. Not trying to handle all variations at once
+
+**Future approach**: Now that Select nodes map to J.FieldAccess, we need to:
+1. Resolve the cursor management issues preventing proper source consumption
+2. Fix the multiple visitor calls for the same import statement
+3. Ensure the J.Import properly captures the complete field access without duplication
 
 ### Next Steps
-1. Fix comment handling in compilation units
-2. Fix the infixWithDot parenthesis duplication
-3. Continue with method invocations and control flow constructs
+1. Implement control flow constructs (if/while/for)
+2. Circle back to imports once we better understand the cursor management patterns
+3. Eventually create S.Import for Scala-specific import syntax (multi-select, aliases)
+4. Continue with classes, traits, and objects
 
 ## Notes
 

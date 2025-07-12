@@ -23,7 +23,8 @@ import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 
-import java.util.{ArrayList, Collections}
+import java.util
+import java.util.Collections
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -184,17 +185,111 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitMethodInvocation(app: untpd.Apply): J = {
-    // For method invocations, we need to handle the entire expression
-    // Check if the span is reasonable
-    val adjustedStart = Math.max(0, app.span.start - offsetAdjustment)
-    val adjustedEnd = Math.min(source.length, app.span.end - offsetAdjustment)
+    val prefix = extractPrefix(app.span)
     
-    // Debug output
-    // For method invocations, we need to handle the entire expression
-    // Check if the span is reasonable
+    // Handle the method call target
+    val (select: Expression, methodName: String, typeParams: java.util.List[Expression]) = app.fun match {
+      case sel: untpd.Select =>
+        // Method call like obj.method(...) or package.Class.method(...)
+        val target = visitTree(sel.qualifier) match {
+          case expr: Expression => expr
+          case _ => return visitUnknown(app)
+        }
+        (target, sel.name.toString, Collections.emptyList[Expression]())
+        
+      case id: untpd.Ident =>
+        // Simple function call like println(...)
+        (null, id.name.toString, Collections.emptyList[Expression]())
+        
+      case typeApp: untpd.TypeApply =>
+        // Method with type parameters like List.empty[Int]
+        // For now, fall back to Unknown for type applications
+        return visitUnknown(app)
+        
+      case _ =>
+        // Other kinds of function applications
+        return visitUnknown(app)
+    }
     
-    // For now, just use Unknown to capture the whole expression correctly
-    visitUnknown(app)
+    // Visit arguments
+    val args = new util.ArrayList[JRightPadded[Expression]]()
+    for (i <- app.args.indices) {
+      val arg = app.args(i)
+      visitTree(arg) match {
+        case expr: Expression => 
+          // For now, assume no trailing comma or space after each argument
+          // This will need refinement to handle formatting properly
+          val rightPadded = JRightPadded.build(expr)
+          args.add(rightPadded)
+        case _ => return visitUnknown(app) // If any argument fails, fall back
+      }
+    }
+    
+    // Extract space before the method name (after the dot if there's a select)
+    val nameSpace = if (select != null) {
+      app.fun match {
+        case sel: untpd.Select =>
+          val qualifierEnd = sel.qualifier.span.end
+          val nameStart = sel.nameSpan.start
+          if (qualifierEnd < nameStart) {
+            val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
+            val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
+            if (dotStart < nameStartAdjusted && dotStart >= cursor && nameStartAdjusted <= source.length) {
+              val between = source.substring(dotStart, nameStartAdjusted)
+              val dotIndex = between.indexOf('.')
+              if (dotIndex >= 0 && dotIndex + 1 < between.length) {
+                Space.format(between.substring(dotIndex + 1))
+              } else {
+                Space.EMPTY
+              }
+            } else {
+              Space.EMPTY
+            }
+          } else {
+            Space.EMPTY
+          }
+        case _ => Space.EMPTY
+      }
+    } else {
+      Space.EMPTY
+    }
+    
+    // Create the method name identifier
+    val name = new J.Identifier(
+      Tree.randomId(),
+      nameSpace,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      methodName,
+      null,
+      null
+    )
+    
+    // Build the arguments container
+    val argContainer = JContainer.build(
+      Space.EMPTY,  // space before '('
+      args,
+      Markers.EMPTY
+    )
+    
+    // Update cursor to end of the apply expression
+    if (app.span.exists) {
+      val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      if (select != null) JRightPadded.build(select) else null,
+      null, // typeParameters - handled separately in TypeApply
+      name,
+      argContainer,
+      null  // method type will be set later
+    )
   }
   
   private def isBinaryOperator(name: String): Boolean = {
@@ -267,12 +362,44 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       // This is something like "x.unary_-" without parentheses - preserve as Unknown
       visitUnknown(sel)
     } else {
-      // For now, treat Select as a field access or method reference
-      // This handles cases like "obj.field" or method references
-      val target = visitTree(sel.qualifier).asInstanceOf[Expression]
+      // Map Select to J.FieldAccess
+      // Extract prefix for this select
+      val prefix = extractPrefix(sel.span)
+      
+      // Visit the qualifier (target) - this could be an identifier, another select, etc.
+      val target = visitTree(sel.qualifier) match {
+        case expr: Expression => expr
+        case _ => 
+          // If the qualifier doesn't produce an expression, fall back to Unknown
+          return visitUnknown(sel)
+      }
+      
+      // Extract the space before the dot
+      val qualifierEnd = sel.qualifier.span.end
+      val nameStart = sel.nameSpan.start
+      val dotSpace = if (qualifierEnd < nameStart) {
+        val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
+        val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
+        if (dotStart < nameStartAdjusted && dotStart >= cursor && nameStartAdjusted <= source.length) {
+          val between = source.substring(dotStart, nameStartAdjusted)
+          // Find the dot and extract space before the name
+          val dotIndex = between.indexOf('.')
+          if (dotIndex >= 0 && dotIndex + 1 < between.length) {
+            Space.format(between.substring(dotIndex + 1))
+          } else {
+            Space.EMPTY
+          }
+        } else {
+          Space.EMPTY
+        }
+      } else {
+        Space.EMPTY
+      }
+      
+      // Create the name identifier
       val name = new J.Identifier(
         Tree.randomId(),
-        Space.EMPTY,
+        dotSpace,
         Markers.EMPTY,
         Collections.emptyList(),
         sel.name.toString,
@@ -280,9 +407,17 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         null
       )
       
+      // Consume up to the end of the selection
+      if (sel.span.exists) {
+        val adjustedEnd = Math.max(0, sel.span.end - offsetAdjustment)
+        if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+          cursor = adjustedEnd
+        }
+      }
+      
       new J.FieldAccess(
         Tree.randomId(),
-        Space.EMPTY,
+        prefix,
         Markers.EMPTY,
         target,
         JLeftPadded.build(name),
@@ -299,10 +434,31 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitImport(imp: untpd.Import): J = {
-    // For now, preserve imports as Unknown to maintain formatting
-    // This will be improved later
+    // For now, keep imports as Unknown until we resolve the cursor management issues
+    // The problem is complex:
+    // 1. Import nodes are being visited multiple times
+    // 2. Field access building is consuming source incorrectly
+    // 3. Prefix extraction is duplicating the "import" keyword
     visitUnknown(imp)
   }
+  
+  private def isSimpleImport(imp: untpd.Import): Boolean = {
+    // Check if this is a simple import without braces
+    if (imp.span.exists) {
+      val adjustedStart = Math.max(0, imp.span.start - offsetAdjustment)
+      val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
+      if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedEnd > adjustedStart) {
+        val importText = source.substring(adjustedStart, adjustedEnd)
+        !importText.contains("{")
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }
+  
+  
   
   private def visitPackageDef(pkg: untpd.PackageDef): J = {
     // Package definitions at the statement level should not be converted to statements
