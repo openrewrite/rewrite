@@ -864,10 +864,108 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitForDo(forTree: untpd.ForDo): J = {
+    // Handle simple for-each loops that can map to J.ForEachLoop
+    // Pattern: for (n <- nums) body
+    if (forTree.enums.size == 1) {
+      forTree.enums.head match {
+        case genFrom: untpd.GenFrom =>
+          // Simple case with single generator - map to J.ForEachLoop
+          return visitSimpleForEach(forTree, genFrom)
+        case _ =>
+          // Other cases fall through to Unknown
+      }
+    }
+    
     // For loops in Scala are quite complex with generators, guards, and definitions
-    // For now, preserve them as Unknown nodes until we can properly model them
-    // This will be replaced with proper S.ForComprehension support in the future
+    // For now, preserve complex cases as Unknown nodes until we can properly model them
     visitUnknown(forTree)
+  }
+  
+  private def visitSimpleForEach(forTree: untpd.ForDo, genFrom: untpd.GenFrom): J.ForEachLoop = {
+    val prefix = extractPrefix(forTree.span)
+    
+    // Extract the pattern (variable declaration)
+    val pattern = genFrom.pat
+    val varName = pattern match {
+      case ident: untpd.Ident => ident.name.toString
+      case _ => 
+        // For now, only handle simple identifier patterns
+        return visitUnknown(forTree).asInstanceOf[J.ForEachLoop]
+    }
+    
+    // Create variable declaration for the loop variable
+    val varDecl = new J.VariableDeclarations(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(), // No leading annotations
+      Collections.emptyList(), // No modifiers
+      null, // Type will be inferred
+      null, // No varargs
+      Collections.singletonList(
+        JRightPadded.build(
+          new J.VariableDeclarations.NamedVariable(
+            Tree.randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            new J.Identifier(
+              Tree.randomId(),
+              Space.EMPTY,
+              Markers.EMPTY,
+              Collections.emptyList(),
+              varName,
+              null,
+              null
+            ),
+            Collections.emptyList(), // No dimension brackets
+            null, // No initializer in the loop variable
+            null // No variable type
+          )
+        )
+      )
+    )
+    
+    // Visit the iterable expression
+    val iterable = visitTree(genFrom.expr) match {
+      case expr: Expression => expr
+      case _ => return visitUnknown(forTree).asInstanceOf[J.ForEachLoop]
+    }
+    
+    // Create the control structure
+    val control = new J.ForEachLoop.Control(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      JRightPadded.build(varDecl),
+      JRightPadded.build(iterable)
+    )
+    
+    // Visit the body
+    // For loops require a statement body, but Scala allows expressions
+    // For now, we'll convert the body to a statement or Unknown
+    val bodyJ = visitTree(forTree.body)
+    val body: Statement = bodyJ match {
+      case stmt: Statement => stmt
+      case _ => 
+        // Wrap non-statement bodies as Unknown to preserve them
+        visitUnknown(forTree.body).asInstanceOf[Statement]
+    }
+    
+    // Update cursor to end of for loop
+    if (forTree.span.exists) {
+      val adjustedEnd = Math.max(0, forTree.span.end - offsetAdjustment)
+      if (adjustedEnd > cursor && adjustedEnd <= source.length) {
+        cursor = adjustedEnd
+      }
+    }
+    
+    new J.ForEachLoop(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      control,
+      JRightPadded.build(body)
+    )
   }
   
   private def visitBlock(block: untpd.Block): J.Block = {

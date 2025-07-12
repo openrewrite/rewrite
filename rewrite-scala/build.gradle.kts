@@ -36,14 +36,19 @@ sourceSets {
     }
 }
 
-// Ensure Scala compiles before Java
-tasks.named<JavaCompile>("compileJava") {
-    dependsOn("compileScala")
-    // Add Scala classes to Java classpath
-    classpath = classpath.plus(files(tasks.named("compileScala").get().outputs))
+// Configure mixed Java/Scala compilation
+// Scala needs to see Java classes from the same module
+tasks.named<ScalaCompile>("compileScala") {
+    // Include Java source files in Scala compilation
+    source(sourceSets.main.get().java)
+    // Scala compiler will compile both Java and Scala files together
+    classpath = sourceSets.main.get().compileClasspath
 }
 
-// Configure the Scala compiler classpath to include Java classes
-tasks.named<ScalaCompile>("compileScala") {
-    classpath = sourceSets.main.get().compileClasspath
+// Ensure Java compilation uses output from Scala compilation
+// Since Scala already compiled Java files, we just need to ensure the classpath is correct
+tasks.named<JavaCompile>("compileJava") {
+    dependsOn("compileScala")
+    // Exclude Java files from Java compilation since Scala already compiled them
+    exclude("**/*.java")
 }
