@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
@@ -154,33 +155,10 @@ public class DependencyUseStringNotation extends Recipe {
                     String name = coerceToStringNotation(mapNotation.get("name"));
                     String version = coerceToStringNotation(mapNotation.get("version"));
                     String classifier = coerceToStringNotation(mapNotation.get("classifier"));
-                    String extension = coerceToStringNotation(mapNotation.get("extension"));
+                    String extension = coerceToStringNotation(mapNotation.get("ext"));
 
-                    StringBuilder sb = new StringBuilder();
-                    //Build against spec from gradle docs, all options are optional apart from name
-                    //configurationName "group:name:version:classifier@extension"
-                    if (group != null) {
-                        sb.append(group);
-                    }
-                    sb.append(":").append(name);
-
-                    if (version != null) {
-                        sb.append(":").append(version);
-                    } else if (classifier != null || extension != null) {
-                        sb.append(":");
-                    }
-
-                    if (classifier != null) {
-                        sb.append(":").append(classifier);
-                    } else if (extension != null) {
-                        sb.append(":");
-                    }
-
-                    if (extension != null) {
-                        sb.append("@").append(extension);
-                    }
-
-                    String stringNotation = sb.toString();
+                    Dependency dependency = new Dependency(group, name, version, classifier, extension);
+                    String stringNotation = dependency.toStringNotation();
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
                 }

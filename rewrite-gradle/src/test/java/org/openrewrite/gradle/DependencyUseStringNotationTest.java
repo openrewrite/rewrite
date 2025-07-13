@@ -148,6 +148,42 @@ class DependencyUseStringNotationTest implements RewriteTest {
     }
 
     @Test
+    void withExtension() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar')
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+                
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release:sources@jar")
+                  implementation "org.openrewrite:rewrite-core:latest.release:sources@jar"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void basicMapLiteral() {
         rewriteRun(
           buildGradle(
@@ -469,7 +505,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-                
+              
               dependencies {
                   api("org.openrewrite:rewrite-core::classifier")
                   implementation "org.openrewrite:rewrite-core::classifier"
