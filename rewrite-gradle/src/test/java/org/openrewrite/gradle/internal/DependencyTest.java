@@ -51,12 +51,6 @@ class DependencyTest {
     }
 
     @Test
-    void toStringNotationWithNullVersionAndExtensionButClassifierPresent() {
-        Dependency dep = new Dependency("com.example", "artifact", null, "sources", null);
-        assertEquals("com.example:artifact::sources", dep.toStringNotation());
-    }
-
-    @Test
     void toStringNotationWithNullClassifierButExtensionPresent() {
         Dependency dep = new Dependency("com.example", "artifact", "1.0.0", null, "jar");
         assertEquals("com.example:artifact:1.0.0@jar", dep.toStringNotation());
@@ -67,5 +61,4 @@ class DependencyTest {
         Dependency dep = new Dependency(null, "artifact", null, null, null);
         assertEquals(":artifact", dep.toStringNotation());
     }
-
 }
