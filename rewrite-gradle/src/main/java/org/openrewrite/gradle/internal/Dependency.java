@@ -25,7 +25,9 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 @With
 @EqualsAndHashCode
 public class Dependency {
+    @Nullable
     String groupId;
+
     String artifactId;
 
     @Nullable
