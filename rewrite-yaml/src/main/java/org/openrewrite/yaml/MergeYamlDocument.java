@@ -105,7 +105,6 @@ public class MergeYamlDocument extends Recipe {
     }
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
-    final static String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
