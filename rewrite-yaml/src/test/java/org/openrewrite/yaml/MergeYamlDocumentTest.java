@@ -117,4 +117,48 @@ class MergeYamlDocumentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddWhenMatcherDoesntMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYamlDocument("$.kind[?(@ == 'Deployment')]", "$.metadata",
+            //language=yaml
+            """
+              annotations:
+                org.openrewrite.yaml/merge: "true"
+              """, null, null, null, null, null)),
+          //language=yaml
+          yaml(
+            """
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: nginx-service
+            spec:
+              selector:
+                app: nginx
+              ports:
+                - port: 80
+                  targetPort: 80
+            ---
+            apiVersion: networking.k8s.io/v1
+            kind: Ingress
+            metadata:
+              name: nginx-ingress
+            spec:
+              rules:
+                - host: example.local
+                  http:
+                    paths:
+                      - path: /
+                        pathType: Prefix
+                        backend:
+                          service:
+                            name: nginx-service
+                            port:
+                              number: 80
+            """
+          )
+        );
+    }
 }
