@@ -28,9 +28,9 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor(force = true) // TODO: remove with @deprecated constructor
 public class MergeYamlDocument extends Recipe {
-    @Option(displayName = "JsonPath matcher",
-            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
-            example = "$.metadata")
+    @Option(displayName = "JsonPath expression to determine which YAML document to merge into",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to identify which YAML Document to apply to.",
+            example = "$.kind[?(@ == 'Deployment')]")
     String matcher;
 
     @Option(displayName = "Key path",
