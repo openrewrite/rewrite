@@ -21,10 +21,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.scala.marker.SObject;
+import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
@@ -83,6 +85,71 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return typeParam;
     }
 
+    @Override
+    public J visitAssignment(J.Assignment assignment, PrintOutputCapture<P> p) {
+        beforeSyntax(assignment, Space.Location.ASSIGNMENT_PREFIX, p);
+        visit(assignment.getVariable(), p);
+        visitLeftPadded("=", assignment.getPadding().getAssignment(), JLeftPadded.Location.ASSIGNMENT, p);
+        afterSyntax(assignment, p);
+        return assignment;
+    }
+    
+    @Override
+    public J visitAssignmentOperation(J.AssignmentOperation assignOp, PrintOutputCapture<P> p) {
+        String keyword = "";
+        switch (assignOp.getOperator()) {
+            case Addition:
+                keyword = "+=";
+                break;
+            case Subtraction:
+                keyword = "-=";
+                break;
+            case Multiplication:
+                keyword = "*=";
+                break;
+            case Division:
+                keyword = "/=";
+                break;
+            case Modulo:
+                keyword = "%=";
+                break;
+            case BitAnd:
+                keyword = "&=";
+                break;
+            case BitOr:
+                keyword = "|=";
+                break;
+            case BitXor:
+                keyword = "^=";
+                break;
+            case LeftShift:
+                keyword = "<<=";
+                break;
+            case RightShift:
+                keyword = ">>=";
+                break;
+            case UnsignedRightShift:
+                keyword = ">>>=";
+                break;
+        }
+        beforeSyntax(assignOp, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
+        visit(assignOp.getVariable(), p);
+        visitSpace(assignOp.getPadding().getOperator().getBefore(), Space.Location.ASSIGNMENT_OPERATION_OPERATOR, p);
+        p.append(keyword);
+        visit(assignOp.getAssignment(), p);
+        afterSyntax(assignOp, p);
+        return assignOp;
+    }
+    
+    @Override
+    protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
+        // In Scala, semicolons are optional and generally not used
+        // Only print them if they were explicitly in the source
+        // For now, we'll skip semicolons entirely as proper semicolon preservation
+        // would require tracking whether they were present in the original source
+        return;
+    }
+    
     @Override
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
@@ -318,6 +385,21 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return block;
         }
         return super.visitBlock(block, p);
+    }
+    
+    @Override
+    public J visitForLoop(J.ForLoop forLoop, PrintOutputCapture<P> p) {
+        // Check if this is a Scala range-based for loop
+        ScalaForLoop marker = forLoop.getMarkers().findFirst(ScalaForLoop.class).orElse(null);
+        if (marker != null && marker.getOriginalSource() != null && !marker.getOriginalSource().isEmpty()) {
+            // Print the original Scala syntax
+            beforeSyntax(forLoop, Space.Location.FOR_PREFIX, p);
+            p.append(marker.getOriginalSource());
+            afterSyntax(forLoop, p);
+            return forLoop;
+        }
+        // Otherwise use Java syntax
+        return super.visitForLoop(forLoop, p);
     }
     
     // Override additional methods here for Scala-specific syntax as needed

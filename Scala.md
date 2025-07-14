@@ -284,55 +284,71 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ## Implementation Progress
 
-### Current Status (As of Jul 11, 2025)
+### Current Status (As of Jul 14, 2025)
 
-We have successfully completed the foundational infrastructure and are making excellent progress on LST element implementation. Currently at **96% test passing rate (145/151 tests)**.
+We have successfully completed the foundational infrastructure and are making excellent progress on LST element implementation. Currently at **92.8% test passing rate (211/227 tests)**.
 
 #### Completed LST Elements ✅
-1. **Literals** (13/13 tests passing) - All literal types including strings, numbers, booleans, characters, null, and symbols
-2. **Identifiers** (8/8 tests passing) - Simple, backtick, and operator identifiers  
-3. **Assignments** (8/8 tests passing) - Simple, compound, field, array, and tuple destructuring assignments
-4. **Parentheses** (10/10 tests passing) - Expression grouping and nesting
-5. **Variable Declarations** (12/12 tests passing) - val, var, lazy val, with modifiers and type annotations
-   - Note: Currently preserved as Unknown nodes for formatting accuracy
-6. **Unary Operations** (7/7 tests passing) - Prefix and postfix operators, unary method calls
-7. **Binary Operations** (20/20 tests passing) - All binary operations including infix method calls
-8. **Compilation Units** (12/12 tests passing) - Package declarations, imports, and statements
-9. **Imports** (8/8 tests passing) - All import variations currently preserved as Unknown nodes
-10. **Field Access** (8/8 tests passing) - Select nodes now properly map to J.FieldAccess
-11. **Method Invocations** (12/12 tests passing) - Apply nodes now properly map to J.MethodInvocation
-    - Simple method calls: `println("Hello")`
-    - No-arg method calls: `s.length()`
-    - Multiple arguments: `Math.max(10, 20)`
-    - Chained calls: `"hello".toUpperCase().substring(1)`
-    - Field access calls: `System.out.println("test")`
-    - Named arguments, infix calls, apply methods, curried calls all supported
-12. **Control Flow** (7/7 tests passing) - Basic control flow constructs
-    - If statements: `if (cond) expr`
-    - If-else statements: `if (cond) expr1 else expr2`
-    - Nested if statements and if-else-if chains
-    - While loops: `while (cond) { body }`
-    - Blocks: `{ statement1; statement2 }`
-    - For comprehensions preserved as Unknown (complex Scala-specific syntax)
-13. **Basic Classes** (12/18 tests passing) - Fundamental class structure working
-    - ✅ Empty classes: `class Empty`
-    - ✅ Classes with empty body: `class Empty { }`
-    - ✅ Classes with fields: `class Counter { var count = 0 }`
-    - ✅ Class modifiers: `private class Secret`, `protected class Internal`, `abstract class Shape`
-    - ✅ Constructor parameters: `class Person(name: String, age: Int)`
-    - ✅ Val/var constructor parameters: `class Person(val name: String, var age: Int)`
-    - ✅ Mixed constructor parameters with access modifiers
-    - ❌ Classes without parameters showing empty `()` 
-    - ❌ Type parameters: `class Box[T]`
-    - ❌ Extends clause: `class Dog extends Animal`
-    - ❌ Case classes: `case class Point(x: Int, y: Int)`
-    - Note: Methods and nested statements within classes preserved as Unknown nodes
+These elements are fully mapped to J model classes without J.Unknown:
+1. **Literals** (13/13 tests passing) - Maps to J.Literal
+2. **Identifiers** (8/8 tests passing) - Maps to J.Identifier  
+3. **Assignments** (7/8 tests passing) - Maps to J.Assignment and J.AssignmentOperation
+   - ✅ Simple assignment: `x = 5` - Maps to J.Assignment
+   - ✅ Compound assignments: `x += 5` - Maps to J.AssignmentOperation
+   - ❌ Tuple destructuring: `(a, b) = (3, 4)` - Parse error (needs special handling)
+4. **Binary Operations** (20/20 tests passing) - Maps to J.Binary
+5. **Field Access** (8/8 tests passing) - Maps to J.FieldAccess
+6. **Method Invocations** (12/12 tests passing) - Maps to J.MethodInvocation
+7. **Control Flow - If** (partial) - Maps to J.If
+8. **Control Flow - While** (partial) - Maps to J.WhileLoop
+9. **Control Flow - Block** (partial) - Maps to J.Block
+10. **Classes** (partial) - Maps to J.ClassDeclaration
+11. **Objects** (partial) - Maps to J.ClassDeclaration with SObject marker
+12. **New Class** (6/6 tests passing) - Maps to J.NewClass
+13. **Return Statements** (6/6 tests passing) - Maps to J.Return
+14. **Throw Statements** (8/8 tests passing) - Maps to J.Throw
+15. **Parameterized Types** (8/10 tests passing) - Maps to J.ParameterizedType
+16. **Compilation Units** (12/12 tests passing) - Maps to S.CompilationUnit
+
+#### Using J.Unknown (Need Proper Mapping) ⚠️
+These elements have passing tests but rely on J.Unknown:
+1. **Variable Declarations** (12/12 tests passing)
+   - Currently preserved as Unknown nodes - needs J.VariableDeclarations mapping
+2. **Unary Operations** (7/7 tests passing)
+   - Currently preserved as Unknown nodes - needs J.Unary mapping
+3. **Parentheses** (10/10 tests passing)
+   - Currently preserved as Unknown nodes - needs J.Parentheses mapping
+4. **Imports** (8/8 tests passing)
+   - Currently preserved as Unknown nodes - needs J.Import mapping
+5. **Type Cast** (7/8 tests passing)
+   - Currently preserved as Unknown nodes - needs J.TypeCast mapping
+6. **Try-Catch-Finally** (8/8 tests passing)
+   - Currently preserved as Unknown nodes - needs J.Try mapping
+7. **For Comprehensions** (part of control flow tests)
+   - Preserved as Unknown with ScalaForLoop marker - complex Scala-specific syntax
 
 #### Not Started Yet ❌
-1. Classes, traits, objects, pattern matching, etc.
+1. Traits, pattern matching, J.ArrayAccess, J.Lambda, etc.
+
+### Important Implementation Principles
+
+#### J.Unknown Usage Policy
+- **J.Unknown is NOT progress**: Having passing tests with J.Unknown nodes is not considered a completed implementation
+- **Partial mappings are acceptable**: For complex Scala-specific constructs (like for-comprehensions), it's okay to map parts to J model and preserve complex parts as J.Unknown with markers
+- **Completion criteria**: An LST element is only considered "done" when it has no J.Unknown nodes in the mapping (except for documented edge cases)
+- **Incremental approach**: Start with J.Unknown to get tests passing, then replace with proper J mappings
+
+#### Current Priority
+Replace existing J.Unknown implementations with proper J model mappings:
+1. J.VariableDeclarations for val/var declarations
+2. J.Unary for unary operations
+3. J.Parentheses for parenthesized expressions
+4. J.Import for import statements
+5. J.TypeCast for asInstanceOf operations
+6. J.Try for try-catch-finally blocks
 
 ### Key Technical Decisions Made
-- Using Unknown nodes to preserve formatting for unimplemented constructs
+- Using Unknown nodes to preserve formatting for unimplemented constructs (temporary)
 - Wrapping bare expressions in object wrappers for valid Scala syntax
 - Updated assignment tests to use object blocks since Scala doesn't allow top-level assignments
 - Implemented multi-line detection in isSimpleExpression to avoid inappropriate wrapping
@@ -371,6 +387,49 @@ This reinforced the importance of:
 3. Circle back to imports once we better understand the cursor management patterns
 4. Eventually create S.Import for Scala-specific import syntax (multi-select, aliases)
 5. Create S.ForComprehension for Scala's complex for loops with generators and guards
+
+## Prioritized Implementation List (Easiest to Hardest)
+
+Based on analysis of available J model classes and Scala language constructs, here's the prioritized implementation order:
+
+### Easy Wins (Map directly to existing J model)
+1. **J.Assignment** ✅ - Simple variable reassignment: `x = 5` (Implemented)
+   - Simple assignments come through as `Assign` nodes
+2. **J.AssignmentOperation** ✅ - Compound assignments: `x += 5` (Implemented)
+   - Compound assignments come through as `InfixOp` nodes with operators ending in `=`
+3. **J.NewClass** ✅ - Object instantiation: `new MyClass(args)` (Implemented)
+   - `new` expressions come through as `New` nodes
+   - Constructor calls with arguments come through as `Apply(New(...), args)`
+4. **J.Return** ✅ - Return statements in methods: `return value` (Implemented)
+   - Return statements come through as `Return` nodes
+   - Handles both void returns (`return`) and value returns (`return expr`)
+5. **J.Throw** ✅ - Exception throwing: `throw new Exception("error")` (Implemented)
+   - Throw statements come through as `Throw` nodes
+   - Handles any expression that evaluates to a Throwable
+6. **J.ParameterizedType** ✅ (8/10 tests) - Generic types: `List[String]`, `Map[K, V]`
+   - Implemented in `visitAppliedTypeTree` method
+   - 8/10 tests passing - basic parameterized types work
+   - TODO: Fix trait handling and variance annotations (+T, -T)
+
+### Moderate Complexity (Straightforward mapping with some nuances)
+7. **J.TypeCast** - Type casting: `x.asInstanceOf[String]`
+8. **J.InstanceOf** - Type checking: `x.isInstanceOf[String]`
+9. **J.Try** - Try-catch-finally blocks
+10. **J.ArrayAccess** - Array/collection indexing: `arr(0)`
+
+### Higher Complexity (Requires careful handling)
+11. **J.Lambda** - Function literals: `(x: Int) => x + 1`
+12. **J.Annotation** - Annotations: `@deprecated`, `@tailrec`
+13. **J.MemberReference** - Method references: `List.apply _`
+14. **J.NewArray** - Array creation: `Array(1, 2, 3)`
+15. **J.Ternary** - Inline if-else expressions (less common in Scala)
+
+### Complex Scala-Specific (May need custom S types)
+16. **Pattern Matching** - Requires J.Switch/Case or custom S.Match
+17. **For Comprehensions** - Complex desugaring to map/flatMap
+18. **Implicit Parameters** - Scala 2 implicits
+19. **Given/Using** - Scala 3 contextual abstractions
+20. **Extension Methods** - Scala 3 extension syntax
 
 ## Important Design Decisions
 

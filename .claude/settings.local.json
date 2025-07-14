@@ -34,7 +34,8 @@
       "Bash(java:*)",
       "Bash(scalac:*)",
       "Bash(scala:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(../gradlew test:*)"
     ],
     "deny": []
   }
