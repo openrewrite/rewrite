@@ -83,6 +83,11 @@ public class DoesNotIncludeDependency extends Recipe {
             final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor();
 
             @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return di.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
