@@ -328,8 +328,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
 
             if (classDecl.getPadding().getImplements() != null) {
-                visitContainer(classDecl.getPadding().getExtends() != null ? " with" : " extends", 
-                              classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, " with", "", p);
+                // In Scala, implements are printed with "with" keyword
+                // The container itself already has the space before the first "with"
+                String prefix = "";
+                if (classDecl.getPadding().getExtends() != null) {
+                    // If we have extends, we need "with" keyword
+                    prefix = "with";
+                } else {
+                    // If no extends, we use "extends" for the first trait
+                    prefix = "extends";
+                }
+                visitContainer(prefix, 
+                              classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, "with", "", p);
             }
 
             if (classDecl.getPadding().getPermits() != null) {

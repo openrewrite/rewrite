@@ -169,7 +169,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         // This is likely a binary operation (infix notation)
         visitBinary(sel, app.args.head, Some(app.span))
       case sel: untpd.Select =>
-        // Method call with dot notation like "1.+(2)"
+        // Method call with dot notation like "obj.method(args)"
         visitMethodInvocation(app)
       case _ =>
         // Other kinds of applications - for now treat as unknown
@@ -267,6 +267,12 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val (select: Expression, methodName: String, typeParams: java.util.List[Expression]) = app.fun match {
       case sel: untpd.Select =>
         // Method call like obj.method(...) or package.Class.method(...)
+        // The Select node represents the full method access (e.g., System.out.println)
+        // We need to use sel.qualifier as the receiver and sel.name as the method name
+        
+        // Debug: check what we're dealing with
+        // println(s"DEBUG visitMethodInvocation: sel=$sel, qualifier=${sel.qualifier}, name=${sel.name}")
+        
         val target = visitTree(sel.qualifier) match {
           case expr: Expression => expr
           case _ => return visitUnknown(app)
@@ -301,34 +307,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       }
     }
     
-    // Extract space before the method name (after the dot if there's a select)
-    val nameSpace = if (select != null) {
-      app.fun match {
-        case sel: untpd.Select =>
-          val qualifierEnd = sel.qualifier.span.end
-          val nameStart = sel.nameSpan.start
-          if (qualifierEnd < nameStart) {
-            val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
-            val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
-            if (dotStart < nameStartAdjusted && dotStart >= cursor && nameStartAdjusted <= source.length) {
-              val between = source.substring(dotStart, nameStartAdjusted)
-              val dotIndex = between.indexOf('.')
-              if (dotIndex >= 0 && dotIndex + 1 < between.length) {
-                Space.format(between.substring(dotIndex + 1))
-              } else {
-                Space.EMPTY
-              }
-            } else {
-              Space.EMPTY
-            }
-          } else {
-            Space.EMPTY
-          }
-        case _ => Space.EMPTY
-      }
-    } else {
-      Space.EMPTY
-    }
+    // For method names, we typically don't need a prefix space since the dot is handled by the printer
+    val nameSpace = Space.EMPTY
     
     // Create the method name identifier
     val name = new J.Identifier(

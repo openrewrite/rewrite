@@ -286,7 +286,7 @@ Each LST element will have comprehensive tests in `org.openrewrite.scala.tree`:
 
 ### Current Status (As of Jul 14, 2025)
 
-We have successfully completed the foundational infrastructure and are making excellent progress on LST element implementation. Currently at **97.9% test passing rate (232/237 tests)**.
+We have successfully completed the foundational infrastructure and are making excellent progress on LST element implementation. Currently at **98.3% test passing rate (233/237 tests)**.
 
 #### Recently Added (Jul 14, 2025)
 1. **Fixed type variance annotations** ✅
@@ -400,10 +400,10 @@ These elements have passing tests but rely on J.Unknown:
    - Preserved as Unknown with ScalaForLoop marker - complex Scala-specific syntax
 
 #### Known Issues 🐛
-1. **Object with multiple traits**: Extra spaces between traits
-2. **Method call on field access**: Parser interaction issue
-3. **Type cast in conditions**: `if (obj.asInstanceOf[Boolean])` needs special handling
-4. **Tuple assignment destructuring**: `(a, b) = (3, 4)` - AST span includes equals sign
+1. **Method call on field access**: `System.out.println("test")` - Complex cursor/span management issue
+2. **Type cast in conditions**: `if (obj.asInstanceOf[Boolean])` needs special handling
+3. **Tuple assignment destructuring**: `(a, b) = (3, 4)` - AST span includes equals sign
+4. **ExtendsImplementsTest failures**: 2 tests failing - Need to investigate
 
 #### Not Started Yet ❌
 1. Traits, pattern matching, J.ArrayAccess, J.Lambda, etc.
