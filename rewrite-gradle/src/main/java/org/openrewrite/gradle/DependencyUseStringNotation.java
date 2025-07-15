@@ -149,7 +149,7 @@ public class DependencyUseStringNotation extends Recipe {
             }
 
             private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
-                //Name is the only required key in a dependency map.
+                // Name is the only required key in a dependency map.
                 if (mapNotation.containsKey("name")) {
                     String group = coerceToStringNotation(mapNotation.get("group"));
                     String name = coerceToStringNotation(mapNotation.get("name"));
