@@ -29,6 +29,7 @@ import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
@@ -389,6 +390,51 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              jacksonCoreVersion=2.12.0
+              """,
+            """
+              jacksonCoreVersion=2.12.5
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
                           because 'CVE-2024-BAD'
                       }
                   }

@@ -46,6 +46,8 @@ import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
@@ -56,8 +58,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singletonMap;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
@@ -175,6 +176,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Value
     public static class DependencyVersionState {
         Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
+        Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
         Set<GradleProject> modules = new HashSet<>();
     }
 
@@ -220,8 +222,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
-                            if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
-                                    resolved.getArtifactId(), resolved.getVersion())) {
+                            if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {
@@ -273,6 +274,158 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     }
                 }
                 return super.visit(tree, ctx);
+            }
+
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                // TODO complete this
+                /*if (m.getArguments().get(0) instanceof G.MapEntry) {
+                    String declaredGroupId = null;
+                    String declaredArtifactId = null;
+                    String declaredVersion = null;
+
+                    for (Expression e : m.getArguments()) {
+                        if (!(e instanceof G.MapEntry)) {
+                            continue;
+                        }
+                        G.MapEntry arg = (G.MapEntry) e;
+                        if (!(arg.getKey() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        String valueValue = null;
+                        if (arg.getValue() instanceof J.Literal) {
+                            J.Literal value = (J.Literal) arg.getValue();
+                            if (value.getValue() instanceof String) {
+                                valueValue = (String) value.getValue();
+                            }
+                        } else if (arg.getValue() instanceof J.Identifier) {
+                            valueValue = ((J.Identifier) arg.getValue()).getSimpleName();
+                        } else if (arg.getValue() instanceof G.GString) {
+                            List<J> strings = ((G.GString) arg.getValue()).getStrings();
+                            if (!strings.isEmpty() && strings.get(0) instanceof G.GString.Value) {
+                                G.GString.Value versionGStringValue = (G.GString.Value) strings.get(0);
+                                if (versionGStringValue.getTree() instanceof J.Identifier) {
+                                    valueValue = ((J.Identifier) versionGStringValue.getTree()).getSimpleName();
+                                }
+                            }
+                        }
+                        if (!(key.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        switch (keyValue) {
+                            case "group":
+                                declaredGroupId = valueValue;
+                                break;
+                            case "name":
+                                declaredArtifactId = valueValue;
+                                break;
+                            case "version":
+                                declaredVersion = valueValue;
+                                break;
+                        }
+                    }
+                    if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
+                        return m;
+                    }
+
+                    String versionVariableName = declaredVersion;
+                    if (true) {
+                        acc.versionPropNameToGA.put(versionVariableName, null);
+                    }
+                } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                    String declaredGroupId = null;
+                    String declaredArtifactId = null;
+                    String declaredVersion = null;
+
+                    for (Expression e : m.getArguments()) {
+                        if (!(e instanceof G.MapEntry)) {
+                            continue;
+                        }
+                        J.Assignment assignment = (J.Assignment) e;
+                        if (!(assignment.getVariable() instanceof J.Identifier)) {
+                            continue;
+                        }
+                        J.Identifier variable = (J.Identifier) assignment.getVariable();
+                        String valueValue = null;
+                        if (assignment.getAssignment() instanceof J.Literal) {
+                            J.Literal value = (J.Literal) assignment.getAssignment();
+                            if (value.getValue() instanceof String) {
+                                valueValue = (String) value.getValue();
+                            }
+                        } else if (assignment.getAssignment() instanceof J.Identifier) {
+                            J.Identifier value = (J.Identifier) assignment.getAssignment();
+                            valueValue = value.getSimpleName();
+                        } else if (assignment.getAssignment() instanceof K.StringTemplate) {
+                            K.StringTemplate value = (K.StringTemplate) assignment.getAssignment();
+                            List<J> strings = value.getStrings();
+                            if (!strings.isEmpty() && strings.get(0) instanceof K.StringTemplate.Expression) {
+                                K.StringTemplate.Expression versionTemplateValue = (K.StringTemplate.Expression) strings.get(0);
+                                if (versionTemplateValue.getTree() instanceof J.Identifier) {
+                                    valueValue = ((J.Identifier) versionTemplateValue.getTree()).getSimpleName();
+                                }
+                            }
+                        }
+                        switch (variable.getSimpleName()) {
+                            case "group":
+                                declaredGroupId = valueValue;
+                                break;
+                            case "name":
+                                declaredArtifactId = valueValue;
+                                break;
+                            case "version":
+                                declaredVersion = valueValue;
+                                break;
+                        }
+                    }
+                    if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
+                        return m;
+                    }
+
+                    String versionVariableName = declaredVersion;
+                    if (true) {
+                        acc.versionPropNameToGA.put(versionVariableName, null);
+                    }
+                } else {*/
+                    for (Expression depArg : m.getArguments()) {
+                        if (depArg instanceof G.GString) {
+                            G.GString gString = (G.GString) depArg;
+                            List<J> strings = gString.getStrings();
+                            if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                                continue;
+                            }
+                            J.Literal groupArtifact = (J.Literal) strings.get(0);
+                            G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                            if (!(groupArtifact.getValue() instanceof String)) {
+                                continue;
+                            }
+                            org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                            if (dep == null) {
+                                continue;
+                            }
+                            acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                        } else if (depArg instanceof K.StringTemplate) {
+                            /*K.StringTemplate template = (K.StringTemplate) depArg;
+                            List<J> strings = template.getStrings();
+                            if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof K.StringTemplate.Expression)) {
+                                continue;
+                            }
+                            J.Literal groupArtifact = (J.Literal) strings.get(0);
+                            K.StringTemplate.Expression versionValue = (K.StringTemplate.Expression) strings.get(1);
+                            if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
+                                continue;
+                            }
+                            org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                            if (dep == null) {
+                                continue;
+                            }
+                            acc.versionPropNameToGA.put(versionValue.toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));*/
+                        }
+                    }
+                //}
+                return m;
             }
 
             /*
@@ -335,13 +488,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new TreeVisitor<Tree, ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc.getUpdatesPerProject());
+            private final UpdateProperties updateProperties = new UpdateProperties(acc.versionPropNameToGA, acc.getUpdatesPerProject());
             private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateGradle.isAcceptable(sf, ctx) || updateLockFile.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) || updateLockFile.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -349,7 +503,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 Tree t = tree;
                 if (t instanceof SourceFile) {
                     SourceFile sf = (SourceFile) t;
-                    if (updateGradle.isAcceptable(sf, ctx)) {
+                    if (updateProperties.isAcceptable(sf, ctx)) {
+                        t = updateProperties.visitNonNull(t, ctx);
+                    } else if (updateGradle.isAcceptable(sf, ctx)) {
                         t = updateGradle.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
@@ -390,7 +546,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
                 return gp;
             }
-        });
+        };
     }
 
 
@@ -458,6 +614,41 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return cu;
             }
             return super.visit(tree, ctx);
+        }
+    }
+
+    private class UpdateProperties extends PropertiesVisitor<ExecutionContext> {
+        final Map<String, GroupArtifact> versionPropNameToGA;
+        final Map<GroupArtifact, String> updates = new HashMap<>();
+        final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+
+        public UpdateProperties(Map<String, GroupArtifact> versionPropNameToGA, Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject) {
+            this.versionPropNameToGA = versionPropNameToGA;
+            for (Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> entry : updatesPerProject.values()) {
+                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : entry.entrySet()) {
+                    if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                        continue;
+                    }
+                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                    for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                        updates.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
+                    }
+                }
+            }
+        }
+
+        @Override
+        public org.openrewrite.properties.tree.Properties visitFile(org.openrewrite.properties.tree.Properties.File file, ExecutionContext ctx) {
+            return file.getSourcePath().endsWith("gradle.properties") ? super.visitFile(file, ctx) : file;
+        }
+
+        @Override
+        public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+            GroupArtifact ga = versionPropNameToGA.get(entry.getKey());
+            if (updates.containsKey(ga)) {
+                return entry.withValue(entry.getValue().withText(updates.get(ga)));
+            }
+            return entry;
         }
     }
 
