@@ -27,6 +27,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.java.Assertions.java;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "<!--~~>-->";
@@ -51,7 +52,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedMarked() {
+    void dependencyPresentTransitivelyWithoutScopeOrDesiredScopeSpecifiedButDirectOnlyMarked() {
         rewriteRun(
           spec -> spec.recipe(new DoesNotIncludeDependency("org.springframework", "spring-beans", true, null)),
           pomXml(
@@ -84,6 +85,19 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void nonPomFilesNotMarked() {
+        rewriteRun(
+          spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(null, null)),
+          //language=java
+          java(
+            """
+              class Something {}
               """
           )
         );
@@ -178,7 +192,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         }
 
         @Nested
-        class OnlyDirectNull extends SharedTests{
+        class OnlyDirectNull extends SharedTests {
             public OnlyDirectNull() {
                 super(null);
             }

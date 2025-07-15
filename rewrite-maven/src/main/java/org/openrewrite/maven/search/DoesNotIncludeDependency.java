@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.Scope;
 
 import static org.openrewrite.Validated.notBlank;
@@ -78,16 +79,23 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.not(Preconditions.or(dependencyInsightVisitors()));
-    }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor();
 
-    @SuppressWarnings("unchecked")
-    private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
-        if (scope == null) {
-            return new TreeVisitor[] {
-                new DependencyInsight(groupId, artifactId, null, null, onlyDirect).getVisitor(),
-            };
-        }
-        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor() };
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                if (di.isAcceptable((SourceFile) tree, ctx)) {
+                    Tree t2 = di.visitNonNull(tree, ctx);
+                    // if POM file is unchanged, we found something without the dependency
+                    if (t2 == tree) {
+                        return SearchResult.found(tree);
+                    }
+                }
+                return tree;
+            }
+        };
     }
 }
