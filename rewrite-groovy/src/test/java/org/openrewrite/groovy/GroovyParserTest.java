@@ -172,18 +172,18 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                class C {
-                  def method() {
-                    f(Map<String, Integer>) {
-                      println "test"
-                    }
-                  }
-                  def methodWithSpaces() {
-                    f( Map < String , Integer > ) {
-                      println "test"
-                    }
+              class C {
+                def method() {
+                  f(Map<String, Integer>) {
+                    println "test"
                   }
                 }
+                def methodWithSpaces() {
+                  f( Map < String , Integer > ) {
+                    println "test"
+                  }
+                }
+              }
               """
           )
         );
@@ -194,11 +194,11 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                class C {
-                  def method() {
-                    f(I<String, Integer>)
-                  }
+              class C {
+                def method() {
+                  f(I<String, Integer>)
                 }
+              }
               """
           )
         );
@@ -209,15 +209,15 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                class C {
-                  def method() {
-                    f(I<Void>) {
-                      first {
-                        second { }
-                      }
+              class C {
+                def method() {
+                  f(I<Void>) {
+                    first {
+                      second { }
                     }
                   }
                 }
+              }
               """
           )
         );
