@@ -248,6 +248,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // Use custom handling only if this is actually a Scala class
         boolean needsScalaHandling = isObject;
         
+        // Check if this is a trait (Interface kind in Scala)
+        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+            needsScalaHandling = true;
+        }
+        
         // Check if we have Scala-style "with" clauses
         if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
             needsScalaHandling = true;
@@ -288,7 +293,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                         kind = "enum";
                         break;
                     case Interface:
-                        kind = "interface";
+                        kind = "trait";  // Scala uses trait, not interface
                         break;
                     case Annotation:
                         kind = "@interface";
@@ -301,7 +306,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append(kind);
 
             visit(classDecl.getName(), p);
-            visit(classDecl.getTypeParameters(), p);
+            visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
             
             // For Scala: print primaryConstructor only if it has elements
             // The primaryConstructor container includes the parentheses and parameters
@@ -348,7 +353,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 visit(classDecl.getPadding().getKind().getAnnotations(), p);
                 visitSpace(classDecl.getPadding().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
-                p.append(classDecl.getKind().name().toLowerCase());
+                // For Scala, print "trait" for Interface kind
+                String classKind = classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface ? 
+                    "trait" : classDecl.getKind().name().toLowerCase();
+                p.append(classKind);
                 visit(classDecl.getName(), p);
                 visit(classDecl.getTypeParameters(), p);
                 // Skip the empty primary constructor
@@ -377,6 +385,24 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
     }
     
+    private void visitTypeParameters(@Nullable JContainer<J.TypeParameter> typeParams, PrintOutputCapture<P> p) {
+        if (typeParams != null && !typeParams.getElements().isEmpty()) {
+            // In Scala, type parameters use square brackets, not angle brackets
+            visitSpace(typeParams.getBefore(), Space.Location.TYPE_PARAMETERS, p);
+            p.append('[');
+            List<JRightPadded<J.TypeParameter>> elements = typeParams.getPadding().getElements();
+            for (int i = 0; i < elements.size(); i++) {
+                JRightPadded<J.TypeParameter> elem = elements.get(i);
+                visit(elem.getElement(), p);
+                if (i < elements.size() - 1) {
+                    visitSpace(elem.getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
+                    p.append(',');
+                }
+            }
+            p.append(']');
+        }
+    }
+
     @Override
     public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
         // Check if this block has the OmitBraces marker (for objects without body)
@@ -403,4 +429,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     // Override additional methods here for Scala-specific syntax as needed
+
+    public J visitTuplePattern(S.TuplePattern tuplePattern, PrintOutputCapture<P> p) {
+        beforeSyntax(tuplePattern, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('(');
+        visitContainer("", tuplePattern.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, ",", "", p);
+        p.append(')');
+        afterSyntax(tuplePattern, p);
+        return tuplePattern;
+    }
 }

@@ -20,6 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.scala.tree.S;
 
@@ -58,4 +59,12 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
 
     // Additional visit methods for Scala-specific constructs will be added here
     // as we implement more S types (e.g., visitTrait, visitObject, visitMatch, etc.)
+
+    public J visitTuplePattern(S.TuplePattern tuplePattern, P p) {
+        S.TuplePattern t = tuplePattern;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
+        return t;
+    }
 }

@@ -30,6 +30,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -264,6 +265,101 @@ public interface S extends J {
                     t.typesInUse, t.padding, t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes,
                     t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, t.imports, statements, t.eof
                 );
+            }
+        }
+    }
+
+    /**
+     * Represents a tuple pattern used in destructuring assignments and declarations.
+     * For example: val (a, b) = (1, 2) or (x, y) = pair
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class TuplePattern implements S, Expression, TypedTree, VariableDeclarator {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        JContainer<Expression> elements;
+
+        public List<Expression> getElements() {
+            return elements.getElements();
+        }
+
+        public S.TuplePattern withElements(List<Expression> elements) {
+            return getPadding().withElements(JContainer.withElements(this.elements, elements));
+        }
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public List<J.Identifier> getNames() {
+            List<J.Identifier> names = new ArrayList<>();
+            collectNames(elements.getElements(), names);
+            return names;
+        }
+
+        private void collectNames(List<Expression> expressions, List<J.Identifier> names) {
+            for (Expression expr : expressions) {
+                if (expr instanceof J.Identifier) {
+                    names.add((J.Identifier) expr);
+                } else if (expr instanceof S.TuplePattern) {
+                    collectNames(((S.TuplePattern) expr).getElements(), names);
+                }
+            }
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitTuplePattern(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.TuplePattern t;
+
+            public JContainer<Expression> getElements() {
+                return t.elements;
+            }
+
+            public S.TuplePattern withElements(JContainer<Expression> elements) {
+                return t.elements == elements ? t : new S.TuplePattern(t.id, t.prefix, t.markers, elements, t.type);
             }
         }
     }
