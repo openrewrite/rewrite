@@ -223,8 +223,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),
                                     resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
-                                    String selected = versionSelector.select(resolved.getGav(), configuration.getName(),
-                                            version, versionPattern, ctx);
+                                    String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {
                                         continue;
                                     }
@@ -255,10 +254,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                             if (config.getName().equals("implementation")) {
                                                                 return true;
                                                             }
-                                                        }
-                                                        if (c.getName().equals("testRuntimeOnly")) {
-                                                            if (config.getName().equals("testImplementation") ||
-                                                                    config.getName().equals("implementation")) {
+                                                        } else if (c.getName().equals("testRuntimeOnly")) {
+                                                            if (config.getName().equals("testImplementation") || config.getName().equals("implementation")) {
                                                                 return true;
                                                             }
                                                         }
@@ -423,10 +420,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                                     if (tree instanceof G.CompilationUnit) {
                                         return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
-                                    } else {
-                                        // K is not type attributed, so do things more manually
-                                        return super.visit(tree, ctx);
                                     }
+                                    // Kotlin is not type attributed, so do things more manually
+                                    return super.visit(tree, ctx);
                                 }
 
                                 @Override
@@ -581,15 +577,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
                 if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                    if (constraintMatcher.matches(m2)) {
+                    if ((!isKotlinDsl && constraintMatcher.matches(m2)) || (isKotlinDsl && m.getSimpleName().equals("constraints"))) {
                         if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
                             existingConstraint = m2;
-                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
-                        }
-                    } else if (isKotlinDsl && m.getSimpleName().equals("constraints")) {
-                        if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
-                            existingConstraint = m2;
-                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
+                            if (m2.getArguments().get(0) instanceof J.Literal) {
+                                existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
+                            }
                         }
                     }
                 }
@@ -609,6 +602,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
         private static boolean matchesConstraint(J.MethodInvocation m, String ga) {
             Expression arg = m.getArguments().get(0);
+            if (arg instanceof G.GString) {
+                for (J j : ((G.GString) arg).getStrings()) {
+                    if (j instanceof J.Literal && ((J.Literal) j).getValue() != null && ((J.Literal) j).getValue().toString().startsWith(ga)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // TODO Kotlin
+
             if (!(arg instanceof J.Literal) || ((J.Literal) arg).getValue() == null) {
                 return false;
             }

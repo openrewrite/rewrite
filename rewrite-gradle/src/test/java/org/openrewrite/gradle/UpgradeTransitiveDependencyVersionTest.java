@@ -1073,6 +1073,102 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void updateConstraintForVersionInSettings() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          ),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.0'
+              }
+              """,
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.5'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUpdateConstraintForVersionInSettings() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { `java-library` }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because("some reason")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins { `java-library` }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because("CVE-2024-BAD")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """
+          ),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.0'
+              }
+              """,
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.5'
+              }
+              """
+          )
+        );
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
