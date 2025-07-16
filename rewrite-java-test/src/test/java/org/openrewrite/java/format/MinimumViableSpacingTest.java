@@ -138,10 +138,10 @@ class MinimumViableSpacingTest implements RewriteTest {
                   void foo(final int[] arr) {
                       for (int n = 0, x = 0; n < 100; n++, x++) {
                       }
-              
+
                       for (int i: arr) {
                       }
-              
+
                       for (final int i: arr) {
                       }
                   }
@@ -186,7 +186,7 @@ class MinimumViableSpacingTest implements RewriteTest {
                   public @Deprecated String method() {
                       return "name";
                   }
-              
+
                   public    @Deprecated String method2() {
                       return "name";
                   }
@@ -197,7 +197,7 @@ class MinimumViableSpacingTest implements RewriteTest {
                   public @Deprecated String method() {
                       return "name";
                   }
-              
+
                   public @Deprecated String method2() {
                       return "name";
                   }
