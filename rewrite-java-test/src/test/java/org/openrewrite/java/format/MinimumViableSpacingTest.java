@@ -225,7 +225,7 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
-    void yieldReformated() {
+    void yieldReformatted() {
         rewriteRun(
           spec -> spec.recipe(new AutoFormat()),
           java(
