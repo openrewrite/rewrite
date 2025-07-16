@@ -1233,7 +1233,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
         @Override
         public UpgradeTransitiveDependencyVersion.DependencyVersionState getInitialValue(ExecutionContext ctx) {
-            return new UpgradeTransitiveDependencyVersion.DependencyVersionState();
+            return new UpgradeTransitiveDependencyVersion.DependencyVersionState("com.fasterxml*", "jackson-core");
         }
 
         @Override

@@ -135,7 +135,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
         return snippetCache(ctx)
-                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(Collections.singletonList(
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singletonList(
                         new Parser.Input(
                                 Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
                                 () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
@@ -173,16 +173,47 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return validated;
     }
 
-    @Value
     public static class DependencyVersionState {
+        DependencyMatcher dependencyMatcher;
         Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
         Map<String, GroupArtifact> versionPropNameToGA = new HashMap<>();
         Set<GradleProject> modules = new HashSet<>();
+
+        public DependencyVersionState(String groupId, String artifactId) {
+            this.dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+        }
+
+        private boolean dependenciesToUpdateCalculated = false;
+        private final Map<GroupArtifact, String> dependenciesToUpdate = new HashMap<>();
+        /**
+         * Collects a map of dependencies that require an update, regardless of which project they belong to.
+         * <p>
+         * Only dependencies that match the configured {@code dependencyMatcher} are included.
+         *
+         * @return a map of {@link GroupArtifact} to target version string, representing dependencies that need updating
+         */
+        private Map<GroupArtifact, String> dependenciesToUpdate() {
+            if (!dependenciesToUpdateCalculated) {
+                for (Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> entry : updatesPerProject.values()) {
+                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : entry.entrySet()) {
+                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                            continue;
+                        }
+                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                            dependenciesToUpdate.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
+                        }
+                    }
+                }
+                dependenciesToUpdateCalculated = true;
+            }
+            return dependenciesToUpdate;
+        }
     }
 
     @Override
     public DependencyVersionState getInitialValue(ExecutionContext ctx) {
-        return new DependencyVersionState();
+        return new DependencyVersionState(groupId, artifactId);
     }
 
     @Override
@@ -489,8 +520,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return new TreeVisitor<Tree, ExecutionContext>() {
-            private final UpdateGradle updateGradle = new UpdateGradle(acc.getUpdatesPerProject());
-            private final UpdateProperties updateProperties = new UpdateProperties(acc.versionPropNameToGA, acc.getUpdatesPerProject());
+            private final UpdateGradle updateGradle = new UpdateGradle(acc);
+            private final UpdateProperties updateProperties = new UpdateProperties(acc);
             private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
@@ -552,101 +583,115 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @RequiredArgsConstructor
     private class UpdateGradle extends JavaVisitor<ExecutionContext> {
-
-        final Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject;
-        final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-
-        @SuppressWarnings("NotNullFieldNotInitialized")
-        GradleProject gradleProject;
+        final DependencyVersionState acc;
 
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
-                gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
-
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
-                if (!projectRequiredUpdates.isEmpty()) {
-                    if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
-                        return cu;
-                    }
-                    cu = (JavaSourceFile) Preconditions.check(
-                            not(new JavaIsoVisitor<ExecutionContext>() {
-                                @Override
-                                public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                                    if (tree instanceof G.CompilationUnit) {
-                                        return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
-                                    }
-                                    // Kotlin is not type attributed, so do things more manually
-                                    return super.visit(tree, ctx);
-                                }
-
-                                @Override
-                                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
-                                        return SearchResult.found(m);
-                                    }
-                                    return m;
-                                }
-                            }),
-                            new AddConstraintsBlock(cu instanceof K.CompilationUnit)
-                    ).visitNonNull(cu, ctx);
-
-                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
-                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                            continue;
+                GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
+                if (gradleProject != null) {
+                    Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
+                    if (!projectRequiredUpdates.isEmpty()) {
+                        if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> acc.dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                            return cu;
                         }
-                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                    update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
-                        }
-                    }
+                        cu = (JavaSourceFile) Preconditions.check(
+                                not(new JavaIsoVisitor<ExecutionContext>() {
+                                    @Override
+                                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        if (tree instanceof G.CompilationUnit) {
+                                            return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
+                                        }
+                                        // Kotlin is not type attributed, so do things more manually
+                                        return super.visit(tree, ctx);
+                                    }
 
-                    // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
-                    if (gradleProject.getPlugins().stream()
-                            .anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
-                        cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
+                                    @Override
+                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                        if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
+                                            return SearchResult.found(m);
+                                        }
+                                        return m;
+                                    }
+                                }),
+                                new AddConstraintsBlock(cu instanceof K.CompilationUnit)
+                        ).visitNonNull(cu, ctx);
+
+                        for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
+                            if (!acc.dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                                continue;
+                            }
+                            Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                            for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                                cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                                        update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                            }
+                        }
+
+                        // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
+                        if (gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                            cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
+                        }
                     }
                 }
-
-                return cu;
+                if (cu != tree) {
+                    return cu;
+                }
             }
             return super.visit(tree, ctx);
         }
-    }
-
-    private class UpdateProperties extends PropertiesVisitor<ExecutionContext> {
-        final Map<String, GroupArtifact> versionPropNameToGA;
-        final Map<GroupArtifact, String> updates = new HashMap<>();
-        final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
-
-        public UpdateProperties(Map<String, GroupArtifact> versionPropNameToGA, Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject) {
-            this.versionPropNameToGA = versionPropNameToGA;
-            for (Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> entry : updatesPerProject.values()) {
-                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : entry.entrySet()) {
-                    if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                        continue;
-                    }
-                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                    for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                        updates.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
-                    }
-                }
-            }
-        }
 
         @Override
-        public org.openrewrite.properties.tree.Properties visitFile(org.openrewrite.properties.tree.Properties.File file, ExecutionContext ctx) {
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            if ("ext".equals(method.getSimpleName()) && isSettingsGradle()) {
+                // rare case that gradle versions are set via settings.gradle ext block
+                m = (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+                        J.Assignment a = super.visitAssignment(assignment, executionContext);
+                        if (!(a.getVariable() instanceof J.Identifier)) {
+                            return a;
+                        }
+                        GroupArtifact ga = acc.versionPropNameToGA.get("gradle." + a.getVariable());
+                        if (acc.dependenciesToUpdate().containsKey(ga)) {
+                            if (!(a.getAssignment() instanceof J.Literal)) {
+                                return a;
+                            }
+                            J.Literal l = (J.Literal) a.getAssignment();
+                            String newVersion = acc.dependenciesToUpdate().get(ga);
+                            String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
+                            a = a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
+                        }
+                        return a;
+                    }
+                }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
+            }
+            return m;
+        }
+
+        private boolean isSettingsGradle() {
+            String path = requireNonNull(getCursor().firstEnclosing(SourceFile.class)).getSourcePath().toString();
+            return path.endsWith("settings.gradle") || path.endsWith("settings.gradle.kts");
+        }
+    }
+
+    @RequiredArgsConstructor
+    private static class UpdateProperties extends PropertiesVisitor<ExecutionContext> {
+        final DependencyVersionState acc;
+
+        @Override
+        public Properties visitFile(Properties.File file, ExecutionContext ctx) {
             return file.getSourcePath().endsWith("gradle.properties") ? super.visitFile(file, ctx) : file;
         }
 
         @Override
-        public org.openrewrite.properties.tree.Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-            GroupArtifact ga = versionPropNameToGA.get(entry.getKey());
-            if (updates.containsKey(ga)) {
-                return entry.withValue(entry.getValue().withText(updates.get(ga)));
+        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+            GroupArtifact ga = acc.versionPropNameToGA.get(entry.getKey());
+            if (acc.dependenciesToUpdate().containsKey(ga)) {
+                return entry.withValue(entry.getValue().withText(acc.dependenciesToUpdate().get(ga)));
             }
             return entry;
         }
