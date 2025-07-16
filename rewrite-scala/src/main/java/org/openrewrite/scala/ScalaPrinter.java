@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.tree.S;
@@ -139,6 +140,26 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(assignOp.getAssignment(), p);
         afterSyntax(assignOp, p);
         return assignOp;
+    }
+    
+    @Override
+    public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
+        beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
+        // In Scala, type casts are written as expression.asInstanceOf[Type]
+        visit(typeCast.getExpression(), p);
+        p.append(".asInstanceOf");
+        
+        // Extract the type from the control parentheses
+        if (typeCast.getClazz() instanceof J.ControlParentheses) {
+            J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
+            visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            p.append('[');
+            visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, "", p);
+            p.append(']');
+        }
+        
+        afterSyntax(typeCast, p);
+        return typeCast;
     }
     
     @Override
@@ -329,17 +350,37 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
             if (classDecl.getPadding().getImplements() != null) {
                 // In Scala, implements are printed with "with" keyword
-                // The container itself already has the space before the first "with"
-                String prefix = "";
+                // The container already has the proper space before the first keyword
+                
+                String firstKeyword = "";
+                String separator = "";
+                
                 if (classDecl.getPadding().getExtends() != null) {
-                    // If we have extends, we need "with" keyword
-                    prefix = "with";
+                    // If we have extends, traits use "with"
+                    firstKeyword = "with";
+                    separator = "with";
                 } else {
-                    // If no extends, we use "extends" for the first trait
-                    prefix = "extends";
+                    // If no extends, first trait uses "extends"
+                    firstKeyword = "extends";
+                    separator = "with";
                 }
-                visitContainer(prefix, 
-                              classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, "with", "", p);
+                
+                // Custom handling for Scala traits
+                JContainer<TypeTree> implContainer = classDecl.getPadding().getImplements();
+                visitSpace(implContainer.getBefore(), Space.Location.IMPLEMENTS, p);
+                p.append(firstKeyword);
+                
+                List<JRightPadded<TypeTree>> elements = implContainer.getPadding().getElements();
+                for (int i = 0; i < elements.size(); i++) {
+                    JRightPadded<TypeTree> elem = elements.get(i);
+                    visit(elem.getElement(), p);
+                    
+                    if (i < elements.size() - 1) {
+                        // Print space after element and the separator
+                        visitSpace(elem.getAfter(), Space.Location.IMPLEMENTS_SUFFIX, p);
+                        p.append(separator);
+                    }
+                }
             }
 
             if (classDecl.getPadding().getPermits() != null) {
@@ -439,6 +480,95 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     // Override additional methods here for Scala-specific syntax as needed
+
+    @Override
+    public J visitArrayAccess(J.ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        
+        // In Scala, array access uses parentheses, not square brackets
+        J.ArrayDimension dimension = arrayAccess.getDimension();
+        visitSpace(dimension.getPrefix(), Space.Location.DIMENSION_PREFIX, p);
+        p.append('(');
+        visitRightPadded(dimension.getPadding().getIndex(), JRightPadded.Location.ARRAY_INDEX, "", p);
+        p.append(')');
+        
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
+    }
+    
+    @Override
+    public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
+        beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
+        
+        // In Scala, instanceof is written as expression.isInstanceOf[Type]
+        visitRightPadded(instanceOf.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, "", p);
+        p.append(".isInstanceOf");
+        
+        // Extract the type and wrap in square brackets
+        p.append('[');
+        visit(instanceOf.getClazz(), p);
+        p.append(']');
+        
+        afterSyntax(instanceOf, p);
+        return instanceOf;
+    }
+    
+    @Override
+    public J visitNewArray(J.NewArray newArray, PrintOutputCapture<P> p) {
+        beforeSyntax(newArray, Space.Location.NEW_ARRAY_PREFIX, p);
+        
+        // In Scala, array creation uses Array(elements) or Array[Type](elements) syntax
+        p.append("Array");
+        
+        // Print type parameter if present
+        if (newArray.getTypeExpression() != null) {
+            p.append('[');
+            visit(newArray.getTypeExpression(), p);
+            p.append(']');
+        }
+        
+        // If we have an initializer, print the elements
+        if (newArray.getInitializer() != null) {
+            // The initializer container already has the proper parentheses spacing
+            visitContainer("", newArray.getPadding().getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, ",", "", p);
+        } else {
+            // Empty array
+            p.append("()");
+        }
+        
+        afterSyntax(newArray, p);
+        return newArray;
+    }
+    
+    @Override
+    public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
+        beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
+        
+        // Print lambda parameters
+        J.Lambda.Parameters params = lambda.getParameters();
+        visitSpace(params.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
+        
+        if (params.isParenthesized()) {
+            p.append('(');
+        }
+        
+        visitRightPadded(params.getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+        
+        if (params.isParenthesized()) {
+            p.append(')');
+        }
+        
+        // Print arrow with spacing
+        visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
+        p.append("=>");
+        
+        // Print lambda body
+        visit(lambda.getBody(), p);
+        
+        afterSyntax(lambda, p);
+        return lambda;
+    }
 
     public J visitTuplePattern(S.TuplePattern tuplePattern, PrintOutputCapture<P> p) {
         beforeSyntax(tuplePattern, Space.Location.LANGUAGE_EXTENSION, p);

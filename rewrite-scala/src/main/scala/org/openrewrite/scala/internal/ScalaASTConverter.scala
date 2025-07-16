@@ -65,6 +65,10 @@ class ScalaASTConverter {
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment)
     val tree = parseResult.tree
 
+    // Debug: Print tree structure
+    System.out.println(s"Top-level tree: ${tree.getClass.getSimpleName}")
+    System.out.println(s"Tree span: ${tree.span}")
+    
     // Check if tree is empty (parse error case)
     if (tree.isEmpty) {
       // Return empty result for parse errors
@@ -123,6 +127,7 @@ class ScalaASTConverter {
         }
       case _ =>
         // Single statement
+        System.out.println(s"Processing single statement: ${tree.getClass.getSimpleName}")
         val converted = visitor.visitTree(tree)
         converted match {
           case null => // Skip null returns
