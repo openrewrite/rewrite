@@ -213,7 +213,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
-        return super.visitYield(yield.withValue(yield.getValue().withPrefix(yield.getValue().getPrefix().withWhitespace(" "))), p);
+        J.Yield y = super.visitYield(yield, p);
+        return y.withValue(y.getValue().withPrefix(Space.SINGLE_SPACE));
     }
 
     @Override
