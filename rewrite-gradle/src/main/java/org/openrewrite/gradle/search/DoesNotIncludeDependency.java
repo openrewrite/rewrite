@@ -79,15 +79,10 @@ public class DoesNotIncludeDependency extends Recipe {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
-                }
-                if (di.isAcceptable((SourceFile) tree, ctx)) {
-                    Tree t2 = di.visitNonNull(tree, ctx);
-                    // if Gradle file is unchanged, we found something without the dependency
-                    if (t2 == tree) {
-                        return SearchResult.found(tree);
-                    }
+                Tree t2 = di.visit(tree, ctx);
+                // if Gradle file is unchanged, we found something without the dependency
+                if (t2 == tree) {
+                    return SearchResult.found(tree);
                 }
                 return tree;
             }
