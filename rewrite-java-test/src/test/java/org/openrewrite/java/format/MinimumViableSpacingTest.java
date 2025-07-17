@@ -270,6 +270,60 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
+    void fieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class Clazz {
+                  static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              class Clazz{static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldWithModifiers() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class Clazz {
+                  static final long serialVersionUID = 1L;
+              }
+              """,
+            """
+              class Clazz{static final long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiAnnotatedFieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+              import org.jspecify.annotations.NonNull;
+
+              class Clazz {
+                  @NonNull @Serial static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;import org.jspecify.annotations.NonNull;class Clazz{@NonNull @Serial static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
     void annotatedFieldWithModifier() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2),
@@ -297,11 +351,11 @@ class MinimumViableSpacingTest implements RewriteTest {
               import java.io.Serial;
 
               class Clazz {
-                  @Serial static final long serialVersionUID = 1L;
+                  @Serial private static final long serialVersionUID = 1L;
               }
               """,
             """
-              import java.io.Serial;class Clazz{@Serial static final long serialVersionUID=1L;}
+              import java.io.Serial;class Clazz{@Serial private static final long serialVersionUID=1L;}
               """
           )
         );

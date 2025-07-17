@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 
@@ -174,16 +175,34 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
-        boolean first = v.getLeadingAnnotations().isEmpty();
+        boolean hasLeadingAnnotations = !v.getLeadingAnnotations().isEmpty();
+        boolean hasModifiers = !v.getModifiers().isEmpty();
+
+        /*
+         * We need at least one space between leading annotations, otherwise we could get a run-on like "@NonNull@Generated@Serial".
+         * Note, this is applicable anywhere that annotations can exist, such as class declarations, etc.
+         */
+        if (hasLeadingAnnotations) {
+            v = v.withLeadingAnnotations(
+                    ListUtils.map(v.getLeadingAnnotations(), (index, annotation) -> {
+                        if (index != 0) {
+                            if (annotation.getPrefix().isEmpty()) {
+                                annotation = annotation.withPrefix(annotation.getPrefix().withWhitespace(" "));
+                            }
+                        }
+                        return annotation;
+                    })
+            );
+        }
 
         /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
-        if (first && !v.getModifiers().isEmpty()) {
+        if (hasModifiers) {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
-                        if (index != 0) {
+                        if (index != 0 || hasLeadingAnnotations) {
                             if (modifier.getPrefix().isEmpty()) {
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                             }
@@ -191,10 +210,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                         return modifier;
                     })
             );
-            first = false;
         }
 
-        if (!first && v.getTypeExpression() != null) {
+        if ((hasLeadingAnnotations || hasModifiers) && v.getTypeExpression() != null) {
             if (v.getTypeExpression().getPrefix().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
             }
@@ -229,6 +247,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return c;
+    }
+
+    @Override
+    public J.Import visitImport(J.Import _import, P p) {
+        J.Import i = super.visitImport(_import, p);
+        return i.withQualid(i.getQualid().withPrefix(Space.SINGLE_SPACE));
     }
 
     @Override
