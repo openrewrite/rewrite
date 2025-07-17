@@ -161,21 +161,6 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return es;
     }
 
-    public J visitTrailingTokenStatement(JS.TrailingTokenStatement statement, P p) {
-        JS.TrailingTokenStatement st = statement;
-        st = st.withPrefix(visitSpace(st.getPrefix(), JsSpace.Location.TRAILING_TOKEN_PREFIX, p));
-        st = st.withMarkers(visitMarkers(st.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(st, p);
-        if (!(temp instanceof JS.TrailingTokenStatement)) {
-            return temp;
-        } else {
-            st = (JS.TrailingTokenStatement) temp;
-        }
-        st = st.getPadding().withExpression(requireNonNull(visitRightPadded(st.getPadding().getExpression(), JsRightPadded.Location.TRAILING_TOKEN_EXPRESSION, p)));
-        st = st.withType(visitType(st.getType(), p));
-        return st;
-    }
-
     public J visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, P p) {
         JS.ExpressionWithTypeArguments ta = expressionWithTypeArguments;
         ta = ta.withPrefix(visitSpace(ta.getPrefix(), JsSpace.Location.EXPR_WITH_TYPE_ARG_PREFIX, p));

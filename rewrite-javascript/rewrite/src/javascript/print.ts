@@ -75,22 +75,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statement.prefix, p);
+        await this.visitMarkers(statement.markers, p);
         await this.visit(statement.expression, p);
         return statement;
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statementExpression.prefix, p);
+        await this.visitMarkers(statementExpression.markers, p);
         await this.visit(statementExpression.statement, p);
         return statementExpression;
-    }
-
-    override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(statement, p);
-        await this.visitRightPadded(statement.expression, p);
-        await this.afterSyntax(statement, p);
-        return statement;
     }
 
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
