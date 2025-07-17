@@ -850,18 +850,32 @@ public class GroovyParserVisitor {
         @Override
         public void visitClassExpression(ClassExpression clazz) {
             Space prefix = whitespace();
-            String name = clazz.getType().getUnresolvedName().replace('$', '.');
+            ClassNode type = clazz.getType();
+            String name = type.getNameWithoutPackage().replace('$', '.');
             if (!source.startsWith(name, cursor)) {
-                name = clazz.getType().getNameWithoutPackage().replace('$', '.');
+                name = type.getUnresolvedName().replace('$', '.');
             }
             skip(name);
+            if (type.isUsingGenerics()) {
+                GenericsType[] generics = type.getGenericsTypes();
+                if (generics != null && generics.length > 0) {
+                    J.Identifier ident = new J.Identifier(randomId(),
+                            EMPTY,
+                            Markers.EMPTY,
+                            emptyList(),
+                            name,
+                            typeMapping.type(type), null);
+                    queue.add(new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(generics), typeMapping.type(type)));
+                    return;
+                }
+            }
             if (sourceStartsWith(".class")) {
                 String classSuffix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source)) + ".class";
                 name += classSuffix;
                 skip(classSuffix);
             }
             queue.add(TypeTree.build(name)
-                    .withType(typeMapping.type(clazz.getType()))
+                    .withType(typeMapping.type(type))
                     .withPrefix(prefix));
         }
 

@@ -17,6 +17,7 @@ package org.openrewrite.gradle.search;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "/*~~>*/";
@@ -39,20 +41,32 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         return new DoesNotIncludeDependency("org.springframework", "spring-beans", configuration);
     }
 
+    @Test
+    void nonGradleFilesNotMarked() {
+        rewriteRun(
+          spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
+          java(
+            """
+              class SomeClass {}
+              """
+          )
+        );
+    }
+
     @Nested
     class DirectDependencyPresent {
         //language=groovy
         private static final String directDependencyTemplate = """
-            plugins {
-                id 'java-library'
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                %s 'org.springframework:spring-beans:6.0.0'
-            }
-            """;
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              %s 'org.springframework:spring-beans:6.0.0'
+          }
+          """;
 
         @ParameterizedTest
         @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
@@ -99,16 +113,16 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     class TransitiveDependencyPresent {
         //language=groovy
         private static final String transitiveDependencyTemplate = """
-            plugins {
-                id 'java-library'
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
-            }
-            """;
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
+          }
+          """;
 
         @ParameterizedTest
         @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
