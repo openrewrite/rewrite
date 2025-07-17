@@ -184,6 +184,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
         private boolean dependenciesToUpdateCalculated = false;
         private final Map<GroupArtifact, String> dependenciesToUpdate = new HashMap<>();
+
         /**
          * Collects a map of dependencies that require an update, regardless of which project they belong to.
          * <p>
