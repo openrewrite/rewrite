@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -247,6 +248,61 @@ class MinimumViableSpacingTest implements RewriteTest {
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void importStatement() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+              
+              class Clazz {}
+              """,
+            """
+              import java.io.Serial;class Clazz{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+
+              class Clazz {
+                  @Serial static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;class Clazz{@Serial static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFieldWithModifiers() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+
+              class Clazz {
+                  @Serial static final long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;class Clazz{@Serial static final long serialVersionUID=1L;}
+              """
           )
         );
     }
