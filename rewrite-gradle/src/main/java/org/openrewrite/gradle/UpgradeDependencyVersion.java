@@ -27,7 +27,6 @@ import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -171,7 +170,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
                 if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
@@ -542,7 +541,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+            GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
             if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 List<Expression> depArgs = m.getArguments();
@@ -614,11 +613,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
 
                         String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
-                                .add(method.getSimpleName());
+                        replaceVariableValue(versionVariableName, method, dep.getGroupId(), dep.getArtifactId());
                     }
                 } else if (arg instanceof K.StringTemplate) {
                     K.StringTemplate template = (K.StringTemplate) arg;
@@ -640,11 +635,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
 
                         String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> new HashSet<>())
-                                .add(method.getSimpleName());
+                        replaceVariableValue(versionVariableName, method, dep.getGroupId(), dep.getArtifactId());
                     }
                 } else if (arg instanceof J.Literal) {
                     J.Literal literal = (J.Literal) arg;
@@ -742,11 +733,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return m.withArguments(newArgs);
                     } else if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
-                                .add(m.getSimpleName());
+                        replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
+                    } else if (versionExp instanceof G.GString) {
+                        G.GString gString = (G.GString) versionExp;
+
+                        if (gString.getStrings().size() != 1) {
+                            return m;
+                        }
+
+                        G.GString.Value versionLiteral = (G.GString.Value) gString.getStrings().get(0);
+                        String versionVariableName = versionLiteral.printTrimmed(getCursor());
+
+                        if (versionVariableName.startsWith("$")) {
+                            versionVariableName = versionVariableName.replaceAll("^\\$\\{?|}?$", "");
+                        }
+
+                        replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
                     }
                 } else if (depArgs.get(0) instanceof J.Assignment &&
                            depArgs.get(1) instanceof J.Assignment &&
@@ -798,16 +800,35 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return m.withArguments(newArgs);
                     } else if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
-                                .computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                                .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
-                                .add(m.getSimpleName());
+                        replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
+                    } else if (versionExp instanceof K.StringTemplate) {
+                        K.StringTemplate kString = (K.StringTemplate) versionExp;
+
+                        if (kString.getStrings().size() != 1) {
+                            return m;
+                        }
+
+                        K.StringTemplate.Expression versionLiteral = (K.StringTemplate.Expression) kString.getStrings().get(0);
+                        String versionVariableName = versionLiteral.printTrimmed(getCursor());
+
+                        if (versionVariableName.startsWith("$")) {
+                            versionVariableName = versionVariableName.replaceAll("^\\$\\{?|}?$", "");
+                        }
+
+                        replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
                     }
                 }
             }
 
             return m;
+        }
+
+        private void replaceVariableValue(String versionVariableName, J.MethodInvocation m, String groupId, String artifactId) {
+            getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                    .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new HashMap<String, Map<GroupArtifact, Set<String>>>())
+                    .computeIfAbsent(versionVariableName, it -> new HashMap<>())
+                    .computeIfAbsent(new GroupArtifact(groupId, artifactId), it -> new HashSet<>())
+                    .add(m.getSimpleName());
         }
     }
 

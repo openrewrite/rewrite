@@ -23,7 +23,6 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.trait.Traits.literal;
 
 class LiteralTest implements RewriteTest {
 
@@ -32,7 +31,7 @@ class LiteralTest implements RewriteTest {
     void numericLiteral() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-              literal().asVisitor(lit -> {
+              new Literal.Matcher().asVisitor(lit -> {
                   assertThat(lit.isNotNull()).isTrue();
                   // NOTE: Jackson's coercion config allows us to
                   // coerce various numeric literal types to an Integer
@@ -63,7 +62,7 @@ class LiteralTest implements RewriteTest {
     void arrayLiteral() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() ->
-              literal().asVisitor(lit -> {
+              new Literal.Matcher().asVisitor(lit -> {
                   assertThat(lit.isNotNull()).isTrue();
                   return SearchResult.found(lit.getTree(),
                     String.join(",", lit.getStrings()));
