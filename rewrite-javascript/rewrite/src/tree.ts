@@ -15,6 +15,8 @@
  */
 import {Markers} from "./markers";
 import {UUID} from "./uuid";
+import {PlainText} from "./text";
+import {RpcCodecs} from "./rpc";
 
 export const TreeKind = {
     Checksum: "org.openrewrite.Checksum",

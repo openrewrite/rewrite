@@ -21,7 +21,6 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
@@ -44,7 +43,8 @@ public class DependencyUseStringNotation extends Recipe {
     public String getDescription() {
         return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
                 "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`.";
+                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
+                "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
     }
 
     @Override
@@ -54,7 +54,7 @@ public class DependencyUseStringNotation extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
                 if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;

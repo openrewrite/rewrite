@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('expression statement mapping', () => {
     const spec = new RecipeSpec();
@@ -209,4 +210,14 @@ describe('expression statement mapping', () => {
             const results = new this.constructor[Symbol.species]<Key, Value>();
         `)
     ));
+
+    test('method invocation', () => spec.rewriteRun({
+        //language=typescript
+        ...typescript(`console.log("Hello");`),
+        afterRecipe : (cu: JS.CompilationUnit) => {
+            const mi = cu.statements[0].element as J.MethodInvocation;
+            expect(mi.select!.element.kind).toEqual(J.Kind.Identifier);
+            expect(mi.name.simpleName).toEqual("log");
+        }
+        }));
 });

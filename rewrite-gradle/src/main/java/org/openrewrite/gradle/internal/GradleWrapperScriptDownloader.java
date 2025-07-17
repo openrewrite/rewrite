@@ -52,7 +52,7 @@ public class GradleWrapperScriptDownloader {
     public static void main(String[] args) throws IOException, InterruptedException {
         Lock lock = new ReentrantLock();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(null, ctx);
+        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(ctx);
         Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
                 new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
 

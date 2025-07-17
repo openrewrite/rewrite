@@ -16,6 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -222,6 +224,35 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateVersionInVariableToRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot", "3.5.x", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def springBootVersion = '3.1.5'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("org.springframework.boot:spring-boot:$springBootVersion")
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("def springBootVersion = '3.5.\\d+'")
+                .actual()
+            )
+          )
+        );
+    }
+
+    @Test
     void deeplyNestedProjectDependency() {
         rewriteRun(
           buildGradle(
@@ -357,6 +388,84 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 implementation (group: "com.google.guava", name: "guava", version: '30.1.1-jre')
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
+    void mapNotationGStringInterpolation(String stringInterpolationReference) {
+        rewriteRun(
+          buildGradle(
+            String.format("""
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              def guavaVersion = '29.0-jre'
+              
+              dependencies {
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
+              }
+              """, stringInterpolationReference),
+            String.format("""
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              def guavaVersion = '30.1.1-jre'
+              
+              dependencies {
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
+              }
+              """, stringInterpolationReference)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
+    void mapNotationKStringTemplateInterpolation(String stringInterpolationReference) {
+        rewriteRun(
+          buildGradleKts(
+            String.format("""
+              plugins {
+                `java-library`
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              val guavaVersion = "29.0-jre"
+              
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
+              }
+              """, stringInterpolationReference),
+            String.format("""
+              plugins {
+                `java-library`
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              val guavaVersion = "30.1.1-jre"
+              
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
+              }
+              """, stringInterpolationReference)
           )
         );
     }
@@ -1321,7 +1430,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1333,7 +1442,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1972,6 +2081,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           \"""
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """,
+            """
+              gradle.ext {
+                  jackson = '2.15.0'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+    
+              repositories {
+                  mavenCentral()
+              }
+    
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
               }
               """
           )

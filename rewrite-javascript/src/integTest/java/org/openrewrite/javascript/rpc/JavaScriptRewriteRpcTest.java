@@ -21,12 +21,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -51,18 +52,18 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     JavaScriptRewriteRpc client;
     PrintStream log;
-    RewriteRpc.Scope scope;
+    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
     void before() throws FileNotFoundException {
         this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
-        this.client = JavaScriptRewriteRpc.builder()
+        this.client = JavaScriptRewriteRpc.builder(Environment.builder().build())
           .nodePath(Path.of("node"))
           .installationDirectory(Path.of("./rewrite/dist"))
 //          .inspectAndBreak()
 //          .timeout(Duration.ofMinutes(10))
           .build();
-        this.scope = RewriteRpc.Context.current().with(client).attach();
+        this.scope = JavaScriptRewriteRpc.current().using(client);
 
 //        client
 //          .traceGetObjectOutput()
@@ -109,6 +110,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+
     @Test
     void printJava() {
         assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
@@ -140,7 +142,12 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void installRecipesFromNpm() {
         assertThat(client.installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
         assertThat(client.getRecipes()).satisfiesExactly(
-          d -> assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`")
+          d -> {
+              assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
+              assertThat(d.getOptions()).satisfiesExactly(
+                o -> assertThat(o.isRequired()).isTrue()
+              );
+          }
         );
     }
 

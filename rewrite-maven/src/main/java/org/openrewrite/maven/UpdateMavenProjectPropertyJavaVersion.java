@@ -96,9 +96,9 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                                     try {
                                         float parsed = Float.parseFloat(getResolutionResult().getPom().getProperties().get(property));
                                         if (parsed < version &&
-                                            (plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                            ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
                                             (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
-                                            (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
+                                            (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property)))) {
                                             d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
                                                     .visitNonNull(d, ctx);
                                             maybeUpdateModel();

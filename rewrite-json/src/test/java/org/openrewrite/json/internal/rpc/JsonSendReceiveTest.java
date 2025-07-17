@@ -51,20 +51,17 @@ class JsonSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut))))
-          .marketplace(env)
-          .batchSize(1)
+        server = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("server",
+          new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
           .timeout(Duration.ofSeconds(10))
-          .build();
+          .build()
+          .batchSize(1);
 
-        client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut))))
-          .marketplace(env)
-          .batchSize(1)
+        client = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("client",
+          new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
           .timeout(Duration.ofSeconds(10))
-          .startServer(true)
-          .build();
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach

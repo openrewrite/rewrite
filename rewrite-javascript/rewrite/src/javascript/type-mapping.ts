@@ -1,7 +1,23 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import * as ts from "typescript";
 import {JavaType} from "../java";
-import {Draft} from "immer";
-import {asRef} from "../rpc";
+import {createDraft, Draft, finishDraft} from "immer";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {MarkersKind, ParseExceptionResult} from "../markers";
 
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<number, JavaType> = new Map();
@@ -118,94 +134,6 @@ export class JavaScriptTypeMapping {
             return JavaType.Primitive.Boolean;
         }
 
-        if (type.isUnion() || type.isIntersection()) {
-            let result: Draft<JavaType.Union> = {
-                kind: type.isUnion() ? JavaType.Kind.Union : JavaType.Kind.Intersection,
-                bounds: []
-            };
-            this.typeCache.set(cacheKey, result);
-
-            result.bounds = type.types.map(t => this.getType(t));
-            return result;
-        } else if (type.flags & ts.TypeFlags.Object) {
-            const objectType = type as ts.ObjectType;
-            if (objectType.isClassOrInterface()) {
-                let result = asRef({
-                    kind: JavaType.Kind.Class,
-                    classKind: type.isClass() ? JavaType.Class.Kind.Class : JavaType.Class.Kind.Interface, // TODO there are other options, no?
-                    fullyQualifiedName: objectType.getSymbol()?.name, // TODO that's not fully qualified
-                    typeParameters: objectType.typeParameters?.map(tp => this.getType(tp)),
-                    annotations: [], // TODO
-                    interfaces: [], // TODO
-                    members: [],
-                    methods: []
-                }) as Draft<JavaType.Class>;
-                this.typeCache.set(cacheKey, result);
-                objectType.getProperties().forEach(symbol => {
-                    const memberType = this.checker.getTypeOfSymbol(symbol);
-                    const callSignatures = memberType.getCallSignatures();
-                    if ((memberType.flags & ts.TypeFlags.Object) && callSignatures.length > 0) {
-                        const signature = callSignatures[0]; // TODO understand multiple signatures, maybe all signatures should be added as separate methods?
-                        result.methods.push(asRef({
-                            kind: JavaType.Kind.Method,
-                            declaringType: result,
-                            name: symbol.getName(),
-                            returnType: this.getType(signature.getReturnType()),
-                            parameterNames: signature.parameters.map(s => s.getName()),
-                            parameterTypes: signature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
-                            thrownExceptions: [],
-                            annotations: [],
-                            defaultValue: [], // TODO
-                            declaredFormalTypeNames: [] // TODO
-                        } as JavaType.Method));
-                    } else {
-                        result.members.push(asRef({
-                            kind: JavaType.Kind.Variable,
-                            name: symbol.getName(),
-                            owner: result,
-                            type: this.getType(memberType),
-                            annotations: []
-                        } as JavaType.Variable));
-                    }
-                });
-                return result;
-            } else if (objectType.getCallSignatures().length > 0) {
-                const callSignature = objectType.getCallSignatures()[0]; // TODO handle multiple signatures
-                const result = asRef({
-                    kind: JavaType.Kind.Method,
-                    declaringType: JavaType.unknownType, // TODO
-                    name: objectType.getSymbol()?.getName(),
-                    returnType: this.getType(callSignature.getReturnType()),
-                    parameterNames: callSignature.parameters.map(s => s.getName()),
-                    parameterTypes: callSignature.parameters.map(s => this.getType(this.checker.getTypeOfSymbol(s))),
-                    thrownExceptions: [],
-                    annotations: [],
-                    defaultValue: undefined, // TODO
-                    declaredFormalTypeNames: []
-                } as JavaType.Method);
-                this.typeCache.set(cacheKey, result);
-                return result;
-            } else if (objectType.objectFlags & ts.ObjectFlags.Reference) {
-                const typeReference = objectType as ts.TypeReference;
-                if (typeReference.target != type) { // TODO handle cases where it is the same
-                    const result = this.getType(typeReference.target);
-                    this.typeCache.set(cacheKey, result);
-                    return result;
-                }
-            }
-        } else if (type.flags & ts.TypeFlags.TypeParameter && signature === "this") {
-            return this.getType(type.getConstraint()!);
-        } else if (type.isTypeParameter()) {
-            const typeParameter = type as ts.TypeParameter;
-            const result = asRef({
-                kind: JavaType.Kind.GenericTypeVariable,
-                name: typeParameter.symbol.name,
-                bounds: typeParameter.getConstraint() ? [this.getType(typeParameter.getConstraint()!)] : []
-            }); // TODO probably need to defer bounds after setting the cache
-            this.typeCache.set(cacheKey, result);
-            return result;
-        }
-
         // if (ts.isRegularExpressionLiteral(node)) {
         //     return JavaType.Primitive.String;
         // }
@@ -213,3 +141,13 @@ export class JavaScriptTypeMapping {
         return JavaType.unknownType;
     }
 }
+
+RpcCodecs.registerCodec(JavaType.Kind.Primitive, {
+    async rpcSend(after: JavaType.Primitive, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, p => p.keyword);
+    },
+    async rpcReceive(before: JavaType.Primitive, q: RpcReceiveQueue): Promise<JavaType.Primitive> {
+        const keyword: string = await q.receive(before.keyword);
+        return JavaType.Primitive.fromKeyword(keyword)!;
+    }
+});
