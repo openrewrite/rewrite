@@ -22,12 +22,58 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CoalescePropertiesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new CoalesceProperties());
+        spec.recipe(new CoalesceProperties(null, null));
+    }
+
+    @Test
+    void blah() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(List.of("$..[endpoint.health][?(@property.match(/.*/))]", "$..[logging.level][?(@property.match(/.*/))]"), List.of("$..spring[?(@property.match(/.*/))]"))),
+          yaml(
+            """
+              spring:
+                application:
+                  name: my-app
+              logging:
+                level:
+                  root: INFO
+                  org.springframework.web: DEBUG
+              management:
+                metrics:
+                  enable.process.files: true
+                endpoint:
+                  health:
+                    something:
+                      yeah: true
+                    show-components: always
+                    show-details: always
+              """,
+            """
+              spring:
+                application.name: my-app
+              logging:
+                level:
+                  root: INFO
+                  org.springframework.web: DEBUG
+              management:
+                metrics:
+                  enable.process.files: true
+                endpoint:
+                  health:
+                    something:
+                      yeah: true
+                    show-components: always
+                    show-details: always
+              """
+          )
+        );
     }
 
     @DocumentExample
