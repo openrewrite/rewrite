@@ -128,7 +128,7 @@ class ChangeTagAttributeTest implements RewriteTest {
     void changeTagAttributeAndXSDProblem() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("//*[namespace-uri() = 'http://java.sun.com/xml/ns/jaxb' and local-name() = 'bindings']",
-            "version", "3.0", "1.0", false)).expectedCyclesThatMakeChanges(0),
+            "version", "3.0", "1.0", false)),
           xml(
             """
               <schema xmlns="http://www.w3.org/2001/XMLSchema"
