@@ -316,7 +316,7 @@ class MinimumViableSpacingTest implements RewriteTest {
               }
               """,
             """
-              import java.io.Serial;import org.jspecify.annotations.NonNull;class Clazz{@NonNull @Serial static long serialVersionUID=1L;}
+              import java.io.Serial;import org.jspecify.annotations.NonNull;class Clazz{@NonNull@Serial static long serialVersionUID=1L;}
               """
           )
         );

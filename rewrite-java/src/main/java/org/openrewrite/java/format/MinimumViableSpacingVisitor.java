@@ -178,23 +178,6 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         boolean hasModifiers = !v.getModifiers().isEmpty();
 
         /*
-         * We need at least one space between leading annotations, otherwise we could get a run-on like "@NonNull@Generated@Serial".
-         * Note, this is applicable anywhere that annotations can exist, such as class declarations, etc.
-         */
-        if (hasLeadingAnnotations) {
-            v = v.withLeadingAnnotations(
-                    ListUtils.map(v.getLeadingAnnotations(), (index, annotation) -> {
-                        if (index != 0) {
-                            if (annotation.getPrefix().isEmpty()) {
-                                annotation = annotation.withPrefix(annotation.getPrefix().withWhitespace(" "));
-                            }
-                        }
-                        return annotation;
-                    })
-            );
-        }
-
-        /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
