@@ -1594,11 +1594,6 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
-
-            if (true) {
-                throw new RuntimeException("sddssd");
-            }
-
             Space fmt = whitespace();
             Delimiter delimiter = getDelimiter(gstring, cursor);
             skip(delimiter.open);
