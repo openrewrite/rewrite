@@ -31,7 +31,6 @@ import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -563,14 +562,14 @@ class AddImportTest implements RewriteTest {
 
     @Test
     void importsAddedInAlphabeticalOrder() {
-        List<String> otherPackages = Arrays.asList("c", "c.c", "c.c.c");
+        List<String> otherPackages = List.of("c", "c.c", "c.c.c");
         List<SourceSpecs> otherImports = new ArrayList<>();
         for (int i = 0; i < otherPackages.size(); i++) {
             String pkg = otherPackages.get(i);
             otherImports.add(java("package " + pkg + ";\npublic class C" + i + " {}", SourceSpec::skip));
         }
 
-        List<String> packages = Arrays.asList("b", "c.b", "c.c.b");
+        List<String> packages = List.of("b", "c.b", "c.c.b");
         for (int order = 0; order < packages.size(); order++) {
             String pkg = packages.get(order);
 
@@ -818,7 +817,7 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipes(
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     return method.withSelect(null);
                 }
             }),
@@ -858,8 +857,8 @@ class AddImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  method = super.visitMethodDeclaration(method, executionContext);
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  method = super.visitMethodDeclaration(method, ctx);
                   method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
                     .imports("java.util.ArrayList", "java.util.List")
                     .staticImports("java.util.Calendar.Builder")
@@ -916,7 +915,7 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipes(
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                     if (method.getName().getSimpleName().equals("emptyList")) {
                         return method.withSelect(null);
                     }
@@ -1651,6 +1650,92 @@ class AddImportTest implements RewriteTest {
                   A a;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void codeSanityCheck() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package com.ex.app.config;
+              public class OldA {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldB {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldC {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldD {}
+              """,
+            """
+              package com.ex.app.task;
+              public class OldE {}
+              """
+          )).recipes(
+            new ChangeType("com.ex.app.config.OldA", "com.ex.app.config.NewA", null),
+            new ChangeType("com.ex.app.task.OldB", "com.ex.app.task.NewB", null),
+            new ChangeType("com.ex.app.task.OldC", "com.ex.app.task.NewC", null),
+            new ChangeType("com.ex.app.task.OldD", "com.ex.app.task.NewD", null),
+            new ChangeType("com.ex.app.task.OldE", "com.ex.app.task.NewE", null)
+          ),
+          java(
+            """
+              package sample;
+              
+              import com.ex.app.config.OldA;
+              import com.ex.app.task.OldB;
+              import com.ex.app.task.OldC;
+              import com.ex.app.task.OldD;
+              import com.ex.app.task.OldE;
+              
+              public class A {
+                  private final OldA a;
+                  private final OldB b;
+                  private final OldC c;
+                  private final OldD d;
+                  private final OldE e;
+              
+                  public A(OldA a, OldB b, OldC c, OldD d, OldE e) {
+                      this.a = a;
+                      this.b = b;
+                      this.c = c;
+                      this.d = d;
+                      this.e = e;
+                  }
+              }
+              """,
+            """
+          package sample;
+          
+          import com.ex.app.config.NewA;
+          import com.ex.app.task.NewB;
+          import com.ex.app.task.NewC;
+          import com.ex.app.task.NewD;
+          import com.ex.app.task.NewE;
+          
+          public class A {
+              private final NewA a;
+              private final NewB b;
+              private final NewC c;
+              private final NewD d;
+              private final NewE e;
+          
+              public A(NewA a, NewB b, NewC c, NewD d, NewE e) {
+                  this.a = a;
+                  this.b = b;
+                  this.c = c;
+                  this.d = d;
+                  this.e = e;
+              }
+          }
+          """
           )
         );
     }

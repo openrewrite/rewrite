@@ -87,4 +87,34 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void simplifyAfterRemoval() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  @interface Copyright {
+                      int year();
+                      String value();
+                  }
+                  """
+              )
+            )
+            .recipe(new RemoveAnnotationAttribute("Copyright", "year")),
+          java(
+            """
+              @Copyright(year = 2002, value = "Yoyodyne Propulsion Systems, Inc.")
+              class OscillationOverthruster {
+              }
+              """,
+            """
+              @Copyright("Yoyodyne Propulsion Systems, Inc.")
+              class OscillationOverthruster {
+              }
+              """
+          )
+        );
+    }
 }

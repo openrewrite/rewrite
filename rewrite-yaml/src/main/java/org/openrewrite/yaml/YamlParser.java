@@ -352,19 +352,24 @@ public class YamlParser implements org.openrewrite.Parser {
                         newLine = "";
 
                         SequenceStartEvent sse = (SequenceStartEvent) event;
+                        int nextLastEnd = event.getEndMark().getIndex();
+                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                            nextLastEnd--;
+                        }
+
                         Yaml.Anchor anchor = null;
                         if (sse.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), nextLastEnd, false);
                             anchors.put(sse.getAnchor(), anchor);
 
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                            fmt = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
                         }
-                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                        String fullPrefix = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
                         int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
@@ -385,10 +390,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
-                        lastEnd = event.getEndMark().getIndex();
-                        if (shouldUseYamlParserBugWorkaround(sse)) {
-                            lastEnd--;
-                        }
+                        lastEnd = nextLastEnd;
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor, tag));
                         break;
                     }
@@ -430,7 +432,7 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     /*
-    The yaml-parser library unfortunately returns inconsistent marks.
+    The SnakeYAML parser library unfortunately returns inconsistent marks.
     If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
     If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
     */
@@ -442,6 +444,9 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         int startChar = event.getStartMark().getBuffer()[startCharIndex];
         int endChar = event.getEndMark().getBuffer()[endCharIndex];
+        if (startChar == '&') { // anchor
+            return event.getEndMark().getBuffer()[endCharIndex - 1] == '-' && endChar != '-';
+        }
         return startChar == '-' && endChar != '-';
     }
 

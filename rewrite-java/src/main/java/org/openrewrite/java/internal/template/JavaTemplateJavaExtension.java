@@ -57,7 +57,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private boolean substituted;
 
             @Override
-            public J visitAnnotation(J.Annotation annotation, Integer integer) {
+            public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
                     isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
@@ -73,7 +73,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
-                return super.visitAnnotation(annotation, integer);
+                return super.visitAnnotation(annotation, p);
             }
 
             @Override

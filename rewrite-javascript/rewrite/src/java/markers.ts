@@ -1,3 +1,18 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import {Marker} from "../markers";
 import {J} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
@@ -23,7 +38,7 @@ declare module "./tree" {
 } as const;
 
 export interface Semicolon extends Marker {
-    readonly kind: typeof J.Markers.Semicolon
+    readonly kind: typeof J.Markers.Semicolon;
 }
 
 export interface TrailingComma extends Marker {
@@ -49,3 +64,25 @@ RpcCodecs.registerCodec(J.Markers.TrailingComma, {
         await q.getAndSend(after, a => a.suffix);
     }
 });
+
+/**
+ * Registers an RPC codec for any marker without additional properties.
+ */
+export function registerMarkerCodec<M extends Marker>(
+    kind: M["kind"]
+) {
+    RpcCodecs.registerCodec(kind, {
+        async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
+            const draft = createDraft(before);
+            draft.id = await q.receive(before.id);
+            return finishDraft(draft) as M;
+        },
+
+        async rpcSend(after: M, q: RpcSendQueue): Promise<void> {
+            await q.getAndSend(after, a => a.id);
+        }
+    });
+}
+
+registerMarkerCodec(J.Markers.Semicolon);
+registerMarkerCodec(J.Markers.OmitParentheses);

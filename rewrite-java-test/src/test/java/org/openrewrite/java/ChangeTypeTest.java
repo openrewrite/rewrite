@@ -1592,8 +1592,8 @@ class ChangeTypeTest implements RewriteTest {
               import a.A2;
               
               public class Example {
-                  public A2 method(A2 a2) {
-                      return a2;
+                  public A2 method(A2 a1) {
+                      return a1;
                   }
               }
               """
@@ -1642,9 +1642,9 @@ class ChangeTypeTest implements RewriteTest {
 
               class Test {
                   void test() {
-                      List<Integer> arrayList = new ArrayList<>();
-                      arrayList.add(1);
-                      arrayList.add(2);
+                      List<Integer> list = new ArrayList<>();
+                      list.add(1);
+                      list.add(2);
                   }
               }
               """,
@@ -1653,9 +1653,9 @@ class ChangeTypeTest implements RewriteTest {
 
               class Test {
                   void test() {
-                      List<Integer> linkedList = new LinkedList<>();
-                      linkedList.add(1);
-                      linkedList.add(2);
+                      List<Integer> list = new LinkedList<>();
+                      list.add(1);
+                      list.add(2);
                   }
               }
               """
@@ -1746,11 +1746,40 @@ class ChangeTypeTest implements RewriteTest {
               import a.A2;
               
               public class Example {
-                  public A2 method1(A2 a2) {
-                      return a2;
+                  public A2 method1(A2 a1) {
+                      return a1;
                   }
                   public A2 method2(A2 a1) {
                       return a1; // Unchanged
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameVariableNeedlessly() {
+        // Comparison to java.util.Optional: this method is equivalent to Java 8's Optional.orElse(null).
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.awt.List", "java.util.List", false)),
+          //language=java
+          java(
+            """
+              import java.awt.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
                   }
               }
               """

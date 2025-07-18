@@ -1,3 +1,20 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {asRef} from "../rpc";
+
 export interface JavaType {
     readonly kind: string;
 }
@@ -6,13 +23,13 @@ export namespace JavaType {
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
+        Array: "org.openrewrite.java.tree.JavaType$Array",
         Class: "org.openrewrite.java.tree.JavaType$Class",
+        GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
+        Intersection: "org.openrewrite.java.tree.JavaType$Intersection",
+        Method: "org.openrewrite.java.tree.JavaType$Method",
         Parameterized: "org.openrewrite.java.tree.JavaType$Parameterized",
         Primitive: "org.openrewrite.java.tree.JavaType$Primitive",
-        Array: "org.openrewrite.java.tree.JavaType$Array",
-        Method: "org.openrewrite.java.tree.JavaType$Method",
-        Intersection: "org.openrewrite.java.tree.JavaType$Intersection",
-        GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
         ShallowClass: "org.openrewrite.java.tree.JavaType$ShallowClass",
         Union: "org.openrewrite.java.tree.JavaType$MultiCatch",
         Unknown: "org.openrewrite.java.tree.JavaType$Unknown",
@@ -144,11 +161,37 @@ export namespace JavaType {
         static values(): Primitive[] {
             return Primitive._all.slice();
         }
-    }
 
-    export interface Primitive extends JavaType {
-        readonly kind: typeof Kind.Primitive;
-        readonly keyword: string;
+        static fromKeyword(keyword: string): Primitive | undefined {
+            switch (keyword) {
+                case 'boolean':
+                    return Primitive.Boolean;
+                case 'byte':
+                    return Primitive.Byte;
+                case 'char':
+                    return Primitive.Char;
+                case 'double':
+                    return Primitive.Double;
+                case 'float':
+                    return Primitive.Float;
+                case 'int':
+                    return Primitive.Int;
+                case 'long':
+                    return Primitive.Long;
+                case 'short':
+                    return Primitive.Short;
+                case 'String':
+                    return Primitive.String;
+                case 'void':
+                    return Primitive.Void;
+                case 'null':
+                    return Primitive.Null;
+                case '':
+                    return Primitive.None;
+                default:
+                    return undefined;
+            }
+        }
     }
 
     export interface Union extends JavaType {
@@ -165,9 +208,9 @@ export namespace JavaType {
         readonly kind: typeof Kind.ShallowClass;
     }
 
-    export const unknownType: JavaType = {
+    export const unknownType: JavaType = asRef({
         kind: JavaType.Kind.Unknown
-    };
+    });
 
     export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
         return type?.kind === JavaType.Kind.Primitive;

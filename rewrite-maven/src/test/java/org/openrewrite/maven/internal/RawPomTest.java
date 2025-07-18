@@ -333,7 +333,7 @@ class RawPomTest {
                       </snapshots>
                       <name>Nexus Snapshots</name>
                       <id>snapshots-repo</id>
-                      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                      <url>https://central.sonatype.com/repository/maven-snapshots</url>
                       <layout>default</layout>
                     </repository>
                   </repositories>
@@ -480,7 +480,7 @@ class RawPomTest {
           .isEqualTo("Apache License, Version 2.0");
 
         assertThat(model.getRepositories().getFirst().getUri())
-          .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+          .isEqualTo("https://central.sonatype.com/repository/maven-snapshots");
 
         Profile java9Profile = model.getProfiles().stream()
           .filter(p -> "java9+".equals(p.getId()))

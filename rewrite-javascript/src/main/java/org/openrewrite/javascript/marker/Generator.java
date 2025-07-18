@@ -17,31 +17,32 @@ package org.openrewrite.javascript.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class PostFixOperator implements Marker {
+public class Generator implements Marker, RpcCodec<Generator> {
     UUID id;
     Space prefix;
-    Operator operator;
 
-    public enum Operator {
-        Exclamation("!"),
-        QuestionDot("?."),
-        Question("?");
+    @Override
+    public void rpcSend(Generator after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, Generator::getPrefix, space -> new JavaSender().visitSpace(space, q));
+    }
 
-        private final String value;
-
-        Operator(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return value;
-        }
+    @Override
+    public Generator rpcReceive(Generator before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withPrefix(q.receive(before.getPrefix(), space -> new JavaReceiver().visitSpace(space, q)));
     }
 }

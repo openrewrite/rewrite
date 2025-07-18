@@ -13,18 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.marker;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
-
-import java.util.UUID;
-
-@Value
-@With
-public class Asterisk implements Marker {
-    UUID id;
-    Space prefix;
+export function tap<T>(obj: T, fn: (x: T) => void) {
+    fn(obj);
 }

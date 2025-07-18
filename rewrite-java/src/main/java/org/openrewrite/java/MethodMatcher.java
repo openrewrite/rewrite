@@ -372,8 +372,7 @@ public class MethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null &&
-            method.getSelect() instanceof J.Identifier &&
+        if (method.getSelect() instanceof J.Identifier &&
             !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
