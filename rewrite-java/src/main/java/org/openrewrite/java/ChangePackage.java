@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.FindFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
@@ -109,6 +110,16 @@ public class ChangePackage extends Recipe {
                     for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
                         if (type instanceof JavaType.FullyQualified) {
                             String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                            if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
+                                return SearchResult.found(cu);
+                            }
+                        }
+                    }
+                    // Also check for fully qualified type references that might have Unknown types
+                    for (String fqn : FindFullyQualifiedTypeReferences.find(cu)) {
+                        int lastDot = fqn.lastIndexOf('.');
+                        if (lastDot > 0) {
+                            String packageName = fqn.substring(0, lastDot);
                             if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
                                 return SearchResult.found(cu);
                             }
