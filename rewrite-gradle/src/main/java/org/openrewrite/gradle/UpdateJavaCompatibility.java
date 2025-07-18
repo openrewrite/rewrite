@@ -81,12 +81,6 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
-    @Option(displayName = "Add Java toolchain if missing",
-            description = "Adds the specified Java toolchain if one is not found.",
-            required = false)
-    @Nullable
-    Boolean addToolchainIfMissing;
-
     private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
     private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
     private static final String JAVA_TOOLCHAIN_FOUND = "JAVA_TOOLCHAIN_FOUND";
@@ -121,10 +115,8 @@ public class UpdateJavaCompatibility extends Recipe {
             if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
                 c = addCompatibilityTypeToSourceFile(c, "target", ctx);
             }
-            if (Boolean.TRUE.equals(addToolchainIfMissing)) {
-                if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
-                    c = addJavaToolchainToSourceFile(c, ctx);
-                }
+            if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
+                c = addJavaToolchainToSourceFile(c, ctx);
             }
             return c;
         }
@@ -140,6 +132,10 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+            if (declarationStyle == DeclarationStyle.JavaToolchain) {
+                return c;
+            }
+
             if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
                 G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
                         .parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
@@ -151,6 +147,14 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private G.CompilationUnit addJavaToolchainToSourceFile(G.CompilationUnit c, ExecutionContext ctx) {
+            if (declarationStyle != DeclarationStyle.JavaToolchain) {
+                return c;
+            }
+
+            if (!(TRUE.equals(addIfMissing))) {
+                return c;
+            }
+
             Optional<J.MethodInvocation> javaStatement = c.getStatements().stream().filter(s -> s instanceof J.MethodInvocation)
                     .map(s -> (J.MethodInvocation) s)
                     .filter(m -> m.getSimpleName().equals("java"))
@@ -211,10 +215,8 @@ public class UpdateJavaCompatibility extends Recipe {
             if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
                 c = addCompatibilityTypeToSourceFile(c, "target", ctx);
             }
-            if (Boolean.TRUE.equals(addToolchainIfMissing)) {
-                if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
-                    // todo : c = addJavaToolchainToSourceFile(c, ctx);
-                }
+            if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
+                // todo : c = addJavaToolchainToSourceFile(c, ctx);
             }
             return super.visitCompilationUnit(c, ctx);
         }
@@ -230,6 +232,10 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+            if (declarationStyle == DeclarationStyle.JavaToolchain) {
+                return c;
+            }
+
             if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
                 J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
                 if (withExistingJavaMethod != c) {
@@ -550,6 +556,6 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     public enum DeclarationStyle {
-        Enum, Number, String
+        Enum, Number, String, JavaToolchain
     }
 }

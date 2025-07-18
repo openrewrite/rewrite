@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void sourceOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -65,7 +65,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -90,7 +90,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void targetOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -128,7 +128,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
           buildGradle(
             """
               plugins {
@@ -153,7 +153,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void handlesJavaExtension() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -182,7 +182,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void handlesJavaToolchains() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -211,9 +211,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void addJavaToolchainIfMissing() {
+    void javaToolchain_addIfMissingTrue() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, false, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
           buildGradle(
             """
               plugins {
@@ -236,9 +236,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void addJavaToolchainIfMissing_javaBlockAlreadyExists() {
+    void javaToolchain_addIfMissingTrue_addedToExistingJavaBlock() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, false, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
           buildGradle(
             """
               plugins {
@@ -268,9 +268,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void addJavaToolchainIfMissing_noModificationsNeeded() {
+    void javaToolchain_noModificationsNeeded() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, false, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
           buildGradle(
             """
               plugins {
@@ -285,6 +285,84 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   withSourcesJar()
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_version_upgrade_applied() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(8)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 8
+              targetCompatibility = 8
+              """,
+           """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 21
+              targetCompatibility = 21
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaToolchain_version_downgrade_applied() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(21)
+                  }
+                  withJavadocJar()
+                  withSourcesJar()
+              }
+              sourceCompatibility = 21
+              targetCompatibility = 21
+              """,
+            """
+               plugins {
+                   id "java"
+               }
+ 
+               java {
+                   toolchain {
+                       languageVersion = JavaLanguageVersion.of(17)
+                   }
+                   withJavadocJar()
+                   withSourcesJar()
+               }
+               sourceCompatibility = 17
+               targetCompatibility = 17
+               """
           )
         );
     }
@@ -298,7 +376,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """)
     void handlesJavaVersionMethodInvocation(int version, String before, String after) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null, null)),
           buildGradle(
             """
               java {
@@ -327,7 +405,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
           buildGradle(
             """
               plugins {
@@ -353,7 +431,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void onlyModifyCompatibilityAssignments() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
             """
               version = "0.1.0-SNAPSHOT"
@@ -378,7 +456,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void doNotDowngradeByDefault() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -400,7 +478,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void doDowngradeWhenRequested() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(17, null, null, true, null)),
           buildGradle(
             """
               plugins {
@@ -444,7 +522,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       """, quoteCharacter = '`')
     void addSourceAndTargetCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility, String targetCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true)),
           buildGradle(
             """
               plugins {
@@ -467,7 +545,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void addSourceCompatibilityIfMissingAndRequested() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, true, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, true)),
           buildGradle(
             """
               plugins {
@@ -489,7 +567,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void addTargetCompatibilityIfMissingAndRequested() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null, true, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null, null, true)),
           buildGradle(
             """
               plugins {
@@ -512,7 +590,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
     void releaseValueGetsUpdated() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -559,7 +637,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void updateExisitingSourceCompatibilityInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null, null, null)),
           buildGradleKts(
             """
               plugins {
@@ -584,7 +662,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void addCompatibilityInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, true, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, true)),
           buildGradleKts(
             """
               plugins {
@@ -608,7 +686,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void handlesJavaToolchainsInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradleKts(
             """
               plugins {
@@ -639,7 +717,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void toVersionInKotlinDSL() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradleKts(
             """
               version = "0.1.0-SNAPSHOT"
