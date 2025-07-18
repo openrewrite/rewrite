@@ -1172,6 +1172,29 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void retainLatestReleaseOrLatestIntegrationIfUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.projectlombok:lombok:latest.release")
+                  testImplementation("org.projectlombok:lombok:latest.integration")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void dontDowngradeWhenExactVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "28.0", "-jre")),
