@@ -21,9 +21,11 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.mavenProject;
 
 class FindDependencyTest implements RewriteTest {
 
@@ -121,6 +123,85 @@ class FindDependencyTest implements RewriteTest {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void generatesDataTableForFoundDependencies() {
+        rewriteRun(
+          spec -> {
+              spec.dataTable(FindDependency.Row.class, rows -> {
+                  assertThat(rows).containsExactly(
+                    new FindDependency.Row("project/build.gradle", "org.openrewrite", "rewrite-core", "latest.release"),
+                    new FindDependency.Row("project/build.gradle", "org.openrewrite.recipe", "rewrite-spring", "latest.release"),
+                    new FindDependency.Row("otherproject/build.gradle", "org.openrewrite", "rewrite-core", "latest.integration"),
+                    new FindDependency.Row("otherproject/build.gradle", "org.openrewrite.recipe", "rewrite-spring", "latest.integration")
+                  );
+              });
+              spec.recipe(new FindDependency("org.openrewrite*", "*", ""));
+          },
+          mavenProject("project",
+            buildGradle(
+              //language=gradle
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    api 'org.openrewrite:rewrite-core:latest.release'
+                    implementation 'org.openrewrite.recipe:rewrite-spring:latest.release'
+                    testImplementation 'org.junit.jupiter:junit-jupiter:latest.release'
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
+                    /*~~>*/implementation 'org.openrewrite.recipe:rewrite-spring:latest.release'
+                    testImplementation 'org.junit.jupiter:junit-jupiter:latest.release'
+                }
+                """
+            )
+          ),
+          mavenProject("otherproject",
+            buildGradle(
+              //language=gradle
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    api 'org.openrewrite:rewrite-core:latest.integration'
+                    implementation 'org.openrewrite.recipe:rewrite-spring:latest.integration'
+                    testImplementation 'org.junit.jupiter:junit-jupiter:latest.integration'
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    /*~~>*/api 'org.openrewrite:rewrite-core:latest.integration'
+                    /*~~>*/implementation 'org.openrewrite.recipe:rewrite-spring:latest.integration'
+                    testImplementation 'org.junit.jupiter:junit-jupiter:latest.integration'
+                }
+                """
+            )
           )
         );
     }
@@ -231,7 +312,7 @@ class FindDependencyTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                   }
               }
               """
