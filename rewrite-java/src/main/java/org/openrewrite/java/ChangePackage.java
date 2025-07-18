@@ -216,6 +216,14 @@ public class ChangePackage extends Recipe {
             if (updatePrefix != null && updatePrefix) {
                 _import = _import.withPrefix(Space.EMPTY);
             }
+            
+            // Check if this import should be changed based on recursive flag
+            String importedPackage = _import.getPackageName();
+            if (importedPackage.startsWith(oldPackageName + ".") && Boolean.FALSE.equals(recursive)) {
+                // This is a sub-package import and recursive is false, so don't process it
+                return _import;
+            }
+            
             return super.visitImport(_import, ctx);
         }
 
