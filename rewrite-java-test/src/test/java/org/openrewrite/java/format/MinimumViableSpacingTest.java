@@ -425,11 +425,31 @@ class MinimumViableSpacingTest implements RewriteTest {
               import java.io.Serializable;
               import java.lang.Cloneable;
 
-              class Clazz implements Serializable, Cloneable{
+              class Clazz implements Serializable, Cloneable {
               }
               """,
             """
               import java.io.Serializable;import java.lang.Cloneable;class Clazz implements Serializable,Cloneable{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classExtendsAndImplementsSeveral() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+              import java.lang.Cloneable;
+              import java.lang.Exception;
+
+              class MyException extends Exception implements Serializable, Cloneable {
+              }
+              """,
+            """
+              import java.io.Serializable;import java.lang.Cloneable;import java.lang.Exception;class MyException extends Exception implements Serializable,Cloneable{}
               """
           )
         );
