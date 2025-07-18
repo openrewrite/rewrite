@@ -1,3 +1,4 @@
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -129,3 +130,49 @@ The build enforces license headers on all source files and runs OWASP dependency
 
 ### Nullability Annotations
 The project uses JSpecify nullability annotations.
+
+
+# Workflow
+
+## First create a plan file in the .local directory:
+`.local/{name}.plan.md`
+
+## Phase 1: Analysis & Planning
+1. **Analyze the request**: Break down the problem into its core components
+2. **Explore the codebase**: Read through relevant files to understand the current implementation
+3. **Create execution plan**: Document the approach in the plan file `.local/{name}.plan.md` with:
+    - Clear, actionable todo items with checkboxes
+    - Estimated complexity/risk level for each task
+    - Dependencies between tasks
+    - Files that will be modified
+
+## Phase 2: Plan Approval
+4. **Present the plan**: Share the complete plan and wait for your approval before proceeding
+5. **Address feedback**: Incorporate any requested changes to the plan
+
+## Phase 3: Implementation
+6. **Execute incrementally**: Work through todo items one at a time, checking them off as completed
+7. **Provide progress updates**: After each task, explain:
+    - What was changed (high-level summary)
+    - Why this approach was chosen
+    - Any challenges encountered
+8. **Maintain simplicity**: Each change should:
+    - Impact the minimum number of files necessary
+    - Use the simplest solution that works
+    - Avoid complex refactoring unless absolutely required
+    - Be easily reversible if needed
+
+## Phase 4: Documentation & Review
+9. **Update task plan**: Add a "Review" section to plan file `.local/{name}.plan.md` containing:
+    - Summary of all changes made
+    - Final file list (what was actually modified)
+    - Any deviations from the original plan and why
+    - Potential follow-up improvements or considerations
+    - Testing recommendations
+
+## Key Principles
+- **Incremental progress**: Small, focused changes over large rewrites
+- **Transparency**: Clear communication at every step
+- **Reversibility**: Changes should be easy to undo if needed
+- **Minimal impact**: Touch as few files as possible
+- **Validation**: Get approval before starting implementation

@@ -1,0 +1,1397 @@
+
+> Configure project :
+Inferred project: rewrite, version: 8.60.0-SNAPSHOT
+
+> Task :rewrite-test:createPropertiesFileForJar UP-TO-DATE
+> Task :rewrite-graphql:processTestResources NO-SOURCE
+> Task :rewrite-test:writeManifestProperties UP-TO-DATE
+> Task :rewrite-core:compileJava UP-TO-DATE
+> Task :rewrite-core:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-core:rewriteRecipeAuthorAttributionResources UP-TO-DATE
+> Task :rewrite-core:copyAttribution UP-TO-DATE
+> Task :rewrite-core:processResources UP-TO-DATE
+> Task :rewrite-core:classes UP-TO-DATE
+> Task :rewrite-core:createPropertiesFileForJar UP-TO-DATE
+> Task :rewrite-core:writeManifestProperties UP-TO-DATE
+> Task :rewrite-core:jar UP-TO-DATE
+> Task :rewrite-test:compileJava UP-TO-DATE
+> Task :rewrite-test:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-test:rewriteRecipeAuthorAttributionResources NO-SOURCE
+> Task :rewrite-test:copyAttribution UP-TO-DATE
+> Task :rewrite-test:processResources NO-SOURCE
+> Task :rewrite-test:classes UP-TO-DATE
+> Task :rewrite-test:jar UP-TO-DATE
+> Task :rewrite-graphql:compileJava UP-TO-DATE
+> Task :rewrite-graphql:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-graphql:rewriteRecipeAuthorAttributionResources UP-TO-DATE
+> Task :rewrite-graphql:copyAttribution UP-TO-DATE
+> Task :rewrite-graphql:processResources UP-TO-DATE
+> Task :rewrite-graphql:classes UP-TO-DATE
+> Task :rewrite-graphql:compileTestJava UP-TO-DATE
+> Task :rewrite-graphql:testClasses UP-TO-DATE
+
+> Task :rewrite-graphql:test FAILED
+
+GraphQlParserComplexFeaturesTest > parseVariableUsageInNestedStructures() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 203d7ed..efa29ae 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,7 +1,7 @@ 
+     query ComplexVariableUsage(
+    -  $userId: ID!
+    -  $postFilter: PostFilter!
+    -  $includeComments: Boolean!
+    +  $userId: ID!,
+    +  $postFilter: PostFilter!,
+    +  $includeComments: Boolean!,
+       $commentLimit: Int = 5
+     ) {
+       user(id: $userId) {
+    @@ -15,7 +15,7 @@
+                 text
+                 replies(
+                   filter: {
+    -                authorId: $userId
+    +                authorId: $userId,
+                     minLikes: $commentLimit
+                   }
+                 ) {
+    ] 
+    expected: 
+      "query ComplexVariableUsage(
+        $userId: ID!
+        $postFilter: PostFilter!
+        $includeComments: Boolean!
+        $commentLimit: Int = 5
+      ) {
+        user(id: $userId) {
+          posts(filter: $postFilter) {
+            id
+            title
+            comments(first: $commentLimit) @include(if: $includeComments) {
+              edges {
+                node {
+                  id
+                  text
+                  replies(
+                    filter: {
+                      authorId: $userId
+                      minLikes: $commentLimit
+                    }
+                  ) {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      }"
+     but was: 
+      "query ComplexVariableUsage(
+        $userId: ID!,
+        $postFilter: PostFilter!,
+        $includeComments: Boolean!,
+        $commentLimit: Int = 5
+      ) {
+        user(id: $userId) {
+          posts(filter: $postFilter) {
+            id
+            title
+            comments(first: $commentLimit) @include(if: $includeComments) {
+              edges {
+                node {
+                  id
+                  text
+                  replies(
+                    filter: {
+                      authorId: $userId,
+                      minLikes: $commentLimit
+                    }
+                  ) {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseVariableUsageInNestedStructures(GraphQlParserComplexFeaturesTest.java:396)
+
+GraphQlParserComplexFeaturesTest > parseFragmentWithVariables() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c0011bf780.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseFragmentWithVariables(GraphQlParserComplexFeaturesTest.java:122)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 1:21 mismatched input '(' expecting 'on'
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeCondition(GraphQLParser.java:1231)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fragmentDefinition(GraphQLParser.java:1122)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:368)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.recoverInline(DefaultErrorStrategy.java:483)
+                at app//org.antlr.v4.runtime.Parser.match(Parser.java:208)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeCondition(GraphQLParser.java:1224)
+                ... 20 more
+
+GraphQlParserEdgeCasesTest > parseEmptySelectionSet() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseEmptySelectionSet(GraphQlParserEdgeCasesTest.java:171)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 3:2 mismatched input '}' expecting {'...', NAME}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:600)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.field(GraphQLParser.java:761)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:650)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:468)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:581)
+                ... 23 more
+
+GraphQlFragmentTest > parseFragmentRoundTrip() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c8011791e8.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c8011c0248.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlFragmentTest.parseFragmentRoundTrip(GraphQlFragmentTest.java:270)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 17:4 mismatched input 'subscription' expecting {'...', NAME}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:600)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.inlineFragment(GraphQLParser.java:1063)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:664)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fragmentDefinition(GraphQLParser.java:1134)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:368)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:581)
+                ... 23 more
+
+GraphQlParserEdgeCasesTest > parseWhitespaceAroundOperators() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index f8d8ba9..ea1148d 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,5 +1,5 @@ 
+    -type User implements Node&Timestamped & Auditable {
+    +type User implements Node &Timestamped & Auditable {
+       id: ID!
+     }
+ 
+    -union Result=User|Post | Comment
+    \ No newline at end of file
+    +union Result =User |Post | Comment
+    \ No newline at end of file
+    ] 
+    expected: 
+      "type User implements Node&Timestamped & Auditable {
+        id: ID!
+      }
+  
+      union Result=User|Post | Comment"
+     but was: 
+      "type User implements Node &Timestamped & Auditable {
+        id: ID!
+      }
+  
+      union Result =User |Post | Comment"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseWhitespaceAroundOperators(GraphQlParserEdgeCasesTest.java:388)
+
+GraphQlFragmentTest > parseFragmentWithVariableDefinitions() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c8011791e8.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c8011c0248.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlFragmentTest.parseFragmentWithVariableDefinitions(GraphQlFragmentTest.java:315)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:18 mismatched input '(' expecting 'on'
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeCondition(GraphQLParser.java:1231)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fragmentDefinition(GraphQLParser.java:1122)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:368)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.recoverInline(DefaultErrorStrategy.java:483)
+                at app//org.antlr.v4.runtime.Parser.match(Parser.java:208)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeCondition(GraphQLParser.java:1224)
+                ... 20 more
+
+GraphQlFragmentTest > parseMultipleInlineFragmentsInUnion() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c8011791e8.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c8011c0248.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlFragmentTest.parseMultipleInlineFragmentsInUnion(GraphQlFragmentTest.java:209)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 1:14 mismatched input 'query' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4755)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variable(GraphQLParser.java:1408)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinition(GraphQLParser.java:1528)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinitions(GraphQLParser.java:1465)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:453)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.recoverInline(DefaultErrorStrategy.java:483)
+                at app//org.antlr.v4.runtime.Parser.match(Parser.java:208)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4750)
+                ... 23 more
+
+GraphQlParserEdgeCasesTest > parseDocumentWithOnlyComments() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseDocumentWithOnlyComments(GraphQlParserEdgeCasesTest.java:41)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:17 mismatched input '<EOF>' expecting {'query', 'mutation', 'subscription', '{', 'fragment', 'schema', 'extend', 'scalar', 'type', 'interface', 'union', 'enum', 'input', 'directive', STRING, BLOCK_STRING}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:225)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:206)
+                ... 16 more
+
+GraphQlParserEdgeCasesTest > parseEmptyObjectValue() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseEmptyObjectValue(GraphQlParserEdgeCasesTest.java:200)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:13 mismatched input 'input' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:881)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.field(GraphQLParser.java:741)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:650)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:468)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:862)
+                ... 23 more
+
+GraphQlParserEdgeCasesTest > parseDocumentWithOnlyWhitespace() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseDocumentWithOnlyWhitespace(GraphQlParserEdgeCasesTest.java:34)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:0 mismatched input '<EOF>' expecting {'query', 'mutation', 'subscription', '{', 'fragment', 'schema', 'extend', 'scalar', 'type', 'interface', 'union', 'enum', 'input', 'directive', STRING, BLOCK_STRING}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:225)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:206)
+                ... 16 more
+
+GraphQlParserEdgeCasesTest > parseDirectiveWithEmptyArguments() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseDirectiveWithEmptyArguments(GraphQlParserEdgeCasesTest.java:350)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:23 mismatched input ')' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:881)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.directive(GraphQLParser.java:1950)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.directives(GraphQLParser.java:1886)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.field(GraphQLParser.java:751)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:650)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:475)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:862)
+                ... 25 more
+
+GraphQlParserEdgeCasesTest > parseSpecialCharactersInComments() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 1aa675a..1462ca2 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,4 +1,4 @@ 
+     # Comment with special chars: @#$%^&*(){}[]|\:;"'<>,.?/~`
+     type User {
+    -  id: ID! # Inline comment with emojis 🎉🚀✨
+    +  id: ID!
+     }
+    \ No newline at end of file
+    ] 
+    expected: 
+      "# Comment with special chars: @#$%^&*(){}[]|\:;"'<>,.?/~`
+      type User {
+        id: ID! # Inline comment with emojis 🎉🚀✨
+      }"
+     but was: 
+      "# Comment with special chars: @#$%^&*(){}[]|\:;"'<>,.?/~`
+      type User {
+        id: ID!
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseSpecialCharactersInComments(GraphQlParserEdgeCasesTest.java:157)
+
+GraphQlParserEdgeCasesTest > parseEscapedUnicodeInStrings() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 2e2f5b7..9eb340f 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,5 +1,5 @@ 
+     query {
+    -  search(text: "\u0048\u0065\u006C\u006C\u006F") {
+    +  search(text: "\\u0048\\u0065\\u006C\\u006C\\u006F") {
+         id
+       }
+     }
+    \ No newline at end of file
+    ] 
+    expected: 
+      "query {
+        search(text: "\u0048\u0065\u006C\u006C\u006F") {
+          id
+        }
+      }"
+     but was: 
+      "query {
+        search(text: "\\u0048\\u0065\\u006C\\u006C\\u006F") {
+          id
+        }
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseEscapedUnicodeInStrings(GraphQlParserEdgeCasesTest.java:83)
+
+GraphQlParserEdgeCasesTest > parseMultilineStringWithIndentation() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 16887da..4275e0d 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -4,6 +4,6 @@ 
+         with indentation
+           and multiple levels
+             of nesting
+    -  """
+    +  """ 
+       name: String!
+     }
+    \ No newline at end of file
+    ] 
+    expected: 
+      "type User {
+        """
+        This is a multiline description
+          with indentation
+            and multiple levels
+              of nesting
+        """
+        name: String!
+      }"
+     but was: 
+      "type User {
+        """
+        This is a multiline description
+          with indentation
+            and multiple levels
+              of nesting
+        """ 
+        name: String!
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseMultilineStringWithIndentation(GraphQlParserEdgeCasesTest.java:230)
+
+GraphQlParserExtensionsTest > parseExtensionWithDirectiveDefinitions() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000b001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000b0011bf598.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserExtensionsTest.parseExtensionWithDirectiveDefinitions(GraphQlParserExtensionsTest.java:246)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 3:7 no viable alternative at input 'extenddirective'
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportNoViableAlternative(DefaultErrorStrategy.java:310)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:136)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeSystemExtension(GraphQLParser.java:2090)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:302)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.NoViableAltException
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.noViableAlt(ParserATNSimulator.java:2014)
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.execATN(ParserATNSimulator.java:445)
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.adaptivePredict(ParserATNSimulator.java:371)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeSystemExtension(GraphQLParser.java:2071)
+                ... 18 more
+
+GraphQlParserEdgeCasesTest > parseEmptyArgumentList() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseEmptyArgumentList(GraphQlParserEdgeCasesTest.java:185)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:7 mismatched input ')' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:881)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.field(GraphQLParser.java:741)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:650)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:468)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:862)
+                ... 23 more
+
+GraphQlParserComplexFeaturesTest > parseComplexArgumentStructures() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index e5ba33f..b0d259b 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -2,28 +2,12 @@ 
+       search(
+         filters: {
+           and: [
+    -        { field: "status", operator: EQUALS, value: "active" }
+    -        {
+    -          or: [
+    -            { field: "type", operator: IN, values: ["A", "B", "C"] }
+    -            { field: "score", operator: GREATER_THAN, value: "80" }
+    -          ]
+    -        }
+    +        { field: "status", operator: EQUALS, value: "active" },{or field:[{field field:"type",operator direction:IN,values direction:["A","B","C" ASC }
+           ]
+    -      not: { field: "deleted", operator: EQUALS, value: "true" }
+    -    }
+    -    pagination: {
+    -      page: 1
+    -      size: 20
+    -      sort: [
+    -        { field: "createdAt", direction: DESC }
+    -        { field: "name", direction: ASC }
+    -      ]
+    -    }
+    -  ) {
+    +    },{field:"score",operator:GREATER_THAN,value:"80"
+         items {
+           id
+    -    }
+    +    }]
+         totalCount
+    -  }
+    -}
+    \ No newline at end of file
+    +  }],not:{field:"deleted",operator:EQUALS,value:"true"
+    +}},pagination:{page:1,size:20,sort:[{field:"createdAt",direction:DESC},{field:"name",direction:ASC}]}){items{id}totalCount}}
+    \ No newline at end of file
+    ] 
+    expected: 
+      "query ComplexArguments {
+        search(
+          filters: {
+            and: [
+              { field: "status", operator: EQUALS, value: "active" }
+              {
+                or: [
+                  { field: "type", operator: IN, values: ["A", "B", "C"] }
+                  { field: "score", operator: GREATER_THAN, value: "80" }
+                ]
+              }
+            ]
+            not: { field: "deleted", operator: EQUALS, value: "true" }
+          }
+          pagination: {
+            page: 1
+            size: 20
+            sort: [
+              { field: "createdAt", direction: DESC }
+              { field: "name", direction: ASC }
+            ]
+          }
+        ) {
+          items {
+            id
+          }
+          totalCount
+        }
+      }"
+     but was: 
+      "query ComplexArguments {
+        search(
+          filters: {
+            and: [
+              { field: "status", operator: EQUALS, value: "active" },{or field:[{field field:"type",operator direction:IN,values direction:["A","B","C" ASC }
+            ]
+          },{field:"score",operator:GREATER_THAN,value:"80"
+          items {
+            id
+          }]
+          totalCount
+        }],not:{field:"deleted",operator:EQUALS,value:"true"
+      }},pagination:{page:1,size:20,sort:[{field:"createdAt",direction:DESC},{field:"name",direction:ASC}]}){items{id}totalCount}}"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseComplexArgumentStructures(GraphQlParserComplexFeaturesTest.java:212)
+
+GraphQlParserEdgeCasesTest > parseBlockStringWithSpecialFormatting() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 1d15dac..a43d407 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -7,6 +7,6 @@ 
+ 
+       	Tab character here
+       Trailing spaces here
+    -  """
+    +  """ 
+       test: String
+     }
+    \ No newline at end of file
+    ] 
+    expected: 
+      "type Query {
+        """
+        First line
+  
+  
+        Multiple blank lines above
+  
+        	Tab character here
+        Trailing spaces here
+        """
+        test: String
+      }"
+     but was: 
+      "type Query {
+        """
+        First line
+  
+  
+        Multiple blank lines above
+  
+        	Tab character here
+        Trailing spaces here
+        """ 
+        test: String
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseBlockStringWithSpecialFormatting(GraphQlParserEdgeCasesTest.java:416)
+
+GraphQlParserEdgeCasesTest > parseEmptyDocument() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseEmptyDocument(GraphQlParserEdgeCasesTest.java:27)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 1:0 mismatched input '<EOF>' expecting {'query', 'mutation', 'subscription', '{', 'fragment', 'schema', 'extend', 'scalar', 'type', 'interface', 'union', 'enum', 'input', 'directive', STRING, BLOCK_STRING}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:225)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:206)
+                ... 16 more
+
+GraphQlParserComplexFeaturesTest > parseIntrospectionQuery() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c0011bf780.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseIntrospectionQuery(GraphQlParserComplexFeaturesTest.java:435)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 36:4 extraneous input 'type' expecting {'}', '...', NAME}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportUnwantedToken(DefaultErrorStrategy.java:377)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:275)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:591)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.field(GraphQLParser.java:761)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selection(GraphQLParser.java:650)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:587)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fragmentDefinition(GraphQLParser.java:1134)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:368)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+GraphQlParserComplexFeaturesTest > parseMultipleOperationsInDocument() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c0011bf780.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseMultipleOperationsInDocument(GraphQlParserComplexFeaturesTest.java:27)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 14:21 mismatched input 'input' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4755)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variable(GraphQLParser.java:1408)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinition(GraphQLParser.java:1528)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinitions(GraphQLParser.java:1465)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:453)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.recoverInline(DefaultErrorStrategy.java:483)
+                at app//org.antlr.v4.runtime.Parser.match(Parser.java:208)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4750)
+                ... 23 more
+
+GraphQlParserComplexFeaturesTest > parseDirectivesWithComplexArguments() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c0011bf780.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseDirectivesWithComplexArguments(GraphQlParserComplexFeaturesTest.java:324)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 16:8 no viable alternative at input '{type'
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportNoViableAlternative(DefaultErrorStrategy.java:310)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:136)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.objectValue(GraphQLParser.java:5098)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.value(GraphQLParser.java:1357)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.listValue(GraphQLParser.java:5003)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.value(GraphQLParser.java:1350)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.argument(GraphQLParser.java:928)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.arguments(GraphQLParser.java:868)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.directive(GraphQLParser.java:1950)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.directives(GraphQLParser.java:1886)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fieldDefinition(GraphQLParser.java:3133)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.fieldsDefinition(GraphQLParser.java:3036)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.objectTypeDefinition(GraphQLParser.java:2756)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeDefinition(GraphQLParser.java:2400)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.typeSystemDefinition(GraphQLParser.java:2015)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:295)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.NoViableAltException
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.noViableAlt(ParserATNSimulator.java:2014)
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.execATN(ParserATNSimulator.java:445)
+                at app//org.antlr.v4.runtime.atn.ParserATNSimulator.adaptivePredict(ParserATNSimulator.java:371)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.objectValue(GraphQLParser.java:5061)
+                ... 30 more
+
+GraphQlParserExtensionsTest > parseExtensionWithComplexFields() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 7261f78..a10981b 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -12,7 +12,7 @@ 
+ 
+       stats: UserStats! @cacheControl(maxAge: 600, scope: PRIVATE)
+ 
+    -  "User's activity history"
+    +  "User's activity history" 
+       activityHistory(
+         startDate: DateTime!
+         endDate: DateTime!
+    ] 
+    expected: 
+      "type User {
+        id: ID!
+      }
+  
+      extend type User {
+        posts(
+          first: Int = 10
+          after: String
+          orderBy: PostOrderBy = { field: CREATED_AT, direction: DESC }
+          filter: PostFilter
+        ): PostConnection! @complexity(value: 10, multipliers: ["first"])
+  
+        stats: UserStats! @cacheControl(maxAge: 600, scope: PRIVATE)
+  
+        "User's activity history"
+        activityHistory(
+          startDate: DateTime!
+          endDate: DateTime!
+          groupBy: TimeUnit = DAY
+        ): [ActivityPoint!]! @auth(requires: [USER, ADMIN])
+      }"
+     but was: 
+      "type User {
+        id: ID!
+      }
+  
+      extend type User {
+        posts(
+          first: Int = 10
+          after: String
+          orderBy: PostOrderBy = { field: CREATED_AT, direction: DESC }
+          filter: PostFilter
+        ): PostConnection! @complexity(value: 10, multipliers: ["first"])
+  
+        stats: UserStats! @cacheControl(maxAge: 600, scope: PRIVATE)
+  
+        "User's activity history" 
+        activityHistory(
+          startDate: DateTime!
+          endDate: DateTime!
+          groupBy: TimeUnit = DAY
+        ): [ActivityPoint!]! @auth(requires: [USER, ADMIN])
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserExtensionsTest.parseExtensionWithComplexFields(GraphQlParserExtensionsTest.java:215)
+
+GraphQlParserComplexFeaturesTest > parseVariableDefaultValuesWithComplexTypes() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x000000c001178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x000000c0011bf780.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserComplexFeaturesTest.parseVariableDefaultValuesWithComplexTypes(GraphQlParserComplexFeaturesTest.java:89)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 6:3 mismatched input 'null' expecting NAME
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4755)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variable(GraphQLParser.java:1408)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinition(GraphQLParser.java:1528)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.variableDefinitions(GraphQLParser.java:1465)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:453)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.recoverInline(DefaultErrorStrategy.java:483)
+                at app//org.antlr.v4.runtime.Parser.match(Parser.java:208)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.name(GraphQLParser.java:4750)
+                ... 23 more
+
+GraphQlParserEdgeCasesTest > parseInterfaceWithNoFields() FAILED
+    java.lang.AssertionError: Failed to parse sources or run recipe
+        at org.openrewrite.test.RewriteTest.lambda$defaultExecutionContext$14(RewriteTest.java:642)
+        at org.openrewrite.test.RewriteTest$$Lambda/0x0000000301178d78.accept(Unknown Source)
+        at org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:53)
+        at org.openrewrite.graphql.GraphQlParser$$Lambda/0x00000003011bfac0.apply(Unknown Source)
+        at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+        at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+        at java.base/java.util.Iterator.forEachRemaining(Iterator.java:133)
+        at java.base/java.util.Spliterators$IteratorSpliterator.forEachRemaining(Spliterators.java:1939)
+        at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+        at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+        at java.base/java.util.stream.ReduceOps$ReduceOp.evaluateSequential(ReduceOps.java:921)
+        at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+        at java.base/java.util.stream.ReferencePipeline.collect(ReferencePipeline.java:682)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:282)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at org.openrewrite.graphql.GraphQlParserEdgeCasesTest.parseInterfaceWithNoFields(GraphQlParserEdgeCasesTest.java:301)
+
+        Caused by:
+        org.openrewrite.graphql.GraphQlParser$GraphQlParsingException: Syntax error at line 2:0 mismatched input '}' expecting {'...', NAME}
+            at app//org.openrewrite.graphql.GraphQlParser$ForwardingErrorListener.syntaxError(GraphQlParser.java:117)
+            at app//org.antlr.v4.runtime.ProxyErrorListener.syntaxError(ProxyErrorListener.java:41)
+            at app//org.antlr.v4.runtime.Parser.notifyErrorListeners(Parser.java:544)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportInputMismatch(DefaultErrorStrategy.java:327)
+            at app//org.antlr.v4.runtime.DefaultErrorStrategy.reportError(DefaultErrorStrategy.java:139)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:600)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.operationDefinition(GraphQLParser.java:475)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.executableDefinition(GraphQLParser.java:361)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.definition(GraphQLParser.java:279)
+            at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.document(GraphQLParser.java:212)
+            at app//org.openrewrite.graphql.GraphQlParser.parseGraphQl(GraphQlParser.java:70)
+            at app//org.openrewrite.graphql.GraphQlParser.lambda$parseInputs$0(GraphQlParser.java:49)
+            ... 14 more
+
+            Caused by:
+            org.antlr.v4.runtime.InputMismatchException
+                at app//org.antlr.v4.runtime.DefaultErrorStrategy.sync(DefaultErrorStrategy.java:270)
+                at app//org.openrewrite.graphql.internal.grammar.GraphQLParser.selectionSet(GraphQLParser.java:581)
+                ... 20 more
+
+GraphQlParserExtensionsTest > parseAllDirectiveLocations() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index ec1c717..96fa355 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,23 +1,5 @@ 
+     directive @example on
+    -  | QUERY
+    -  | MUTATION
+    -  | SUBSCRIPTION
+    -  | FIELD
+    -  | FRAGMENT_DEFINITION
+    -  | FRAGMENT_SPREAD
+    -  | INLINE_FRAGMENT
+    -  | VARIABLE_DEFINITION
+    -  | SCHEMA
+    -  | SCALAR
+    -  | OBJECT
+    -  | FIELD_DEFINITION
+    -  | ARGUMENT_DEFINITION
+    -  | INTERFACE
+    -  | UNION
+    -  | ENUM
+    -  | ENUM_VALUE
+    -  | INPUT_OBJECT
+    -  | INPUT_FIELD_DEFINITION
+    +  | QUERY | MUTATION | SUBSCRIPTION | FIELD | FRAGMENT_DEFINITION | FRAGMENT_SPREAD | INLINE_FRAGMENT | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+ 
+     # Use directive on various locations
+     schema @example {
+    ] 
+    expected: 
+      "directive @example on
+        | QUERY
+        | MUTATION
+        | SUBSCRIPTION
+        | FIELD
+        | FRAGMENT_DEFINITION
+        | FRAGMENT_SPREAD
+        | INLINE_FRAGMENT
+        | VARIABLE_DEFINITION
+        | SCHEMA
+        | SCALAR
+        | OBJECT
+        | FIELD_DEFINITION
+        | ARGUMENT_DEFINITION
+        | INTERFACE
+        | UNION
+        | ENUM
+        | ENUM_VALUE
+        | INPUT_OBJECT
+        | INPUT_FIELD_DEFINITION
+  
+      # Use directive on various locations
+      schema @example {
+        query: Query
+      }
+  
+      scalar Date @example
+  
+      type User @example {
+        id: ID! @example
+        name(format: String @example): String!
+      }
+  
+      interface Node @example {
+        id: ID!
+      }
+  
+      union Result @example = User | Post
+  
+      enum Role @example {
+        ADMIN @example
+        USER
+      }
+  
+      input Filter @example {
+        field: String @example
+      }
+  
+      query GetUser($id: ID! @example) @example {
+        user(id: $id) @example {
+          ...UserFragment @example
+          ... @example {
+            email
+          }
+        }
+      }
+  
+      fragment UserFragment on User @example {
+        id
+        name
+      }"
+     but was: 
+      "directive @example on
+        | QUERY | MUTATION | SUBSCRIPTION | FIELD | FRAGMENT_DEFINITION | FRAGMENT_SPREAD | INLINE_FRAGMENT | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+  
+      # Use directive on various locations
+      schema @example {
+        query: Query
+      }
+  
+      scalar Date @example
+  
+      type User @example {
+        id: ID! @example
+        name(format: String @example): String!
+      }
+  
+      interface Node @example {
+        id: ID!
+      }
+  
+      union Result @example = User | Post
+  
+      enum Role @example {
+        ADMIN @example
+        USER
+      }
+  
+      input Filter @example {
+        field: String @example
+      }
+  
+      query GetUser($id: ID! @example) @example {
+        user(id: $id) @example {
+          ...UserFragment @example
+          ... @example {
+            email
+          }
+        }
+      }
+  
+      fragment UserFragment on User @example {
+        id
+        name
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.GraphQlParserExtensionsTest.parseAllDirectiveLocations(GraphQlParserExtensionsTest.java:392)
+
+MultilineClosingBraceTest > directiveDefinitionWithMultilineLocation() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index 31ffc14..26d02e7 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,4 +1,2 @@ 
+     directive @example on
+    -  | QUERY
+    -  | MUTATION
+    -  | FIELD
+    \ No newline at end of file
+    +  | QUERY | MUTATION | FIELD
+    \ No newline at end of file
+    ] 
+    expected: 
+      "directive @example on
+        | QUERY
+        | MUTATION
+        | FIELD"
+     but was: 
+      "directive @example on
+        | QUERY | MUTATION | FIELD"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:125)
+        at app//org.openrewrite.graphql.MultilineClosingBraceTest.directiveDefinitionWithMultilineLocation(MultilineClosingBraceTest.java:71)
+
+[Incubating] Problems report is available at: file:///Users/kylescully/Repos/rewrite/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+21 actionable tasks: 1 executed, 20 up-to-date

@@ -1,0 +1,82 @@
+
+> Configure project :
+Inferred project: rewrite, version: 8.59.0-SNAPSHOT
+
+> Task :rewrite-graphql:processTestResources NO-SOURCE
+> Task :rewrite-test:createPropertiesFileForJar UP-TO-DATE
+> Task :rewrite-test:writeManifestProperties UP-TO-DATE
+> Task :rewrite-core:compileJava UP-TO-DATE
+> Task :rewrite-core:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-core:rewriteRecipeAuthorAttributionResources UP-TO-DATE
+> Task :rewrite-core:copyAttribution UP-TO-DATE
+> Task :rewrite-core:processResources UP-TO-DATE
+> Task :rewrite-core:classes UP-TO-DATE
+> Task :rewrite-core:createPropertiesFileForJar UP-TO-DATE
+> Task :rewrite-core:writeManifestProperties UP-TO-DATE
+> Task :rewrite-core:jar UP-TO-DATE
+> Task :rewrite-test:compileJava UP-TO-DATE
+> Task :rewrite-test:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-test:rewriteRecipeAuthorAttributionResources NO-SOURCE
+> Task :rewrite-test:copyAttribution UP-TO-DATE
+> Task :rewrite-test:processResources NO-SOURCE
+> Task :rewrite-test:classes UP-TO-DATE
+> Task :rewrite-test:jar UP-TO-DATE
+> Task :rewrite-graphql:compileJava UP-TO-DATE
+> Task :rewrite-graphql:rewriteRecipeAuthorAttributionJava UP-TO-DATE
+> Task :rewrite-graphql:rewriteRecipeAuthorAttributionResources NO-SOURCE
+> Task :rewrite-graphql:copyAttribution UP-TO-DATE
+> Task :rewrite-graphql:processResources NO-SOURCE
+> Task :rewrite-graphql:classes UP-TO-DATE
+> Task :rewrite-graphql:compileTestJava UP-TO-DATE
+> Task :rewrite-graphql:testClasses UP-TO-DATE
+
+> Task :rewrite-graphql:test FAILED
+
+SimpleCommentTest > singleCommentDebug() FAILED
+    org.opentest4j.AssertionFailedError: [When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code. This means there is a bug in the parser implementation itself. Please open an issue to report this, providing a sample of the code that generated this error. "file.graphql":
+    diff --git a/file.graphql b/file.graphql
+    index d47c46c..f2ac1e8 100644
+    --- a/file.graphql
+    +++ b/file.graphql
+    @@ -1,4 +1,5 @@ 
+     # Comment
+    +# Comment
+     type User {
+       id: ID!
+     }
+    \ No newline at end of file
+    ] 
+    expected: 
+      "# Comment
+      type User {
+        id: ID!
+      }"
+     but was: 
+      "# Comment
+      # Comment
+      type User {
+        id: ID!
+      }"
+        at app//org.openrewrite.test.RewriteTest.assertContentEquals(RewriteTest.java:622)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:311)
+        at app//org.openrewrite.test.RewriteTest.rewriteRun(RewriteTest.java:130)
+        at app//org.openrewrite.graphql.SimpleCommentTest.singleCommentDebug(SimpleCommentTest.java:41)
+
+1 test completed, 1 failed
+
+[Incubating] Problems report is available at: file:///Users/kylescully/Repos/rewrite/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':rewrite-graphql:test'.
+> There were failing tests. See the report at: file:///Users/kylescully/Repos/rewrite/rewrite-graphql/build/reports/tests/test/index.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3s
+19 actionable tasks: 1 executed, 18 up-to-date

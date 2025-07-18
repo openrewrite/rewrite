@@ -1,16 +1,25 @@
 {
   "permissions": {
     "allow": [
+      "Bash(../gradlew test:*)",
       "Bash(./gradlew:*)",
+      "Bash(brew install:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
       "Bash(echo:*)",
       "Bash(find:*)",
       "Bash(gh:*)",
       "Bash(git:*)",
       "Bash(grep:*)",
+      "Bash(java:*)",
+      "Bash(javac:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(npm test:*)",
       "Bash(rg:*)",
       "Bash(rm:*)",
+      "Bash(sdk:*)",
       "Bash(timeout:*)",
       "WebFetch(domain:github.com)",
       "mcp__github__get_issue",
@@ -27,8 +36,25 @@
       "mcp__idea__open_file_in_editor",
       "mcp__idea__replace_selected_text",
       "mcp__idea__replace_specific_text",
-      "mcp__idea__search_in_files_content"
+      "mcp__idea__search_in_files_content",
+      "Bash(python3:*)",
+      "Bash(../gradlew build:*)",
+      "Bash(../gradlew:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:spec.graphql.org)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:generateGrammarSource)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:tasks)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:compileJava)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:clean :rewrite-graphql:compileJava)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:test --tests \"*Escaped*\" -x licenseMain -x licenseTest -x downloadLicenses)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:test --tests \"*EdgeCase*\" -x licenseMain -x licenseTest -x downloadLicenses)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:test)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:clean :rewrite-graphql:compileJava --no-build-cache)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:test --tests \"*parseEscapedCharactersInStrings*\" -x licenseMain -x licenseTest -x downloadLicenses)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:generateAntlrSources)",
+      "Bash(/Users/kylescully/Repos/rewrite/gradlew -p /Users/kylescully/Repos/rewrite :rewrite-graphql:test --tests \"*parseStringWithQuotesInside*\" -x licenseMain -x licenseTest -x downloadLicenses)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits"
   }
 }
