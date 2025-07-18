@@ -214,7 +214,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
         J.Yield y = super.visitYield(yield, p);
-        return y.withValue(y.getValue().withPrefix(Space.SINGLE_SPACE));
+        return y.withValue(y.getValue().withPrefix(y.getValue().getPrefix().withWhitespace(" ")));
     }
 
     @Override
@@ -225,7 +225,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             // At a minimum, we need a space between the guard and the case label
             JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
             return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
-                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(last.getAfter().withWhitespace(" ")) : last)));
         }
 
         return c;

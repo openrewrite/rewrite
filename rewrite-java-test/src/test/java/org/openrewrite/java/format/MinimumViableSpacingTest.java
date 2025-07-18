@@ -174,6 +174,26 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiAnnotatedOnClass() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Deprecated;
+
+              @Deprecated
+              @SuppressWarnings("unchecked")
+              class Clazz {
+              }
+              """,
+            """
+              import java.lang.Deprecated;@Deprecated @SuppressWarnings("unchecked") class Clazz{}
+              """
+          )
+        );
+    }
+
     // This test can not be reproduced by running MinimumViableSpacingVisitor only, so using `AutoFormat` recipe here.
     @Issue("https://github.com/openrewrite/rewrite/issues/3346")
     @Test
