@@ -128,7 +128,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     @Deprecated
     public void maybeCoalesceProperties() {
         if (getAfterVisit().stream().noneMatch(CoalescePropertiesVisitor.class::isInstance)) {
-            doAfterVisit(new CoalescePropertiesVisitor<>());
+            doAfterVisit(new CoalescePropertiesVisitor<>(null, null));
         }
     }
 
