@@ -188,7 +188,7 @@ class MinimumViableSpacingTest implements RewriteTest {
               }
               """,
             """
-              import java.lang.Deprecated;@Deprecated @SuppressWarnings("unchecked") class Clazz{}
+              import java.lang.Deprecated;@Deprecated@SuppressWarnings("unchecked") class Clazz{}
               """
           )
         );
