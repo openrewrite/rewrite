@@ -158,10 +158,10 @@ class MinimumViableSpacingTest implements RewriteTest {
                   void foo(final int[] arr) {
                       for (int n = 0, x = 0; n < 100; n++, x++) {
                       }
-              
+
                       for (int i: arr) {
                       }
-              
+
                       for (final int i: arr) {
                       }
                   }
@@ -201,7 +201,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.lang.Deprecated;
-              
+
               @Deprecated
               @SuppressWarnings("unchecked")
               class Clazz {
@@ -226,7 +226,7 @@ class MinimumViableSpacingTest implements RewriteTest {
                   public @Deprecated String method() {
                       return "name";
                   }
-              
+
                   public    @Deprecated String method2() {
                       return "name";
                   }
@@ -237,7 +237,7 @@ class MinimumViableSpacingTest implements RewriteTest {
                   public @Deprecated String method() {
                       return "name";
                   }
-              
+
                   public @Deprecated String method2() {
                       return "name";
                   }
@@ -350,7 +350,7 @@ class MinimumViableSpacingTest implements RewriteTest {
             """
               import java.io.Serial;
               import org.jspecify.annotations.NonNull;
-              
+
               class Clazz {
                   @NonNull @Serial static long serialVersionUID = 1L;
               }
@@ -369,7 +369,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.io.Serial;
-              
+
               class Clazz {
                   @Serial static long serialVersionUID = 1L;
               }
@@ -388,7 +388,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.io.Serial;
-              
+
               class Clazz {
                   @Serial private static final long serialVersionUID = 1L;
               }
