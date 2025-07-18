@@ -53,6 +53,8 @@ import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
+    // Only match single-line Helm templates that don't span multiple lines
+    private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*\\}\\}");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -95,23 +97,37 @@ public class YamlParser implements org.openrewrite.Parser {
     private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
+        Map<String, String> helmTemplateByUuid = new HashMap<>();
 
-        StringBuilder yamlSourceWithVariablePlaceholders = new StringBuilder();
-        Matcher variableMatcher = VARIABLE_PATTERN.matcher(yamlSource);
+        // First, replace all Helm templates with UUIDs
+        String processedSource = yamlSource;
+        Matcher helmMatcher = HELM_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuffer helmBuffer = new StringBuffer();
+        while (helmMatcher.find()) {
+            String uuid = UUID.randomUUID().toString();
+            helmTemplateByUuid.put(uuid, helmMatcher.group());
+            helmMatcher.appendReplacement(helmBuffer, uuid);
+        }
+        helmMatcher.appendTail(helmBuffer);
+        processedSource = helmBuffer.toString();
+
+        // Then, replace @variable@ patterns with UUIDs
+        StringBuilder yamlSourceWithPlaceholders = new StringBuilder();
+        Matcher variableMatcher = VARIABLE_PATTERN.matcher(processedSource);
         int pos = 0;
-        while (pos < yamlSource.length() && variableMatcher.find(pos)) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, variableMatcher.start(1));
+        while (pos < processedSource.length() && variableMatcher.find(pos)) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, variableMatcher.start(1));
             String uuid = UUID.randomUUID().toString();
             variableByUuid.put(uuid, variableMatcher.group(1));
-            yamlSourceWithVariablePlaceholders.append(uuid);
+            yamlSourceWithPlaceholders.append(uuid);
             pos = variableMatcher.end(1);
         }
 
-        if (pos < yamlSource.length() - 1) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
+        if (pos < processedSource.length()) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
         }
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithVariablePlaceholders.toString())) {
+        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithPlaceholders.toString())) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -269,6 +285,13 @@ public class YamlParser implements org.openrewrite.Parser {
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 break;
                         }
+                        // First restore any Helm template UUIDs
+                        for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        // Then check for variable UUIDs (these are exact matches)
                         if (variableByUuid.containsKey(scalarValue)) {
                             scalarValue = variableByUuid.get(scalarValue);
                         }
