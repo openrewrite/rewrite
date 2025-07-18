@@ -74,12 +74,12 @@ class MinimumViableSpacingTest implements RewriteTest {
               import java.lang.Exception;
               
               class A {
-                  public <T> void foo() throws Exception {
+                  void foo() throws Exception {
                   }
               }
               """,
             """
-              import java.lang.Exception;class A{public <T> void foo() throws Exception{}}
+              import java.lang.Exception;class A{void foo() throws Exception{}}
               """
           )
         );
