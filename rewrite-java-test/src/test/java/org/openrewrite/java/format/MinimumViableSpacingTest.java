@@ -379,4 +379,59 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classExtends() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Exception;
+
+              class MyException extends Exception {
+              }
+              """,
+            """
+              import java.lang.Exception;class MyException extends Exception{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classImplements() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+
+              class Clazz implements Serializable {
+              }
+              """,
+            """
+              import java.io.Serializable;class Clazz implements Serializable{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classImplementsSeveral() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+              import java.lang.Cloneable;
+
+              class Clazz implements Serializable, Cloneable{
+              }
+              """,
+            """
+              import java.io.Serializable;import java.lang.Cloneable;class Clazz implements Serializable,Cloneable{}
+              """
+          )
+        );
+    }
 }

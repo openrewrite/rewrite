@@ -75,6 +75,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             Space before = c.getPadding().getExtends().getBefore();
             if (before.getWhitespace().isEmpty()) {
                 c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(before.withWhitespace(" ")));
+                if(c.getExtends().getPrefix().isEmpty()) {
+                    c = c.withExtends(c.getExtends().withPrefix(c.getExtends().getPrefix().withWhitespace(" ")));
+                }
             }
         }
 
