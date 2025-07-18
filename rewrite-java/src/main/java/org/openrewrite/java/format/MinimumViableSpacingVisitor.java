@@ -234,7 +234,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Import visitImport(J.Import _import, P p) {
         J.Import i = super.visitImport(_import, p);
-        if(i.getQualid().getPrefix().isEmpty()) {
+        if (i.getQualid().getPrefix().isEmpty()) {
             return i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
         }
         return i;
