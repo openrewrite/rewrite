@@ -132,7 +132,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
-            if (declarationStyle == DeclarationStyle.JavaToolchain) {
+            if (compatibilityType == CompatibilityType.javaToolchain) {
                 return c;
             }
 
@@ -147,10 +147,6 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private G.CompilationUnit addJavaToolchainToSourceFile(G.CompilationUnit c, ExecutionContext ctx) {
-            if (declarationStyle != DeclarationStyle.JavaToolchain) {
-                return c;
-            }
-
             if (!(TRUE.equals(addIfMissing))) {
                 return c;
             }
@@ -232,7 +228,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
-            if (declarationStyle == DeclarationStyle.JavaToolchain) {
+            if (compatibilityType == CompatibilityType.javaToolchain) {
                 return c;
             }
 
@@ -552,10 +548,10 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     public enum CompatibilityType {
-        source, target
+        source, target, javaToolchain
     }
 
     public enum DeclarationStyle {
-        Enum, Number, String, JavaToolchain
+        Enum, Number, String
     }
 }

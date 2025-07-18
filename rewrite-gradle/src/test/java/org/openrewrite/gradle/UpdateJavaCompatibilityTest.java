@@ -54,6 +54,20 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
+    @Test
+    void toolchainOnly_default_does_not_add_if_missing() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
@@ -211,9 +225,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void javaToolchain_addIfMissingTrue() {
+    void javaToolchain_added_when_addIfMissingTrue() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, null, null, true)),
           buildGradle(
             """
               plugins {
@@ -224,6 +238,8 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
+              sourceCompatibility = 21
+              targetCompatibility = 21
 
               java {
                   toolchain {
@@ -236,9 +252,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void javaToolchain_addIfMissingTrue_addedToExistingJavaBlock() {
+    void javaToolchain_addIfMissingTrue_toolchainAddedToExistingJavaBlock() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, true)),
           buildGradle(
             """
               plugins {
@@ -268,9 +284,9 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
-    void javaToolchain_noModificationsNeeded() {
+    void javaToolchain_isPresent_noModificationsNeeded() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(21, null, UpdateJavaCompatibility.DeclarationStyle.JavaToolchain, null, true)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(21, UpdateJavaCompatibility.CompatibilityType.javaToolchain, null, null, true)),
           buildGradle(
             """
               plugins {
