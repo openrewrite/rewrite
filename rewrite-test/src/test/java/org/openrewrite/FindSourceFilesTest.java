@@ -22,7 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.test.SourceSpecs.*;
 
 class FindSourceFilesTest implements RewriteTest {
 
@@ -202,6 +202,19 @@ class FindSourceFilesTest implements RewriteTest {
           spec -> spec.recipe(new FindSourceFiles("!(not-this/**)")),
           text("not-this", spec -> spec.path("not-this/not-this.txt")),
           text("this", "~~>this", spec -> spec.path("this/this.txt"))
+        );
+    }
+
+
+    @Test
+    void findMatchingQuark() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("**/hello.cfg")),
+          other(
+            "hello world!",
+            "~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛",
+            spec -> spec.path("a/b/hello.cfg")
+          )
         );
     }
 }
