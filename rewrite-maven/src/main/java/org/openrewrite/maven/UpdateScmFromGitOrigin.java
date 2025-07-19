@@ -49,7 +49,8 @@ public class UpdateScmFromGitOrigin extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
                     return super.visitTag(tag, ctx);
-                } else if ("scm".equals(tag.getName())) {
+                }
+                if ("scm".equals(tag.getName())) {
                     String origin = Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
                             .map(Xml.Document::getMarkers)
                             .flatMap(markers -> markers.findFirst(GitProvenance.class))
@@ -153,7 +154,11 @@ public class UpdateScmFromGitOrigin extends Recipe {
                 String protocol = protocolMatcher.group(1);
                 String user = protocolMatcher.group(2);
                 String userPrefix = (user != null) ? user + "@" : "";
-                return protocol + userPrefix + newHost + "/" + newPath + gitSuffix;
+                String newUrl = protocol + userPrefix + newHost + "/" + newPath + gitSuffix;
+                if (originalUrl.startsWith(newUrl)) {
+                    return originalUrl; // No change needed if the URL already matches
+                }
+                return newUrl;
             }
 
             throw new IllegalArgumentException("Unable to parse original URL: " + originalUrl);

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
@@ -280,7 +281,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     }
 
     @Test
-    void shouldNotUpdateWhenGitOriginIsTheSame() {
+    void retainUrlSuffix() {
         rewriteRun(
           spec -> spec.recipe(new UpdateScmFromGitOrigin()),
           pomXml(
@@ -291,51 +292,91 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
                 <artifactId>my-app</artifactId>
                 <version>1</version>
                 <scm>
-                  <url>https://github.com/apache/roller</url>
-                  <connection>scm:git:https://github.com/apache/roller.git</connection>
-                  <developerConnection>scm:git:https://github.com/apache/roller.git</developerConnection>
+                  <connection>scm:git:https://gitbox.apache.org/repos/asf/maven-invoker.git</connection>
+                  <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/maven-invoker.git</developerConnection>
+                  <url>https://github.com/apache/maven-invoker/tree/${project.scm.tag}</url>
                 </scm>
               </project>
               """,
-            spec -> spec.markers(gitProvenance("ssh://git@github.com/apache/roller.git"))
-          )
-        );
-    }
-
-    @Test
-    void doesNothingWhenScmIsMissing() {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
-          pomXml(
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+                <scm>
+                  <connection>scm:git:https://github.com/apache/maven-invoker.git</connection>
+                  <developerConnection>scm:git:https://github.com/apache/maven-invoker.git</developerConnection>
+                  <url>https://github.com/apache/maven-invoker/tree/${project.scm.tag}</url>
+                </scm>
               </project>
               """,
-            spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
+            spec -> spec.markers(gitProvenance("https://github.com/apache/maven-invoker.git"))
           )
         );
     }
 
-    @Test
-    void doesNothingWhenGitOriginIsNull() {
-        rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin()),
-          pomXml(
-            """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            spec -> spec.markers(gitProvenance(null))
-          )
-        );
+    @Nested
+    class NoChange {
+
+        @Test
+        void gitOriginIsTheSame() {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <scm>
+                      <url>https://github.com/apache/roller</url>
+                      <connection>scm:git:https://github.com/apache/roller.git</connection>
+                      <developerConnection>scm:git:https://github.com/apache/roller.git</developerConnection>
+                    </scm>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance("ssh://git@github.com/apache/roller.git"))
+              )
+            );
+        }
+
+        @Test
+        void scmIsMissing() {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance("git@new-server.example.com:username/repo.git"))
+              )
+            );
+        }
+
+        @Test
+        void gitOriginIsNull() {
+            rewriteRun(
+              spec -> spec.recipe(new UpdateScmFromGitOrigin()),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+                  """,
+                spec -> spec.markers(gitProvenance(null))
+              )
+            );
+        }
     }
 
     private GitProvenance gitProvenance(String origin) {
