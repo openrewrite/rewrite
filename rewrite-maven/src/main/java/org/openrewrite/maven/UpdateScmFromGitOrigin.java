@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -29,7 +31,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
-import static org.openrewrite.maven.UpdateScmFromGitOrigin.GitOrigin.replaceHostAndPath;
 
 public class UpdateScmFromGitOrigin extends Recipe {
     @Override
@@ -51,102 +52,76 @@ public class UpdateScmFromGitOrigin extends Recipe {
                     return super.visitTag(tag, ctx);
                 }
                 if ("scm".equals(tag.getName())) {
-                    String origin = Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
+                    Optional.ofNullable(getCursor().firstEnclosing(Xml.Document.class))
                             .map(Xml.Document::getMarkers)
                             .flatMap(markers -> markers.findFirst(GitProvenance.class))
                             .map(GitProvenance::getOrigin)
-                            .orElse(null);
-                    if (origin == null) {
-                        return tag;
-                    }
-
-                    GitOrigin originHostAndPath;
-                    try {
-                        originHostAndPath = GitOrigin.parseGitUrl(origin);
-                    } catch (IllegalArgumentException e) {
-                        return tag;
-                    }
-
-                    updateTagValue(tag, "url", originHostAndPath);
-                    updateTagValue(tag, "connection", originHostAndPath);
-                    updateTagValue(tag, "developerConnection", originHostAndPath);
-
+                            .map(GitOrigin::parseGitUrl)
+                            .ifPresent(gitOrigin -> {
+                                updateTagValue(tag, "url", gitOrigin);
+                                updateTagValue(tag, "connection", gitOrigin);
+                                updateTagValue(tag, "developerConnection", gitOrigin);
+                            });
                     return tag;
                 }
                 // Only process the <scm> tag if it's a direct child of <project>
                 return tag;
             }
 
-            private void updateTagValue(Xml.Tag tag, String tagName, GitOrigin originHostAndPath) {
+            private void updateTagValue(Xml.Tag tag, String tagName, GitOrigin gitOrigin) {
                 tag.getChild(tagName).ifPresent(childTag -> {
-                    String updated = replaceHostAndPath(childTag.getValue().orElse(""), originHostAndPath);
-                    doAfterVisit(new ChangeTagValueVisitor<>(childTag, updated));
+                    String originalUrl = childTag.getValue().orElse("");
+                    String updatedUrl = gitOrigin.replaceHostAndPath(originalUrl);
+                    doAfterVisit(new ChangeTagValueVisitor<>(childTag, updatedUrl));
                 });
             }
         });
     }
 
+    @Value
     static class GitOrigin {
-        private final String host;
-        private final String path;
-        private static final String[] URL_PATTERNS = {
+        private static final Pattern[] URL_PATTERNS = {
                 // SSH format: git@host:path(.git)?
-                "^git@([^:]+):(.+?)(?:\\.git)?$",
+                Pattern.compile("^git@([^:]+):(.+?)(?:\\.git)?$"),
 
                 // HTTP/HTTPS with optional username and port: http(s)://[username@]host[:port]/path(.git)?
-                "^https?://(?:[^@]+@)?([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$",
+                Pattern.compile("^https?://(?:[^@]+@)?([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$"),
 
                 // SSH with protocol and port: ssh://git@host[:port]/path(.git)?
-                "^ssh://git@([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$",
+                Pattern.compile("^ssh://git@([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$"),
 
                 // Generic protocol://[user@]host[:port]/path(.git)? - catches any other protocols
-                "^[a-zA-Z][a-zA-Z0-9+.-]*://(?:[^@]+@)?([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$"
+                Pattern.compile("^[a-zA-Z][a-zA-Z0-9+.-]*://(?:[^@]+@)?([^/:]+(?::[0-9]+)?)/(.+?)(?:\\.git)?$")
         };
 
-        GitOrigin(String host, String path) {
-            this.host = host;
-            this.path = path;
-        }
+        String host;
+        String path;
 
-        String getHost() {
-            return host;
-        }
-
-        String getPath() {
-            return path;
-        }
-
-        static GitOrigin parseGitUrl(String gitUrl) {
-            if (isNullOrEmpty(gitUrl)) {
-                throw new IllegalArgumentException("Git URL cannot be null or empty");
-            }
-
-            for (String pattern : URL_PATTERNS) {
-                Matcher matcher = Pattern.compile(pattern).matcher(gitUrl);
-                if (matcher.matches()) {
-                    return new GitOrigin(matcher.group(1), matcher.group(2));
+        static @Nullable GitOrigin parseGitUrl(String gitUrl) {
+            if (!isNullOrEmpty(gitUrl)) {
+                for (Pattern pattern : URL_PATTERNS) {
+                    Matcher matcher = pattern.matcher(gitUrl);
+                    if (matcher.matches()) {
+                        return new GitOrigin(matcher.group(1), matcher.group(2));
+                    }
                 }
             }
-            throw new IllegalArgumentException("Unable to parse Git URL: " + gitUrl);
+            return null;
         }
 
-        static String replaceHostAndPath(String originalUrl, GitOrigin hostAndPath) {
+        String replaceHostAndPath(String originalUrl) {
             if (isNullOrEmpty(originalUrl)) {
-                throw new IllegalArgumentException("Original URL cannot be null or empty");
+                return originalUrl;
             }
 
             if (originalUrl.startsWith("scm:git:")) {
                 String actualUrl = originalUrl.substring("scm:git:".length());
-                return "scm:git:" + replaceHostAndPath(actualUrl, hostAndPath);
+                return "scm:git:" + replaceHostAndPath(actualUrl);
             }
-            String newHost = hostAndPath.getHost();
-            String newPath = hostAndPath.getPath();
 
-            boolean hasGitSuffix = originalUrl.endsWith(".git");
-            String gitSuffix = hasGitSuffix ? ".git" : "";
-
+            String gitSuffix = originalUrl.endsWith(".git") ? ".git" : "";
             if (originalUrl.startsWith("git@")) {
-                return "git@" + newHost + ":" + newPath + gitSuffix;
+                return "git@" + host + ":" + path + gitSuffix;
             }
 
             Matcher protocolMatcher = Pattern.compile("^([a-zA-Z][a-zA-Z0-9+.-]*://)(?:([^@/]+)@)?").matcher(originalUrl);
@@ -154,14 +129,15 @@ public class UpdateScmFromGitOrigin extends Recipe {
                 String protocol = protocolMatcher.group(1);
                 String user = protocolMatcher.group(2);
                 String userPrefix = (user != null) ? user + "@" : "";
-                String newUrl = protocol + userPrefix + newHost + "/" + newPath + gitSuffix;
+                String newUrl = protocol + userPrefix + host + "/" + path + gitSuffix;
                 if (originalUrl.startsWith(newUrl)) {
-                    return originalUrl; // No change needed if the URL already matches
+                    return originalUrl; // Retain e.g. tree/${project.scm.tag}
                 }
                 return newUrl;
             }
 
-            throw new IllegalArgumentException("Unable to parse original URL: " + originalUrl);
+            // Return the original URL if no patterns matched
+            return originalUrl;
         }
     }
 }
