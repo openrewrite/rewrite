@@ -66,6 +66,26 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
+    void methodWithThrows() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Exception;
+              
+              class A {
+                  void foo() throws Exception {
+                  }
+              }
+              """,
+            """
+              import java.lang.Exception;class A{void foo() throws Exception{}}
+              """
+          )
+        );
+    }
+
+    @Test
     void returnExpression() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2),
@@ -174,6 +194,26 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiAnnotatedOnClass() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Deprecated;
+
+              @Deprecated
+              @SuppressWarnings("unchecked")
+              class Clazz {
+              }
+              """,
+            """
+              import java.lang.Deprecated;@Deprecated@SuppressWarnings("unchecked") class Clazz{}
+              """
+          )
+        );
+    }
+
     // This test can not be reproduced by running MinimumViableSpacingVisitor only, so using `AutoFormat` recipe here.
     @Issue("https://github.com/openrewrite/rewrite/issues/3346")
     @Test
@@ -230,23 +270,207 @@ class MinimumViableSpacingTest implements RewriteTest {
           spec -> spec.recipe(new AutoFormat()),
           java(
             """
-            class Test {
-                String yielded(int i) {
-                    return switch (i) {
-                        default: yield"value";
-                    };
-                }
-            }
-            """,
+              class Test {
+                  String yielded(int i) {
+                      return switch (i) {
+                          default: yield"value";
+                      };
+                  }
+              }
+              """,
             """
-            class Test {
-                String yielded(int i) {
-                    return switch (i) {
-                        default: yield "value";
-                    };
-                }
-            }
+              class Test {
+                  String yielded(int i) {
+                      return switch (i) {
+                          default: yield "value";
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importStatement() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
             """
+              import java.io.Serial;
+              
+              class Clazz {}
+              """,
+            """
+              import java.io.Serial;class Clazz{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class Clazz {
+                  static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              class Clazz{static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldWithModifiers() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class Clazz {
+                  static final long serialVersionUID = 1L;
+              }
+              """,
+            """
+              class Clazz{static final long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiAnnotatedFieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+              import org.jspecify.annotations.NonNull;
+
+              class Clazz {
+                  @NonNull @Serial static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;import org.jspecify.annotations.NonNull;class Clazz{@NonNull@Serial static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFieldWithModifier() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+
+              class Clazz {
+                  @Serial static long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;class Clazz{@Serial static long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedFieldWithModifiers() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serial;
+
+              class Clazz {
+                  @Serial private static final long serialVersionUID = 1L;
+              }
+              """,
+            """
+              import java.io.Serial;class Clazz{@Serial private static final long serialVersionUID=1L;}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classExtends() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Exception;
+
+              class MyException extends Exception {
+              }
+              """,
+            """
+              import java.lang.Exception;class MyException extends Exception{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classImplements() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+
+              class Clazz implements Serializable {
+              }
+              """,
+            """
+              import java.io.Serializable;class Clazz implements Serializable{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classImplementsSeveral() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+              import java.lang.Cloneable;
+
+              class Clazz implements Serializable, Cloneable {
+              }
+              """,
+            """
+              import java.io.Serializable;import java.lang.Cloneable;class Clazz implements Serializable,Cloneable{}
+              """
+          )
+        );
+    }
+
+    @Test
+    void classExtendsAndImplementsSeveral() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.io.Serializable;
+              import java.lang.Cloneable;
+              import java.lang.Exception;
+
+              class MyException extends Exception implements Serializable, Cloneable {
+              }
+              """,
+            """
+              import java.io.Serializable;import java.lang.Cloneable;import java.lang.Exception;class MyException extends Exception implements Serializable,Cloneable{}
+              """
           )
         );
     }

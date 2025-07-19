@@ -75,6 +75,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             Space before = c.getPadding().getExtends().getBefore();
             if (before.getWhitespace().isEmpty()) {
                 c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(before.withWhitespace(" ")));
+                if (c.getExtends().getPrefix().isEmpty()) {
+                    c = c.withExtends(c.getExtends().withPrefix(c.getExtends().getPrefix().withWhitespace(" ")));
+                }
             }
         }
 
@@ -154,6 +157,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             Space before = m.getPadding().getThrows().getBefore();
             if (before.getWhitespace().isEmpty()) {
                 m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(before.withWhitespace(" ")));
+                m = m.withThrows(ListUtils.mapFirst(m.getThrows(), aThrows -> {
+                    if (aThrows.getPrefix().getWhitespace().isEmpty()) {
+                        return aThrows.withPrefix(aThrows.getPrefix().withWhitespace(" "));
+                    }
+                    return aThrows;
+                }));
             }
         }
 
@@ -174,16 +183,17 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
         J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, p);
 
-        boolean first = v.getLeadingAnnotations().isEmpty();
+        boolean hasLeadingAnnotations = !v.getLeadingAnnotations().isEmpty();
+        boolean hasModifiers = !v.getModifiers().isEmpty();
 
         /*
          * We need at least one space between multiple modifiers, otherwise we could get a run-on like "publicstaticfinal".
          * Note, this is applicable anywhere that modifiers can exist, such as class declarations, etc.
          */
-        if (first && !v.getModifiers().isEmpty()) {
+        if (hasModifiers) {
             v = v.withModifiers(
                     ListUtils.map(v.getModifiers(), (index, modifier) -> {
-                        if (index != 0) {
+                        if (index != 0 || hasLeadingAnnotations) {
                             if (modifier.getPrefix().isEmpty()) {
                                 modifier = modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                             }
@@ -191,10 +201,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                         return modifier;
                     })
             );
-            first = false;
         }
 
-        if (!first && v.getTypeExpression() != null) {
+        if ((hasLeadingAnnotations || hasModifiers) && v.getTypeExpression() != null) {
             if (v.getTypeExpression().getPrefix().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
             }
@@ -214,7 +223,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Yield visitYield(J.Yield yield, P p) {
         J.Yield y = super.visitYield(yield, p);
-        return y.withValue(y.getValue().withPrefix(Space.SINGLE_SPACE));
+        return y.withValue(y.getValue().withPrefix(y.getValue().getPrefix().withWhitespace(" ")));
     }
 
     @Override
@@ -225,10 +234,19 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             // At a minimum, we need a space between the guard and the case label
             JContainer.Padding<J> padding = c.getPadding().getCaseLabels().getPadding();
             return c.getPadding().withCaseLabels(padding.withElements(ListUtils.mapLast(padding.getElements(),
-                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(Space.SINGLE_SPACE) : last)));
+                    last -> last != null && last.getAfter().isEmpty() ? last.withAfter(last.getAfter().withWhitespace(" ")) : last)));
         }
 
         return c;
+    }
+
+    @Override
+    public J.Import visitImport(J.Import _import, P p) {
+        J.Import i = super.visitImport(_import, p);
+        if (i.getQualid().getPrefix().isEmpty()) {
+            return i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
+        }
+        return i;
     }
 
     @Override
