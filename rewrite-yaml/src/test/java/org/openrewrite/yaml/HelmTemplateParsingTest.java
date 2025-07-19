@@ -17,11 +17,36 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class HelmTemplateParsingTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void modifyHelmTemplate() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.metadata.name", "{{ .Release.Tag }}-service", null)),
+          yaml(
+            """
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: {{ .Release.Name }}-service
+              """,
+            """
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: {{ .Release.Tag }}-service
+              """
+          )
+        );
+    }
 
     @Test
     void parseSimpleHelmTemplate() {
@@ -40,7 +65,13 @@ class HelmTemplateParsingTest implements RewriteTest {
                 ports:
                   - port: {{ .Values.service.port }}
                     targetPort: {{ .Values.service.targetPort }}
-              """
+              """,
+            spec -> spec.afterRecipe(docs -> {
+                Yaml.Mapping root = (Yaml.Mapping) docs.getDocuments().getFirst().getBlock();
+                Yaml.Mapping metadata = (Yaml.Mapping) root.getEntries().get(2).getValue();
+                Yaml.Scalar name = (Yaml.Scalar) metadata.getEntries().getFirst().getValue();
+                assertThat(name.getValue()).contains("{{ .Release.Name }}-service");
+            })
           )
         );
     }
