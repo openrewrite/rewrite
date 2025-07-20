@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.search;
+package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.tree.Scope;
 
 import static org.openrewrite.Validated.notBlank;
 
-@EqualsAndHashCode(callSuper = false)
 @Value
+@EqualsAndHashCode(callSuper = false)
 public class DoesNotIncludeDependency extends Recipe {
 
     @Option(displayName = "Group",
@@ -38,24 +37,16 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
-    @Option(displayName = "Only direct dependencies",
-            description = "Default false. If enabled, transitive dependencies will not be considered.",
-            required = false,
-            example = "true")
-    @Nullable
-    Boolean onlyDirect;
-
     @Option(displayName = "Scope",
-            description = "Default any. If specified, only the requested scope's classpaths will be checked.",
-            required = false,
-            valid = {"compile", "test", "runtime", "provided"},
-            example = "compile")
+            description = "Match dependencies with the specified scope. If not specified, all configurations will be searched.",
+            example = "compileClasspath",
+            required = false)
     @Nullable
-    String scope;
+    String configuration;
 
     @Override
     public String getDisplayName() {
-        return "Does not include Maven dependency";
+        return "Does not include Gradle dependency";
     }
 
     @Override
@@ -65,22 +56,21 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. " +
+        return "A precondition which returns false if visiting a Gradle file which includes the specified dependency in the classpath of some scope. " +
                 "For compatibility with multimodule projects, this should most often be applied as a precondition.";
     }
 
     @Override
     public Validated<Object> validate() {
         return super.validate()
-                .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
-                .and(Validated.test("scope", "scope is a valid Maven scope", scope,
-                        s -> Scope.fromName(s) != Scope.Invalid));
+                .and(notBlank("groupId", groupId))
+                .and(notBlank("artifactId", artifactId));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor();
+            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, null, configuration).getVisitor();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -90,7 +80,7 @@ public class DoesNotIncludeDependency extends Recipe {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Tree t2 = di.visit(tree, ctx);
-                // if POM file is unchanged, we found something without the dependency
+                // if Gradle file is unchanged, we found something without the dependency
                 if (t2 == tree) {
                     return SearchResult.found(tree);
                 }

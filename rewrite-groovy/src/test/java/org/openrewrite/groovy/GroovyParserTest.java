@@ -144,4 +144,83 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5730")
+    void innerOuter() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def outer() {
+                  f(I<Void>) {
+                    innner() { }
+                  }
+                }
+                def outerWithSpaces() {
+                  g( I < Void > ) {
+                    innner() { }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleTypeParams() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(Map<String, Integer>) {
+                    println "test"
+                  }
+                }
+                def methodWithSpaces() {
+                  f( Map < String , Integer > ) {
+                    println "test"
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedArgOnly() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<String, Integer>)
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedClosureAfterGeneric() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<Void>) {
+                    first {
+                      second { }
+                    }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
 }
