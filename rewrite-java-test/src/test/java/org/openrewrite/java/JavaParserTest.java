@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -451,7 +452,7 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
+    @Disabled("Fails due to whitespace before Semicolon not being preserved. See discussion in issue #5744.")
     void semicolonAfterClassWithSpace() {
         rewriteRun(
           // language=java
