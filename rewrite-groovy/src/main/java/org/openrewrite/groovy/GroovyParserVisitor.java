@@ -2314,7 +2314,7 @@ public class GroovyParserVisitor {
                                 } else {
                                     expression = bodyVisitor.visit(arg.getValue());
                                 }
-                                Expression element = isImplicitValue ? expression :
+                                Expression element = isImplicitValue ? expression.withPrefix(argPrefix) :
                                         (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
                                         new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
                                         padLeft(isSign, expression), null));
