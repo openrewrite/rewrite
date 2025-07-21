@@ -250,4 +250,22 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nullAsIdentifier() {
+        rewriteRun(
+          hcl(
+            """
+              terraform {
+                required_providers {
+                  null = {
+                    source = "hashicorp/null"
+                    version = "=3.2.3"
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
 }
