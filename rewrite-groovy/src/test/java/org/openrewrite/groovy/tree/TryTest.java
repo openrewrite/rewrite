@@ -63,7 +63,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              } catch (final RuntimeException e) {
+              } catch (  final       RuntimeException                           e     ) {
               }
               """
           )

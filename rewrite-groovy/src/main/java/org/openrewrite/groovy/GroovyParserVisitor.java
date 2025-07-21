@@ -1108,6 +1108,7 @@ public class GroovyParserVisitor {
         public void visitCatchStatement(CatchStatement node) {
             Space prefix = sourceBefore("catch");
             Space parenPrefix = sourceBefore("(");
+            List<J.Modifier> modifiers = getModifiers();
 
             // This does not handle multi-catch statements like catch(ExceptionTypeA | ExceptionTypeB e)
             // The Groovy AST seems to only record the first type in the list, so some extra hacking is required to get the others
@@ -1133,8 +1134,8 @@ public class GroovyParserVisitor {
             cursor += param.getName().length();
             Space rightPad = whitespace();
             skip(")");
-            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
-                    Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
+            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), EMPTY,
+                    Markers.EMPTY, emptyList(), modifiers, paramType,
                     null,
                     singletonList(paramName))
             ).withAfter(rightPad);
