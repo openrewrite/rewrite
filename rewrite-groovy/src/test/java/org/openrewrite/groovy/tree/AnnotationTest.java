@@ -121,7 +121,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @Foo("A")
+              @Foo( "A" )
               class Test {}
               """
           )
