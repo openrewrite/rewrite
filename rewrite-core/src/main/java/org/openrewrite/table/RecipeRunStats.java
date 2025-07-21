@@ -35,12 +35,19 @@ import static java.util.Objects.requireNonNull;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     private final MeterRegistry registry = new SimpleMeterRegistry();
+    private final Set<Path> sourceFileVisited = new HashSet<>();
     private final Set<Path> sourceFileChanged = new HashSet<>();
 
     public RecipeRunStats(Recipe recipe) {
         super(recipe,
                 "Recipe performance",
                 "Statistics used in analyzing the performance of recipes.");
+    }
+
+    public void recordSourceVisited(@Nullable SourceFile source) {
+        if (source != null) {
+            sourceFileVisited.add(source.getSourcePath());
+        }
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
@@ -73,7 +80,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
             Timer scanner = registry.find("rewrite.recipe.scan").tag("name", recipeName).timer();
             Row row = new Row(
                     recipeName,
-                    Long.valueOf(editor.count()).intValue(),
+                    sourceFileVisited.size(),
                     sourceFileChanged.size(),
                     scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
                     scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),

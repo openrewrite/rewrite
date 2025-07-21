@@ -20,10 +20,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -44,17 +44,18 @@ public class DependencyUseStringNotation extends Recipe {
     public String getDescription() {
         return "In Gradle, dependencies can be expressed as a `String` like `\"groupId:artifactId:version\"`, " +
                 "or equivalently as a `Map` like `group: 'groupId', name: 'artifactId', version: 'version'`. " +
-                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`.";
+                "This recipe replaces dependencies represented as `Maps` with an equivalent dependency represented as a `String`, " +
+                "as recommended per the [Gradle best practices for dependencies to use a single GAV](https://docs.gradle.org/8.14.2/userguide/best_practices_dependencies.html#single-gav-string).";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
                 if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
@@ -116,33 +117,48 @@ public class DependencyUseStringNotation extends Recipe {
                     } else {
                         m = m.withArguments(Collections.singletonList(stringNotation));
                     }
+                } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                    J.Assignment firstEntry = (J.Assignment) m.getArguments().get(0);
+                    Space prefix = firstEntry.getPrefix();
+                    Markers markers = firstEntry.getMarkers();
+
+                    for (Expression e : m.getArguments()) {
+                        if (e instanceof J.Assignment) {
+                            J.Assignment assignment = (J.Assignment) e;
+                            if (assignment.getVariable() instanceof J.Identifier) {
+                                J.Identifier key = (J.Identifier) assignment.getVariable();
+                                mapNotation.put(key.getSimpleName(), assignment.getAssignment());
+                            }
+                        }
+                    }
+
+                    J.Literal stringNotation = toLiteral(prefix, markers, mapNotation);
+                    if (stringNotation == null) {
+                        return m;
+                    }
+
+                    Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
+                    if (lastArg instanceof J.Lambda) {
+                        m = m.withArguments(Arrays.asList(stringNotation, lastArg));
+                    } else {
+                        m = m.withArguments(Collections.singletonList(stringNotation));
+                    }
                 }
 
                 return m;
             }
 
             private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
-                if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
-                    String stringNotation = "";
-
+                // Name is the only required key in a dependency map.
+                if (mapNotation.containsKey("name")) {
                     String group = coerceToStringNotation(mapNotation.get("group"));
-                    if (group != null) {
-                        stringNotation += group;
-                    }
-
                     String name = coerceToStringNotation(mapNotation.get("name"));
-                    if (name != null) {
-                        stringNotation += ":" + name;
-                    }
-
                     String version = coerceToStringNotation(mapNotation.get("version"));
-                    if (version != null) {
-                        stringNotation += ":" + version;
-                        String classifier = coerceToStringNotation(mapNotation.get("classifier"));
-                        if (classifier != null) {
-                            stringNotation += ":" + classifier;
-                        }
-                    }
+                    String classifier = coerceToStringNotation(mapNotation.get("classifier"));
+                    String extension = coerceToStringNotation(mapNotation.get("ext"));
+
+                    Dependency dependency = new Dependency(group, name, version, classifier, extension);
+                    String stringNotation = dependency.toStringNotation();
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
                 }

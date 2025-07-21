@@ -25,6 +25,7 @@ describe('AutoformatVisitor', () => {
     test('everything', () => {
         return spec.rewriteRun(
             // TODO there should be no newline after the default case in switch
+            // TODO not sure if there should be a newline after the if and after the finally
             // @formatter:off
             //language=typescript
             typescript(`
@@ -99,6 +100,7 @@ describe('AutoformatVisitor', () => {
                     if (1 > 0) {
                         console.log("four", "three", "six");
                     }
+
                     let i = 1;
                     while (i < 4) {
                         i++;
@@ -110,6 +112,7 @@ describe('AutoformatVisitor', () => {
                     } finally {
                         console.log("finally");
                     }
+
                     const isTypeScriptFun = i > 3 ? "yes" : "hell yeah!";
                     for (let j = 1; j <= 5; j++) {
                         console.log(\`Number: \` + j);
@@ -135,6 +138,7 @@ describe('AutoformatVisitor', () => {
         )});
 
     test('a statement following an if', () => {
+        // TODO not sure if there should be a newline after the if
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
@@ -146,8 +150,39 @@ describe('AutoformatVisitor', () => {
             `
             if (1 > 0) {
             }
+
             let i = 1;
             `)
+            // @formatter:on
+        )});
+
+    test('try catch-all', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `,
+                `
+            try {
+                m();
+            } catch {
+                console.log("It failed", e);
+            }
+            `)
+            // @formatter:on
+        )});
+
+    test('import', () => {
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`import { delta,gamma} from 'delta.js'`,
+                 `import {delta, gamma} from 'delta.js'`)
             // @formatter:on
         )});
 });

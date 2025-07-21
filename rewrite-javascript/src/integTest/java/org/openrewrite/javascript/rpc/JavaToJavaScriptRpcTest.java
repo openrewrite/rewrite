@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -29,6 +28,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Path;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,17 +53,15 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               try {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.start(
-                    Environment.builder().build(),
-                    "node",
-                    "--enable-source-maps",
-                    // Uncomment this to debug the server
-//                  "--inspect-brk",
-                    "./rewrite/dist/src/rpc/server.js"
-                  );
-
-                  client.batchSize(20)
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
+                    .nodePath(Path.of("node"))
+                    .installationDirectory(Path.of("./rewrite/dist"))
+//                    .inspectAndBreak()
+//                    .socket(12345)
                     .timeout(Duration.ofMinutes(10))
+                    .build();
+
+                  client
                     .traceGetObjectOutput()
                     .traceGetObjectInput(log);
 
@@ -73,7 +71,7 @@ public class JavaToJavaScriptRpcTest {
 
                   return new JavaVisitor<>() {
                       @Override
-                      public J preVisit(@NonNull J tree, @NonNull ExecutionContext ctx) {
+                      public J preVisit(J tree, ExecutionContext ctx) {
                           SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                           try {
                               assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());
@@ -81,7 +79,7 @@ public class JavaToJavaScriptRpcTest {
                               return tree;
                           } finally {
                               log.close();
-                              client.shutdown();
+                              client.close();
                           }
                       }
                   };

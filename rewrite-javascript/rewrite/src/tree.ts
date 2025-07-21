@@ -15,6 +15,8 @@
  */
 import {Markers} from "./markers";
 import {UUID} from "./uuid";
+import {PlainText} from "./text";
+import {RpcCodecs} from "./rpc";
 
 export const TreeKind = {
     Checksum: "org.openrewrite.Checksum",
@@ -41,6 +43,10 @@ export function isTree(tree: any): tree is Tree {
         tree !== null &&
         "id" in tree && "markers" in tree
     );
+}
+
+export function isScope(a: Tree, b: Tree): boolean {
+    return a !== undefined && b !== undefined && (a === b || a.id === b.id);
 }
 
 export class Cursor {

@@ -17,7 +17,10 @@ package org.openrewrite.xml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
 import static org.openrewrite.Preconditions.not;
 

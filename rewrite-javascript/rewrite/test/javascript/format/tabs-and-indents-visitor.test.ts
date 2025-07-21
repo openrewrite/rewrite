@@ -155,7 +155,6 @@ describe('TabsAndIndentsVisitor', () => {
                             switch( s  ){
                                 case "apple"  :
                                     return 1;
-                   
                             }
                             return 0;
                         }
@@ -236,6 +235,52 @@ describe('TabsAndIndentsVisitor', () => {
                     [key: string]: any;
                 }
                 `)
+            // @formatter:on
+        )
+    })
+
+    test("multi-line callback", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(
+                `
+                [1, 2, 3].forEach( x => {
+                console.log(x);
+                });
+                `,
+                `
+                [1, 2, 3].forEach( x => {
+                    console.log(x);
+                });
+                `)
+            // @formatter:on
+        )
+    })
+
+    test("single-line callback with braces", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`[1, 2, 3].forEach(x => {console.log(x)});`)
+            // @formatter:on
+        )
+    })
+
+    test("single-line callback without braces", () => {
+        const spec = new RecipeSpec()
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents(draft => {
+        })));
+        return spec.rewriteRun(
+            // @formatter:off
+            //language=typescript
+            typescript(`[1, 2, 3].forEach(x => console.log(x));`)
             // @formatter:on
         )
     })

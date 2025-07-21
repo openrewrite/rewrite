@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
+import {tap} from "../../test-util";
 
 describe('interface mapping', () => {
     const spec = new RecipeSpec();
@@ -384,4 +386,23 @@ describe('interface mapping', () => {
                 }
             `)
         ));
+
+    test('interface type mapping', async () => {
+        const spec = new RecipeSpec();
+        //language=typescript
+        const source = typescript(`
+                interface ColumnDescriptor {
+                    displayName: string,
+                    number: number,
+                    print(prefix: string): string
+                }
+                let columnDescriptor: ColumnDescriptor;
+                `)
+        source.afterRecipe = tree => {
+            const varDecl = tree.statements[1].element as J.VariableDeclarations;
+            const ident = varDecl.variables[0].element.name as J.Identifier;
+            expect(ident.simpleName).toEqual("columnDescriptor");
+        }
+        await spec.rewriteRun(source);
+    })
 });

@@ -615,7 +615,7 @@ public class MavenPomDownloader {
                             // Record the absense of the pom file
                             ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         // unable to read the pom from a file-based repository.
                         repositoryResponses.put(repo, e.getMessage());
                     }
@@ -680,7 +680,7 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }
@@ -1020,7 +1020,7 @@ public class MavenPomDownloader {
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
+                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
                     try (HttpSender.Response response = httpSender.send(authenticated)) {
                         return response.isSuccessful();
                     }
@@ -1030,7 +1030,7 @@ public class MavenPomDownloader {
                 if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
-                        HttpSender.Request unauthenticated = httpSender.get(jarUrl).build();
+                        HttpSender.Request unauthenticated = httpSender.head(jarUrl).build();
                         try (HttpSender.Response response = httpSender.send(unauthenticated)) {
                             return response.isSuccessful();
                         }

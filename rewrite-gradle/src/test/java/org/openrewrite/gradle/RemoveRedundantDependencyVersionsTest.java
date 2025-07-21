@@ -24,6 +24,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
+@SuppressWarnings("GroovyAssignabilityCheck")
 class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -312,6 +313,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void removeDirectDependencyWithLowerVersionNumberIfDependencyIsLoadedTransitivelyWithHigherVersionNumber() {
         rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
           buildGradle(
             """
               plugins {
@@ -401,10 +403,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               }
               
               dependencies {
-                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  // Without explicit spring-webmvc:6.2.8 gradle would resolve 6.2.7
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.springframework.boot:spring-boot-starter-web-services:3.3.3")
-                  implementation("org.springframework:spring-webmvc:6.1.13")
+                  implementation("org.springframework:spring-webmvc:6.2.8")
               }
               """,
             """
@@ -417,10 +419,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               }
               
               dependencies {
-                  // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
+                  // Without explicit spring-webmvc:6.2.8 gradle would resolve 6.2.7
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.springframework.boot:spring-boot-starter-web-services")
-                  implementation("org.springframework:spring-webmvc:6.1.13")
+                  implementation("org.springframework:spring-webmvc:6.2.8")
               }
               """
           )
@@ -430,6 +432,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void handleSeveralPlatformDependencies() {
         rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
           buildGradle(
             """
               plugins {
@@ -537,6 +540,85 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeUnmanagedDependencyIfDependencyIsLoadedTransitivelyIsExactlyTheSame() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+                  runtimeOnly('org.flywaydb:flyway-core:10.10.0')
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepUnmanagedDependencyIfDependencyIsLoadedTransitivelyIsDifferentVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver:10.10.0')
+                  runtimeOnly('org.flywaydb:flyway-core:10.11.0')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepUnmanagedDirectDependencyIfDependencyIsLoadedTransitivelyHasNoVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation('org.flywaydb:flyway-sqlserver')
+                  runtimeOnly('org.flywaydb:flyway-core')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlin() {
         rewriteRun(
           buildGradleKts(
@@ -612,6 +694,80 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               dependencies {
                   testImplementation(platform("org.junit:junit-bom:5.10.1"))
                   testImplementation("org.junit.jupiter:junit-jupiter")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRepeatedDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-core:8.55.0")
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void webfluxGTE() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // spring-cloud-starter-gateway-server-webflux:4.30 depends on reactor-netty-http:1.2.6
+                  implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux:4.3.0")
+                  implementation("io.projectreactor.netty:reactor-netty-http:1.1.13")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  // spring-cloud-starter-gateway-server-webflux:4.30 depends on reactor-netty-http:1.2.6
+                  implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux:4.3.0")
               }
               """
           )

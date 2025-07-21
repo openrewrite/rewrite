@@ -34,6 +34,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.trait.Trait;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -102,6 +103,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Expression argument = methodInvocation.getArguments().get(0);
                 if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
                     dependency = parseDependency(methodInvocation.getArguments());
+                } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
+                    dependency = parseDependency(Arrays.asList(((J.Binary) argument).getLeft()));
                 } else if (argument instanceof J.MethodInvocation) {
                     if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
                             ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {
@@ -124,7 +127,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                 Dependency req = resolvedDependency.getRequested();
                                 if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                         req.getArtifactId().equals(dependency.getArtifactId())) {
-                                    return new GradleDependency(cursor, resolvedDependency);
+                                    return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
                                 }
                             }
                         }
@@ -137,7 +140,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                         Dependency req = resolvedDependency.getRequested();
                                         if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                                 req.getArtifactId().equals(dependency.getArtifactId())) {
-                                            return new GradleDependency(cursor, resolvedDependency);
+                                            return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
                                         }
                                     }
                                 }
@@ -161,12 +164,22 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                                     .classifier(dependency.getClassifier())
                                     .build())
                             .build();
-                    return new GradleDependency(cursor, resolvedDependency);
+                    return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
                 }
             }
 
             return null;
         }
+
+        /**
+         * Our Gradle model doesn't truly know the requested versions as it isn't able to get that from the Gradle API.
+         * So if this Trait has figured out which declaration made the request resulting in a particular resolved dependency
+         * use that more-accurate information instead.
+         */
+        private static ResolvedDependency withRequested(ResolvedDependency resolved, org.openrewrite.gradle.internal.Dependency requested) {
+            return resolved.withRequested(resolved.getRequested().withGav(requested.getGav()));
+        }
+
 
         private static @Nullable GradleDependencyConfiguration getConfiguration(@Nullable GradleProject gradleProject, J.MethodInvocation methodInvocation) {
             if (gradleProject == null) {

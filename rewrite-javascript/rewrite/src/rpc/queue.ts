@@ -13,48 +13,89 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker, Markers, MarkersKind} from "../markers";
-import {RpcCodec, RpcCodecs} from "./codec";
-import {randomId} from "../uuid";
-import {WriteStream} from "fs";
+import {emptyMarkers, Marker, Markers, MarkersKind} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
+import {asRef, isRef, Reference, ReferenceMap} from "./reference";
+import {Writable} from "node:stream";
 
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
+/**
+ * Interface representing an RPC codec that defines methods
+ * for sending and receiving objects in an RPC communication.
+ */
+export interface RpcCodec<T> {
+    /**
+     * Serializes and sends an object over an RPC send queue.
+     *
+     * @param after - The object to be sent.
+     * @param q - The RPC send queue where the object will be enqueued.
+     */
+    rpcSend(after: T, q: RpcSendQueue): Promise<void>;
 
-export interface Reference {
-    [REFERENCE_KEY]: true;
+    /**
+     * Receives and deserializes an object from an RPC receive queue.
+     *
+     * @param before - The initial object state before deserialization.
+     * @param q - The RPC receive queue where the object data is retrieved.
+     * @returns A Promise resolving to the deserialized object.
+     */
+    rpcReceive(before: T, q: RpcReceiveQueue): Promise<T>;
 }
 
-export function asRef<T extends {}>(obj: T | undefined): T & Reference | undefined {
-    if(obj === undefined) {
-        return undefined;
-    }
-    try {
-        // Spread would create a new object. This can be used multiple times on the
-        // same object without changing the reference.
-        Object.assign(obj, {[REFERENCE_KEY]: true});
-        return obj as T & Reference;
-    } catch (Error) {
-        return obj as T & Reference;
-    }
-}
+/**
+ * A registry for managing RPC codecs based on object types.
+ */
+export class RpcCodecs {
+    private static codecs = new Map<string, RpcCodec<any>>();
 
-function isRef(obj?: any): obj is Reference {
-    return obj !== undefined && obj[REFERENCE_KEY] === true;
+    /**
+     * Registers an RPC codec for a given type.
+     *
+     * @param type - The string identifier of the object type.
+     * @param codec - The codec implementation to be registered.
+     */
+    static registerCodec(type: string, codec: RpcCodec<any>): void {
+        this.codecs.set(type, codec);
+    }
+
+    /**
+     * Retrieves the registered codec for a given type.
+     *
+     * @param type - The string identifier of the object type.
+     * @returns The corresponding `RpcCodec`, or `undefined` if not found.
+     */
+    static forType(type: string): RpcCodec<any> | undefined {
+        return this.codecs.get(type);
+    }
+
+    /**
+     * Determines the appropriate codec for an instance based on its `kind` property.
+     *
+     * @param before - The object instance to find a codec for.
+     * @returns The corresponding `RpcCodec`, or `undefined` if no matching codec is found.
+     */
+    static forInstance(before: any): RpcCodec<any> | undefined {
+        if (before !== undefined && before !== null && typeof before === "object" && "kind" in before) {
+            return RpcCodecs.forType(before["kind"] as string);
+        }
+    }
 }
 
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
 
-    private refCount = 1
     private before?: any;
 
-    constructor(private readonly refs: WeakMap<Object, number>, private readonly trace: boolean) {
+    constructor(private readonly refs: ReferenceMap, private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
-        await this.send(after, before);
+        if (after.kind === MarkersKind.Markers) {
+            // FIXME check if we can solve this via RpcCodec
+            await this.sendMarkers(undefined!, _ => after);
+        } else {
+            await this.send(after, before);
+        }
 
         const result = this.q;
         result.push({state: RpcObjectState.END_OF_OBJECT});
@@ -163,16 +204,15 @@ export class RpcSendQueue {
     private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
         let ref: number | undefined;
         if (isRef(after)) {
-            if (this.refs.has(after)) {
+            ref = this.refs.get(after);
+            if (ref) {
                 this.put({
                     state: RpcObjectState.ADD,
-                    valueType: this.getValueType(after),
-                    ref: this.refs.get(after)
+                    ref
                 });
                 return;
             }
-            ref = this.refCount++;
-            this.refs.set(after, ref);
+            ref = this.refs.create(after);
         }
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
         this.put({
@@ -201,7 +241,7 @@ export class RpcSendQueue {
     }
 
     private getValueType(after?: any): string | undefined {
-        if (after !== undefined && typeof after === "object" && "kind" in after) {
+        if (after !== undefined && after !== null && typeof after === "object" && "kind" in after) {
             return after["kind"];
         }
     }
@@ -212,7 +252,10 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: WriteStream) {
+                private readonly logFile?: Writable,
+                private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
+                    throw new Error(`Reference ${refId} not found and no getRef function provided`);
+                }) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -222,13 +265,13 @@ export class RpcReceiveQueue {
         return this.batch.shift()!;
     }
 
-    receiveMarkers(markers?: Markers): Promise<any> {
+    receiveMarkers(markers?: Markers): Promise<Markers> {
         if (markers === undefined) {
-            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
+            markers = emptyMarkers;
         }
-        return this.receive(markers, m => {
+        return this.receive(markers, async m => {
             return saveTrace(this.logFile, async () => {
-                const draft = createDraft(markers);
+                const draft = createDraft(markers!);
                 draft.id = await this.receive(m.id);
                 draft.markers = (await this.receiveList(m.markers))!;
                 return finishDraft(draft);
@@ -251,20 +294,32 @@ export class RpcReceiveQueue {
                     return undefined as T;
                 case RpcObjectState.ADD:
                     ref = message.ref;
-                    if (ref !== undefined && this.refs.has(ref)) {
-                        return this.refs.get(ref);
+                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                        // This is a pure reference to an existing object
+                        if (this.refs.has(ref)) {
+                            return this.refs.get(ref);
+                        } else {
+                            // Ref was evicted from cache, fetch it
+                            const refObject = await this.getRef(ref);
+                            this.refs.set(ref, refObject);
+                            return refObject;
+                        }
+                    } else {
+                        // This is either a new object or a forward declaration with ref
+                        before = message.valueType === undefined ?
+                            message.value :
+                            this.newObj(message.valueType);
                     }
-                    before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
                     let after;
                     let codec;
                     if (onChange) {
-                        after = onChange(before!);
+                        after = await onChange(before!);
                     } else if ((codec = RpcCodecs.forInstance(before))) {
-                        after = codec.rpcReceive(before, this);
+                        after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
-                        after = message.value;
+                        after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
                     } else {
                         after = before;
                     }
@@ -304,6 +359,9 @@ export class RpcReceiveQueue {
                     // The next message should be a CHANGE with a list of positions
                     const d = await this.take();
                     const positions = d.value as number[];
+                    if (!positions) {
+                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                    }
                     const after: T[] = new Array(positions.length);
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];

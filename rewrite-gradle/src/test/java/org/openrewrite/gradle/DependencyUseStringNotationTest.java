@@ -17,10 +17,12 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class DependencyUseStringNotationTest implements RewriteTest {
@@ -68,6 +70,47 @@ class DependencyUseStringNotationTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
+    @Test
+    void kotlinSupport() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              val version = "latest.release"
+              
+              dependencies {
+                  api(group = "org.openrewrite", name = "rewrite-core", version = "latest.release")
+                  implementation(group = "org.openrewrite", name = "rewrite-core", version = version, classifier = "sources")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              val version = "latest.release"
+              
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release")
+                  implementation("org.openrewrite:rewrite-core:$version:sources")
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void withClassifier() {
         rewriteRun(
@@ -98,6 +141,42 @@ class DependencyUseStringNotationTest implements RewriteTest {
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release:sources")
                   implementation "org.openrewrite:rewrite-core:latest.release:sources"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withExtension() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                            
+              repositories {
+                  mavenCentral()
+              }
+                
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar')
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+                
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release:sources@jar")
+                  implementation "org.openrewrite:rewrite-core:latest.release:sources@jar"
               }
               """
           )
@@ -367,7 +446,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -379,7 +458,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -394,6 +473,43 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   id("java")
               }
               apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5702")
+    void handleClassifierWithNoVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }  
+                
+              dependencies {
+                  api(group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier')
+                  implementation group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  api("org.openrewrite:rewrite-core::classifier")
+                  implementation "org.openrewrite:rewrite-core::classifier"
+              }
               """
           )
         );

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker} from "./markers";
+import {Marker, MarkersKind, SearchResult} from "./markers";
 import {Cursor, isSourceFile, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
 
@@ -27,22 +27,74 @@ export interface MarkerPrinter {
     afterSyntax(marker: Marker, cursor: Cursor, commentWrapper: CommentWrapper): string;
 }
 
-const defaultMarkerPrinter: MarkerPrinter = {
-    beforeSyntax(): string {
-        return "";
-    },
-    beforePrefix(): string {
-        return "";
-    },
-    afterSyntax(): string {
-        return "";
-    },
+export namespace MarkerPrinter {
+    export const DEFAULT: MarkerPrinter = {
+        beforeSyntax(marker: Marker, _cursor: Cursor, commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult) {
+                let searchResult = marker as SearchResult;
+                return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
+            } else if (marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
+                // TODO add markup marker types
+                return commentWrapper("(" + (marker as any).message + ")");
+            }
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
+    export const SEARCH_MARKERS_ONLY: MarkerPrinter = {
+        beforeSyntax(marker: Marker, _cursor: Cursor, commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult) {
+                let searchResult = marker as SearchResult;
+                return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
+            }
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
+    export const FENCED: MarkerPrinter = {
+        beforeSyntax(marker: Marker, _cursor: Cursor, _commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult || marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
+                return `{{${marker.id}}}`;
+            }
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(marker: Marker, _cursor: Cursor, _commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult || marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
+                return `{{${marker.id}}}`;
+            }
+            return "";
+        },
+    }
+    export const SANITIZED: MarkerPrinter = {
+        beforeSyntax(): string {
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
 }
 
 export class PrintOutputCapture {
     private _out: string = "";
 
-    constructor(public readonly markerPrinter: MarkerPrinter = defaultMarkerPrinter) {
+    constructor(public readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
 
     get out(): string {
@@ -73,14 +125,13 @@ export class TreePrinters {
     private static _registry =
         new Map<string, TreePrinter>();
 
-    static register(kind: string, printer: TreeVisitor<any, PrintOutputCapture>): void {
+    static register(kind: string, printer: () => TreeVisitor<any, PrintOutputCapture>): void {
         this._registry.set(kind, {
             async print(tree: Tree, out?: PrintOutputCapture): Promise<string> {
                 const p = out || new PrintOutputCapture();
-                await printer.visit(tree, p);
+                await printer().visit(tree, p);
                 return p.out;
-            }
-        });
+            }})
     }
 
     /**

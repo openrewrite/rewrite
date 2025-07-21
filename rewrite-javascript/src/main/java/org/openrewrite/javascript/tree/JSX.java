@@ -25,7 +25,6 @@ import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,26 +92,15 @@ public interface JSX extends JS {
         @Nullable
         Space selfClosing;
 
+        @Getter
+        @With
         @Nullable
-        List<JRightPadded<Expression>> children;
-
-        public @Nullable List<Expression> getChildren() {
-            return children == null ? null : JRightPadded.getElements(children);
-        }
-
-        public Tag withChildren(@Nullable List<Expression> children) {
-            if (this.children == null && children == null) {
-                return this;
-            } else if (this.children == null) {
-                return getPadding().withChildren(JRightPadded.withElements(new ArrayList<>(), children));
-            }
-            return getPadding().withChildren(children == null ? null : JRightPadded.withElements(this.children, children));
-        }
+        List<Expression> children;
 
         @Nullable
-        JLeftPadded<String> closingName;
+        JLeftPadded<J> closingName;
 
-        public @Nullable String getClosingName() {
+        public @Nullable J getClosingName() {
             return closingName == null ? null : closingName.getElement();
         }
 
@@ -187,19 +175,11 @@ public interface JSX extends JS {
                 return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
-            public @Nullable List<JRightPadded<Expression>> getChildren() {
-                return t.children;
-            }
-
-            public Tag withChildren(@Nullable List<JRightPadded<Expression>> children) {
-                return t.children == children ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, children, t.closingName, t.afterClosingName);
-            }
-
-            public @Nullable JLeftPadded<String> getClosingName() {
+            public @Nullable JLeftPadded<J> getClosingName() {
                 return t.closingName;
             }
 
-            public Tag withClosingName(@Nullable JLeftPadded<String> closingName) {
+            public Tag withClosingName(@Nullable JLeftPadded<J> closingName) {
                 return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName, t.afterClosingName);
             }
         }

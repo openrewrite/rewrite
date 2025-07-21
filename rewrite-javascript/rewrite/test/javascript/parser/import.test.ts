@@ -116,17 +116,44 @@ describe('import mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                import type {SpyInstance} from 'jest';
-                ///*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
+                /*{1}*/import /*{2}*/type /*{3}*/{ /*{4}*/ SpyInstance /*{5}*/} /*{6}*/ from /*{7}*/ 'jest' /*{8}*/;
                 import SpyInstance = jest.SpyInstance;
             `)
         ));
 
-    test('external module import', () =>
+    test('import equals with require', () =>
         spec.rewriteRun(
             //language=typescript
             typescript(`
                 import mongodb = /*a*/require/*b*/(/*c*/'mongodb'/*d*/)/*e*/;
+            `)
+        ));
+
+    test('import equals with qualified name', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                namespace MyLib {
+                    export function hello() {}
+                }
+                import my = MyLib.hello;
+            `)
+        ));
+
+    test('import type equals', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import   type my = require('my-library');
+                `)
+        ));
+
+    test('export import', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                import * as i from "immer";
+                /*1*/ export /*2*/ import /*3*/ cd /*4*/ = i.createDraft;
             `)
         ));
 });
