@@ -31,11 +31,8 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              
               } catch (RuntimeException e) {
-              
               } catch (Exception e) {
-              
               }
               """
           )
@@ -48,9 +45,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              
               } catch (all) {
-              
               }
               """
           )
@@ -63,7 +58,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              } catch (  final       RuntimeException                           e     ) {
+              } catch (final RuntimeException e) {
               }
               """
           )
@@ -76,9 +71,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              
               } finally {
-                  // some comment
               }
               """
           )
@@ -91,9 +84,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
              try {
-             
              } catch (Exception e) {
-             
              } finally {
                  def a = ""
              }
@@ -111,7 +102,6 @@ class TryTest implements RewriteTest {
             """
               try {
               } catch (IOException | UncheckedIOException e) {
-              
               }
               """
           )
@@ -126,9 +116,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
-              
               } catch (Exception e) {
-              
               }
               """
           )
@@ -143,9 +131,26 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
-              
               } catch (Exception e) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void whitespace() {
+        rewriteRun(
+          groovy(
+            """
+              try     {
               
+              }    catch(RuntimeException e)      {
+              
+              }catch (     final         Exception          e) {
+              
+              }finally{
+                  // some comment
               }
               """
           )
