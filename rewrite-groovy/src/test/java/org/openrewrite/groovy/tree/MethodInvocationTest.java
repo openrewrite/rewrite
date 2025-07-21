@@ -199,17 +199,6 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void staticMethodPointer() {
-        rewriteRun(
-          groovy(
-            """
-              Integer.&parseInt
-              """
-          )
-        );
-    }
-
-    @Test
     void staticMethodReference() {
         rewriteRun(
           groovy(
@@ -221,33 +210,11 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void instanceMethodPointer() {
-        rewriteRun(
-          groovy(
-            """
-              ["a", "b", "c"].forEach(System.out.&println)
-              """
-          )
-        );
-    }
-
-    @Test
     void instanceMethodReference() {
         rewriteRun(
           groovy(
             """
               ["a", "b", "c"].forEach(System.out::println)
-              """
-          )
-        );
-    }
-
-    @Test
-    void constructorMethodPointer() {
-        rewriteRun(
-          groovy(
-            """
-              ArrayList.&new
               """
           )
         );

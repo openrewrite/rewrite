@@ -1878,7 +1878,6 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
-            boolean isMethodRef = ref instanceof MethodReferenceExpression;
             Space fmt = whitespace();
 
             String referenceName = null;
@@ -1888,8 +1887,8 @@ public class GroovyParserVisitor {
 
             queue.add(new J.MemberReference(randomId(),
                     fmt,
-                    isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
-                    padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
+                    Markers.EMPTY,
+                    padRight(visit(ref.getExpression()), sourceBefore("::")),
                     null, // not supported by Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
                             sourceBefore(referenceName),
