@@ -203,9 +203,9 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def xTransmission() {}
+              def xMethod() {}
               def prefix = "x"
-              "${prefix}Transmission"()
+              "${prefix}Method"()
               """
           )
         );
