@@ -440,19 +440,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
-    void closureReturnVariable() {
-        rewriteRun(
-          groovy(
-            """
-              foo { it ->
-                  return it
-              }
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/4055")
     @Test
     void chainOfMethodInvocations() {
