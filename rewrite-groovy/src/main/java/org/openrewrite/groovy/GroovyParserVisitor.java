@@ -1134,12 +1134,18 @@ public class GroovyParserVisitor {
             cursor += param.getName().length();
             Space rightPad = whitespace();
             skip(")");
-            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), modifiers.isEmpty() ? paramType.getPrefix() : EMPTY,
-                    Markers.EMPTY, emptyList(), modifiers, modifiers.isEmpty() ? paramType.withPrefix(EMPTY) : paramType,
-                    null,
-                    singletonList(paramName))
-            ).withAfter(rightPad);
 
+            Space varDeclPrefix = paramType.getPrefix();
+            TypeTree varDeclTypeExpression = paramType.withPrefix(EMPTY);
+            if (!modifiers.isEmpty()) {
+                varDeclPrefix = modifiers.get(0).getPrefix();
+                varDeclTypeExpression = paramType;
+                modifiers = ListUtils.mapFirst(modifiers, it -> it.withPrefix(EMPTY));
+            }
+
+            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(
+                    new J.VariableDeclarations(randomId(), varDeclPrefix, Markers.EMPTY, emptyList(), modifiers, varDeclTypeExpression, null, singletonList(paramName))
+            ).withAfter(rightPad);
             J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY, variable);
             queue.add(new J.Try.Catch(randomId(), prefix, Markers.EMPTY, catchControl, visit(node.getCode())));
         }
