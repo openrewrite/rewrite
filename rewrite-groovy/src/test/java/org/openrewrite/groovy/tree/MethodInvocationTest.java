@@ -199,6 +199,72 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void staticMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              Integer.&parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              Integer::parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out.&println)
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out::println)
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList.&new
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList::new
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
@@ -368,6 +434,19 @@ class MethodInvocationTest implements RewriteTest {
             """
               foo {
                   return
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureReturnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              foo { it ->
+                  return it
               }
               """
           )
