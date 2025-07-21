@@ -339,4 +339,93 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void helmTemplateComplexFunctions() {
+        rewriteRun(
+          yaml(
+            """
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: {{ include "app.fullname" . }}
+                namespace: {{ .Values.namespace | default "default" }}
+                labels:
+                  app.kubernetes.io/name: {{ include "app.name" . }}
+                  app.kubernetes.io/instance: {{ .Release.Name }}
+                  app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+              spec:
+                replicas: {{ .Values.replicaCount | default 1 }}
+                selector:
+                  matchLabels:
+                    app.kubernetes.io/name: {{ include "app.name" . }}
+                    app.kubernetes.io/instance: {{ .Release.Name }}
+                template:
+                  metadata:
+                    labels:
+                      app.kubernetes.io/name: {{ include "app.name" . }}
+                      app.kubernetes.io/instance: {{ .Release.Name }}
+                    annotations:
+                      checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+                      helmVersion: {{ .Capabilities.HelmVersion }}
+                  spec:
+                    serviceAccountName: {{ include "app.serviceAccountName" . }}
+                    containers:
+                      - name: {{ .Chart.Name }}
+                        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+                        imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+                        ports:
+                          - name: http
+                            containerPort: {{ .Values.service.port | default 8080 }}
+                            protocol: TCP
+                        livenessProbe:
+                          httpGet:
+                            path: {{ .Values.livenessProbe.path | default "/health" }}
+                            port: http
+                          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds | default 30 }}
+                          periodSeconds: {{ .Values.livenessProbe.periodSeconds | default 10 }}
+                        resources:
+                          limits:
+                            cpu: {{ .Values.resources.limits.cpu | default "1000m" }}
+                            memory: {{ .Values.resources.limits.memory | default "512Mi" }}
+                          requests:
+                            cpu: {{ .Values.resources.requests.cpu | default "100m" }}
+                            memory: {{ .Values.resources.requests.memory | default "128Mi" }}
+                        env:
+                          - name: ENVIRONMENT
+                            value: {{ ternary "production" "development" (eq .Values.environment "prod") }}
+                          - name: LOG_LEVEL
+                            value: {{ coalesce .Values.logLevel .Values.global.logLevel "info" }}
+                          - name: DATABASE_URL
+                            value: {{ required "database.url is required" .Values.database.url }}
+                          - name: FEATURE_FLAG_A
+                            value: {{ and .Values.features.flagA (not .Values.features.disableAll) | quote }}
+                          - name: FEATURE_FLAG_B
+                            value: {{ or .Values.features.flagB .Values.features.defaultEnabled | quote }}
+                          - name: API_VERSION
+                            value: {{ .Values.apiVersion | default "v1" | upper }}
+                          - name: MAX_REPLICAS
+                            value: {{ max .Values.minReplicas .Values.maxReplicas | quote }}
+                          - name: MIN_REPLICAS
+                            value: {{ min .Values.minReplicas .Values.maxReplicas | quote }}
+                          - name: DEPLOYMENT_REGION
+                            value: {{ first .Values.regions | default "us-east-1" }}
+                          - name: IS_PRODUCTION
+                            value: {{ has .Values.environment (list "prod" "production") | quote }}
+                          - name: CONFIG_HASH
+                            value: {{ .Values.config | toJson | sha256sum | trunc 8 }}
+                          - name: APP_URL
+                            value: {{ printf "https://%s.%s" .Values.subdomain .Values.domain }}
+                          - name: VERSION_TAG
+                            value: {{ regexReplaceAll "^v" .Values.version "" }}
+                          - name: ENABLED_FEATURES
+                            value: {{ join "," .Values.enabledFeatures }}
+                          - name: WORKER_COUNT
+                            value: {{ add .Values.baseWorkers .Values.extraWorkers | quote }}
+                          - name: TIMEOUT_SECONDS
+                            value: {{ mul .Values.timeoutMinutes 60 | quote }}
+              """
+          )
+        );
+    }
 }
