@@ -301,4 +301,23 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void helmTemplatesInMappingKeys() {
+        rewriteRun(
+          yaml(
+            """
+              myconfig:
+                {{ .Values.keyName }}: "some value"
+                {{ .Values.dynamicKey }}: {{ .Values.dynamicValue }}
+                staticKey: {{ .Values.someValue }}
+              annotations:
+                {{ .Values.annotationKey }}: "enabled"
+                "{{ .Values.quotedKey }}": 'quoted value'
+              labels:
+                {{ include "app.labelKey" . }}: {{ include "app.labelValue" . }}
+              """
+          )
+        );
+    }
 }
