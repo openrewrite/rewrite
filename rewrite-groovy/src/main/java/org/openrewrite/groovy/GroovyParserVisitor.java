@@ -1869,6 +1869,44 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitMethodReferenceExpression(MethodReferenceExpression ref) {
+            Space fmt = whitespace();
+
+            String referenceName = null;
+            if (ref.getMethodName() instanceof ConstantExpression) {
+                referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
+            }
+
+            JavaType.Method methodReferenceType = null;
+            /*if (ref.sym instanceof Symbol.MethodSymbol) {
+                Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
+                methodReferenceType = typeMapping.methodInvocationType(methodSymbol.type, methodSymbol);
+            }*/
+
+            JavaType.Variable fieldReferenceType = null;
+            /*if (ref.sym instanceof Symbol.VarSymbol) {
+                Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) ref.sym;
+                fieldReferenceType = typeMapping.variableType(varSymbol);
+            }*/
+
+            queue.add(new J.MemberReference(randomId(),
+                    fmt,
+                    Markers.EMPTY,
+                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    null, //convertTypeParameters(node.getTypeArguments()),
+                    padLeft(whitespace(), new J.Identifier(randomId(),
+                            sourceBefore(referenceName),
+                            Markers.EMPTY,
+                            emptyList(),
+                            referenceName,
+                            null, null)),
+                    null, //visit(ref.getType()), //typeMapping.type(node),
+                    methodReferenceType,
+                    fieldReferenceType
+            ));
+        }
+
+        @Override
         public void visitAttributeExpression(AttributeExpression attr) {
             queue.add(insideParentheses(attr, fmt -> {
                 Expression target = visit(attr.getObjectExpression());
