@@ -67,8 +67,7 @@ import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isWhitespace;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.internal.Delimiter.*;
@@ -704,7 +703,7 @@ public class GroovyParserVisitor {
                 expressions = convertAll(expression.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
                     if (n == expression.getExpression(expression.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
                         cursor++;
-                        return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                        return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
                     }
                     return Markers.EMPTY;
                 });
@@ -1269,7 +1268,7 @@ public class GroovyParserVisitor {
                 arrowPrefix = EMPTY;
             }
             J body = visit(expression.getCode());
-            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singletonList(ls)), params,
+            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singleton(ls)), params,
                     arrowPrefix,
                     body,
                     closureType));
@@ -1869,7 +1868,8 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitMethodReferenceExpression(MethodReferenceExpression ref) {
+        public void visitMethodPointerExpression(MethodPointerExpression ref) {
+            boolean isMethodRef = ref instanceof MethodReferenceExpression;
             Space fmt = whitespace();
 
             String referenceName = null;
@@ -1891,8 +1891,8 @@ public class GroovyParserVisitor {
 
             queue.add(new J.MemberReference(randomId(),
                     fmt,
-                    Markers.EMPTY,
-                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
+                    padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
                     null, //convertTypeParameters(node.getTypeArguments()),
                     padLeft(whitespace(), new J.Identifier(randomId(),
                             sourceBefore(referenceName),
