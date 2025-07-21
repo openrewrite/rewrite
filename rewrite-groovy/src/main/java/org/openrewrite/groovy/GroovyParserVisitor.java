@@ -1877,32 +1877,20 @@ public class GroovyParserVisitor {
                 referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
             }
 
-            JavaType.Method methodReferenceType = null;
-            /*if (ref.sym instanceof Symbol.MethodSymbol) {
-                Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) ref.sym;
-                methodReferenceType = typeMapping.methodInvocationType(methodSymbol.type, methodSymbol);
-            }*/
-
-            JavaType.Variable fieldReferenceType = null;
-            /*if (ref.sym instanceof Symbol.VarSymbol) {
-                Symbol.VarSymbol varSymbol = (Symbol.VarSymbol) ref.sym;
-                fieldReferenceType = typeMapping.variableType(varSymbol);
-            }*/
-
             queue.add(new J.MemberReference(randomId(),
                     fmt,
                     isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
                     padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
-                    null, //convertTypeParameters(node.getTypeArguments()),
+                    null, // not supported in Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
                             sourceBefore(referenceName),
                             Markers.EMPTY,
                             emptyList(),
                             referenceName,
                             null, null)),
-                    null, //visit(ref.getType()), //typeMapping.type(node),
-                    methodReferenceType,
-                    fieldReferenceType
+                    typeMapping.type(ref.getType()),
+                    null, // not enough information in the AST
+                    null  // not enough information in the AST
             ));
         }
 
