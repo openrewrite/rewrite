@@ -1878,15 +1878,13 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
-            Space fmt = whitespace();
-
             String referenceName = null;
             if (ref.getMethodName() instanceof ConstantExpression) {
                 referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
             }
 
             queue.add(new J.MemberReference(randomId(),
-                    fmt,
+                    whitespace(),
                     Markers.EMPTY,
                     padRight(visit(ref.getExpression()), sourceBefore("::")),
                     null, // not supported by Groovy
