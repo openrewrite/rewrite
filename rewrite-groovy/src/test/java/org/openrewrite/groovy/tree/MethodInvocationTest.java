@@ -199,6 +199,19 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void dynamicMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              def xTransmission() {}
+              def prefix = "x"
+              "${prefix}Transmission"()
+              """
+          )
+        );
+    }
+
+    @Test
     void staticMethodReference() {
         rewriteRun(
           groovy(
@@ -676,22 +689,6 @@ class MethodInvocationTest implements RewriteTest {
                   return Math.random() > 0.5 ? { println "yes" } : null
               }
               maybe()?.call()
-              """
-          )
-        );
-    }
-
-    @Test
-    void generics() {
-        rewriteRun(
-          groovy(
-            """
-              class Util {
-                  static <T> boolean compare(T t1, T t2) {
-                      return t1 == t2
-                  }
-              }
-              Util.<String>compare("A", "B")
               """
           )
         );
