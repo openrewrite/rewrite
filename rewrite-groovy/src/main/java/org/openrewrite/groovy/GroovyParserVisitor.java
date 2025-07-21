@@ -1881,7 +1881,7 @@ public class GroovyParserVisitor {
                     fmt,
                     isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
                     padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
-                    null, // not supported in Groovy
+                    null, // not supported by Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
                             sourceBefore(referenceName),
                             Markers.EMPTY,
