@@ -1134,8 +1134,8 @@ public class GroovyParserVisitor {
             cursor += param.getName().length();
             Space rightPad = whitespace();
             skip(")");
-            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), EMPTY,
-                    Markers.EMPTY, emptyList(), modifiers, paramType,
+            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), modifiers.isEmpty() ? paramType.getPrefix() : EMPTY,
+                    Markers.EMPTY, emptyList(), modifiers, modifiers.isEmpty() ? paramType.withPrefix(EMPTY) : paramType,
                     null,
                     singletonList(paramName))
             ).withAfter(rightPad);
