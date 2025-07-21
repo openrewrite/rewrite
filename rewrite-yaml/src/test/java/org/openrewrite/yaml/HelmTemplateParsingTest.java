@@ -286,6 +286,25 @@ class HelmTemplateParsingTest implements RewriteTest {
     }
 
     @Test
+    void conditionalWithWhitespace() {
+        rewriteRun(
+          yaml(
+            """
+              data:
+                script.sh: |
+                  {{ if PIPELINE }}
+                    # Do something
+                  {{ else if OTHER PIPELINE }}
+                    # Do something else
+                  {{ else }}
+                    # Default case
+                  {{ end }}
+              """
+          )
+        );
+    }
+
+    @Test
     void nestedHelmTemplates() {
         rewriteRun(
           yaml(
