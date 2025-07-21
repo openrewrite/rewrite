@@ -23,7 +23,6 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class EnumTest implements RewriteTest {
 
-    @ExpectedToFail
     @Test
     void enumDefinition() {
         rewriteRun(
@@ -38,7 +37,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void innerEnum() {
         rewriteRun(
@@ -54,7 +52,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithAnnotations() {
         rewriteRun(
@@ -63,7 +60,7 @@ class EnumTest implements RewriteTest {
               enum Test {
                   @Deprecated(since = "now")
                   One,
-                  
+
                   @Deprecated(since = "now")
                   Two;
               }
@@ -83,15 +80,15 @@ class EnumTest implements RewriteTest {
                       @Deprecated
                       void foo() {}
                   },
-              
+
                   A2 {
                       @Deprecated
                       void foo() {}
                   };
-                  
+
                   A() {}
                   A(int n) {}
-                  
+
                   abstract void foo();
               }
               """
@@ -108,10 +105,10 @@ class EnumTest implements RewriteTest {
               class Outer {
                   enum A {
                       A1(1);
-                  
+
                       A(int n) {}
                   }
-                  
+
                   private static final class ContextFailedToStart {
                       private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
                           return new Object[arguments.length + 2]
@@ -146,7 +143,7 @@ class EnumTest implements RewriteTest {
               enum A {
                   ONE(1),
                   TWO(2);
-              
+
                   A(int n) {}
               }
               """
@@ -154,7 +151,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithoutParameters() {
         rewriteRun(
@@ -164,7 +160,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
