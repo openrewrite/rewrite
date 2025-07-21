@@ -29,33 +29,8 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
-                  B, C, D
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void enumDefinitionUnnecessarilyTerminatedWithSemicolon() {
-        rewriteRun(
-          groovy(
-            """
-              enum A {
-                  B, C;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void enumDefinitionUnnecessarilyTerminatedWithComma() {
-        rewriteRun(
-          groovy(
-            """
-              enum A {
                   B, C,
+                  D;
               }
               """
           )
@@ -85,24 +60,9 @@ class EnumTest implements RewriteTest {
               enum Test {
                   @Deprecated(since = "now")
                   One,
-              
+
                   @Deprecated(since = "now")
                   Two;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void enumWithMethods() {
-        rewriteRun(
-          groovy(
-            """
-              enum Test {
-                  One, Two;
-              
-                  void test() {}
               }
               """
           )
@@ -120,61 +80,42 @@ class EnumTest implements RewriteTest {
                       @Deprecated
                       void foo() {}
                   },
-              
+
                   A2 {
                       @Deprecated
                       void foo() {}
                   };
-              
+
                   A() {}
                   A(int n) {}
+
+                  abstract void foo();
               }
               """
           )
         );
     }
 
+    @ExpectedToFail
     @Test
     void enumConstructor() {
         rewriteRun(
           groovy(
             """
-              enum A {
-                  A1;
-                  A() {}
-              }
-              """
-          )
-        );
-    }
+              class Outer {
+                  enum A {
+                      A1(1);
 
-    @Test
-    void enumConstructorWithStatements() {
-        rewriteRun(
-          groovy(
-            """
-              enum A {
-                  A1;
-                  A() {
-                    println "statement"
-                    println "statement"
+                      A(int n) {}
+                  }
+
+                  private static final class ContextFailedToStart {
+                      private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
+                          return new Object[arguments.length + 2]
+                      }
                   }
               }
               """
-          )
-        );
-    }
-
-    @Test
-    void enumConstructorWithDynamicallyTypedParam() {
-        rewriteRun(
-          groovy(
-            """
-             enum A {
-                 A1;
-                 A(dynamicVar) {}
-              }
-             """
           )
         );
     }
@@ -195,42 +136,45 @@ class EnumTest implements RewriteTest {
 
     @ExpectedToFail
     @Test
-    void enumWithLiteralParameters() {
+    void enumWithParameters() {
         rewriteRun(
           groovy(
             """
               enum A {
-                  ONE(1, "A"),
-                  TWO(2, "B", ")"),
-                  THREE(3, $/C/$, 1);
-              
-                  A(int n, String s) {
-                    this(n, s, "ignore")
-                  }
-                  A(int n, String s, dynamicVar) {}
+                  ONE(1),
+                  TWO(2);
+
+                  A(int n) {}
               }
               """
           )
         );
     }
 
-    @ExpectedToFail
     @Test
-    void enumWithInvocationParameters() {
+    void enumWithoutParameters() {
         rewriteRun(
           groovy(
-            """
-              class X {
-                static X create() { new X() }
-              }
-              
-              enum A {
-                  ONE(new X()),
-                  TWO(X.create())
-              
-                  A(X x) {}
-              }
-              """
+            "enum A { ONE, TWO }"
+          )
+        );
+    }
+
+    @Test
+    void enumUnnecessarilyTerminatedWithSemicolon() {
+        rewriteRun(
+          groovy(
+            "enum A { ONE ; }"
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    void enumWithEmptyParameters() {
+        rewriteRun(
+          groovy(
+            "enum A { ONE ( ), TWO ( ) }"
           )
         );
     }

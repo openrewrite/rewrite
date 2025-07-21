@@ -19,6 +19,7 @@ import groovy.lang.GroovySystem;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
+import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -239,22 +240,21 @@ public class GroovyParserVisitor {
             List<J.Modifier> modifiers = getModifiers();
 
             Space kindPrefix = whitespace();
-            J.ClassDeclaration.Kind.Type kindType;
+            J.ClassDeclaration.Kind.Type kindType = null;
             if (sourceStartsWith("class")) {
                 kindType = J.ClassDeclaration.Kind.Type.Class;
                 skip("class");
-            } else if (clazz.isAnnotationDefinition()) {
-                kindType = J.ClassDeclaration.Kind.Type.Annotation;
-                skip("@interface");
-            } else if (clazz.isInterface()) {
+            } else if (sourceStartsWith("interface")) {
                 kindType = J.ClassDeclaration.Kind.Type.Interface;
                 skip("interface");
-            } else if (clazz.isEnum()) {
+            } else if (sourceStartsWith("@interface")) {
+                kindType = J.ClassDeclaration.Kind.Type.Annotation;
+                skip("@interface");
+            } else if (sourceStartsWith("enum")) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
                 skip("enum");
-            } else {
-                throw new IllegalStateException("Unexpected class type: " + name());
             }
+            assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
             J.Identifier name = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
@@ -304,11 +304,11 @@ public class GroovyParserVisitor {
                     extendings,
                     implementings,
                     null,
-                    visitClassBlock(clazz),
+                    visitClassBlock(clazz, kindType == J.ClassDeclaration.Kind.Type.Enum),
                     TypeUtils.asFullyQualified(typeMapping.type(clazz))));
         }
 
-        J.Block visitClassBlock(ClassNode clazz) {
+        J.Block visitClassBlock(ClassNode clazz, boolean isEnum) {
             NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
             List<FieldNode> enumConstants = new ArrayList<>();
             for (MethodNode method : clazz.getMethods()) {
@@ -351,11 +351,12 @@ public class GroovyParserVisitor {
                 if (!appearsInSource(field)) {
                     continue;
                 }
-                if (field.isEnum()) {
+                // Collect enum constants separately if this is an enum
+                if (isEnum && (field.getModifiers() & Opcodes.ACC_ENUM) != 0) {
                     enumConstants.add(field);
                     continue;
                 }
-                if (field.getInitialExpression() instanceof ConstructorCallExpression) {
+                if (field.hasInitialExpression() && field.getInitialExpression() instanceof ConstructorCallExpression) {
                     ConstructorCallExpression cce = (ConstructorCallExpression) field.getInitialExpression();
                     if (cce.isUsingAnonymousInnerClass() && cce.getType() instanceof InnerClassNode) {
                         fieldInitializers.add((InnerClassNode) cce.getType());
@@ -379,50 +380,94 @@ public class GroovyParserVisitor {
             }
 
             Space blockPrefix = sourceBefore("{");
-
+            
+            // Process enum constants first if this is an enum
             List<JRightPadded<Statement>> statements = new ArrayList<>();
-            if (!enumConstants.isEmpty()) {
-                enumConstants.sort(Comparator.comparing(GroovyParserVisitor::pos));
-
+            if (isEnum && !enumConstants.isEmpty()) {
+                // Sort enum constants by position
+                enumConstants.sort(Comparator.comparing(field -> pos(field)));
+                
                 List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>();
                 for (int i = 0; i < enumConstants.size(); i++) {
-                    J.EnumValue enumValue = visitEnumField(enumConstants.get(i));
-                    JRightPadded<J.EnumValue> paddedEnumValue = JRightPadded.build(enumValue).withAfter(whitespace());
-                    if (sourceStartsWith(",")) {
-                        skip(",");
-                        if (i == enumConstants.size() - 1) {
-                            paddedEnumValue = paddedEnumValue.withMarkers(Markers.build(singleton(new TrailingComma(randomId(), whitespace()))));
+                    FieldNode enumConstant = enumConstants.get(i);
+                    boolean isLast = i == enumConstants.size() - 1;
+                    
+                    // Visit the enum constant
+                    J.EnumValue enumValue = visitEnumValue(enumConstant, isLast);
+                    
+                    // Handle comma or semicolon after the enum value
+                    Space afterSpace = EMPTY;
+                    if (!isLast) {
+                        afterSpace = sourceBefore(",");
+                    } else {
+                        // For the last enum value, check if there's a trailing comma or semicolon
+                        int cursorBefore = cursor;
+                        Space maybeSpace = whitespace();
+                        if (sourceStartsWith(",")) {
+                            skip(",");
+                            // This is a trailing comma - add it as a marker
+                            enumValues.add(JRightPadded.build(enumValue)
+                                    .withAfter(maybeSpace)
+                                    .withMarkers(Markers.build(singletonList(new TrailingComma(randomId(), whitespace())))));
+                            continue;
+                        } else if (sourceStartsWith(";")) {
+                            // Semicolon will be handled outside the loop, but preserve the space
+                            cursor = cursorBefore;
+                            afterSpace = maybeSpace;
+                        } else {
+                            // No comma or semicolon, restore cursor to before the space
+                            cursor = cursorBefore;
+                            afterSpace = EMPTY;
                         }
                     }
-                    enumValues.add(paddedEnumValue);
+                    
+                    enumValues.add(JRightPadded.build(enumValue).withAfter(afterSpace));
                 }
-
-                J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, sourceStartsWith(";"));
-                if (enumValueSet.isTerminatedWithSemicolon()) {
+                
+                // Check for semicolon after enum values
+                boolean hasTerminalSemicolon = false;
+                Space spaceBeforeSemicolon = whitespace();
+                if (sourceStartsWith(";")) {
                     skip(";");
+                    hasTerminalSemicolon = true;
+                } else {
+                    // No semicolon, restore cursor
+                    cursor -= spaceBeforeSemicolon.getWhitespace().length();
                 }
-                statements.add(JRightPadded.build(enumValueSet));
+                
+                J.EnumValueSet enumValueSet = new J.EnumValueSet(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        enumValues,
+                        hasTerminalSemicolon
+                );
+                
+                statements.add(JRightPadded.build((Statement) enumValueSet));
             }
-
+            
+            // Process other members
+            statements.addAll(sortedByPosition.values().stream()
+                    // anonymous classes will be visited as part of visiting the ConstructorCallExpression
+                    .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
+                    .map(ast -> {
+                        if (ast instanceof FieldNode) {
+                            visitField((FieldNode) ast);
+                        } else if (ast instanceof MethodNode) {
+                            visitMethod((MethodNode) ast);
+                        } else if (ast instanceof ClassNode) {
+                            visitClass((ClassNode) ast);
+                        } else if (ast instanceof BlockStatement) {
+                            visitBlockStatement((BlockStatement) ast);
+                        }
+                        Statement stat = pollQueue();
+                        return maybeSemicolon(stat);
+                    })
+                    .collect(toList()));
+            
             return new J.Block(randomId(), blockPrefix, Markers.EMPTY,
                     JRightPadded.build(false),
-                    ListUtils.concatAll(statements, sortedByPosition.values().stream()
-                            // anonymous classes will be visited as part of visiting the ConstructorCallExpression
-                            .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
-                            .map(ast -> {
-                                if (ast instanceof FieldNode) {
-                                    visitField((FieldNode) ast);
-                                } else if (ast instanceof MethodNode) {
-                                    visitMethod((MethodNode) ast);
-                                } else if (ast instanceof ClassNode) {
-                                    visitClass((ClassNode) ast);
-                                } else if (ast instanceof BlockStatement) {
-                                    visitBlockStatement((BlockStatement) ast);
-                                }
-                                Statement stat = pollQueue();
-                                return maybeSemicolon(stat);
-                            })
-                            .collect(toList())),
+                    statements,
                     sourceBefore("}"));
         }
 
@@ -434,27 +479,73 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitField(FieldNode field) {
-            if (field.isEnum()) {
-                // Enum constants are handled separately in visitClassBlock, thus should be skipped here
+            if ((field.getModifiers() & Opcodes.ACC_ENUM) != 0) {
+                // Enum constants are handled separately in visitClassBlock
+                // This should not be called for enum constants anymore
                 return;
+            } else {
+                visitVariableField(field);
             }
-            visitVariableField(field);
         }
 
-        private J.EnumValue visitEnumField(FieldNode field) {
+        private J.EnumValue visitEnumValue(FieldNode fieldNode, boolean isLast) {
             Space prefix = whitespace();
-
-            List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
-
+            
+            // Handle annotations
+            List<J.Annotation> annotations = visitAndGetAnnotations(fieldNode, this);
+            
+            // Consume whitespace between annotations and name
             Space namePrefix = whitespace();
-            String enumName = field.getName();
+            
+            // Consume the enum constant name from source
+            String enumName = fieldNode.getName();
             skip(enumName);
-
-            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
-
-            // TODO initializer (enum constructor invocation)
-
-            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, null);
+            
+            J.Identifier name = new J.Identifier(
+                    randomId(),
+                    namePrefix,
+                    Markers.EMPTY,
+                    emptyList(),
+                    enumName,
+                    typeMapping.type(fieldNode.getType()),
+                    typeMapping.variableType(fieldNode)
+            );
+            
+            // Handle initializer (constructor arguments)
+            J.NewClass initializer = null;
+            if (fieldNode.hasInitialExpression() && fieldNode.getInitialExpression() instanceof ConstructorCallExpression) {
+                ConstructorCallExpression cce = (ConstructorCallExpression) fieldNode.getInitialExpression();
+                
+                // For enum values, we expect the arguments to appear directly without "new" keyword
+                // e.g., RED("FF0000") not new Color("FF0000")
+                if (sourceStartsWith("(")) {
+                    // Parse just the arguments using RewriteGroovyVisitor
+                    RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(cce.getArguments(), this);
+                    JContainer<Expression> args = visitor.visit(cce.getArguments());
+                    
+                    // Create a minimal NewClass just to hold the arguments
+                    initializer = new J.NewClass(
+                            randomId(),
+                            EMPTY,
+                            Markers.EMPTY,
+                            null,
+                            EMPTY,
+                            null,
+                            args,
+                            null,
+                            typeMapping.methodType(null)
+                    );
+                }
+            }
+            
+            return new J.EnumValue(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    annotations,
+                    name,
+                    initializer
+            );
         }
 
         private void visitVariableField(FieldNode field) {
@@ -508,7 +599,6 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
             List<J.Modifier> modifiers = getModifiers();
-            boolean isConstructorOfEnum = false;
             boolean isConstructorOfInnerNonStaticClass = false;
             J.TypeParameters typeParameters = null;
             if (method.getGenericsTypes() != null) {
@@ -526,35 +616,21 @@ public class GroovyParserVisitor {
             Space namePrefix = whitespace();
             String methodName;
             if (method instanceof ConstructorNode) {
-                // To support special constructors well, the groovy compiler adds extra parameters and statements to the constructor under the hood.
-                // In our LST, we don't need this internal logic.
-                if (method.getDeclaringClass().isEnum()) {
-                    /*
-                    For enums, there are two extra parameters and wraps the block in a super call:
-                    enum A {                                enum A {
-                      A1                                      A1
-                      A(String s) {           =>             A(String __str, int __int, String s) {
-                        println "ss"          =>                super() { println "ss" }
-                      }                                       }
+                /*
+                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter with a reference to its parent class under the hood:
+                class A {                               class A {
+                  class B {                               class B {
+                    String s                                String s
+                    B(String s) {           =>              B(A $p$, String s) {
+                                            =>                new Object().this$0 = $p$
+                      this.s = s            =>                this.s = s
                     }                                       }
-                    */
-                    isConstructorOfEnum = true;
-                } else {
-                    /*
-                    For Java syntax for non-static inner classes, there's an extra parameter with a reference to its parent class and two statements (ConstructorCallExpression and BlockStatement):
-                    class A {                               class A {
-                      class B {                               class B {
-                        String s                                String s
-                        B(String s) {           =>              B(A $p$, String s) {
-                                                =>                new Object().this$0 = $p$
-                          this.s = s            =>                this.s = s
-                        }                                       }
-                      }                                       }
-                    }
-                    See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
-                    */
-                    isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
+                  }                                       }
                 }
+                In our LST, we don't need this internal logic, so we'll skip the first param + first two statements (ConstructorCallExpression and BlockStatement)}
+                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
+                */
+                isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
                 methodName = method.getDeclaringClass().getNameWithoutPackage().replaceFirst(".*\\$", "");
             } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
@@ -577,22 +653,14 @@ public class GroovyParserVisitor {
             Space beforeParen = sourceBefore("(");
             List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
             Parameter[] unparsedParams = method.getParameters();
-            int skipParams = isConstructorOfEnum ? 2 : isConstructorOfInnerNonStaticClass ? 1 : 0;
-            for (int i = skipParams; i < unparsedParams.length; i++) {
+            for (int i = (isConstructorOfInnerNonStaticClass ? 1 : 0); i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
                 List<J.Modifier> paramModifiers = getModifiers();
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    if (sourceStartsWith("java.lang.Object")) {
-                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), JavaType.ShallowClass.build("java.lang.Object"), null);
-                    } else {
-                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                    }
-                } else {
-                    paramType = visitTypeTree(param.getType());
-                }
+                TypeTree paramType = param.isDynamicTyped() ?
+                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
+                        visitTypeTree(param.getOriginType());
 
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
@@ -624,7 +692,7 @@ public class GroovyParserVisitor {
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            if (unparsedParams.length == skipParams) {
+            if (unparsedParams.length == 0 || (isConstructorOfInnerNonStaticClass && unparsedParams.length == 1)) {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
@@ -636,23 +704,13 @@ public class GroovyParserVisitor {
 
             J.Block body = null;
             if (method.getCode() != null) {
-                if (isConstructorOfInnerNonStaticClass) {
-                    body = bodyVisitor.visit(
-                            new BlockStatement(
-                                    ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
-                                    ((BlockStatement) method.getCode()).getVariableScope()
-                            )
-                    );
-                } else if (isConstructorOfEnum && ((BlockStatement) method.getCode()).getStatements().size() > 1) {
-                    org.codehaus.groovy.ast.stmt.Statement node = ((BlockStatement) method.getCode()).getStatements().get(1);
-                    if (node instanceof BlockStatement) {
-                        body = bodyVisitor.visit(node);
-                    } else {
-                        body = bodyVisitor.visit(method.getCode());
-                    }
-                } else {
-                    body = bodyVisitor.visit(method.getCode());
-                }
+                ASTNode code = isConstructorOfInnerNonStaticClass ?
+                        new BlockStatement(
+                                ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
+                                ((BlockStatement) method.getCode()).getVariableScope()
+                        ) :
+                        method.getCode();
+                body = bodyVisitor.visit(code);
             }
 
             queue.add(new J.MethodDeclaration(
@@ -1446,7 +1504,7 @@ public class GroovyParserVisitor {
                     }
                     jType = JavaType.Primitive.Null;
                 } else {
-                    throw new IllegalStateException("Unexpected constant type: " + type);
+                    throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
                 // Get the string literal from the source, as numeric literals may have a unary operator, underscores, dots and can be followed by "L", "f", or "d"
@@ -1498,7 +1556,7 @@ public class GroovyParserVisitor {
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
                 if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
-                    body = classVisitor.visitClassBlock(ctor.getType());
+                    body = classVisitor.visitClassBlock(ctor.getType(), false);
                 }
                 MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 return new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
@@ -2595,11 +2653,11 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode &&
-                    classNode.getUnresolvedSuperClass() != null &&
-                    classNode.getUnresolvedSuperClass().isUsingGenerics() &&
-                    !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder() &&
-                    classNode.getGenericsTypes() == null;
+            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode
+                    && classNode.getUnresolvedSuperClass() != null
+                    && classNode.getUnresolvedSuperClass().isUsingGenerics()
+                    && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
+                    && classNode.getGenericsTypes() == null;
             if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
@@ -3033,9 +3091,6 @@ public class GroovyParserVisitor {
             String name = ((AnnotationNode) node).getClassNode().getUnresolvedName();
             String[] parts = name.split("\\.");
             return sourceStartsWith("@" + name) || sourceStartsWith("@" + parts[parts.length - 1]);
-        }
-        if (node instanceof ConstructorNode && ((ConstructorNode) node).getDeclaringClass().isEnum()) {
-            return ((ConstructorNode) node).getAnnotations(new ClassNode(Generated.class)).isEmpty();
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
