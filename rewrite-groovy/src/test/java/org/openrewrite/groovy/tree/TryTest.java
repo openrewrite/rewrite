@@ -31,13 +31,13 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-               
+              
               } catch (RuntimeException e) {
-               
+              
               } catch (Exception e) {
-                           
+              
               }
-               """
+              """
           )
         );
     }
@@ -51,6 +51,19 @@ class TryTest implements RewriteTest {
               
               } catch (all) {
               
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifier() {
+        rewriteRun(
+          groovy(
+            """
+              try {
+              } catch (final RuntimeException e) {
               }
               """
           )
@@ -84,7 +97,7 @@ class TryTest implements RewriteTest {
              } finally {
                  def a = ""
              }
-              """
+             """
           )
         );
     }
