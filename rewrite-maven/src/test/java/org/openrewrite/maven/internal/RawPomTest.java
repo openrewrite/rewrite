@@ -24,8 +24,10 @@ import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
+import java.io.UncheckedIOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RawPomTest {
 
@@ -199,6 +201,26 @@ class RawPomTest {
                 assertThat(plugin.getExecutions().getFirst().getInherited()).isEqualTo("false");
             }
         }
+    }
+
+    @Test
+    void pomAtOriginOfDeserializationExceptionIsPartOfExceptionMessage() {
+        assertThatThrownBy(() -> RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+            
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        )).isInstanceOf(UncheckedIOException.class)
+          .hasMessageContaining("Failed to parse pom: Illegal processing instruction target (\"xml\")");
     }
 
 
