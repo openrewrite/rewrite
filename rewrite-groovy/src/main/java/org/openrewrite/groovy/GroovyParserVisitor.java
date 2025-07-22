@@ -1721,6 +1721,7 @@ public class GroovyParserVisitor {
                     }
                     select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
+                JContainer<Expression> typeParameters = call.getGenericsTypes() != null ? visitTypeParameterizations(call.getGenericsTypes()) : null;
                 // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
                 // closure() has implicitThis set to false
                 // So the "select" that was just parsed _may_ have actually been the method name
@@ -1832,11 +1833,10 @@ public class GroovyParserVisitor {
                             break;
                         }
                     }
-
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-                return new J.MethodInvocation(randomId(), fmt, markers, select, null, name, args, methodType);
+                return new J.MethodInvocation(randomId(), fmt, markers, select, typeParameters, name, args, methodType);
             }));
         }
 
