@@ -67,8 +67,7 @@ import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isWhitespace;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.internal.Delimiter.*;
@@ -704,7 +703,7 @@ public class GroovyParserVisitor {
                 expressions = convertAll(expression.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
                     if (n == expression.getExpression(expression.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
                         cursor++;
-                        return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                        return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
                     }
                     return Markers.EMPTY;
                 });
@@ -1278,7 +1277,7 @@ public class GroovyParserVisitor {
                 arrowPrefix = EMPTY;
             }
             J body = visit(expression.getCode());
-            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singletonList(ls)), params,
+            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singleton(ls)), params,
                     arrowPrefix,
                     body,
                     closureType));
@@ -1875,6 +1874,30 @@ public class GroovyParserVisitor {
             JContainer<Expression> args = visit(call.getArguments());
 
             queue.add(new J.MethodInvocation(randomId(), fmt, markers, null, null, name, args, methodType));
+        }
+
+        @Override
+        public void visitMethodPointerExpression(MethodPointerExpression ref) {
+            String referenceName = null;
+            if (ref.getMethodName() instanceof ConstantExpression) {
+                referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
+            }
+
+            queue.add(new J.MemberReference(randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    null, // not supported by Groovy
+                    padLeft(whitespace(), new J.Identifier(randomId(),
+                            sourceBefore(referenceName),
+                            Markers.EMPTY,
+                            emptyList(),
+                            referenceName,
+                            null, null)),
+                    typeMapping.type(ref.getType()),
+                    null, // not enough information in the AST
+                    null  // not enough information in the AST
+            ));
         }
 
         @Override
