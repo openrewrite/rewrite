@@ -1061,7 +1061,11 @@ public class GroovyParserVisitor {
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
-            boolean withinClosure = parent instanceof ClosureExpression || (parent instanceof ExpressionStatement && ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression);
+            boolean withinClosure = !(parent instanceof LambdaExpression) && parent instanceof ClosureExpression ||
+                                    (parent instanceof ExpressionStatement &&
+                                            !(((ExpressionStatement) parent).getExpression() instanceof LambdaExpression) &&
+                                            ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression
+                                    );
             if (isStaticInit) {
                 fmt = sourceBefore("static");
                 staticInitPadding = whitespace();
@@ -1281,7 +1285,9 @@ public class GroovyParserVisitor {
                     arrowPrefix,
                     body,
                     closureType));
-            skip("}");
+            if (cursor < source.length() && source.charAt(cursor) == '}') {
+                skip("}");
+            }
         }
 
         @Override

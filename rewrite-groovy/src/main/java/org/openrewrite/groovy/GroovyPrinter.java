@@ -332,7 +332,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.append("->");
             }
-            if (lambda.getBody() instanceof J.Block) {
+            if (lambda.getBody() instanceof J.Block && !ls.isJavaStyle()) {
                 J.Block block = (J.Block) lambda.getBody();
                 visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
                 visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
