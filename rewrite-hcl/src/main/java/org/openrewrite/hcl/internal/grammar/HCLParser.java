@@ -711,7 +711,6 @@ public class HCLParser extends Parser {
         ParserRuleContext _parentctx = _ctx;
         int _parentState = getState();
         ExpressionContext _localctx = new ExpressionContext(_ctx, _parentState);
-        ExpressionContext _prevctx = _localctx;
         int _startState = 12;
         enterRecursionRule(_localctx, 12, RULE_expression, _p);
         try {
@@ -724,7 +723,6 @@ public class HCLParser extends Parser {
                     case 1: {
                         _localctx = new ExpressionTermContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
 
                         setState(115);
                         exprTerm(0);
@@ -733,7 +731,6 @@ public class HCLParser extends Parser {
                     case 2: {
                         _localctx = new OperationExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(116);
                         operation();
                     }
@@ -746,7 +743,6 @@ public class HCLParser extends Parser {
                 while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
                     if (_alt == 1) {
                         if (_parseListeners != null) triggerExitRuleEvent();
-                        _prevctx = _localctx;
                         {
                             {
                                 _localctx = new ConditionalExpressionContext(new ExpressionContext(_parentctx, _parentState));
@@ -1145,7 +1141,6 @@ public class HCLParser extends Parser {
         ParserRuleContext _parentctx = _ctx;
         int _parentState = getState();
         ExprTermContext _localctx = new ExprTermContext(_ctx, _parentState);
-        ExprTermContext _prevctx = _localctx;
         int _startState = 14;
         enterRecursionRule(_localctx, 14, RULE_exprTerm, _p);
         try {
@@ -1158,7 +1153,6 @@ public class HCLParser extends Parser {
                     case 1: {
                         _localctx = new TemplateExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
 
                         setState(131);
                         templateExpr();
@@ -1167,7 +1161,6 @@ public class HCLParser extends Parser {
                     case 2: {
                         _localctx = new LiteralExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(132);
                         literalValue();
                     }
@@ -1175,7 +1168,6 @@ public class HCLParser extends Parser {
                     case 3: {
                         _localctx = new ForExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(133);
                         forExpr();
                     }
@@ -1183,7 +1175,6 @@ public class HCLParser extends Parser {
                     case 4: {
                         _localctx = new CollectionValueExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(134);
                         collectionValue();
                     }
@@ -1191,7 +1182,6 @@ public class HCLParser extends Parser {
                     case 5: {
                         _localctx = new VariableExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(135);
                         variableExpr();
                     }
@@ -1199,7 +1189,6 @@ public class HCLParser extends Parser {
                     case 6: {
                         _localctx = new FunctionCallExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(136);
                         functionCall();
                     }
@@ -1207,7 +1196,6 @@ public class HCLParser extends Parser {
                     case 7: {
                         _localctx = new ParentheticalExpressionContext(_localctx);
                         _ctx = _localctx;
-                        _prevctx = _localctx;
                         setState(137);
                         match(LPAREN);
                         setState(138);
@@ -1224,7 +1212,6 @@ public class HCLParser extends Parser {
                 while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
                     if (_alt == 1) {
                         if (_parseListeners != null) triggerExitRuleEvent();
-                        _prevctx = _localctx;
                         {
                             setState(151);
                             _errHandler.sync(this);
@@ -4017,7 +4004,7 @@ public class HCLParser extends Parser {
         return _localctx;
     }
 
-    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+    @Override public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
         switch (ruleIndex) {
             case 6:
                 return expression_sempred((ExpressionContext) _localctx, predIndex);

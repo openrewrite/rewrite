@@ -841,7 +841,6 @@ public class JsonPathParser extends Parser {
         ParserRuleContext _parentctx = _ctx;
         int _parentState = getState();
         BinaryExpressionContext _localctx = new BinaryExpressionContext(_ctx, _parentState);
-        BinaryExpressionContext _prevctx = _localctx;
         int _startState = 14;
         enterRecursionRule(_localctx, 14, RULE_binaryExpression, _p);
         try {
@@ -931,7 +930,6 @@ public class JsonPathParser extends Parser {
                 while (_alt != 2 && _alt != org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER) {
                     if (_alt == 1) {
                         if (_parseListeners != null) triggerExitRuleEvent();
-                        _prevctx = _localctx;
                         {
                             setState(130);
                             _errHandler.sync(this);
@@ -1777,7 +1775,7 @@ public class JsonPathParser extends Parser {
         return _localctx;
     }
 
-    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+    @Override public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
         switch (ruleIndex) {
             case 7:
                 return binaryExpression_sempred((BinaryExpressionContext) _localctx, predIndex);
