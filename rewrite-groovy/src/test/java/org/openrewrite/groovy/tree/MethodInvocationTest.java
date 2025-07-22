@@ -199,6 +199,39 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void staticMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              Integer::parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out::println)
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList::new
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
