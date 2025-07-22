@@ -448,7 +448,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
         // Defaulted to `true` in IntelliJ's Kotlin formatting.
         boolean aroundOperatorsBitwise = true;
-        mc = mc.getPadding().withAlternatives(
+        return mc.getPadding().withAlternatives(
                 ListUtils.map(mc.getPadding().getAlternatives(),
                         (index, arg) -> {
                             if (index > 0) {
@@ -463,7 +463,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                         }
                 )
         );
-        return mc;
     }
 
     @Override
@@ -474,7 +473,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), beforeLeftBrace));
 
         // useSpaceWithinIfParentheses is defaulted to `false` in IntelliJ's Kotlin formatting.
-        i = i.withIfCondition(
+        return i.withIfCondition(
                 i.getIfCondition().getPadding().withTree(
                         spaceAfter(
                                 i.getIfCondition().getPadding().getTree().withElement(
@@ -485,7 +484,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                         )
                 )
         );
-        return i;
     }
 
     @Override
@@ -496,8 +494,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
         // Defaulted to `true` in IntelliJ's Kotlin formatting.
         boolean beforeKeywordsElseKeyword = true;
-        e = spaceBefore(e, beforeKeywordsElseKeyword);
-        return e;
+        return spaceBefore(e, beforeKeywordsElseKeyword);
     }
 
     @Override
@@ -517,19 +514,17 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 )
         );
         boolean otherBeforeColonInForLoop = true;
-        f = f.withControl(
+        return f.withControl(
                 f.getControl().getPadding().withVariable(
                         spaceAfter(f.getControl().getPadding().getVariable(), otherBeforeColonInForLoop)
                 )
         );
-        return f;
     }
 
     @Override
     public K.SpreadArgument visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
         K.SpreadArgument s = super.visitSpreadArgument(spreadArgument, p);
-        s = s.withExpression(spaceBefore(s.getExpression(), style.getAroundOperators().getUnary()));
-        return s;
+        return s.withExpression(spaceBefore(s.getExpression(), style.getAroundOperators().getUnary()));
     }
 
     @Override
@@ -602,12 +597,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                         spaceBefore(w.getCondition().getTree(), withinParentheses)
                 )
         );
-        w = w.withCondition(
+        return w.withCondition(
                 w.getCondition().getPadding().withTree(
                         spaceAfter(w.getCondition().getPadding().getTree(), withinParentheses)
                 )
         );
-        return w;
     }
 
     @Override
@@ -621,12 +615,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                         spaceBefore(d.getWhileCondition().getTree(), withinParentheses)
                 )
         );
-        d = d.withWhileCondition(
+        return d.withWhileCondition(
                 d.getWhileCondition().getPadding().withTree(
                         spaceAfter(d.getWhileCondition().getPadding().getTree(), withinParentheses)
                 )
         );
-        return d;
     }
 
     @Override
@@ -664,12 +657,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                         spaceBefore(c.getParameter().getTree(), withinParentheses)
                 )
         );
-        c = c.withParameter(
+        return c.withParameter(
                 c.getParameter().getPadding().withTree(
                         spaceAfter(c.getParameter().getPadding().getTree(), withinParentheses)
                 )
         );
-        return c;
     }
 
     @Override
@@ -712,12 +704,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.Assignment visitAssignment(J.Assignment assignment, P p) {
         J.Assignment a = super.visitAssignment(assignment, p);
         a = a.getPadding().withAssignment(spaceBefore(a.getPadding().getAssignment(), style.getAroundOperators().getAssignment()));
-        a = a.getPadding().withAssignment(
+        return a.getPadding().withAssignment(
                 a.getPadding().getAssignment().withElement(
                         spaceBefore(a.getPadding().getAssignment().getElement(), style.getAroundOperators().getAssignment())
                 )
         );
-        return a;
     }
 
     @Override
@@ -739,8 +730,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                     )
             );
         }
-        a = a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().getAssignment()));
-        return a;
+        return a.withAssignment(spaceBefore(a.getAssignment(), style.getAroundOperators().getAssignment()));
     }
 
     @Override
@@ -850,8 +840,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         binary = padding.withOperator(
                 operator.withBefore(updateSpace(operator.getBefore(), spaceBefore))
         );
-        binary = binary.withRight(spaceBefore(binary.getRight(), spaceAfter));
-        return binary;
+        return binary.withRight(spaceBefore(binary.getRight(), spaceAfter));
     }
 
     private K.Binary applyBinarySpaceAround(K.Binary binary, boolean useSpaceAround) {
@@ -860,8 +849,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         binary = padding.withOperator(
                 operator.withBefore(updateSpace(operator.getBefore(), useSpaceAround))
         );
-        binary = binary.withRight(spaceBefore(binary.getRight(), useSpaceAround));
-        return binary;
+        return binary.withRight(spaceBefore(binary.getRight(), useSpaceAround));
     }
 
     @Override
@@ -931,8 +919,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         JRightPadded<TypedTree> rpTypedTree = kf.getReturnType();
-        kf = kf.withReturnType(rpTypedTree.withElement(spaceBefore(rpTypedTree.getElement(), style.getOther().getAroundArrowInFunctionTypes())));
-        return kf;
+        return kf.withReturnType(rpTypedTree.withElement(spaceBefore(rpTypedTree.getElement(), style.getOther().getAroundArrowInFunctionTypes())));
     }
 
     @Override

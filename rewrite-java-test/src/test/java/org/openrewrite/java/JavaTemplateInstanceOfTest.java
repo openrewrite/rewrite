@@ -487,9 +487,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                         arguments.toArray()
                       );
 
-                    mi = maybeAutoFormat(mi, mi.withArguments(
+                    return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
-                    return mi;
                 }
             }
           )),

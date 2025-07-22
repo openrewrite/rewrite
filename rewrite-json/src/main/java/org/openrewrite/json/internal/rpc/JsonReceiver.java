@@ -37,8 +37,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
         j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
-        return j;
+        return j.withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override

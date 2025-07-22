@@ -129,8 +129,7 @@ public class AddProperty extends Recipe {
                     return c;
                 });
 
-                p = p.withContent(contentList);
-                return p;
+                return p.withContent(contentList);
             }
         };
     }
