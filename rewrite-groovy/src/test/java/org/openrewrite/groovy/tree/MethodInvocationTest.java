@@ -681,4 +681,20 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void generics() {
+        rewriteRun(
+          groovy(
+            """
+              class Util {
+                  static <T> boolean compare(T t1, T t2) {
+                      return t1 == t2
+                  }
+              }
+              Util.<String>compare("A", "B")
+              """
+          )
+        );
+    }
+
 }
