@@ -1883,11 +1883,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
             boolean isMethodRef = ref instanceof MethodReferenceExpression;
-            String name = null;
-            if (ref.getMethodName() instanceof ConstantExpression) {
-                name = ((ConstantExpression) ref.getMethodName()).getValue().toString();
-            }
-
+            String name = ref.getMethodName().getText();
             queue.add(new J.MemberReference(randomId(),
                     whitespace(),
                     isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
