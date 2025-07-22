@@ -34,6 +34,10 @@ public enum Flag {
     Abstract(1L << 10),
     Strictfp(1L << 11),
     /**
+     * An enumeration type (on a class) or an enumeration constant (on a member)
+     */
+    Enum(1L << 14),
+    /**
      * Flag is set for a variable symbol if the variable's definition
      * has an initializer part.
      */
