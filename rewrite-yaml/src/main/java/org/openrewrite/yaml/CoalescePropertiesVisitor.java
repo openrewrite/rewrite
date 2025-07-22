@@ -51,18 +51,42 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
+    public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+        int levels = 0;
+        Cursor c = getCursor();
+        while (c != null && !c.isRoot()) {
+            Cursor current = c;
+            boolean foundMatch = exclusionMatchers.stream().anyMatch(it -> it.matches(current));
+            if (foundMatch) {
+                for (int i = 0; i <= levels; i++) {
+                    getCursor().getParent(i).putMessage("COALESCE_COLLAPSING", false);
+                }
+                break;
+            } else {
+                c = c.getParent();
+                levels++;
+            }
+        }
+        return e;
+    }
+
+    @Override
     public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
         Yaml.Mapping m = super.visitMapping(mapping, p);
 
+        boolean allowCoalesce = getCursor().getMessage("COALESCE_COLLAPSING", true);
+        if (!allowCoalesce) {
+            return m;
+        }
         boolean changed = false;
         List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         for (Yaml.Mapping.Entry entry : m.getEntries()) {
             if (entry.getValue() instanceof Yaml.Mapping) {
                 Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
-                if (!matchesExclusion(entry) && valueMapping.getEntries().size() == 1) {
+                if (valueMapping.getEntries().size() == 1) { //&& !matchesExclusion(entry) && matchesApplyTo(entry)) {
                     Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
-                    if (!subEntry.getPrefix().contains("#") && !matchesExclusion(subEntry) && matchesApplyTo(subEntry)) {
+                    if (!subEntry.getPrefix().contains("#")) {// && !matchesExclusion(subEntry) && matchesApplyTo(subEntry)) {
                         Yaml.Scalar coalescedKey = ((Yaml.Scalar) entry.getKey()).withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
 
                         entries.add(entry.withKey(coalescedKey)
