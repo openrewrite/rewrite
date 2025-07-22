@@ -849,7 +849,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitClassExpression(ClassExpression clazz) {
             ClassNode type = clazz.getType();
-            if (type.getTypeClass().isArray()) {
+            if (type.isArray()) {
                 queue.add(arrayType(clazz.getType()));
                 return;
             }
