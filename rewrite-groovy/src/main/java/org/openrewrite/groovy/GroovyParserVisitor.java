@@ -3095,8 +3095,7 @@ public class GroovyParserVisitor {
 
         ClassNode innerClass = ctor.getType();
         if (!(innerClass instanceof InnerClassNode)) {
-            GenericsType[] generics = innerClass != null ? innerClass.getGenericsTypes() : null;
-            return generics != null && generics.length == 0;
+            return innerClass.getGenericsTypes() != null && innerClass.getGenericsTypes().length == 0;
         }
 
         ClassNode superClass = innerClass.getUnresolvedSuperClass();
