@@ -848,8 +848,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClassExpression(ClassExpression clazz) {
-            Space prefix = whitespace();
             ClassNode type = clazz.getType();
+            if (type.getTypeClass().isArray()) {
+                queue.add(arrayType(clazz.getType()));
+                return;
+            }
+            Space prefix = whitespace();
             String name = type.getNameWithoutPackage().replace('$', '.');
             if (!source.startsWith(name, cursor)) {
                 name = type.getUnresolvedName().replace('$', '.');
@@ -1878,21 +1882,22 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodPointerExpression(MethodPointerExpression ref) {
-            String referenceName = null;
+            boolean isMethodRef = ref instanceof MethodReferenceExpression;
+            String name = null;
             if (ref.getMethodName() instanceof ConstantExpression) {
-                referenceName = ((ConstantExpression) ref.getMethodName()).getValue().toString();
+                name = ((ConstantExpression) ref.getMethodName()).getValue().toString();
             }
 
             queue.add(new J.MemberReference(randomId(),
                     whitespace(),
-                    Markers.EMPTY,
-                    padRight(visit(ref.getExpression()), sourceBefore("::")),
+                    isMethodRef ? Markers.EMPTY : Markers.build(singleton(new MethodPointer(randomId()))),
+                    padRight(visit(ref.getExpression()), sourceBefore(isMethodRef ? "::" : ".&")),
                     null, // not supported by Groovy
                     padLeft(whitespace(), new J.Identifier(randomId(),
-                            sourceBefore(referenceName),
+                            sourceBefore(name),
                             Markers.EMPTY,
                             emptyList(),
-                            referenceName,
+                            name,
                             null, null)),
                     typeMapping.type(ref.getType()),
                     null, // not enough information in the AST
@@ -2531,7 +2536,7 @@ public class GroovyParserVisitor {
         return expr.withPrefix(prefix);
     }
 
-    private TypeTree arrayType(ClassNode classNode) {
+    private J.ArrayType arrayType(ClassNode classNode) {
         ClassNode typeTree = classNode.getComponentType();
         int count = 1;
         while (typeTree.isArray()) {
