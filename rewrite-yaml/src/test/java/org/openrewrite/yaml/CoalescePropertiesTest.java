@@ -33,6 +33,76 @@ class CoalescePropertiesTest implements RewriteTest {
     }
 
     @Test
+    void blah2() {
+        rewriteRun(
+          // "$..[\"endpoint.health\"]"
+          spec -> spec.recipe(new CoalesceProperties(List.of("$..[endpoint.health]"), null)),
+          //language=yaml
+          yaml(
+//            """
+//              spring:
+//                application:
+//                  name: my-app
+//              logging:
+//                level:
+//                  root: INFO
+//                  org.springframework.web: DEBUG
+//              management:
+//                metrics:
+//                  enable.process.files: true
+//                endpoint:
+//                  health:
+//                    something:
+//                      yeah: true
+//                    show-components: always
+//                    show-details: always
+//              """,
+            """
+              management:
+                metrics:
+                  enable.process.files: true
+                endpoint:
+                  health:
+                    something:
+                      yeah: true
+                    show-components: always
+                    show-details: always
+              """,
+//            """
+//              management:
+//                metrics:
+//                  enable.process.files: true
+//                endpoint.health:
+//                  something:
+//                    yeah: true
+//                  show-components: always
+//                  show-details: always
+//              """,
+//            """
+//              spring.application.name: my-app
+//              logging.level:
+//                root: INFO
+//                org.springframework.web: DEBUG
+//              management:
+//                metrics.enable.process.files: true
+//                endpoint.health:
+//                  something.yeah: true
+//                  show-components: always
+//                  show-details: always
+//              """,
+            """
+              management:
+                metrics.enable.process.files: true
+                endpoint.health:
+                  something.yeah: true
+                  show-components: always
+                  show-details: always
+              """
+          )
+        );
+    }
+
+    @Test
     void blah() {
         rewriteRun(
           spec -> spec.recipe(new CoalesceProperties(List.of("$..[endpoint.health][?(@property.match(/.*/))]", "$..[logging.level][?(@property.match(/.*/))]"), List.of("$..spring[?(@property.match(/.*/))]"))),
