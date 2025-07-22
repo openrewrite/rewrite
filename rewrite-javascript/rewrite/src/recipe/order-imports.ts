@@ -158,7 +158,12 @@ export class OrderImports extends Recipe {
                     const import_ = importPadded.element;
                     if (this.isMultipleImport(import_) == 1) {
                         const importSorted = produce(import_, draft => {
-                            (draft.importClause!.namedBindings as Draft<JS.NamedImports>).elements.elements.sort((a, b) => {
+                            let elements = (draft.importClause!.namedBindings as Draft<JS.NamedImports>).elements.elements;
+                            const trailingComma = elements.length > 0 && elements[elements.length - 1].markers?.markers.find(m => m.kind === J.Markers.TrailingComma);
+                            if (trailingComma) {
+                                elements[elements.length - 1].markers.markers = elements[elements.length - 1].markers.markers.filter(m => m.kind !== J.Markers.TrailingComma);
+                            }
+                            elements.sort((a, b) => {
                                 const namesExtracted: string[] = [a.element, b.element].map(expr => {
                                     const is = expr as JS.ImportSpecifier;
                                     if (is.specifier.kind == JS.Kind.Alias) {
@@ -171,6 +176,9 @@ export class OrderImports extends Recipe {
                                 });
                                 return namesExtracted[0].localeCompare(namesExtracted[1]);
                             });
+                            if (trailingComma && elements.length > 0 && !elements[elements.length - 1].markers.markers.find(m => m.kind === J.Markers.TrailingComma)) {
+                                elements[elements.length - 1].markers.markers.push(trailingComma);
+                            }
                         });
                         const formatted = await new AutoformatVisitor().visit(importSorted, {}) as JS.Import;
                         ret.push(produce(importPadded, draft => {

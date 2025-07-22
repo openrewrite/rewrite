@@ -24,7 +24,7 @@ public class GradleWrapperTest {
 
     @Test
     void listGradleWrappers() {
-        RemoteResource resource = GradleWrapper.create(null, null, null, new InMemoryExecutionContext())
+        RemoteResource resource = GradleWrapper.create(null, null, new InMemoryExecutionContext())
                 .gradlew();
     }
 }

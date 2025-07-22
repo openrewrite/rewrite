@@ -106,6 +106,11 @@ public class ChangeTagAttribute extends Recipe {
                         (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue)) :
                         newValue;
 
+                // Check if the value is already set to the desired value (idempotency)
+                if (stringValue.equals(changedValue)) {
+                    return attribute;
+                }
+
                 return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),
                                 "",

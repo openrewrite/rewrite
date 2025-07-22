@@ -199,6 +199,39 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void staticMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              Integer::parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out::println)
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList::new
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
@@ -533,4 +566,119 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5729")
+    void closureChainedCall() {
+        rewriteRun(
+          groovy(
+            """
+              foo { }()
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureCallWithArgs() {
+        rewriteRun(
+          groovy(
+            """
+              def bar(closure) {
+                  return { x -> println x }
+              }
+              bar { }("hello")
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleChainedCalls() {
+        rewriteRun(
+          groovy(
+            """
+              def chain() {
+                  return { { println "nested" } }
+              }
+              chain()()
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureWithParamCall() {
+        rewriteRun(
+          groovy(
+            """
+              def create(x) {
+                  return { y -> println '$x $y' }
+              }
+              create("hello") { }("world")
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedMethodClosureCall() {
+        rewriteRun(
+          groovy(
+            """
+              def outer() {
+                  return { inner() }
+              }
+              def inner() {
+                  return { println "inner" }
+              }
+              outer()()
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableClosureCall() {
+        rewriteRun(
+          groovy(
+            """
+              def factory() {
+                  return { x -> x * 2 }
+              }
+              def closure = factory()
+              closure(5)
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureComplexArgs() {
+        rewriteRun(
+          groovy(
+            """
+              def builder(closure) {
+                  return { a, b -> closure(a + b) }
+              }
+              builder { println it }(10, 20)
+              """
+          )
+        );
+    }
+
+    @Test
+    void safeNavigationClosureCall() {
+        rewriteRun(
+          groovy(
+            """
+              def maybe() {
+                  return Math.random() > 0.5 ? { println "yes" } : null
+              }
+              maybe()?.call()
+              """
+          )
+        );
+    }
+
 }
