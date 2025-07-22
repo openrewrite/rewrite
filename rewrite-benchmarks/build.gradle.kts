@@ -22,9 +22,13 @@ dependencies {
     jmhAnnotationProcessor("org.openjdk.jmh:jmh-generator-annprocess:latest.release")
 }
 
+val jmhIncludes = findProperty("jmhIncludes") as String?;
 jmh {
     fork = 1
     warmupIterations = 1
     iterations = 1
     duplicateClassesStrategy = DuplicatesStrategy.EXCLUDE
+    if (jmhIncludes != null) {
+        includes.set(setOf(jmhIncludes))
+    }
 }
