@@ -219,7 +219,7 @@ class EnumTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().getFirst();
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
                 JavaType.Class colorEnumType = (JavaType.Class) requireNonNull(md.getReturnTypeExpression()).getType();
 
                 assertEquals(JavaType.FullyQualified.Kind.Enum, requireNonNull(colorEnumType).getKind());
