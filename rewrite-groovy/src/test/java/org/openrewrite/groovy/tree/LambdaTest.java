@@ -36,6 +36,17 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void lambdaExpressionWithParens() {
+        rewriteRun(
+          groovy(
+            """
+              def lambda = a -> { a }
+              """
+          )
+        );
+    }
+
+    @Test
     void lambdaExpressionNoArguments() {
         rewriteRun(
           groovy(
@@ -45,6 +56,7 @@ class LambdaTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void lambdaExpressionWithArgument() {
         rewriteRun(
