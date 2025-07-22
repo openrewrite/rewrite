@@ -2516,15 +2516,10 @@ public class GroovyParserVisitor {
                     && classNode.getUnresolvedSuperClass().isUsingGenerics()
                     && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
                     && classNode.getGenericsTypes() == null;
-            if (isAnonymousClassWithGenericSuper) {
+            if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
-                        visitTypeParameterizations(classNode.getUnresolvedSuperClass().getGenericsTypes());
-                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
-            } else if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-                JContainer<Expression> typeParameters = inferredType ?
-                        JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
-                        visitTypeParameterizations(classNode.getGenericsTypes());
+                        visitTypeParameterizations(isAnonymousClassWithGenericSuper ? classNode.getUnresolvedSuperClass().getGenericsTypes() : classNode.getGenericsTypes());
                 expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, typeParameters, typeMapping.type(classNode));
             }
         }
@@ -3100,7 +3095,8 @@ public class GroovyParserVisitor {
 
         ClassNode innerClass = ctor.getType();
         if (!(innerClass instanceof InnerClassNode)) {
-            return false;
+            GenericsType[] generics = innerClass != null ? innerClass.getGenericsTypes() : null;
+            return generics != null && generics.length == 0;
         }
 
         ClassNode superClass = innerClass.getUnresolvedSuperClass();
