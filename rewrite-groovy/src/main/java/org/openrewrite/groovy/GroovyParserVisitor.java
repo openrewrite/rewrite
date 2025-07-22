@@ -2536,7 +2536,7 @@ public class GroovyParserVisitor {
         return expr.withPrefix(prefix);
     }
 
-    private J.ArrayType arrayType(ClassNode classNode) {
+    private TypeTree arrayType(ClassNode classNode) {
         ClassNode typeTree = classNode.getComponentType();
         int count = 1;
         while (typeTree.isArray()) {
