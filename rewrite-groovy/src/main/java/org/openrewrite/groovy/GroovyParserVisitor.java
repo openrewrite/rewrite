@@ -850,7 +850,7 @@ public class GroovyParserVisitor {
         public void visitClassExpression(ClassExpression clazz) {
             ClassNode type = clazz.getType();
             if (type.isArray()) {
-                queue.add(arrayType(clazz.getType()));
+                queue.add(arrayType(type));
                 return;
             }
             Space prefix = whitespace();
