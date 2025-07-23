@@ -25,6 +25,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
@@ -36,8 +37,6 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTaskToTasksRegister extends Recipe {
-
-    private static final GradleParser GRADLE_PARSER = GradleParser.builder().build();
 
     @Override
     public String getDisplayName() {
@@ -119,19 +118,20 @@ public class ChangeTaskToTasksRegister extends Recipe {
             Expression select = m.getSelect();
             if (select != null) {
                 template.append("#{any()}.");
-                parameters.add(select);
+                parameters.add(select.withType(JavaType.Primitive.Void)); // Bypass the type check for `project.tasks` not found
             }
-            template.append("tasks.register(\"#{}\"");
+            template.append("tasks.register(\"#{}\")");
             parameters.add(inner.getSimpleName());
-            if (taskType != null) {
-                template.append(", #{any()}");
-                parameters.add(taskType);
-            }
-            template.append(")");
 
             J.MethodInvocation taskRegistration = GroovyTemplate.apply(template.toString(), getCursor(), m.getCoordinates().replace(), parameters.toArray());
-
-            return taskRegistration.withArguments(ListUtils.concat(taskRegistration.getArguments(), taskLambda));
+            List<Expression> appendArgs = new ArrayList<>();
+            if (taskType != null) {
+                appendArgs.add(taskType);
+            }
+            if (taskLambda != null) {
+                appendArgs.add(taskLambda);
+            }
+            return taskRegistration.withArguments(ListUtils.concatAll(taskRegistration.getArguments(), appendArgs));
         }
 
         private boolean isTaskDeclaration(J.MethodInvocation method, Cursor cursor) {
@@ -185,11 +185,6 @@ public class ChangeTaskToTasksRegister extends Recipe {
                 return m;
             }
 
-            Expression taskType = null;
-            if(m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
-                taskType = m.getTypeParameters().get(0);
-            }
-
             J.Lambda taskLambda = null;
             if (args.size() == 2 && args.get(1) instanceof J.Lambda) {
                 taskLambda = (J.Lambda) args.get(1);
@@ -202,18 +197,13 @@ public class ChangeTaskToTasksRegister extends Recipe {
                 template.append("#{any()}.");
                 parameters.add(select);
             }
-            template.append("tasks.register");
-            // if (taskType != null) {
-                // template.append("<#{any()}>");
-                // parameters.add(taskType);
-            // }
-            template.append("(\"#{}\")");
+            template.append("tasks.register(\"#{}\")");
             parameters.add(taskName.getValue());
 
             J.MethodInvocation taskRegistration = KotlinTemplate.apply(template.toString(), getCursor(), m.getCoordinates().replace(), parameters.toArray());
 
-            return m.withSelect(taskRegistration.getSelect()) //due to KotlinTemplate parsing tasks.register<Type>() as a J.Binary LargerThan check (created separate ticket), skipping the taskType in template but then have to set it manually
-                    .withName(taskRegistration.getName()) //due to KotlinTemplate parsing tasks.register<Type>() as a J.Binary LargerThan check (created separate ticket), skipping the taskType in template but then have to set it manually
+            return m.withSelect(taskRegistration.getSelect())
+                    .withName(taskRegistration.getName())
                     .withArguments(ListUtils.concat((taskRegistration).getArguments(), taskLambda));
         }
 
