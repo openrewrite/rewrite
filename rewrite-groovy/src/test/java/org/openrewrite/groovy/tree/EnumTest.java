@@ -105,10 +105,10 @@ class EnumTest implements RewriteTest {
               class Outer {
                   enum A {
                       A1(1);
-
+              
                       A(int n) {}
                   }
-
+              
                   private static final class ContextFailedToStart {
                       private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
                           return new Object[arguments.length + 2]
