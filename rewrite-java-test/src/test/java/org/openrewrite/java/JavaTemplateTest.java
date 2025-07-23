@@ -16,16 +16,15 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1475,6 +1474,92 @@ class JavaTemplateTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void switchTemplateSupportsNullLabel() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.SwitchExpression visitSwitchExpression(J.SwitchExpression switch_, ExecutionContext ctx) {
+                  if (switch_.getCases().getStatements().stream().anyMatch(case_ -> !(case_ instanceof J.Case) || ((J.Case) case_).getCaseLabels().stream().anyMatch(label -> label.toString().contains("null")))) {
+                      return super.visitSwitchExpression(switch_, ctx);
+                  }
+
+                  J.Parentheses<J.SwitchExpression> nullParenthesizedSwitch = JavaTemplate.apply("switch (#{any()}) {case null -> \"Not entered yet\";}", getCursor(), switch_.getCoordinates().replace(), switch_.getSelector().getTree());
+                  J.SwitchExpression nullSwitch = nullParenthesizedSwitch.getTree();
+                  if (nullSwitch.getCases() == null || nullSwitch.getCases().getStatements() == null || nullSwitch.getCases().getStatements().isEmpty() || !(nullSwitch.getCases().getStatements().get(0) instanceof J.Case) || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels() == null || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().isEmpty() || !(((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().get(0) instanceof J.Literal)) {
+                      throw new IllegalStateException("Template is parsing wrong");
+                  }
+                  switch_ = switch_.withCases(switch_.getCases().withStatements(ListUtils.insert(switch_.getCases().getStatements(), nullSwitch.getCases().getStatements().get(0) ,0)));
+                  return super.visitSwitchExpression(switch_, ctx);
+              }
+
+              @Override
+              public J.Switch visitSwitch(J.Switch switch_, ExecutionContext ctx) {
+                  if (switch_.getCases().getStatements().stream().anyMatch(case_ -> !(case_ instanceof J.Case) || ((J.Case) case_).getCaseLabels().stream().anyMatch(label -> label.toString().contains("null")))) {
+                      return super.visitSwitch(switch_, ctx);
+                  }
+
+                  J.Switch nullSwitch = JavaTemplate.apply("switch (#{any()}) {case null: #{any()} = \"Not entered yet\";}", getCursor(), switch_.getCoordinates().replace(), switch_.getSelector().getTree(), toReturnIdentifier(switch_));
+                  if (nullSwitch.getCases() == null || nullSwitch.getCases().getStatements() == null || nullSwitch.getCases().getStatements().isEmpty() || !(nullSwitch.getCases().getStatements().get(0) instanceof J.Case) || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels() == null || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().isEmpty() || !(((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().get(0) instanceof J.Literal)) {
+                      throw new IllegalStateException("Template is parsing wrong");
+                  }
+                  switch_ = switch_.withCases(switch_.getCases().withStatements(ListUtils.insert(switch_.getCases().getStatements(), nullSwitch.getCases().getStatements().get(0) ,0)));
+                  return super.visitSwitch(switch_, ctx);
+              }
+
+              private J.Identifier toReturnIdentifier(Tree tree) {
+                  return new JavaIsoVisitor<AtomicReference<J.Identifier>>() {
+                      @Override
+                      public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<J.Identifier> identifierAtomicReference) {
+                          if (identifier.getSimpleName().equals("toReturn")) {
+                              identifierAtomicReference.set(identifier);
+                          }
+                          return super.visitIdentifier(identifier, identifierAtomicReference);
+                      }
+                  }.reduce(tree, new AtomicReference<>()).get();
+              }
+            })),
+          java(
+            """
+              class BugTest {
+                  static String score(Integer i) {
+                      String toReturn = "0";
+                      switch (i) {
+                          case 0, 1, 2, 3, 4: toReturn = "FAILED";
+                          case 5, 6: toReturn = "AVERAGE";
+                      }
+                      return switch (i) {
+                          case 7, 8 -> "GOOD";
+                          case 9 -> "EXCELLENT";
+                          case 10 -> "UNBELIEVABLE";
+                          default -> toReturn;
+                      };
+                  }
+              }
+              """,
+            """
+               class BugTest {
+                   static String score(Integer i) {
+                       String toReturn = "0";
+                       switch (i) {
+                           case null: toReturn = "Not entered yet";
+                           case 0, 1, 2, 3, 4: toReturn = "FAILED";
+                           case 5, 6: toReturn = "AVERAGE";
+                       }
+                       return switch (i) {
+                           case null -> "Not entered yet";
+                           case 7, 8 -> "GOOD";
+                           case 9 -> "EXCELLENT";
+                           case 10 -> "UNBELIEVABLE";
+                           default -> toReturn;
+                       };
+                   }
+               }
+               """
           )
         );
     }
