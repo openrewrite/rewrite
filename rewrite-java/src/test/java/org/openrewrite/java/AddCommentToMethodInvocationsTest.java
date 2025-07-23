@@ -23,8 +23,8 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 class AddCommentToMethodInvocationsTest implements RewriteTest {
-    private static final String SHORT_COMMENT = " Short comment to add";
-    private static final String LONG_COMMENT = " This is a very long comment to add. The comment uses multiline comments, not single line.";
+    private static final String SHORT_COMMENT = "Short comment to add";
+    private static final String LONG_COMMENT = "This is a very long comment to add. The comment uses multiline comments, not single line.";
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -33,6 +33,12 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
             package foo;
             public class Foo {
                 public void bar(String arg) {}
+                public boolean gar() {
+                    return true;
+                }
+                public String har(boolean arg) {
+                    return "";
+                }
             }
             """
         ));
@@ -42,27 +48,34 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     @Test
     void addSingleLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false)),
+          spec -> spec.recipes(
+            new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false),
+            new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo gar(..)", false)
+          ),
           //language=java
           java(
             """
               import foo.Foo;
-   
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
+                      boolean gar = foo.gar();
+                      String har = foo.har(foo.gar());
                   }
               }
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
                       // Short comment to add
                       foo.bar("a");
+                      boolean gar = /* Short comment to add */ foo.gar();
+                      String har = foo.har(/* Short comment to add */foo.gar());
                   }
               }
               """
@@ -78,7 +91,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -88,11 +101,11 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
-                      /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
+                      /* This is a very long comment to add. The comment uses multiline comments, not single line. */
                       foo.bar("a");
                   }
               }
@@ -109,7 +122,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -119,15 +132,15 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
                       /*
-                      Line 1
-                      Line 2
-                      Line 3
-                      */
+                       * Line 1
+                       * Line 2
+                       * Line 3
+                       */
                       foo.bar("a");
                   }
               }
@@ -139,27 +152,32 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     @Test
     void addMultilineCommentOnSingleLine() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethodInvocations("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false)),
+          spec -> spec.recipes(
+            new AddCommentToMethodInvocations("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false),
+            new AddCommentToMethodInvocations("\nLine 1\nLine 2\nLine 3\n", "foo.Foo gar(..)", false)
+          ),
           //language=java
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
                       foo.bar("a");
+                      boolean gar = foo.gar();
                   }
               }
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
-                      // Line 1 Line 2 Line 3\s
+                      // Line 1 * Line 2 * Line 3
                       foo.bar("a");
+                      boolean gar = /* Line 1 * Line 2 * Line 3 */ foo.gar();
                   }
               }
               """
@@ -175,7 +193,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -187,7 +205,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -205,12 +223,15 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
     @Test
     void addSingleLineCommentToExistingMultiLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false)),
+          spec -> spec.recipes(
+            new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo bar(..)", false),
+            new AddCommentToMethodInvocations(SHORT_COMMENT, "foo.Foo gar(..)", false)
+          ),
           //language=java
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -219,12 +240,13 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
                        * comment
                        */
                       foo.bar("a");
+                      boolean gar = /* Existing comment */ foo.gar();
                   }
               }
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -234,6 +256,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
                        */
                       // Short comment to add
                       foo.bar("a");
+                      boolean gar = /* Existing comment */ /* Short comment to add */ foo.gar();
                   }
               }
               """
@@ -249,7 +272,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -263,7 +286,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-
+              
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -271,7 +294,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
                        * Existing multi line
                        * comment
                        */
-                      /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
+                      /* This is a very long comment to add. The comment uses multiline comments, not single line. */
                       foo.bar("a");
                   }
               }
