@@ -386,19 +386,14 @@ public class GroovyParserVisitor {
                 
                 List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>();
                 for (int i = 0; i < enumConstants.size(); i++) {
-                    FieldNode enumConstant = enumConstants.get(i);
-                    boolean isLast = i == enumConstants.size() - 1;
-                    
-                    J.EnumValue enumValue = visitEnumVariable(enumConstant);
+                    J.EnumValue enumValue = visitEnumVariable(enumConstants.get(i));
                     JRightPadded<J.EnumValue> paddedEnumValue = JRightPadded.build(enumValue).withAfter(whitespace());
-
                     if (sourceStartsWith(",")) {
                         skip(",");
-                        if (isLast) {
+                        if (i == enumConstants.size() - 1) {
                             paddedEnumValue = paddedEnumValue.withMarkers(Markers.build(singleton(new TrailingComma(randomId(), whitespace()))));
                         }
                     }
-
                     enumValues.add(paddedEnumValue);
                 }
                 
@@ -408,15 +403,8 @@ public class GroovyParserVisitor {
                     hasTerminalSemicolon = true;
                 }
                 
-                J.EnumValueSet enumValueSet = new J.EnumValueSet(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        enumValues,
-                        hasTerminalSemicolon
-                );
-                
-                statements.add(JRightPadded.build((Statement) enumValueSet));
+                J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, hasTerminalSemicolon);
+                statements.add(JRightPadded.build(enumValueSet));
             }
             
             statements.addAll(sortedByPosition.values().stream()
@@ -482,6 +470,7 @@ public class GroovyParserVisitor {
                         args,
                         null,
                         typeMapping.methodType(null)
+                        //typeMapping.methodType(field.getDeclaringClass().getDeclaredConstructors().get(0))
                 );
             }
             return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);
