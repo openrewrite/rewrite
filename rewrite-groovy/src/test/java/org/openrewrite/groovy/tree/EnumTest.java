@@ -60,7 +60,7 @@ class EnumTest implements RewriteTest {
               enum Test {
                   @Deprecated(since = "now")
                   One,
-
+              
                   @Deprecated(since = "now")
                   Two;
               }
@@ -80,15 +80,15 @@ class EnumTest implements RewriteTest {
                       @Deprecated
                       void foo() {}
                   },
-
+              
                   A2 {
                       @Deprecated
                       void foo() {}
                   };
-
+              
                   A() {}
                   A(int n) {}
-
+              
                   abstract void foo();
               }
               """
@@ -143,7 +143,7 @@ class EnumTest implements RewriteTest {
               enum A {
                   ONE(1),
                   TWO(2);
-
+              
                   A(int n) {}
               }
               """
