@@ -1021,6 +1021,18 @@ public class GroovyParserVisitor {
                     case "?=":
                         gBinaryOp = G.Binary.Type.ElvisAssignment;
                         break;
+                    case "**":
+                        gBinaryOp = G.Binary.Type.Power;
+                        break;
+                    case "**=":
+                        gBinaryOp = G.Binary.Type.PowerAssignment;
+                        break;
+                    case "===":
+                        gBinaryOp = G.Binary.Type.IdentityEquals;
+                        break;
+                    case "!==":
+                        gBinaryOp = G.Binary.Type.IdentityNotEquals;
+                        break;
                 }
 
                 cursor += binary.getOperation().getText().length();
