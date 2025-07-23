@@ -504,8 +504,8 @@ public class GroovyParserVisitor {
                 methodName = method.getName();
             } else {
                 // Method name might be in quotes
-                char openingQuote = source.charAt(cursor);
-                methodName = openingQuote + method.getName() + openingQuote;
+                String delim = source.charAt(cursor) + "";
+                methodName = sourceSubstring(cursor, delim) + delim;
             }
             cursor += methodName.length();
             J.Identifier name = new J.Identifier(randomId(),
