@@ -19,7 +19,6 @@ import groovy.lang.GroovySystem;
 import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
-import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -356,7 +355,7 @@ public class GroovyParserVisitor {
                     enumConstants.add(field);
                     continue;
                 }
-                if (field.hasInitialExpression() && field.getInitialExpression() instanceof ConstructorCallExpression) {
+                if (field.getInitialExpression() instanceof ConstructorCallExpression) {
                     ConstructorCallExpression cce = (ConstructorCallExpression) field.getInitialExpression();
                     if (cce.isUsingAnonymousInnerClass() && cce.getType() instanceof InnerClassNode) {
                         fieldInitializers.add((InnerClassNode) cce.getType());
@@ -381,10 +380,8 @@ public class GroovyParserVisitor {
 
             Space blockPrefix = sourceBefore("{");
             
-            // Process enum constants first if this is an enum
             List<JRightPadded<Statement>> statements = new ArrayList<>();
             if (!enumConstants.isEmpty()) {
-                // Sort enum constants by position
                 enumConstants.sort(Comparator.comparing(GroovyParserVisitor::pos));
                 
                 List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>();
@@ -392,47 +389,23 @@ public class GroovyParserVisitor {
                     FieldNode enumConstant = enumConstants.get(i);
                     boolean isLast = i == enumConstants.size() - 1;
                     
-                    // Visit the enum constant
-                    J.EnumValue enumValue = visitEnumValue(enumConstant, isLast);
-                    
-                    // Handle comma or semicolon after the enum value
-                    Space afterSpace = EMPTY;
-                    if (!isLast) {
-                        afterSpace = sourceBefore(",");
-                    } else {
-                        // For the last enum value, check if there's a trailing comma or semicolon
-                        int cursorBefore = cursor;
-                        Space maybeSpace = whitespace();
-                        if (sourceStartsWith(",")) {
-                            skip(",");
-                            // This is a trailing comma - add it as a marker
-                            enumValues.add(JRightPadded.build(enumValue)
-                                    .withAfter(maybeSpace)
-                                    .withMarkers(Markers.build(singletonList(new TrailingComma(randomId(), whitespace())))));
-                            continue;
-                        } else if (sourceStartsWith(";")) {
-                            // Semicolon will be handled outside the loop, but preserve the space
-                            cursor = cursorBefore;
-                            afterSpace = maybeSpace;
-                        } else {
-                            // No comma or semicolon, restore cursor to before the space
-                            cursor = cursorBefore;
-                            afterSpace = EMPTY;
+                    J.EnumValue enumValue = visitEnumVariable(enumConstant);
+                    JRightPadded<J.EnumValue> paddedEnumValue = JRightPadded.build(enumValue).withAfter(whitespace());
+
+                    if (sourceStartsWith(",")) {
+                        skip(",");
+                        if (isLast) {
+                            paddedEnumValue = paddedEnumValue.withMarkers(Markers.build(singleton(new TrailingComma(randomId(), whitespace()))));
                         }
                     }
-                    
-                    enumValues.add(JRightPadded.build(enumValue).withAfter(afterSpace));
+
+                    enumValues.add(paddedEnumValue);
                 }
                 
-                // Check for semicolon after enum values
                 boolean hasTerminalSemicolon = false;
-                Space spaceBeforeSemicolon = whitespace();
                 if (sourceStartsWith(";")) {
                     skip(";");
                     hasTerminalSemicolon = true;
-                } else {
-                    // No semicolon, restore cursor
-                    cursor -= spaceBeforeSemicolon.getWhitespace().length();
                 }
                 
                 J.EnumValueSet enumValueSet = new J.EnumValueSet(
@@ -446,7 +419,6 @@ public class GroovyParserVisitor {
                 statements.add(JRightPadded.build((Statement) enumValueSet));
             }
             
-            // Process other members
             statements.addAll(sortedByPosition.values().stream()
                     // anonymous classes will be visited as part of visiting the ConstructorCallExpression
                     .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
@@ -465,10 +437,7 @@ public class GroovyParserVisitor {
                     })
                     .collect(toList()));
             
-            return new J.Block(randomId(), blockPrefix, Markers.EMPTY,
-                    JRightPadded.build(false),
-                    statements,
-                    sourceBefore("}"));
+            return new J.Block(randomId(), blockPrefix, Markers.EMPTY, JRightPadded.build(false), statements, sourceBefore("}"));
         }
 
         @Override
@@ -480,61 +449,42 @@ public class GroovyParserVisitor {
         @Override
         public void visitField(FieldNode field) {
             if (field.isEnum()) {
-                // Enum constants are handled separately in visitClassBlock, thus should not be called for enum constants here
+                // Enum constants are handled separately in visitClassBlock, thus should not be skipped here
                 return;
             }
             visitVariableField(field);
         }
 
-        private J.EnumValue visitEnumValue(FieldNode fieldNode, boolean isLast) {
+        private J.EnumValue visitEnumVariable(FieldNode field) {
             Space prefix = whitespace();
             
-            List<J.Annotation> annotations = visitAndGetAnnotations(fieldNode, this);
+            List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
 
             Space namePrefix = whitespace();
-            String enumName = fieldNode.getName();
+            String enumName = field.getName();
             skip(enumName);
-            
-            J.Identifier name = new J.Identifier(
-                    randomId(),
-                    namePrefix,
-                    Markers.EMPTY,
-                    emptyList(),
-                    enumName,
-                    typeMapping.type(fieldNode.getType()),
-                    typeMapping.variableType(fieldNode)
-            );
-            
+
+            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
+
             J.NewClass initializer = null;
-            if (fieldNode.getInitialExpression() instanceof ConstructorCallExpression) {
-                ConstructorCallExpression cce = (ConstructorCallExpression) fieldNode.getInitialExpression();
-                
-                if (sourceStartsWith("(")) {
-                    RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(cce.getArguments(), this);
-                    JContainer<Expression> args = visitor.visit(cce.getArguments());
-                    
-                    initializer = new J.NewClass(
-                            randomId(),
-                            EMPTY,
-                            Markers.EMPTY,
-                            null,
-                            EMPTY,
-                            null,
-                            args,
-                            null,
-                            typeMapping.methodType(null)
-                    );
-                }
+            if (sourceStartsWith("(") && field.getInitialExpression() instanceof ConstructorCallExpression) {
+                ConstructorCallExpression cce = (ConstructorCallExpression) field.getInitialExpression();
+                RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(cce.getArguments(), this);
+                JContainer<Expression> args = visitor.visit(cce.getArguments());
+
+                initializer = new J.NewClass(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        null,
+                        EMPTY,
+                        null,
+                        args,
+                        null,
+                        typeMapping.methodType(null)
+                );
             }
-            
-            return new J.EnumValue(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    annotations,
-                    name,
-                    initializer
-            );
+            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);
         }
 
         private void visitVariableField(FieldNode field) {
