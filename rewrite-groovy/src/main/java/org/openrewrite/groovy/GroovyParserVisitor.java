@@ -351,7 +351,7 @@ public class GroovyParserVisitor {
                 if (!appearsInSource(field)) {
                     continue;
                 }
-                if (clazz.isEnum()) {
+                if (field.isEnum()) {
                     enumConstants.add(field);
                     continue;
                 }
