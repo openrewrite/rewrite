@@ -123,8 +123,7 @@ public class NoWhitespaceBefore extends Recipe {
                     return vd;
                 }
                 vd = vd.getPadding().withVariables(ListUtils.map(vd.getPadding().getVariables(), v -> {
-                    v = v.withAfter(v.getAfter().withWhitespace(""));
-                    return v;
+                    return v.withAfter(v.getAfter().withWhitespace(""));
                 }));
             }
             return vd;
@@ -158,8 +157,7 @@ public class NoWhitespaceBefore extends Recipe {
                 if (p.getPadding().getTypeParameters() != null) {
                     p = p.getPadding().withTypeParameters(p.getPadding().getTypeParameters().getPadding().withElements(
                             ListUtils.map(p.getPadding().getTypeParameters().getPadding().getElements(), e -> {
-                                e = e.withAfter(e.getAfter().withWhitespace(""));
-                                return e;
+                                return e.withAfter(e.getAfter().withWhitespace(""));
                             })
                     ));
                 }

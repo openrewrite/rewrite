@@ -32,7 +32,6 @@ public class QuarkVisitor<P> extends TreeVisitor<Quark, P> {
 
     public Quark visitQuark(Quark quark, P p) {
         Quark q = quark;
-        q = q.withMarkers(visitMarkers(q.getMarkers(), p));
-        return q;
+        return q.withMarkers(visitMarkers(q.getMarkers(), p));
     }
 }

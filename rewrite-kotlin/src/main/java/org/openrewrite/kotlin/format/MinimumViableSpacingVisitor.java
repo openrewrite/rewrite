@@ -45,8 +45,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, P p) {
         K.CompilationUnit kcu = super.visitCompilationUnit(cu, p);
-        kcu = kcu.getPadding().withStatements(visitStatementList(kcu.getPadding().getStatements()));
-        return kcu;
+        return kcu.getPadding().withStatements(visitStatementList(kcu.getPadding().getStatements()));
     }
 
     @Override
@@ -103,10 +102,8 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
 
-        c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(),
+        return c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(),
                 (i, st) -> (i != 0) ? st.withPrefix(addNewline(st.getPrefix())) : st)));
-
-        return c;
     }
 
     private Space addNewline(Space prefix) {
@@ -232,8 +229,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        b = b.getPadding().withStatements(visitStatementList(b.getPadding().getStatements()));
-        return b;
+        return b.getPadding().withStatements(visitStatementList(b.getPadding().getStatements()));
     }
 
     private List<JRightPadded<Statement>> visitStatementList(List<JRightPadded<Statement>> statements) {
@@ -288,8 +284,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
         J.ForEachLoop.Control c = super.visitForEachControl(control, p);
         c = c.getPadding().withVariable(c.getPadding().getVariable().withAfter(updateSpace(c.getPadding().getVariable().getAfter(), true)));
-        c = c.withIterable(spaceBefore(c.getIterable(), true));
-        return c;
+        return c.withIterable(spaceBefore(c.getIterable(), true));
     }
 
     @Override

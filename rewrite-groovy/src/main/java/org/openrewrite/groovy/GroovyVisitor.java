@@ -42,8 +42,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             c = c.withPackageDeclaration((G.Package) visitNonNull(c.getPackageDeclaration(), p));
         }
         c = c.withStatements(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p)));
-        c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
-        return c;
+        return c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
     }
 
     @Override
@@ -62,16 +61,14 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             g = (G.GString) temp;
         }
         g = g.withStrings(ListUtils.map(g.getStrings(), s -> visit(s, p)));
-        g = g.withType(visitType(gString.getType(), p));
-        return g;
+        return g.withType(visitType(gString.getType(), p));
     }
 
     public J visitGStringValue(G.GString.Value value, P p) {
         G.GString.Value v = value;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withTree(visit(v.getTree(), p));
-        v = v.withAfter(visitSpace(v.getAfter(), GSpace.Location.GSTRING, p));
-        return v;
+        return v.withAfter(visitSpace(v.getAfter(), GSpace.Location.GSTRING, p));
     }
 
     public J visitListLiteral(G.ListLiteral listLiteral, P p) {
@@ -85,8 +82,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             l = (G.ListLiteral) temp;
         }
         l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS, p));
-        l = l.withType(visitType(l.getType(), p));
-        return l;
+        return l.withType(visitType(l.getType(), p));
     }
 
     public J visitMapEntry(G.MapEntry mapEntry, P p) {
@@ -101,8 +97,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         }
         m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p));
         m = m.withValue((Expression) visit(m.getValue(), p));
-        m = m.withType(visitType(m.getType(), p));
-        return m;
+        return m.withType(visitType(m.getType(), p));
     }
 
     public J visitMapLiteral(G.MapLiteral mapLiteral, P p) {
@@ -116,8 +111,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
             m = (G.MapLiteral) temp;
         }
         m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, p));
-        m = m.withType(visitType(m.getType(), p));
-        return m;
+        return m.withType(visitType(m.getType(), p));
     }
 
     public J visitUnary(G.Unary unary, P p) {
@@ -132,8 +126,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         }
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, p));
         u = u.withExpression(visitAndCast(u.getExpression(), p));
-        u = u.withType(visitType(u.getType(), p));
-        return u;
+        return u.withType(visitType(u.getType(), p));
     }
 
     public J visitBinary(G.Binary binary, P p) {
@@ -149,8 +142,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), GLeftPadded.Location.BINARY_OPERATOR, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
-        b = b.withType(visitType(b.getType(), p));
-        return b;
+        return b.withType(visitType(b.getType(), p));
     }
 
     public J visitRange(G.Range range, P p) {
@@ -166,8 +158,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         r = r.withFrom(visitAndCast(r.getFrom(), p));
         r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, p));
         r = r.withTo(visitAndCast(r.getTo(), p));
-        r = r.withType(visitType(r.getType(), p));
-        return r;
+        return r.withType(visitType(r.getType(), p));
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {

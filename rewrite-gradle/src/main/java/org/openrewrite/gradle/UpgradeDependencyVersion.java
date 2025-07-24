@@ -649,8 +649,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return a;
                         }
                         String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
-                        a = a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
-                        return a;
+                        return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
             } else if (m.getSimpleName().equals("ext")) {
