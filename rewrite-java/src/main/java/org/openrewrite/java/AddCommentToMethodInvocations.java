@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
@@ -51,14 +50,6 @@ public class AddCommentToMethodInvocations extends Recipe {
             example = "java.util.List add*(..)")
     String methodPattern;
 
-    @Option(displayName = "Multiline",
-            description = "Comments use by default single line // but they can use multiline /* */. If adding a comment to " +
-                    "an invocation that is part of an assignment, for example, it will force a multiline comment on the same " +
-                    "line as the invocation in order to keep it associated with the LST element.",
-            required = false)
-    @Nullable
-    Boolean isMultiline;
-
     private static final Pattern NEWLINE = Pattern.compile("\\R");
 
     @Override
@@ -75,57 +66,19 @@ public class AddCommentToMethodInvocations extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                 if (methodMatcher.matches(m)) {
-                    Cursor parent = getCursor().getParent();
-                    return addCommentToTargetElement(m, comment, Boolean.TRUE.equals(isMultiline), isClearOfObstructions(getCursor()));
+                    return addCommentToTargetElement(m, comment);
                 }
                 return m;
             }
 
-            private boolean isClearOfObstructions(Cursor cursor) {
-                Cursor parent = cursor.getParent();
-                boolean isClear = parent != null && parent.getValue() instanceof JRightPadded;
-                if (isClear) {
-                    return parent.getParent() != null && !(parent.getParent().getValue() instanceof JContainer);
-                }
-                return false;
-            }
-
-            private <T extends J> T addCommentToTargetElement(T target, String comment, boolean multiline, boolean isClear) {
+            private <T extends J> T addCommentToTargetElement(T target, String comment) {
                 String prefixWhitespace = target.getPrefix().getWhitespace();
-                String newCommentText = comment;
-                if (!isClear) {
-                    newCommentText = newCommentText.trim();
-                    Matcher matcher = NEWLINE.matcher(newCommentText);
-                    // First Line * Second Line
-                    newCommentText = " " + matcher.replaceAll(" * ");
-                    if (!multiline) {
-                        /* First Line * Second Line */
-                        newCommentText += " ";
-                    }
-                } else {
-                    Pattern wrappedPattern = Pattern.compile("^\\R+(.*)");
-                    Matcher wrappedMatcher = wrappedPattern.matcher(newCommentText);
-                    newCommentText = newCommentText.trim();
-                    Matcher newlineMatcher = NEWLINE.matcher(newCommentText);
-                    newCommentText = newlineMatcher.find() ? newlineMatcher.replaceAll(multiline ? prefixWhitespace + " * " : " * ") : newCommentText;
-                    if (multiline) {
-                        if (wrappedMatcher.find()) {
-                            /*
-                             * First Line
-                             * Second Line
-                             */
-                            newCommentText = prefixWhitespace + " * " + newCommentText + prefixWhitespace + " ";
-                        } else {
-                            /* First Line * Second Line */
-                            newCommentText = " " + newCommentText + " ";
-                        }
-                    } else {
-                        // First Line * Second Line
-                        newCommentText = " " + newCommentText;
-                    }
-                }
+                String newCommentText = comment.trim();
+                Matcher matcher = NEWLINE.matcher(newCommentText);
+                /* First Line * Second Line */
+                newCommentText = " " + matcher.replaceAll(" * ") + " ";
                 if (doesNotHaveComment(newCommentText, target.getComments())) {
-                    TextComment textComment = new TextComment(multiline || !isClear, newCommentText, prefixWhitespace, Markers.EMPTY);
+                    TextComment textComment = new TextComment(true, newCommentText, prefixWhitespace, Markers.EMPTY);
                     return target.withComments(ListUtils.concat(target.getComments(), textComment));
                 }
                 return target;
@@ -134,7 +87,7 @@ public class AddCommentToMethodInvocations extends Recipe {
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                            lookFor.equals(((TextComment) c).getText())) {
+                            lookFor.trim().equals(((TextComment) c).getText().trim())) {
                         return false;
                     }
                 }
