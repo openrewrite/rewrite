@@ -96,8 +96,8 @@ public class ScalaParserVisitor {
         }
         
         // If we didn't get any statements and have source content, create an Unknown node
-        // But skip if we already have a package declaration (to avoid duplication)
-        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null) {
+        // But skip if we already have a package declaration or imports (to avoid duplication)
+        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null && imports.isEmpty()) {
             J.Unknown.Source unknownSource = new J.Unknown.Source(
                 randomId(),
                 EMPTY,
@@ -116,7 +116,7 @@ public class ScalaParserVisitor {
         }
         
         // Get remaining source for EOF
-        String remainingSource = converter.getRemainingSource(parseResult, source);
+        String remainingSource = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition());
         Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
 
         // Build S.CompilationUnit - the @RequiredArgsConstructor creates a constructor with all final fields

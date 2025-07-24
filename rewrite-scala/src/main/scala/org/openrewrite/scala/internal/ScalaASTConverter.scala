@@ -30,13 +30,16 @@ import java.util.{Collections, List as JList}
 class CompilationUnitResult(
                              val packageDecl: J.Package,
                              val imports: JList[J.Import],
-                             val statements: JList[Statement]
+                             val statements: JList[Statement],
+                             val lastCursorPosition: Int
                            ) {
   def getPackageDecl: J.Package = packageDecl
 
   def getImports: JList[J.Import] = imports
 
   def getStatements: JList[Statement] = statements
+  
+  def getLastCursorPosition: Int = lastCursorPosition
 }
 
 /**
@@ -65,14 +68,11 @@ class ScalaASTConverter {
     val visitor = new ScalaTreeVisitor(source, offsetAdjustment)
     val tree = parseResult.tree
 
-    // Debug: Print tree structure
-    System.out.println(s"Top-level tree: ${tree.getClass.getSimpleName}")
-    System.out.println(s"Tree span: ${tree.span}")
     
     // Check if tree is empty (parse error case)
     if (tree.isEmpty) {
       // Return empty result for parse errors
-      return CompilationUnitResult(packageDecl, imports, statements)
+      return new CompilationUnitResult(packageDecl, imports, statements, 0)
     }
 
     // Handle different types of top-level trees
@@ -137,7 +137,7 @@ class ScalaASTConverter {
         }
     }
 
-    new CompilationUnitResult(packageDecl, imports, statements)
+    new CompilationUnitResult(packageDecl, imports, statements, visitor.getCursor)
   }
 
   /**
@@ -202,34 +202,20 @@ class ScalaASTConverter {
 
   /**
    * Gets the remaining source after parsing (for EOF space).
+   * This should return the source text after the last parsed element.
    */
-  def getRemainingSource(parseResult: ScalaParseResult, source: String): String = {
-    given Context = dotty.tools.dotc.core.Contexts.NoContext
-
+  def getRemainingSource(parseResult: ScalaParseResult, source: String, lastCursorPosition: Int): String = {
     // If tree is empty (parse error), don't return any remaining source
     // The Unknown node will handle the entire source
     if (parseResult.tree.isEmpty) {
       return ""
     }
 
-    val offsetAdjustment = if (parseResult.wasWrapped) {
-      "object ExprWrapper { val result = ".length
+    // Return any remaining source after the last cursor position
+    if (lastCursorPosition < source.length) {
+      source.substring(lastCursorPosition)
     } else {
-      0
+      ""
     }
-    val visitor = new ScalaTreeVisitor(source, offsetAdjustment)
-
-    // For package definitions, we need to handle them specially
-    // to avoid visiting the package itself
-    parseResult.tree match {
-      case pkgDef: untpd.PackageDef =>
-        // Visit only the statements within the package
-        pkgDef.stats.foreach(visitor.visitTree)
-      case tree =>
-        // For other trees, visit normally
-        visitor.visitTree(tree)
-    }
-
-    visitor.getRemainingSource
   }
 }

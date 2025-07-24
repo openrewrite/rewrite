@@ -16,6 +16,7 @@
 package org.openrewrite.scala;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
@@ -43,12 +44,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                                   JContainer.Location location, String suffixBetween, 
                                   @Nullable String after, PrintOutputCapture<P> p) {
         if (location == JContainer.Location.TYPE_PARAMETERS) {
-            // Use Scala-style square brackets for type parameters
+            // For type parameters, check if we're being called with explicit brackets
+            // If so, use them; otherwise default to Scala-style square brackets
+            String openBracket = before.isEmpty() ? "[" : before;
+            String closeBracket = (after == null || after.isEmpty()) ? "]" : after;
+            
             if (container != null) {
                 visitSpace(container.getBefore(), location.getBeforeLocation(), p);
-                p.append('['); // Use [ instead of <
+                p.append(openBracket);
                 visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
-                p.append(']'); // Use ] instead of >
+                p.append(closeBracket);
             }
         } else {
             // Delegate to superclass for other container types
@@ -201,6 +206,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
         for (J.Import anImport : scu.getImports()) {
             visit(anImport, p);
+            // Scala imports don't end with semicolons but need newlines between them
+            if (!anImport.getPrefix().getWhitespace().isEmpty() || scu.getImports().indexOf(anImport) < scu.getImports().size() - 1) {
+                // Already has whitespace or not the last import
+            }
         }
 
         for (int i = 0; i < scu.getStatements().size(); i++) {
@@ -481,6 +490,105 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     // Override additional methods here for Scala-specific syntax as needed
 
+    @Override
+    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
+        beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+        visit(multiVariable.getLeadingAnnotations(), p);
+        
+        // Print modifiers but handle final specially since Scala has val/var
+        boolean isVal = false;
+        boolean hasLazy = false;
+        boolean hasModifiers = false;
+        boolean hasExplicitFinal = false;
+        
+        for (J.Modifier m : multiVariable.getModifiers()) {
+            if (m.getType() == J.Modifier.Type.Final) {
+                isVal = true;
+                // Check if this final modifier has an explicit keyword (not implicit)
+                if (m.getKeyword() != null && "final".equals(m.getKeyword())) {
+                    hasExplicitFinal = true;
+                    visit(m, p);
+                    hasModifiers = true;
+                }
+            } else if (m.getKeyword() != null && "lazy".equals(m.getKeyword())) {
+                // Skip lazy here as it's already handled in the val/var printing
+                hasLazy = true;
+            } else {
+                visit(m, p);
+                hasModifiers = true;
+            }
+        }
+        
+        // Add space after modifiers if any were printed
+        if (hasModifiers) {
+            p.append(" ");
+        }
+        
+        // Print lazy if present (only once)
+        if (hasLazy) {
+            p.append("lazy ");
+        }
+        
+        // Print val or var
+        p.append(isVal ? "val" : "var");
+        
+        // In Scala, variable declarations don't have a type at the declaration level
+        // Each variable has its own type annotation
+        
+        // Visit each variable (the variable's prefix already contains the space)
+        visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
+        
+        afterSyntax(multiVariable, p);
+        return multiVariable;
+    }
+    
+    @Override
+    public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+        beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
+        
+        // Print the variable name
+        visit(variable.getName(), p);
+        
+        // In Scala, type annotation comes after the name
+        J.VariableDeclarations parent = getCursor().getParentOrThrow().getValue();
+        if (parent.getTypeExpression() != null) {
+            p.append(":");
+            // The type expression should have the space after colon in its prefix
+            visit(parent.getTypeExpression(), p);
+            
+            // If there's an initializer, we need to handle the space before equals
+            if (variable.getPadding().getInitializer() != null) {
+                // The space before equals is in the initializer's before
+                visitSpace(variable.getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                p.append("=");
+                visit(variable.getPadding().getInitializer().getElement(), p);
+            }
+        } else {
+            // No type annotation, handle initializer normally
+            if (variable.getPadding().getInitializer() != null) {
+                // Print the space that's in the initializer's before
+                visitSpace(variable.getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                p.append("=");
+                visit(variable.getPadding().getInitializer().getElement(), p);
+            }
+        }
+        
+        afterSyntax(variable, p);
+        return variable;
+    }
+
+    @Override
+    public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
+        beforeSyntax(type, Space.Location.PARAMETERIZED_TYPE_PREFIX, p);
+        visit(type.getClazz(), p);
+        
+        // Use Scala-style square brackets for type parameters
+        visitContainer("[", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
+        
+        afterSyntax(type, p);
+        return type;
+    }
+    
     @Override
     public J visitArrayAccess(J.ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
         beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);

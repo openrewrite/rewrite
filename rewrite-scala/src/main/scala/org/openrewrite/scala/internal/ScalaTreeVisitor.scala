@@ -38,6 +38,9 @@ import java.util.{Collections, Arrays}
 class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: Context) {
   
   private var cursor = 0
+  private var isInImportContext = false
+  
+  def getCursor: Int = cursor
   
   def updateCursor(position: Int): Unit = {
     val adjustedPosition = Math.max(0, position - offsetAdjustment)
@@ -142,7 +145,13 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   private def visitIdent(id: untpd.Ident): J.Identifier = {
     val prefix = extractPrefix(id.span)
     val sourceText = extractSource(id.span) // Extract source to move cursor
-    val simpleName = id.name.toString
+    var simpleName = id.name.toString
+    
+    // Special handling for wildcard imports: convert Scala's "_" to Java's "*"
+    // This is needed because J.Import expects "*" for wildcard imports
+    if (simpleName == "_" && isInImportContext) {
+      simpleName = "*"
+    }
     
     new J.Identifier(
       Tree.randomId(),
@@ -1106,12 +1115,111 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
 
   private def visitImport(imp: untpd.Import): J = {
-    // For now, keep imports as Unknown until we resolve the cursor management issues
-    // The problem is complex:
-    // 1. Import nodes are being visited multiple times
-    // 2. Field access building is consuming source incorrectly  
-    // 3. Prefix extraction is duplicating the "import" keyword
-    visitUnknown(imp)
+    // Check if this is a simple import (no braces) that can map to J.Import
+    if (isSimpleImport(imp)) {
+      // Extract the prefix - should only be whitespace/comments before "import"
+      val adjustedStart = Math.max(0, imp.span.start - offsetAdjustment)
+      val prefix = if (cursor < adjustedStart) {
+        val prefixText = source.substring(cursor, adjustedStart)
+        cursor = adjustedStart
+        Space.format(prefixText)
+      } else {
+        Space.EMPTY
+      }
+      
+      
+      // Set import context flag for identifier processing
+      val oldInImportContext = isInImportContext
+      isInImportContext = true
+      
+      // Save current cursor position and move it to the start of the import expression
+      // The import expression (imp.expr) should have its span starting after "import "
+      val savedCursor = cursor
+      if (imp.expr.span.exists) {
+        val exprStart = Math.max(0, imp.expr.span.start - offsetAdjustment)
+        cursor = exprStart
+      }
+      
+      // Visit the import expression to get the field access
+      val expr = visitTree(imp.expr)
+      
+      // Restore import context flag
+      isInImportContext = oldInImportContext
+      
+      // For imports, we need a FieldAccess that includes the selectors
+      var qualid = expr match {
+        case fa: J.FieldAccess => fa
+        case id: J.Identifier => 
+          // Single identifier imports need to be wrapped in a FieldAccess
+          // This shouldn't happen for valid Scala imports, but handle it just in case
+          new J.FieldAccess(
+            Tree.randomId(),
+            Space.EMPTY,
+            Markers.EMPTY,
+            new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY),
+            JLeftPadded.build(id),
+            null
+          )
+        case other => 
+          // Fall back to Unknown for complex cases
+          return visitUnknown(imp)
+      }
+      
+      // Handle selectors - in Scala, import java.util.List has "java.util" as expr and "List" as selector
+      if (imp.selectors.nonEmpty && imp.selectors.size == 1) {
+        val selector = imp.selectors.head
+        selector match {
+          case untpd.ImportSelector(ident: untpd.Ident, untpd.EmptyTree, untpd.EmptyTree) =>
+            // Simple selector like "List" in "import java.util.List"
+            // Need to advance cursor past the dot before the selector
+            if (cursor < source.length && source.charAt(cursor) == '.') {
+              cursor += 1 // Skip the dot
+            }
+            
+            val selectorName = new J.Identifier(
+              Tree.randomId(),
+              Space.EMPTY,
+              Markers.EMPTY,
+              Collections.emptyList(),
+              ident.name.toString,
+              null,
+              null
+            )
+            
+            // Create a new FieldAccess with the selector
+            qualid = new J.FieldAccess(
+              Tree.randomId(),
+              Space.EMPTY,
+              Markers.EMPTY,
+              qualid,
+              JLeftPadded.build(selectorName),
+              null
+            )
+          case _ =>
+            // Complex selectors (aliases, wildcards, etc.) - keep as is for now
+        }
+      }
+      
+      // Update cursor to the end of the import
+      if (imp.span.exists) {
+        val adjustedEnd = Math.max(0, imp.span.end - offsetAdjustment)
+        updateCursor(adjustedEnd)
+      }
+      
+      // Create J.Import
+      new J.Import(
+        Tree.randomId(),
+        prefix,
+        Markers.EMPTY,
+        JLeftPadded.build(false), // static imports are not supported in Scala
+        qualid,
+        null // no alias for simple imports
+      )
+    } else {
+      // For complex imports with braces, aliases, etc., keep as Unknown for now
+      // We'll implement S.Import for these later
+      visitUnknown(imp)
+    }
   }
   
   private def isSimpleImport(imp: untpd.Import): Boolean = {
@@ -1140,9 +1248,275 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitValDef(vd: untpd.ValDef): J = {
-    // For now, preserve as Unknown to maintain correct spacing
-    // TODO: Properly implement J.VariableDeclarations with correct spacing
-    visitUnknown(vd)
+    val prefix = extractPrefix(vd.span)
+    
+    // Extract modifiers and keywords from source
+    val adjustedStart = Math.max(0, vd.span.start - offsetAdjustment)
+    val adjustedEnd = Math.max(0, vd.span.end - offsetAdjustment)
+    
+    // Extract source to find modifier keywords and val/var
+    var valVarKeyword = ""
+    var beforeValVar = Space.EMPTY
+    var afterValVar = Space.EMPTY
+    val modifiers = new util.ArrayList[J.Modifier]()
+    var hasExplicitFinal = false
+    var hasExplicitLazy = false
+    
+    if (adjustedStart >= cursor && adjustedEnd <= source.length && adjustedStart < adjustedEnd) {
+      val sourceSnippet = source.substring(cursor, adjustedEnd)
+      
+      // First, extract any modifiers before val/var
+      var modifierEndPos = 0
+      
+      // Check for access modifiers
+      if (sourceSnippet.startsWith("private ")) {
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          "private",
+          J.Modifier.Type.Private,
+          Collections.emptyList()
+        ))
+        modifierEndPos = "private ".length
+      } else if (sourceSnippet.startsWith("protected ")) {
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          Space.EMPTY,
+          Markers.EMPTY,
+          "protected",
+          J.Modifier.Type.Protected,
+          Collections.emptyList()
+        ))
+        modifierEndPos = "protected ".length
+      }
+      
+      // Check for final modifier after access modifier
+      val afterAccess = sourceSnippet.substring(modifierEndPos)
+      if (afterAccess.startsWith("final ")) {
+        hasExplicitFinal = true
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          if (modifierEndPos > 0) Space.SINGLE_SPACE else Space.EMPTY,
+          Markers.EMPTY,
+          "final",
+          J.Modifier.Type.Final,
+          Collections.emptyList()
+        ))
+        modifierEndPos += "final ".length
+      }
+      
+      // Check for lazy modifier
+      val afterFinal = sourceSnippet.substring(modifierEndPos)
+      if (afterFinal.startsWith("lazy ")) {
+        hasExplicitLazy = true
+        modifiers.add(new J.Modifier(
+          Tree.randomId(),
+          if (modifierEndPos > 0) Space.SINGLE_SPACE else Space.EMPTY,
+          Markers.EMPTY,
+          "lazy",
+          J.Modifier.Type.LanguageExtension,
+          Collections.emptyList()
+        ))
+        modifierEndPos += "lazy ".length
+      }
+      
+      // Now find val/var after modifiers
+      val afterModifiers = sourceSnippet.substring(modifierEndPos)
+      val valIndex = afterModifiers.indexOf("val")
+      val varIndex = afterModifiers.indexOf("var")
+      
+      val (keywordStart, keyword) = if (valIndex >= 0 && (varIndex < 0 || valIndex < varIndex)) {
+        (valIndex, "val")
+      } else if (varIndex >= 0) {
+        (varIndex, "var")
+      } else {
+        (-1, "")
+      }
+      
+      if (keywordStart >= 0) {
+        // Extract space before val/var (after modifiers)
+        if (keywordStart > 0) {
+          beforeValVar = Space.format(afterModifiers.substring(0, keywordStart))
+        }
+        
+        // Move cursor past all modifiers and the keyword
+        cursor = cursor + modifierEndPos + keywordStart + keyword.length
+        valVarKeyword = keyword
+        
+        // Extract space after val/var
+        // Look for the variable name in the source
+        val varNameStr = vd.name.toString
+        val nameIndex = source.indexOf(varNameStr, cursor)
+        if (nameIndex >= cursor) {
+          afterValVar = Space.format(source.substring(cursor, nameIndex))
+          cursor = nameIndex
+        }
+      }
+    }
+    
+    // Val is implicitly final in Scala (but don't add it if we already have explicit final)
+    val isFinal = valVarKeyword == "val"
+    if (isFinal && !hasExplicitFinal) {
+      modifiers.add(new J.Modifier(
+        Tree.randomId(),
+        if (modifiers.isEmpty) beforeValVar else Space.SINGLE_SPACE,
+        Markers.EMPTY,
+        null, // No keyword for implicit final
+        J.Modifier.Type.Final,
+        Collections.emptyList()
+      ))
+    }
+    
+    // Handle type annotation if present
+    var typeExpression: TypeTree = null
+    var beforeColon = Space.EMPTY
+    var afterColon = Space.EMPTY
+    
+    if (vd.tpt != null && !vd.tpt.isEmpty && vd.tpt.span.exists) {
+      // Find the end of the variable name in source
+      val nameEnd = cursor + vd.name.toString.length
+      val typeStart = Math.max(0, vd.tpt.span.start - offsetAdjustment)
+      
+      if (nameEnd < typeStart && typeStart <= source.length) {
+        val between = source.substring(nameEnd, typeStart)
+        val colonIndex = between.indexOf(':')
+        if (colonIndex >= 0) {
+          beforeColon = Space.format(between.substring(0, colonIndex))
+          afterColon = Space.format(between.substring(colonIndex + 1))
+          cursor = typeStart
+        }
+      }
+      
+      // Visit the type
+      typeExpression = visitTree(vd.tpt) match {
+        case tt: TypeTree => 
+          // For type expressions in variable declarations, we need to preserve
+          // the space after the colon
+          tt match {
+            case pt: J.ParameterizedType => pt.withPrefix(afterColon)
+            case id: J.Identifier => id.withPrefix(afterColon)
+            case fa: J.FieldAccess => fa.withPrefix(afterColon)
+            case _ => tt
+          }
+        case _ => null
+      }
+    }
+    
+    // Extract variable name
+    val varName = new J.Identifier(
+      Tree.randomId(),
+      afterValVar,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      vd.name.toString,
+      null,
+      null
+    )
+    
+    // Update cursor past the name only if we haven't parsed a type
+    // If we parsed a type, the cursor is already past the type
+    if (typeExpression == null) {
+      cursor = cursor + vd.name.toString.length
+    }
+    
+    // Handle initializer
+    var beforeEquals = Space.EMPTY
+    var initializer: Expression = null
+    
+    if (vd.rhs != null && !vd.rhs.isEmpty && vd.rhs.span.exists) {
+      val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
+      
+      // Look for equals sign
+      if (cursor < rhsStart && rhsStart <= source.length) {
+        val beforeRhs = source.substring(cursor, rhsStart)
+        val equalsIndex = beforeRhs.indexOf('=')
+        if (equalsIndex >= 0) {
+          beforeEquals = Space.format(beforeRhs.substring(0, equalsIndex))
+          val afterEqualsStr = beforeRhs.substring(equalsIndex + 1)
+          cursor = rhsStart
+          
+          // Visit the initializer
+          val rhsExpr = visitTree(vd.rhs) match {
+            case expr: Expression => expr
+            case _ => null
+          }
+          
+          if (rhsExpr != null) {
+            // Set initializer with space after equals
+            initializer = rhsExpr match {
+              case lit: J.Literal => lit.withPrefix(Space.format(afterEqualsStr))
+              case id: J.Identifier => id.withPrefix(Space.format(afterEqualsStr))
+              case mi: J.MethodInvocation => mi.withPrefix(Space.format(afterEqualsStr))
+              case na: J.NewArray => na.withPrefix(Space.format(afterEqualsStr))
+              case bin: J.Binary => bin.withPrefix(Space.format(afterEqualsStr))
+              case aa: J.ArrayAccess => aa.withPrefix(Space.format(afterEqualsStr))
+              case fa: J.FieldAccess => fa.withPrefix(Space.format(afterEqualsStr))
+              case paren: J.Parentheses[_] => paren.withPrefix(Space.format(afterEqualsStr))
+              case unknown: J.Unknown => unknown.withPrefix(Space.format(afterEqualsStr))
+              case _ => 
+                // For any other expression type, just return it as-is
+                rhsExpr
+            }
+          }
+        }
+      }
+    } else if (vd.rhs != null && vd.rhs.toString == "_") {
+      // Handle uninitialized var: var x: Int = _
+      // Look for the underscore in source
+      val underscoreIndex = source.indexOf('_', cursor)
+      if (underscoreIndex >= 0) {
+        val beforeUnderscore = source.substring(cursor, underscoreIndex)
+        val equalsIndex = beforeUnderscore.indexOf('=')
+        if (equalsIndex >= 0) {
+          beforeEquals = Space.format(beforeUnderscore.substring(0, equalsIndex))
+          val afterEquals = Space.format(beforeUnderscore.substring(equalsIndex + 1))
+          cursor = underscoreIndex + 1
+          
+          // Create a special identifier for the underscore
+          initializer = new J.Identifier(
+            Tree.randomId(),
+            afterEquals,
+            Markers.EMPTY,
+            Collections.emptyList(),
+            "_",
+            null,
+            null
+          )
+        }
+      }
+    }
+    
+    // Update cursor to end of ValDef
+    updateCursor(vd.span.end)
+    
+    // Create variable declarator
+    val namedVariable = new J.VariableDeclarations.NamedVariable(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      varName, // VariableDeclarator - J.Identifier implements this
+      Collections.emptyList(), // dimensionsAfterName - not used in Scala
+      if (initializer != null) JLeftPadded.build(initializer).withBefore(beforeEquals) else null,
+      null // variableType - will be set later by type attribution
+    )
+    
+    val declarator = JRightPadded.build(namedVariable)
+    
+    // Create the variable declarations
+    // In Scala, we need to put the type expression in the overall declaration
+    // even though it's syntactically attached to each variable
+    new J.VariableDeclarations(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      Collections.emptyList(), // leadingAnnotations
+      modifiers,
+      typeExpression, // Store type here for now
+      null, // varargs
+      Collections.emptyList(), // dimensionsBeforeName
+      Collections.singletonList(declarator)
+    )
   }
   
   private def visitModuleDef(md: untpd.ModuleDef): J.ClassDeclaration = {
@@ -2899,6 +3273,9 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // AppliedTypeTree represents a parameterized type like List[String]
     val prefix = extractPrefix(at.span)
     
+    // Save original cursor position
+    val originalCursor = cursor
+    
     // Visit the base type (e.g., List, Map, Option)
     val clazz = visitTree(at.tpt) match {
       case nt: NameTree => nt
@@ -2907,6 +3284,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     // Extract the source to find bracket positions
     val source = extractSource(at.span)
+    System.out.println(s"DEBUG visitAppliedTypeTree: full source='$source', cursor before args=$cursor")
     val openBracketIdx = source.indexOf('[')
     val closeBracketIdx = source.lastIndexOf(']')
     
@@ -2931,42 +3309,48 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val typeArgs = new util.ArrayList[JRightPadded[Expression]]()
     
     if (at.args.nonEmpty) {
-      // Track position within the brackets
-      var currentPos = openBracketIdx + 1
+      // Update cursor to the start of the first argument
+      val firstArgStart = Math.max(0, at.args.head.span.start - offsetAdjustment)
+      System.out.println(s"DEBUG: Moving cursor from $cursor to $firstArgStart for first arg")
+      cursor = firstArgStart
       
       for (i <- at.args.indices) {
         val arg = at.args(i)
+        System.out.println(s"DEBUG: Processing arg $i, cursor=$cursor")
         val argTree = visitTree(arg) match {
           case expr: Expression => expr
           case _ => return visitUnknown(at)
         }
+        System.out.println(s"DEBUG: After visiting arg $i, cursor=$cursor, argTree=$argTree")
         
         // Extract trailing comma/space
         val isLast = i == at.args.size - 1
         val afterSpace = if (isLast) {
           // Space before closing bracket
-          val argEnd = if (i > 0 && at.args.size > 1) {
-            // Find position after this arg
-            source.lastIndexOf(']')
-          } else {
-            closeBracketIdx
-          }
-          if (currentPos < argEnd) {
-            Space.format(source.substring(currentPos, argEnd).takeWhile(c => c != ']'))
+          val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+          if (argEnd < closeBracketIdx + originalCursor) {
+            val spaceStr = this.source.substring(argEnd, closeBracketIdx + originalCursor)
+            System.out.println(s"DEBUG: Last arg space='$spaceStr'")
+            Space.format(spaceStr)
           } else {
             Space.EMPTY
           }
         } else {
           // Look for comma and space after it
-          val commaIdx = source.indexOf(',', currentPos)
-          if (commaIdx > 0 && commaIdx < closeBracketIdx) {
-            // Skip to after comma for next iteration
-            val nextArgStart = source.indexWhere(c => c != ' ' && c != ',', commaIdx)
-            if (nextArgStart > commaIdx) {
-              currentPos = nextArgStart
-              Space.format(source.substring(commaIdx + 1, nextArgStart))
+          val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+          val nextArgStart = if (i + 1 < at.args.size) {
+            Math.max(0, at.args(i + 1).span.start - offsetAdjustment)
+          } else {
+            closeBracketIdx + originalCursor
+          }
+          
+          if (argEnd < nextArgStart && argEnd < this.source.length && nextArgStart <= this.source.length) {
+            val between = this.source.substring(argEnd, nextArgStart)
+            val commaIdx = between.indexOf(',')
+            if (commaIdx >= 0 && commaIdx + 1 < between.length) {
+              cursor = argEnd + commaIdx + 1
+              Space.format(between.substring(commaIdx + 1))
             } else {
-              currentPos = commaIdx + 1
               Space.EMPTY
             }
           } else {
@@ -2977,6 +3361,9 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         typeArgs.add(JRightPadded.build(argTree).withAfter(afterSpace))
       }
     }
+    
+    // Update cursor to the end of the AppliedTypeTree
+    updateCursor(at.span.end)
     
     // Create the type parameters container
     val typeParameters = JContainer.build(
@@ -3242,8 +3629,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     if (adjustedStart >= 0 && adjustedEnd <= source.length && adjustedEnd > adjustedStart) {
       cursor = adjustedEnd
       val result = source.substring(adjustedStart, adjustedEnd)
-      // Debug output
-      // Debug output removed
       result
     } else {
       ""

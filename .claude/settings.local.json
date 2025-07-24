@@ -35,7 +35,10 @@
       "Bash(scalac:*)",
       "Bash(scala:*)",
       "Bash(ls:*)",
-      "Bash(../gradlew test:*)"
+      "Bash(../gradlew test:*)",
+      "Bash(./gradlew :rewrite-scala:test --tests \"org.openrewrite.scala.tree.MethodInvocationTest.methodCallOnFieldAccess\" -i)",
+      "Bash(touch:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

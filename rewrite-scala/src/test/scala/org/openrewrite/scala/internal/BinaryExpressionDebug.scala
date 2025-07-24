@@ -26,12 +26,13 @@ object BinaryExpressionDebug {
     val parseResult = bridge.parse("test.scala", source)
     println(s"Was wrapped: ${parseResult.wasWrapped}")
     
-    // Get statements
-    val statements = converter.convertToStatements(parseResult, source)
+    // Get compilation unit result
+    val result = converter.convertToCompilationUnit(parseResult, source)
+    val statements = result.getStatements
     println(s"Number of statements: ${statements.size()}")
     
     // Get remaining source
-    val remaining = converter.getRemainingSource(parseResult, source)
+    val remaining = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition)
     println(s"Remaining source: '$remaining'")
     println(s"Remaining length: ${remaining.length}")
   }
