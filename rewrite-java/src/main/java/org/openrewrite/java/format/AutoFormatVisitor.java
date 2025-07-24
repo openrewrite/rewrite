@@ -84,9 +84,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
-        return t;
+        return new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
     }
 
     @Override
