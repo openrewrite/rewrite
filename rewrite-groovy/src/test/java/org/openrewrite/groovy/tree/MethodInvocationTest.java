@@ -199,6 +199,19 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void dynamicMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              def xMethod() {}
+              def prefix = "x"
+              "${prefix}Method"()
+              """
+          )
+        );
+    }
+
+    @Test
     void staticMethodReference() {
         rewriteRun(
           groovy(
@@ -696,5 +709,4 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
-
 }

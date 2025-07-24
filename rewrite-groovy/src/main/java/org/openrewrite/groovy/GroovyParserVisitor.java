@@ -504,8 +504,8 @@ public class GroovyParserVisitor {
                 methodName = method.getName();
             } else {
                 // Method name might be in quotes
-                char openingQuote = source.charAt(cursor);
-                methodName = openingQuote + method.getName() + openingQuote;
+                String delim = source.charAt(cursor) + "";
+                methodName = sourceSubstring(cursor, delim) + delim;
             }
             cursor += methodName.length();
             J.Identifier name = new J.Identifier(randomId(),
@@ -1739,25 +1739,26 @@ public class GroovyParserVisitor {
                 // So the "select" that was just parsed _may_ have actually been the method name
                 J.Identifier name;
 
-                String methodNameExpression = call.getMethodAsString();
+                String methodName = call.getMethodAsString();
+                // Check for escaped method name, often used in tests (def 'description'() {}) or to avoid clashing with Groovy keywords
                 if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                    // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
-                    // or to workaround names that are also keywords in groovy
-                    methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
+                    // TODO: Methods with string interpolation are parsed as just one method name instead of multiple LST elements
+                    String delim = source.charAt(cursor) + "";
+                    methodName = sourceSubstring(cursor, delim) + delim;
                 }
 
                 Space prefix = whitespace();
-                boolean implicitCall = (methodNameExpression != null && cursor < source.length() &&
-                        source.charAt(cursor) == '(' && (cursor + methodNameExpression.length() > source.length() ||
-                        !methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length())))
+                boolean implicitCall = (methodName != null && cursor < source.length() &&
+                        source.charAt(cursor) == '(' && (cursor + methodName.length() > source.length() ||
+                        !methodName.equals(source.substring(cursor, cursor + methodName.length())))
                 );
                 if (implicitCall) {
                     // This is an implicit call() method - create identifier but it doesn't get printed
                     name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), "", null, null);
                 } else {
-                    if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                        skip(methodNameExpression);
-                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
+                    if (methodName.equals(source.substring(cursor, cursor + methodName.length()))) {
+                        skip(methodName);
+                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodName, null, null);
                     } else if (select != null && select.getElement() instanceof J.Identifier) {
                         name = (J.Identifier) select.getElement();
                         select = null;
