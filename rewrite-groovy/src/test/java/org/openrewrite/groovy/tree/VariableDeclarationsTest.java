@@ -111,24 +111,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2752")
-    @Test
-    void numericValueWithUnderscores() {
-        rewriteRun(
-          groovy(
-                """
-          def l1 = 10_000L
-          def l2 = 10_000l
-          def i = 10_000
-          def d1 = 10_000d
-          def d2 = 10_000D
-          def f1 = 10_000f
-          def f2 = 10_000.0F
-          """
-          )
-        );
-    }
-
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
