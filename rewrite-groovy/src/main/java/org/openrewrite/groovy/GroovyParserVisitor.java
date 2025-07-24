@@ -406,25 +406,26 @@ public class GroovyParserVisitor {
                 statements.add(JRightPadded.build(enumValueSet));
             }
             
-            statements.addAll(sortedByPosition.values().stream()
-                    // anonymous classes will be visited as part of visiting the ConstructorCallExpression
-                    .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
-                    .map(ast -> {
-                        if (ast instanceof FieldNode) {
-                            visitField((FieldNode) ast);
-                        } else if (ast instanceof MethodNode) {
-                            visitMethod((MethodNode) ast);
-                        } else if (ast instanceof ClassNode) {
-                            visitClass((ClassNode) ast);
-                        } else if (ast instanceof BlockStatement) {
-                            visitBlockStatement((BlockStatement) ast);
-                        }
-                        Statement stat = pollQueue();
-                        return maybeSemicolon(stat);
-                    })
-                    .collect(toList()));
-            
-            return new J.Block(randomId(), blockPrefix, Markers.EMPTY, JRightPadded.build(false), statements, sourceBefore("}"));
+            return new J.Block(randomId(), blockPrefix, Markers.EMPTY,
+                    JRightPadded.build(false),
+                    ListUtils.concatAll(statements, sortedByPosition.values().stream()
+                            // anonymous classes will be visited as part of visiting the ConstructorCallExpression
+                            .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
+                            .map(ast -> {
+                                if (ast instanceof FieldNode) {
+                                    visitField((FieldNode) ast);
+                                } else if (ast instanceof MethodNode) {
+                                    visitMethod((MethodNode) ast);
+                                } else if (ast instanceof ClassNode) {
+                                    visitClass((ClassNode) ast);
+                                } else if (ast instanceof BlockStatement) {
+                                    visitBlockStatement((BlockStatement) ast);
+                                }
+                                Statement stat = pollQueue();
+                                return maybeSemicolon(stat);
+                            })
+                            .collect(toList())),
+                    sourceBefore("}"));
         }
 
         @Override
