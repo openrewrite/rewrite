@@ -508,6 +508,7 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
             List<J.Modifier> modifiers = getModifiers();
+            boolean isConstructorOfEnum = false;
             boolean isConstructorOfInnerNonStaticClass = false;
             J.TypeParameters typeParameters = null;
             if (method.getGenericsTypes() != null) {
@@ -525,21 +526,36 @@ public class GroovyParserVisitor {
             Space namePrefix = whitespace();
             String methodName;
             if (method instanceof ConstructorNode) {
-                /*
-                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter with a reference to its parent class under the hood:
-                class A {                               class A {
-                  class B {                               class B {
-                    String s                                String s
-                    B(String s) {           =>              B(A $p$, String s) {
-                                            =>                new Object().this$0 = $p$
-                      this.s = s            =>                this.s = s
+                // To support special constructors well, the groovy compiler adds extra parameters and statements to the constructor under the hood.
+                // In our LST, we don't need this internal logic.
+                if (method.getDeclaringClass().isEnum()) {
+                    /*
+                    For enums, there are two extra parameters and a super call:
+                    enum A {                                enum A {
+                      A1                                      A1
+                      A(String s) {           =>             A(String __str, int __int, String s) {
+                                              =>                super()
+                        println "ss"          =>                { println "ss" }
+                      }                                       }
                     }                                       }
-                  }                                       }
+                    */
+                    isConstructorOfEnum = true;
+                } else {
+                    /*
+                    For Java syntax for non-static inner classes, there's an extra parameter with a reference to its parent class:
+                    class A {                               class A {
+                      class B {                               class B {
+                        String s                                String s
+                        B(String s) {           =>              B(A $p$, String s) {
+                                                =>                new Object().this$0 = $p$
+                          this.s = s            =>                this.s = s
+                        }                                       }
+                      }                                       }
+                    }
+                    See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
+                    */
+                    isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
                 }
-                In our LST, we don't need this internal logic, so we'll skip the first param + first two statements (ConstructorCallExpression and BlockStatement)}
-                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
-                */
-                isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
                 methodName = method.getDeclaringClass().getNameWithoutPackage().replaceFirst(".*\\$", "");
             } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
@@ -562,7 +578,8 @@ public class GroovyParserVisitor {
             Space beforeParen = sourceBefore("(");
             List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
             Parameter[] unparsedParams = method.getParameters();
-            for (int i = (isConstructorOfInnerNonStaticClass ? 1 : 0); i < unparsedParams.length; i++) {
+            int skipParams = isConstructorOfEnum ? 2 : isConstructorOfInnerNonStaticClass ? 1 : 0;
+            for (int i = skipParams; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
@@ -601,7 +618,8 @@ public class GroovyParserVisitor {
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            if (unparsedParams.length == 0 || (isConstructorOfInnerNonStaticClass && unparsedParams.length == 1)) {
+            // Close when no parameters exist
+            if (unparsedParams.length == skipParams) {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
@@ -613,13 +631,18 @@ public class GroovyParserVisitor {
 
             J.Block body = null;
             if (method.getCode() != null) {
-                ASTNode code = isConstructorOfInnerNonStaticClass ?
-                        new BlockStatement(
-                                ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
-                                ((BlockStatement) method.getCode()).getVariableScope()
-                        ) :
-                        method.getCode();
-                body = bodyVisitor.visit(code);
+                if (isConstructorOfInnerNonStaticClass) {
+                    body = bodyVisitor.visit(
+                            new BlockStatement(
+                                    ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
+                                    ((BlockStatement) method.getCode()).getVariableScope()
+                            )
+                    );
+                } else if (isConstructorOfEnum) {
+                    body = bodyVisitor.visit(((BlockStatement) method.getCode()).getStatements().get(1));
+                } else {
+                    body = bodyVisitor.visit(method.getCode());
+                }
             }
 
             queue.add(new J.MethodDeclaration(
@@ -3000,6 +3023,9 @@ public class GroovyParserVisitor {
             String name = ((AnnotationNode) node).getClassNode().getUnresolvedName();
             String[] parts = name.split("\\.");
             return sourceStartsWith("@" + name) || sourceStartsWith("@" + parts[parts.length - 1]);
+        }
+        if (node instanceof ConstructorNode && ((ConstructorNode) node).getDeclaringClass().isEnum()) {
+            return ((ConstructorNode) node).getAnnotations(new ClassNode(Generated.class)).isEmpty();
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
