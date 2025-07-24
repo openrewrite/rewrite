@@ -396,14 +396,12 @@ public class GroovyParserVisitor {
                     }
                     enumValues.add(paddedEnumValue);
                 }
-                
-                boolean hasTerminalSemicolon = sourceStartsWith(";");
-                if (hasTerminalSemicolon) {
+
+                J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, sourceStartsWith(";"));
+                statements.add(JRightPadded.build(enumValueSet));
+                if (enumValueSet.isTerminatedWithSemicolon()) {
                     skip(";");
                 }
-                
-                J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, hasTerminalSemicolon);
-                statements.add(JRightPadded.build(enumValueSet));
             }
             
             return new J.Block(randomId(), blockPrefix, Markers.EMPTY,
