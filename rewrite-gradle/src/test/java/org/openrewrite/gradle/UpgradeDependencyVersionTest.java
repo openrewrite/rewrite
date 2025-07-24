@@ -2369,6 +2369,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())
             .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          //language=groovy
           buildGradle(
             """
               buildscript {
