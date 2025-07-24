@@ -454,26 +454,9 @@ public class GroovyParserVisitor {
 
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
 
-            J.NewClass initializer = null;
-            if (sourceStartsWith("(") && field.getInitialExpression() instanceof ConstructorCallExpression) {
-                ConstructorCallExpression cce = (ConstructorCallExpression) field.getInitialExpression();
-                RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(cce.getArguments(), this);
-                JContainer<Expression> args = visitor.visit(cce.getArguments());
+            // TODO initializer (enum constructor invocation)
 
-                initializer = new J.NewClass(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        null,
-                        EMPTY,
-                        null,
-                        args,
-                        null,
-                        typeMapping.methodType(null)
-                        //typeMapping.methodType(field.getDeclaringClass().getDeclaredConstructors().get(0))
-                );
-            }
-            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);
+            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, null);
         }
 
         private void visitVariableField(FieldNode field) {
