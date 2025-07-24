@@ -509,6 +509,36 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void retainReleaseOrLatestIfUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null, null, null)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.projectlombok</groupId>
+                    <artifactId>lombok</artifactId>
+                    <version>RELEASE</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.projectlombok</groupId>
+                    <artifactId>lombok</artifactId>
+                    <version>LATEST</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeGuava() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-android", null, null)),

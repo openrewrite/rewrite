@@ -99,9 +99,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                      annotation = JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
+                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
                         getCursor(), annotation.getCoordinates().replace(), "2.0");
-                      return annotation;
                   }
               }
             ))

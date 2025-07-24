@@ -74,7 +74,7 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           buildGradle("plugins { id 'java' }"),
           properties(
-            null,
+            doesNotExist(),
             //language=properties
             """
               org.gradle.caching=true

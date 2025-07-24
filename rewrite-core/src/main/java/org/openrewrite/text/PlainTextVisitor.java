@@ -39,8 +39,7 @@ public class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
     public PlainText visitText(PlainText text, P p) {
         PlainText t = text;
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
-        t = t.withSnippets(ListUtils.map(t.getSnippets(), s -> visitAndCast(s, p)));
-        return t;
+        return t.withSnippets(ListUtils.map(t.getSnippets(), s -> visitAndCast(s, p)));
     }
 
     public PlainText.Snippet visitSnippet(PlainText.Snippet snippet, P p) {

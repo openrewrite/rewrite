@@ -475,9 +475,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         script = script.replace("\\$", "$");
         script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
         script = script.replace("\\\\", "\\");
-        script = script.replaceAll("\r\n|\r|\n", lineSeparator);
-
-        return script;
+        return script.replaceAll("\r\n|\r|\n", lineSeparator);
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
