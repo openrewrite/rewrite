@@ -29,8 +29,33 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
+                  B, C, D
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumDefinitionTrailingSemicolon() {
+        rewriteRun(
+          groovy(
+            """
+              enum A {
+                  B, C;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumDefinitionTrailingComma() {
+        rewriteRun(
+          groovy(
+            """
+              enum A {
                   B, C,
-                  D;
               }
               """
           )
