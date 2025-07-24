@@ -379,11 +379,11 @@ public class GroovyParserVisitor {
             }
 
             Space blockPrefix = sourceBefore("{");
-            
+
             List<JRightPadded<Statement>> statements = new ArrayList<>();
             if (!enumConstants.isEmpty()) {
                 enumConstants.sort(Comparator.comparing(GroovyParserVisitor::pos));
-                
+
                 List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>();
                 for (int i = 0; i < enumConstants.size(); i++) {
                     J.EnumValue enumValue = visitEnumField(enumConstants.get(i));
@@ -398,12 +398,12 @@ public class GroovyParserVisitor {
                 }
 
                 J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, sourceStartsWith(";"));
-                statements.add(JRightPadded.build(enumValueSet));
                 if (enumValueSet.isTerminatedWithSemicolon()) {
                     skip(";");
                 }
+                statements.add(JRightPadded.build(enumValueSet));
             }
-            
+
             return new J.Block(randomId(), blockPrefix, Markers.EMPTY,
                     JRightPadded.build(false),
                     ListUtils.concatAll(statements, sortedByPosition.values().stream()
@@ -443,7 +443,7 @@ public class GroovyParserVisitor {
 
         private J.EnumValue visitEnumField(FieldNode field) {
             Space prefix = whitespace();
-            
+
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
 
             Space namePrefix = whitespace();
