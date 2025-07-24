@@ -386,7 +386,7 @@ public class GroovyParserVisitor {
                 
                 List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>();
                 for (int i = 0; i < enumConstants.size(); i++) {
-                    J.EnumValue enumValue = visitEnumVariable(enumConstants.get(i));
+                    J.EnumValue enumValue = visitEnumField(enumConstants.get(i));
                     JRightPadded<J.EnumValue> paddedEnumValue = JRightPadded.build(enumValue).withAfter(whitespace());
                     if (sourceStartsWith(",")) {
                         skip(",");
@@ -437,13 +437,13 @@ public class GroovyParserVisitor {
         @Override
         public void visitField(FieldNode field) {
             if (field.isEnum()) {
-                // Enum constants are handled separately in visitClassBlock, thus should not be skipped here
+                // Enum constants are handled separately in visitClassBlock, thus should be skipped here
                 return;
             }
             visitVariableField(field);
         }
 
-        private J.EnumValue visitEnumVariable(FieldNode field) {
+        private J.EnumValue visitEnumField(FieldNode field) {
             Space prefix = whitespace();
             
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
