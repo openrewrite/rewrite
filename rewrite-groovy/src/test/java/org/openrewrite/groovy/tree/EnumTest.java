@@ -127,18 +127,8 @@ class EnumTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class Outer {
-                  enum A {
-                      A1(1);
-                  
-                      A(int n) {}
-                  }
-                  
-                  private static final class ContextFailedToStart {
-                      private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
-                          return new Object[arguments.length + 2]
-                      }
-                  }
+              enum A {
+                  A() {}
               }
               """
           )
@@ -161,15 +151,40 @@ class EnumTest implements RewriteTest {
 
     @ExpectedToFail
     @Test
-    void enumWithParameters() {
+    void enumWithLiteralParameters() {
         rewriteRun(
           groovy(
             """
               enum A {
-                  ONE(1),
-                  TWO(2);
+                  ONE(1, "A"),
+                  TWO(2, "B", "X"),
+                  THREE(3, "C", 1)
               
-                  A(int n) {}
+                  A(int n, String s) {
+                    this(n, s, "ignore")
+                  }
+                  A(int n, String s, dynamicVar) {}
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    void enumWithInvocationParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class X {
+                static X create() { new X() }
+              }
+              
+              enum A {
+                  ONE(new X()),
+                  TWO(X.create())
+              
+                  A(X x) {}
               }
               """
           )
