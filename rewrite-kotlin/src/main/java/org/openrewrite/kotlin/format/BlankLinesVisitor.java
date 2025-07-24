@@ -319,8 +319,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             return padded.withElement(statement);
         });
 
-        b = b.getPadding().withStatements(blockStatements);
-        return b;
+        return b.getPadding().withStatements(blockStatements);
     }
 
     @Override

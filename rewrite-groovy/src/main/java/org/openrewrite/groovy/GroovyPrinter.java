@@ -172,6 +172,18 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case ElvisAssignment:
                 keyword = "?=";
                 break;
+            case Power:
+                keyword = "**";
+                break;
+            case PowerAssignment:
+                keyword = "**=";
+                break;
+            case IdentityEquals:
+                keyword = "===";
+                break;
+            case IdentityNotEquals:
+                keyword = "!==";
+                break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);

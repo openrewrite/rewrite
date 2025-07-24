@@ -87,8 +87,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (!cd.getLeadingAnnotations().isEmpty()) {
                       return cd;
                   }
-                  cd = template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
-                  return cd;
+                  return template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
               }
           })),
           java(

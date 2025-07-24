@@ -165,8 +165,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
-                            c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
-                            return c;
+                            return c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
                         }
                         case IMPLEMENTS: {
                             List<TypeTree> implementings = unsubstitute(templateParser.parseImplements(getCursor(), substitutedTemplate));
@@ -369,9 +368,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
 
                             //noinspection ConstantConditions
-                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
+                            return m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
                                     .withMethodType(type).withName(method.getName().withType(type));
-                            return m;
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));

@@ -67,8 +67,7 @@ public class DependencyUseMapNotation extends Recipe {
                 return m;
             }
             m = forBasicString(m, this::mapEntry, J.Assignment::withPrefix, Function.identity());
-            m = forStringTemplate(m, K.StringTemplate.class, K.StringTemplate::getStrings, K.StringTemplate.Expression.class, K.StringTemplate.Expression::getTree, this::mapEntry, this::mapEntry, J.Assignment::withPrefix, Function.identity());
-            return m;
+            return forStringTemplate(m, K.StringTemplate.class, K.StringTemplate::getStrings, K.StringTemplate.Expression.class, K.StringTemplate.Expression::getTree, this::mapEntry, this::mapEntry, J.Assignment::withPrefix, Function.identity());
         }
 
         private J.Assignment mapEntry(String key, String value) {
@@ -99,8 +98,7 @@ public class DependencyUseMapNotation extends Recipe {
                 return m;
             }
             m = forBasicString(m, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
-            m = forStringTemplate(m, G.GString.class, G.GString::getStrings, G.GString.Value.class, G.GString.Value::getTree, this::mapEntry, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
-            return m;
+            return forStringTemplate(m, G.GString.class, G.GString::getStrings, G.GString.Value.class, G.GString.Value::getTree, this::mapEntry, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
         }
 
         private J.MethodInvocation updateTypeForMapArgument(J.MethodInvocation m) {

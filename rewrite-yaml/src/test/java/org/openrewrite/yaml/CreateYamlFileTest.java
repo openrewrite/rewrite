@@ -56,7 +56,7 @@ class CreateYamlFileTest implements RewriteTest {
             null
           )),
           yaml(
-            null,
+            doesNotExist(),
             fileContents,
             spec -> spec.path("test/test.yaml")
           )
@@ -129,7 +129,7 @@ class CreateYamlFileTest implements RewriteTest {
             spec -> spec.path("test/test-file-1.yaml")
           ),
           yaml(
-            null,
+            doesNotExist(),
             "",
             spec -> spec.path("test/test-file-2.yaml")
           )
@@ -179,7 +179,7 @@ class CreateYamlFileTest implements RewriteTest {
               true)
             ),
           yaml(
-            null,
+            doesNotExist(),
             yamlContent,
             spec -> spec.path("test/test.yaml")
           )
@@ -202,7 +202,7 @@ class CreateYamlFileTest implements RewriteTest {
             true)
           ),
           yaml(
-            null,
+            doesNotExist(),
             fileContents,
             spec -> spec.path("test/test.yaml")
           )
@@ -230,7 +230,7 @@ class CreateYamlFileTest implements RewriteTest {
             """,
                 spec -> spec.path("precondition.yml")),
           yaml(
-            null,
+            doesNotExist(),
             """
                     content: yes
                     """,
@@ -263,7 +263,7 @@ class CreateYamlFileTest implements RewriteTest {
             """,
                 spec -> spec.path("precondition.yml")),
           yaml(
-            null,
+            doesNotExist(),
             """
                     content: yes
                     """,
