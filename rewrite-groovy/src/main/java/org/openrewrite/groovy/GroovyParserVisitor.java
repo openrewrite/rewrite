@@ -397,10 +397,9 @@ public class GroovyParserVisitor {
                     enumValues.add(paddedEnumValue);
                 }
                 
-                boolean hasTerminalSemicolon = false;
-                if (sourceStartsWith(";")) {
+                boolean hasTerminalSemicolon = sourceStartsWith(";");
+                if (hasTerminalSemicolon) {
                     skip(";");
-                    hasTerminalSemicolon = true;
                 }
                 
                 J.EnumValueSet enumValueSet = new J.EnumValueSet(randomId(), EMPTY, Markers.EMPTY, enumValues, hasTerminalSemicolon);
