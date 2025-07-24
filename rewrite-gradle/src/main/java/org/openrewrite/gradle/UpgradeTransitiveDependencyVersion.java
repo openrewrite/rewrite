@@ -134,11 +134,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
         return snippetCache(ctx)
-                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singletonList(
-                                new Parser.Input(
-                                        Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
-                                        () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
-                                )), null, ctx)
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(singleton(
+                        new Parser.Input(
+                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
+                        )), null, ctx)
                         .findFirst()
                         .map(maybeCu -> {
                             maybeCu.getMarkers()
