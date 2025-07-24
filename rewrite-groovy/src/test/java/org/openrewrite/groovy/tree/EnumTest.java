@@ -121,7 +121,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumConstructor() {
         rewriteRun(
@@ -129,7 +128,9 @@ class EnumTest implements RewriteTest {
             """
               enum A {
                   A1;
-                  A() {}
+                  A() {
+                    println "some statement"
+                  }
               }
               """
           )
