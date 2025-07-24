@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -29,6 +30,7 @@ import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
@@ -394,6 +396,188 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("String interpolation with inline properties is not yet supported")
+    void updateConstraintGStringInterpolation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              def jacksonCoreVersion = "2.12.0"
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              def jacksonCoreVersion = "2.12.5"
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              jacksonCoreVersion=2.12.0
+              """,
+            """
+              jacksonCoreVersion=2.12.5
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintInPropertiesFileMapNotation() {
+        rewriteRun(
+          properties(
+            """
+              jacksonCoreVersion=2.12.0
+              """,
+            """
+              jacksonCoreVersion=2.12.5
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUpdateConstraintInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              jacksonCoreVersion=2.12.0
+              """,
+            """
+              jacksonCoreVersion=2.12.5
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                `java-library`
+              }
+              repositories { mavenCentral() }
+              
+              val jacksonCoreVersion: String by project
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because("some reason")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
+              }
+              """,
+            """
+              plugins {
+                `java-library`
+              }
+              repositories { mavenCentral() }
+              
+              val jacksonCoreVersion: String by project
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                          because("CVE-2024-BAD")
+                      }
+                  }
+              
+                  implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
           )
@@ -1067,6 +1251,54 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               
                   implementation 'org.springframework.boot:spring-boot-starter-tomcat:3.3.12'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateConstraintForVersionInSettings() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because 'some reason'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          ),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.0'
+              }
+              """,
+            """
+              gradle.ext {
+                  jacksonCoreVersion = '2.12.5'
               }
               """
           )
