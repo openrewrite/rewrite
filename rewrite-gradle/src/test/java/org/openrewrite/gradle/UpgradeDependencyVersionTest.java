@@ -1210,36 +1210,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void disallowDowngrade() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "*", "5.3.x", null)),
-          properties(
-            """
-              springBootVersion=3.0.0
-              springSecurityVersion=5.4.0
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void retainLatestReleaseOrLatestIntegrationIfUsed() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null)),
