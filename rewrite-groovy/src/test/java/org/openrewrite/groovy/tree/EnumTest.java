@@ -128,6 +128,7 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
+                  A1;
                   A() {}
               }
               """
