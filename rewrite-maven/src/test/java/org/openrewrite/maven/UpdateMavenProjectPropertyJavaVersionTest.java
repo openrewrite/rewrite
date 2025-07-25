@@ -364,8 +364,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/514")
+    @Test
     void addReleaseIfNoOtherChangeIsMade() {
         rewriteRun(
           //language=xml

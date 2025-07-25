@@ -108,10 +108,10 @@ class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"abcd,false",
             "2022,false",
             "2022-01-01,true"})
+    @ParameterizedTest
     void valid(String untilDate, boolean valid) {
         assertThat(new AddOwaspDateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);
     }

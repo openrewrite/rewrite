@@ -97,8 +97,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeStringStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -135,8 +135,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeMapStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -173,8 +173,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeGStringStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -211,8 +211,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"*:project2", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksForProjectDependencies(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),

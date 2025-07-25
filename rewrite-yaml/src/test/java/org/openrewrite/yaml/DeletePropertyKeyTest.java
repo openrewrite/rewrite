@@ -41,8 +41,8 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    @Test
     void firstItem() {
         rewriteRun(
           yaml(
@@ -186,8 +186,8 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("YAMLUnusedAnchor")
     @Issue("https://github.com/openrewrite/rewrite/issues/2273")
+    @SuppressWarnings("YAMLUnusedAnchor")
     @Test
     void aliasAnchorPairs() {
         rewriteRun(
@@ -203,13 +203,13 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
       "acme.myProject.person.firstName",
       "acme.my_project.person.first_name"
     })
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty(propertyKey, false, true, null)),
@@ -219,8 +219,8 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false, null)),

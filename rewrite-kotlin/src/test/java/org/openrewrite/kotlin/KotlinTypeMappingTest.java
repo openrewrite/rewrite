@@ -355,12 +355,12 @@ class KotlinTypeMappingTest {
         assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
     }
 
-    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     @Nested
+    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     class ParsingTest implements RewriteTest {
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
+        @Test
         void coneTypeProjection() {
             rewriteRun(
               kotlin(
@@ -578,13 +578,13 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           "n++~kotlin.Int",
           "--n~kotlin.Int",
           "n += a~kotlin.Int",
           "n = a + b~kotlin.Int"
         }, delimiter = '~')
+        @ParameterizedTest
         void operatorOverload(String p1, String p2) {
             rewriteRun(
               kotlin(
@@ -629,7 +629,6 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           // Method type on overload with no named arguments.
           "foo(\"\", 1, true)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
@@ -640,6 +639,7 @@ class KotlinTypeMappingTest {
           // Method type with trailing lambda
           "foo(b = 1, noDefault = true) {}~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
         }, delimiter = '~')
+        @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
             rewriteRun(
               kotlin(
@@ -769,8 +769,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("UnusedReceiverParameter")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @SuppressWarnings("UnusedReceiverParameter")
         @Test
         void parameterizedReceiver() {
             rewriteRun(
@@ -865,8 +865,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/374")
+        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Test
         void privateToThisModifier() {
             rewriteRun(
@@ -1177,8 +1177,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("HasPlatformType")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/483")
+        @SuppressWarnings("HasPlatformType")
         @Test
         void isStaticFlag() {
             //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
@@ -1236,8 +1236,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Test
         void memberReference() {
             //noinspection RemoveRedundantBackticks
@@ -1266,12 +1266,12 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
-        @ParameterizedTest
         @CsvSource(value = {
           "fun foo(l: MutableList<String>) { @Suppress l += \"x\" }~kotlin.Suppress",
           "val releaseDates: List< @Suppress String > = emptyList()~kotlin.Suppress"
         }, delimiter = '~')
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @ParameterizedTest
         void annotationOnKotlinConeType(String input, String type) {
             //noinspection RemoveRedundantBackticks
             rewriteRun(
@@ -1779,8 +1779,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")
+        @Test
         void callWithDefaultedGenericParameters() {
             rewriteRun(
               kotlin(

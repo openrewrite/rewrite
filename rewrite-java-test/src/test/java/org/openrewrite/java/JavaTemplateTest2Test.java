@@ -74,8 +74,8 @@ class JavaTemplateTest2Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("StringOperationCanBeSimplified")
     @Issue("https://github.com/openrewrite/rewrite/issues/2185")
+    @SuppressWarnings("StringOperationCanBeSimplified")
     @Test
     void chainedMethodInvocationsAsNewClassArgument() {
         rewriteRun(

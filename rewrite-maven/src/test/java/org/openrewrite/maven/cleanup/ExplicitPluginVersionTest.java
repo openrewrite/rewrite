@@ -31,9 +31,9 @@ class ExplicitPluginVersionTest implements RewriteTest {
         spec.recipe(new ExplicitPluginVersion());
     }
 
-    @Test
     @DocumentExample
     @Issue("https://github.com/openrewrite/rewrite/issues/2735")
+    @Test
     void shouldAddLatest() {
         rewriteRun(
           pomXml(

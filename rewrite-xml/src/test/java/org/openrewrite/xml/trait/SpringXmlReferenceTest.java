@@ -31,9 +31,9 @@ class SpringXmlReferenceTest implements RewriteTest {
           .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 
+    @DocumentExample
     @SuppressWarnings("SpringXmlModelInspection")
     @Test
-    @DocumentExample
     void xmlConfiguration() {
         rewriteRun(
           xml(

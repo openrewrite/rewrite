@@ -47,8 +47,8 @@ class ReplaceMethodInvocationWithConstantTest implements RewriteTest {
     @Nested
     class InMethod {
         @DocumentExample
-        @Test
         @SuppressWarnings("removal")
+        @Test
         void withNull() {
             rewriteRun(
               recipeSpec -> recipeSpec.recipe(REPLACE_WITH_NULL),
@@ -103,8 +103,8 @@ class ReplaceMethodInvocationWithConstantTest implements RewriteTest {
 
     @Nested
     class InField {
-        @Test
         @SuppressWarnings("removal")
+        @Test
         void withNull() {
             rewriteRun(
               recipeSpec -> recipeSpec.recipe(REPLACE_WITH_NULL),

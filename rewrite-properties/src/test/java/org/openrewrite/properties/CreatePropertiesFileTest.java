@@ -46,7 +46,6 @@ class CreatePropertiesFileTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(

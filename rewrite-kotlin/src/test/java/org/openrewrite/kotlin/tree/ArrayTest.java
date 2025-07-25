@@ -93,8 +93,8 @@ class ArrayTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/291")
+    @Test
     void incrementArrayElement() {
         rewriteRun(
           kotlin(

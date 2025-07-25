@@ -75,9 +75,8 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(javascript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(javascript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -106,9 +105,8 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Paths.get("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -184,9 +182,8 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.tsx"), script);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
