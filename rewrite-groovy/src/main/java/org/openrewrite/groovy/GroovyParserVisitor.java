@@ -542,7 +542,7 @@ public class GroovyParserVisitor {
                     isConstructorOfEnum = true;
                 } else {
                     /*
-                    For Java syntax for non-static inner classes, there's an extra parameter with a reference to its parent class:
+                    For Java syntax for non-static inner classes, there's an extra parameter with a reference to its parent class and two statements (ConstructorCallExpression and BlockStatement):
                     class A {                               class A {
                       class B {                               class B {
                         String s                                String s
