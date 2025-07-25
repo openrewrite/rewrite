@@ -179,7 +179,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void noArguments() {
         rewriteRun(
@@ -193,7 +192,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithLiteralParameters() {
         rewriteRun(
@@ -214,7 +212,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithInvocationParameters() {
         rewriteRun(
