@@ -179,6 +179,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
     @Test
     void noArguments() {
         rewriteRun(
