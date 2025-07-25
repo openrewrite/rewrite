@@ -62,7 +62,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void skipMissingTypeAttribution() {
         rewriteRun(

@@ -301,7 +301,6 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
-    @DocumentExample
     @Test
     void accurateReportingOfRecipesMakingChanges() {
         rewriteRun(

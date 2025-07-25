@@ -715,7 +715,7 @@ class ResolvedPomTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void circularProjectVersionInDependency() {
         // Test case where a property shadows project.version and is used in a dependency

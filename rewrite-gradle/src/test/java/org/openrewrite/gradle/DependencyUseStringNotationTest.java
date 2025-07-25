@@ -70,7 +70,6 @@ class DependencyUseStringNotationTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void kotlinSupport() {
         rewriteRun(

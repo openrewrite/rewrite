@@ -48,7 +48,6 @@ class CreateEmptyJavaClassTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
