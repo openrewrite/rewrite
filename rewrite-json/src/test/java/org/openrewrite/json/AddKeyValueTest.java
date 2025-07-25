@@ -23,8 +23,8 @@ import static org.openrewrite.json.Assertions.json;
 
 class AddKeyValueTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void shouldAppendSimpleValue() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$.", "key", "\"val\"", false)),

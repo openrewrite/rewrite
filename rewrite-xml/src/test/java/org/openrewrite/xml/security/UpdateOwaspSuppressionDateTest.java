@@ -130,10 +130,10 @@ class UpdateOwaspSuppressionDateTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"abcd,false",
             "2022,false",
             "2022-01-01,true"})
+    @ParameterizedTest
     void valid(String untilDate, boolean valid) {
         assertThat(new UpdateOwaspSuppressionDate(Collections.singletonList(""), untilDate).validate().isValid()).isEqualTo(valid);
     }

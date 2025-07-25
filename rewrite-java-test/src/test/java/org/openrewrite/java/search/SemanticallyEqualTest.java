@@ -470,7 +470,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsEqual(@Language(value = "java") String source) {
+    private void assertExpressionsEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 
@@ -490,7 +490,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsNotEqual(@Language(value = "java") String source) {
+    private void assertExpressionsNotEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 

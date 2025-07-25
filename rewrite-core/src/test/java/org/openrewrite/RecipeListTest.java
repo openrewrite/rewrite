@@ -61,8 +61,8 @@ class RecipeListTest implements RewriteTest {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class FormalHello extends Recipe {
     @Option(example = "TODO Provide a usage example for the docs", displayName = "Before name",
             description = "The name of a person being greeted")

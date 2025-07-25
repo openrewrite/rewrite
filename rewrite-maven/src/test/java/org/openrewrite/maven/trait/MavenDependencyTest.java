@@ -31,8 +31,8 @@ class MavenDependencyTest implements RewriteTest {
           SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
 
-    @Test
     @DocumentExample
+    @Test
     void dependency() {
         rewriteRun(
           pomXml(

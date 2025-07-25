@@ -502,7 +502,6 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "../pom.xml,'',,<relativePath />", // self-closing tag gets added
       "../pom.xml,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
@@ -518,6 +517,7 @@ class ChangeParentPomTest implements RewriteTest {
       "'','../pom.xml',<relativePath></relativePath>,<relativePath>../pom.xml</relativePath>", // tag gets updated
       "'','../pom.xml',<relativePath/>,<relativePath>../pom.xml</relativePath>", // tag gets expanded and updated
     })
+    @ParameterizedTest
     void multiModuleChangeChildrenBasedOnRelativePath(String oldRelativePath, String newRelativePath, String oldRelativePathTag, String expectedNewRelativePathTag) {
         ChangeParentPom recipe = new ChangeParentPom(
           "org.sample", "org.springframework.boot",
@@ -596,12 +596,12 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "../pom.xml,<relativePath />", // self-closing means empty string
       "../pom.xml,<relativePath>../../pom.xml</relativePath>", // different value
       "..,,", // absent tag means '../pom.xml' not '..'
     })
+    @ParameterizedTest
     void multiModuleRelativePathNotMatching(String oldRelativePath, String oldRelativePathTag) {
         ChangeParentPom recipe = new ChangeParentPom(
           "org.sample", "org.springframework.boot",
@@ -1125,8 +1125,8 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
+    @Nested
     class RetainVersions {
         @DocumentExample
         @Test
@@ -1411,8 +1411,8 @@ class ChangeParentPomTest implements RewriteTest {
         }
     }
 
-    @RepeatedTest(10)
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
+    @RepeatedTest(10)
     void multiModule() {
         ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, null, null, true);
         rewriteRun(

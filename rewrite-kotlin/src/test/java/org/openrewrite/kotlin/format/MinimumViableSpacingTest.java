@@ -364,8 +364,8 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/322")
+    @Test
     void statementWithCommentInPrefix() {
         rewriteRun(
           spec -> spec.recipes(

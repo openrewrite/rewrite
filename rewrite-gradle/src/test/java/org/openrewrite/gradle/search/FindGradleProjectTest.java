@@ -54,8 +54,8 @@ class FindGradleProjectTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @EnumSource(FindGradleProject.SearchCriteria.class)
+    @ParameterizedTest
     void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())

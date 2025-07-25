@@ -318,7 +318,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
 
     @Nested
     class AddIfMissing {
-        
+
         @DocumentExample("Add SCM section when missing")
         @Test
         void addScmWhenMissingWithHttps() {
@@ -507,7 +507,7 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
               )
             );
         }
-        
+
         @Test
         void scmIsMissingWithAddIfMissingFalse() {
             rewriteRun(

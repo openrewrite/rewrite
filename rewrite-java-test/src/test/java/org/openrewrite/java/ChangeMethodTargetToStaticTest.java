@@ -185,10 +185,10 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
-    @Disabled
     void keepImportComments() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),

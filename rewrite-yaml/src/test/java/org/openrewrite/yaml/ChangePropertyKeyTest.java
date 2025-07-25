@@ -195,8 +195,8 @@ class ChangePropertyKeyTest implements RewriteTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/1114")
+        @Test
         void changePathToOnePathLonger() {
             rewriteRun(
               spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null)),
@@ -208,13 +208,13 @@ class ChangePropertyKeyTest implements RewriteTest {
         }
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
       "acme.myProject.person.firstName",
       "acme.my_project.person.first_name"
     })
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null, null)),
@@ -239,8 +239,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(
@@ -357,8 +357,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/434")
+    @Test
     void doesNotChangePropertyOrdering() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(
@@ -407,8 +407,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    @Test
     void doesNotReformatUnrelatedProperties() {
         rewriteRun(
           yaml(
@@ -432,8 +432,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
+    @Test
     void relocatesPropertyIfNothingElseInFamily() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.b.c", "x.y.z", true, null, null)),
@@ -454,8 +454,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2016")
+    @Test
     void relocatesPropertyWithSamePrefix() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(
@@ -482,8 +482,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
+    @Nested
     class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
         @DocumentExample
         @Test
@@ -538,8 +538,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         }
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
+    @Nested
     class ExceptTest implements RewriteTest {
 
         @Nested
@@ -765,8 +765,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2881")
+    @Test
     void embedIndentedPropertyIntoExisting() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("a.b.d", "a.b", null, null, null)),
