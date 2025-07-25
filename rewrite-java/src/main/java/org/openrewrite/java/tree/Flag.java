@@ -34,6 +34,10 @@ public enum Flag {
     Abstract(1L << 10),
     Strictfp(1L << 11),
     /**
+     * An enumeration type (on a class) or an enumeration constant (on a member)
+     */
+    Enum(1L << 14),
+    /**
      * Flag is set for a variable symbol if the variable's definition
      * has an initializer part.
      */
@@ -48,7 +52,7 @@ public enum Flag {
 
     private final long bitMask;
 
-    public static final long VALID_CLASS_FLAGS = Stream.of(Public, Private, Protected, Static,  Final, Interface, Abstract, Strictfp)
+    public static final long VALID_CLASS_FLAGS = Stream.of(Public, Private, Protected, Static,  Final, Interface, Abstract, Strictfp, Enum)
             .map(Flag::getBitMask).reduce(0L, (m1, m2) -> m1 | m2);
     public static final long VALID_FLAGS = Arrays.stream(Flag.values())
             .map(Flag::getBitMask)
