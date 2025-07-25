@@ -1176,9 +1176,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     GroupArtifactVersion gav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), newVersions.get(depGA));
                     Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
                     ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
-                    
-                    // Filter transitive dependencies to only include those that were already in the dependency graph
-                    Set<GroupArtifact> existingTransitiveGAs = new HashSet<>();
+
+
+
                     for (ResolvedDependency existing : directResolved) {
                         existingTransitiveGAs.add(existing.getGav().asGroupArtifact());
                         collectTransitiveGAs(existing, existingTransitiveGAs);
