@@ -27,7 +27,10 @@
       "mcp__idea__open_file_in_editor",
       "mcp__idea__replace_selected_text",
       "mcp__idea__replace_specific_text",
-      "mcp__idea__search_in_files_content"
+      "mcp__idea__search_in_files_content",
+      "Bash(cat:*)",
+      "Bash(../gradlew dependencies:*)",
+      "Bash(gradle:*)"
     ],
     "deny": []
   }
