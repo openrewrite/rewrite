@@ -1305,7 +1305,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
     @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
