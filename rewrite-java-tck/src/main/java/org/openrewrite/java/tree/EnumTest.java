@@ -26,8 +26,8 @@ import static org.openrewrite.java.Assertions.java;
 
 class EnumTest implements RewriteTest {
 
-    @SuppressWarnings("UnnecessarySemicolon")
     @Issue("https://github.com/openrewrite/rewrite/issues/379")
+    @SuppressWarnings("UnnecessarySemicolon")
     @Test
     void enumWithAnnotations() {
         rewriteRun(
@@ -181,8 +181,8 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5146")
+    @Test
     void noValuesJustSemicolon() {
         rewriteRun(
           java(

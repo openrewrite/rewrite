@@ -49,6 +49,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 
 import static java.util.Collections.*;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -622,8 +623,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
-            } else if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
-                // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
+            } else if ("ext".equals(method.getSimpleName()) && isSettingsGradle()) {
+                // rare case that gradle versions are set via settings.gradle ext block
                 m = (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
@@ -648,8 +649,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return a;
                         }
                         String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
-                        a = a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
-                        return a;
+                        return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
             } else if (m.getSimpleName().equals("ext")) {
@@ -665,6 +665,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }.visit(arg, ctx)));
             }
             return m;
+        }
+
+        private boolean isSettingsGradle() {
+            String path = requireNonNull(getCursor().firstEnclosing(SourceFile.class)).getSourcePath().toString();
+            return path.endsWith("settings.gradle") || path.endsWith("settings.gradle.kts");
         }
 
         private J.MethodInvocation updateDependency(J.MethodInvocation method, ExecutionContext ctx) {

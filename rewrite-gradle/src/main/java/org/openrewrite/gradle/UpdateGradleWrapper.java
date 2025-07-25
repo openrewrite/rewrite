@@ -99,7 +99,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
                     "When this option is set, the version and distribution fields must not be specified — only one source of truth is allowed. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
-                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" + 
+                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" +
                     "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
@@ -475,9 +475,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         script = script.replace("\\$", "$");
         script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
         script = script.replace("\\\\", "\\");
-        script = script.replaceAll("\r\n|\r|\n", lineSeparator);
-
-        return script;
+        return script.replaceAll("\r\n|\r|\n", lineSeparator);
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

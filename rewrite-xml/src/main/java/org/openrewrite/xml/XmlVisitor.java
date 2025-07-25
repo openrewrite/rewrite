@@ -68,8 +68,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         Xml.Document d = document;
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withProlog(visitAndCast(d.getProlog(), p));
-        d = d.withRoot(visitAndCast(d.getRoot(), p));
-        return d;
+        return d.withRoot(visitAndCast(d.getRoot(), p));
     }
 
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, P p) {
@@ -79,8 +78,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, P p) {
         Xml.ProcessingInstruction pi = processingInstruction.withMarkers(visitMarkers(processingInstruction.getMarkers(), p));
-        pi = pi.withProcessingInstructions(visitAndCast(pi.getProcessingInstructions(), p));
-        return pi;
+        return pi.withProcessingInstructions(visitAndCast(pi.getProcessingInstructions(), p));
     }
 
     public Xml visitTag(Xml.Tag tag, P p) {
@@ -90,8 +88,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         if (t.getContent() != null) {
             t = t.withContent(ListUtils.map(t.getContent(), c -> visitAndCast(c, p)));
         }
-        t = t.withClosing(visitAndCast(t.getClosing(), p));
-        return t;
+        return t.withClosing(visitAndCast(t.getClosing(), p));
     }
 
     public Xml visitTagClosing(Xml.Tag.Closing closing, P p) {
@@ -101,8 +98,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     public Xml visitAttribute(Xml.Attribute attribute, P p) {
         Xml.Attribute a = attribute;
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withValue(visitAndCast(a.getValue(), p));
-        return a;
+        return a.withValue(visitAndCast(a.getValue(), p));
     }
 
     public Xml visitAttributeValue(Xml.Attribute.Value value, P p) {
@@ -121,15 +117,13 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         Xml.DocTypeDecl d = docTypeDecl;
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withInternalSubset(ListUtils.map(d.getInternalSubset(), i -> visitAndCast(i, p)));
-        d = d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
-        return d;
+        return d.withExternalSubsets(visitAndCast(d.getExternalSubsets(), p));
     }
 
     public Xml visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
         Xml.DocTypeDecl.ExternalSubsets e = externalSubsets;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        e = e.withElements(ListUtils.map(e.getElements(), i -> visitAndCast(i, p)));
-        return e;
+        return e.withElements(ListUtils.map(e.getElements(), i -> visitAndCast(i, p)));
     }
 
     public Xml visitProlog(Xml.Prolog prolog, P p) {
@@ -137,8 +131,7 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         pl = pl.withMarkers(visitMarkers(pl.getMarkers(), p));
         pl = pl.withXmlDecl(visitAndCast(prolog.getXmlDecl(), p));
         pl = pl.withMisc(ListUtils.map(pl.getMisc(), m -> visitAndCast(m, p)));
-        pl = pl.withJspDirectives(ListUtils.map(pl.getJspDirectives(), m -> visitAndCast(m, p)));
-        return pl;
+        return pl.withJspDirectives(ListUtils.map(pl.getJspDirectives(), m -> visitAndCast(m, p)));
     }
 
     public Xml visitIdent(Xml.Ident ident, P p) {
@@ -148,14 +141,12 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     public Xml visitElement(Xml.Element element, P p) {
         Xml.Element e = element;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        e = e.withSubset(ListUtils.map(e.getSubset(), i -> visitAndCast(i, p)));
-        return e;
+        return e.withSubset(ListUtils.map(e.getSubset(), i -> visitAndCast(i, p)));
     }
 
     public Xml visitJspDirective(Xml.JspDirective jspDirective, P p) {
         Xml.JspDirective j = jspDirective;
         j = j.withMarkers(visitMarkers(j.getMarkers(), p));
-        j = j.withAttributes(ListUtils.map(j.getAttributes(), a -> visitAndCast(a, p)));
-        return j;
+        return j.withAttributes(ListUtils.map(j.getAttributes(), a -> visitAndCast(a, p)));
     }
 }

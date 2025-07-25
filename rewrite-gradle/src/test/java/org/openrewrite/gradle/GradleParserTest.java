@@ -366,8 +366,8 @@ class GradleParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
     void trailingComma() {
         rewriteRun(
           buildGradle(

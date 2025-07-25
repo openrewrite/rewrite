@@ -67,7 +67,7 @@ public class GetObject implements RpcRequest {
 
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
-                
+
                 // Determine what the remote has cached
                 Object before = null;
                 if (request.getLastKnownId() != null) {

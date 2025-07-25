@@ -51,8 +51,7 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
 
         js = new WrappingAndBracesVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
         js = new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
-        js = new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
-        return js;
+        return new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
     }
 
     @Override
@@ -65,9 +64,7 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
 
         js = (Json.Document) new WrappingAndBracesVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p);
         js = (Json.Document) new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p);
-        js = (Json.Document) new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p);
-
-        return js;
+        return (Json.Document) new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p);
     }
 
     @Override

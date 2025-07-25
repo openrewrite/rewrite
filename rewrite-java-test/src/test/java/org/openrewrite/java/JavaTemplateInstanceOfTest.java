@@ -91,10 +91,10 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
     @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
+    @Test
     void referenceFromWithinLambdaInIfCondition() {
         rewriteRun(
           templatedJava17(
@@ -487,9 +487,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                         arguments.toArray()
                       );
 
-                    mi = maybeAutoFormat(mi, mi.withArguments(
+                    return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
-                    return mi;
                 }
             }
           )),

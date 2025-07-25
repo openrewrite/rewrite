@@ -136,8 +136,8 @@ class ChangeFieldNameTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/632")
+    @Test
     void changeFieldNameReferencesInOtherClassUsingStaticImport() {
         rewriteRun(
           spec -> spec.recipe(changeFieldName("com.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1")),

@@ -76,8 +76,8 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(

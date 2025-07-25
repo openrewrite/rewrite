@@ -101,7 +101,6 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void changePluginGroupIdAndArtifactIdWithVersion() {
         rewriteRun(

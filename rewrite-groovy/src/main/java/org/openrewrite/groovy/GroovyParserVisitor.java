@@ -504,8 +504,8 @@ public class GroovyParserVisitor {
                 methodName = method.getName();
             } else {
                 // Method name might be in quotes
-                char openingQuote = source.charAt(cursor);
-                methodName = openingQuote + method.getName() + openingQuote;
+                String delim = source.charAt(cursor) + "";
+                methodName = sourceSubstring(cursor, delim) + delim;
             }
             cursor += methodName.length();
             J.Identifier name = new J.Identifier(randomId(),
@@ -1342,23 +1342,11 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Char;
                 } else if (type == ClassHelper.double_TYPE || Double.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Double;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.float_TYPE || Float.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Float;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.int_TYPE || Integer.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Int;
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.long_TYPE || Long.class.getName().equals(type.getName())) {
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                     jType = JavaType.Primitive.Long;
                 } else if (type == ClassHelper.short_TYPE || Short.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Short;
@@ -1387,20 +1375,23 @@ public class GroovyParserVisitor {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
-                if (cursor < source.length() && source.charAt(cursor) == '+' && !text.startsWith("+")) {
-                    // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
-                    text = "+" + text;
-                }
-                cursor += text.length();
-                // Numeric literals may be followed by "L", "f", or "d" to indicate Long, float, or double respectively
-                if (jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
-                    if (source.startsWith("L", cursor) || source.startsWith("f", cursor) || source.startsWith("d", cursor)) {
-                        text += source.charAt(cursor);
-                        cursor++;
+                // Get the string literal from the source, as numeric literals may have a unary operator, underscores, dots and can be followed by "L", "f", or "d"
+                if (jType == JavaType.Primitive.Int || jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
+                    int i = cursor;
+                    if (source.charAt(cursor) == '-' || source.charAt(cursor) == '+') {
+                        i = indexOfNextNonWhitespace(cursor + 1, source);
                     }
+                    for (; i < source.length(); i++) {
+                        char c = source.charAt(i);
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && isJavaIdentifierPart(source.charAt(i + 1))))) {
+                            break;
+                        }
+                    }
+                    text = source.substring(cursor, i);
                 }
-                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
-                        null, jType);
+
+                skip(text);
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text, null, jType);
             }));
         }
 
@@ -1739,25 +1730,26 @@ public class GroovyParserVisitor {
                 // So the "select" that was just parsed _may_ have actually been the method name
                 J.Identifier name;
 
-                String methodNameExpression = call.getMethodAsString();
+                String methodName = call.getMethodAsString();
+                // Check for escaped method name, often used in tests (def 'description'() {}) or to avoid clashing with Groovy keywords
                 if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                    // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
-                    // or to workaround names that are also keywords in groovy
-                    methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
+                    // TODO: Methods with string interpolation are parsed as just one method name instead of multiple LST elements
+                    String delim = source.charAt(cursor) + "";
+                    methodName = sourceSubstring(cursor, delim) + delim;
                 }
 
                 Space prefix = whitespace();
-                boolean implicitCall = (methodNameExpression != null && cursor < source.length() &&
-                        source.charAt(cursor) == '(' && (cursor + methodNameExpression.length() > source.length() ||
-                        !methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length())))
+                boolean implicitCall = (methodName != null && cursor < source.length() &&
+                        source.charAt(cursor) == '(' && (cursor + methodName.length() > source.length() ||
+                        !methodName.equals(source.substring(cursor, cursor + methodName.length())))
                 );
                 if (implicitCall) {
                     // This is an implicit call() method - create identifier but it doesn't get printed
                     name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), "", null, null);
                 } else {
-                    if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                        skip(methodNameExpression);
-                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
+                    if (methodName.equals(source.substring(cursor, cursor + methodName.length()))) {
+                        skip(methodName);
+                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodName, null, null);
                     } else if (select != null && select.getElement() instanceof J.Identifier) {
                         name = (J.Identifier) select.getElement();
                         select = null;
@@ -2529,11 +2521,11 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode
-                    && classNode.getUnresolvedSuperClass() != null
-                    && classNode.getUnresolvedSuperClass().isUsingGenerics()
-                    && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
-                    && classNode.getGenericsTypes() == null;
+            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode &&
+                    classNode.getUnresolvedSuperClass() != null &&
+                    classNode.getUnresolvedSuperClass().isUsingGenerics() &&
+                    !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder() &&
+                    classNode.getGenericsTypes() == null;
             if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :

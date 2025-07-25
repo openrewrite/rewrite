@@ -76,8 +76,8 @@ class HclForTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4857")
+    @Test
     void commentInAFor() {
         rewriteRun(
           hcl(

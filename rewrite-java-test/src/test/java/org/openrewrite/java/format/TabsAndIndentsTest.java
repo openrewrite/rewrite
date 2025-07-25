@@ -96,8 +96,8 @@ class TabsAndIndentsTest implements RewriteTest {
           )));
     }
 
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void multilineCommentStartPositionIsIndented() {
         rewriteRun(
@@ -454,8 +454,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    @Test
     void methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent() {
         rewriteRun(
           java(
@@ -534,8 +534,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    @Test
     void lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent() {
         rewriteRun(
           java(
@@ -1217,8 +1217,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("DuplicateCondition")
+    @Test
     void nestedIfElse() {
         rewriteRun(
           java(
@@ -2184,8 +2184,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("TextBlockMigration")
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @SuppressWarnings("TextBlockMigration")
     @Test
     void alignJavaDocsWithCRLF() {
         rewriteRun(

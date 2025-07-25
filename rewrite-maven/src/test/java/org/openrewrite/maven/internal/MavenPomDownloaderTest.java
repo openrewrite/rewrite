@@ -305,8 +305,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertThat(oss.getUri()).isEqualTo("https://central.sonatype.com/repository/maven-snapshots/");
         }
 
-        @ParameterizedTest
         @Issue("https://github.com/openrewrite/rewrite/issues/3141")
+        @ParameterizedTest
         @ValueSource(strings = {"http://0.0.0.0", "https://0.0.0.0", "0.0.0.0:443"})
         void skipBlockedRepository(String url) {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
@@ -355,8 +355,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @Disabled
+        @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
                  MockWebServer releaseRepo = new MockWebServer()) {
@@ -1076,8 +1076,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3152")
+        @Test
         void useSnapshotTimestampVersion() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
@@ -1190,9 +1190,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("When username or password are environment properties that cannot be resolved, they should not be used")
         @Issue("https://github.com/openrewrite/rewrite/issues/3142")
+        @Test
         void doesNotUseAuthenticationIfCredentialsCannotBeResolved() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
@@ -1231,9 +1231,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("Throw exception if there is no pom and no jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+        @Test
         void pomNotFoundWithNoJarShouldThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
@@ -1257,9 +1257,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("Don't throw exception if there is no pom and but there is a jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+        @Test
         void pomNotFoundWithJarFoundShouldNotThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
@@ -1289,9 +1289,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("Clearly identify which pom failed to parse")
         @Issue("https://github.com/openrewrite/rewrite/issues/5558")
+        @Test
         void clearlyIdentifyWhichPomFailedToParse() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {

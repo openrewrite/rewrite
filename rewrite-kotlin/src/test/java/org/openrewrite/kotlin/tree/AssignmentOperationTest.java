@@ -95,8 +95,8 @@ class AssignmentOperationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/268")
+    @Test
     void augmentedAssign() {
         rewriteRun(
           kotlin(
@@ -117,8 +117,8 @@ class AssignmentOperationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/305")
+    @Test
     void augmentedAssignmentAnnotation() {
         rewriteRun(
           // Type validation is disabled due to https://github.com/openrewrite/rewrite-kotlin/issues/511
