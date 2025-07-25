@@ -594,8 +594,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4228")
+    @Test
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
@@ -1140,8 +1140,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
         @Override
         public String getDisplayName() {

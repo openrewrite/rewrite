@@ -421,12 +421,12 @@ class JavaTemplateTest6Test implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "UnnecessaryBoxing",
       "CachedNumberConstructorCall",
       "ResultOfMethodCallIgnored"
       , "Convert2MethodRef"})
+    @Test
     void replaceNamedVariableInitializerMethodInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

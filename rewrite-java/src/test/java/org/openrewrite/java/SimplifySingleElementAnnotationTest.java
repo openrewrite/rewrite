@@ -37,8 +37,8 @@ class SimplifySingleElementAnnotationTest implements RewriteTest {
     /**
      * Here is an example of a single-element annotation.
      */
-    @Test
     @DocumentExample
+    @Test
     void simpleExample() {
         rewriteRun(
           spec -> spec

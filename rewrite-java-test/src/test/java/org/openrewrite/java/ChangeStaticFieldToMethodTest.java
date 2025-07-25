@@ -59,8 +59,8 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
       }
       """;
 
-    @Test
     @SuppressWarnings("unchecked")
+    @Test
     void migratesQualifiedField() {
         rewriteRun(
           java(acmeLists),
@@ -165,8 +165,8 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4382")
+    @Test
     void migratesNestedFieldInitializer() {
         rewriteRun(
           java(acmeLists),
@@ -216,8 +216,8 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
+    @Test
     void migratesToJavaLangClass() {
         rewriteRun(
           spec -> spec.recipe(new ChangeStaticFieldToMethod(
@@ -274,8 +274,8 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1626")
+    @Test
     void constantToMethodOnStaticTarget() {
         rewriteRun(
           spec -> spec.recipe(new ChangeStaticFieldToMethod(
@@ -338,8 +338,8 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4390")
+    @Test
     void migratesTernaryOperator() {
         rewriteRun(
           java(acmeLists),

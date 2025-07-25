@@ -73,8 +73,8 @@ class JsonSendReceiveTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();

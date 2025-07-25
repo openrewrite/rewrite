@@ -25,12 +25,12 @@ import static org.openrewrite.java.Assertions.java;
 
 class ReplaceAnnotationTest implements RewriteTest {
 
-    @SuppressWarnings("NullableProblems")
     @Nested
+    @SuppressWarnings("NullableProblems")
     class OnMatch {
 
-        @Test
         @DocumentExample
+        @Test
         void matchWithPrams() {
             rewriteRun(
               spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
@@ -105,8 +105,8 @@ class ReplaceAnnotationTest implements RewriteTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/4441")
+        @Test
         void methodWithAnnotatedParameter() {
             rewriteRun(
               spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),

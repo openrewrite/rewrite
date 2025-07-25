@@ -395,9 +395,9 @@ class AppendToSequenceTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3215")
+    @Test
     void appendTwice() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""

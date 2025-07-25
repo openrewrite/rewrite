@@ -443,8 +443,8 @@ class LiteralTest implements RewriteTest {
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
+    @Test
     void stringWithMultipleBackslashes() {
         rewriteRun(
           groovy(

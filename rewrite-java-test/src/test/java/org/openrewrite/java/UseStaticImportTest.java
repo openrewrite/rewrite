@@ -152,8 +152,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodImportedNoStaticImport() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
@@ -174,8 +174,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodsNoStaticImport() {
         rewriteRun(
           spec -> spec.recipes(
@@ -276,8 +276,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void staticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
@@ -308,8 +308,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void nonStaticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
