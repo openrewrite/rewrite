@@ -1210,36 +1210,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void disallowDowngrade() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "*", "5.3.x", null)),
-          properties(
-            """
-              springBootVersion=3.0.0
-              springSecurityVersion=5.4.0
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void retainLatestReleaseOrLatestIntegrationIfUsed() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null)),
@@ -2339,6 +2309,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeRegularDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.1.33", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.1.43'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          //language=groovy
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath("com.google.guava:guava:30.1.1-jre")
+                  }
               }
               """
           )
