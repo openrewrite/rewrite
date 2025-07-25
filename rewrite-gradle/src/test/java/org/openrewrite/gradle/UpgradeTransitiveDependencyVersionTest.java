@@ -1078,7 +1078,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new UpgradeTransitiveDependencyVersion(
-              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, null)),
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, List.of("testImplementation"))),
           buildGradle(
             """
               plugins {
