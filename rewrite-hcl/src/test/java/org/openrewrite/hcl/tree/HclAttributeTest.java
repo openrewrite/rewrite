@@ -80,4 +80,22 @@ class HclAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void objectKey() {
+        rewriteRun(
+          hcl(
+            """
+              terraform {
+                required_providers {
+                  null = {
+                    source = "hashicorp/null"
+                    version = "=3.2.3"
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
 }

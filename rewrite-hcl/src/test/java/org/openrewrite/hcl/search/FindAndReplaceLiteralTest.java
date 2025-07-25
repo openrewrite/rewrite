@@ -24,8 +24,8 @@ import static org.openrewrite.hcl.Assertions.hcl;
 
 class FindAndReplaceLiteralTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void defaultNonRegexReplace() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null)),
@@ -274,8 +274,8 @@ class FindAndReplaceLiteralTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5579")
+    @Test
     void handleNullLiteral() {
         rewriteRun(
           spec -> spec.recipes(

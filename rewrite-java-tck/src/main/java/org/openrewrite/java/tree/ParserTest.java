@@ -30,8 +30,8 @@ import java.util.stream.Collectors;
 
 class ParserTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4914")
+    @Test
     void parseString() throws IOException {
         // path needs to be resolvable from `rewrite-java-8` etc.
         Path targetFile = Paths.get("../rewrite-java-tck/src/main/java/org/openrewrite/java/tree/ParserTest.java");

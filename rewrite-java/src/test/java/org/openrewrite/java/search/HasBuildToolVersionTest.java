@@ -33,13 +33,13 @@ class HasBuildToolVersionTest implements RewriteTest {
         spec.recipe(new HasBuildToolVersion(BuildTool.Type.Maven, "3.6.0-3.8.0"));
     }
 
+    @DocumentExample
     @ParameterizedTest
     @ValueSource(strings = {
       "3.6.0",
       "3.6.1",
       "3.8.0"
     })
-    @DocumentExample
     void detectMavenVersionWithinRange(String version) {
         rewriteRun(
           java("class A {}", "/*~~>*/class A {}",

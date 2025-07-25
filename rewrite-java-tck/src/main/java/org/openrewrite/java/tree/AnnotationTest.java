@@ -472,8 +472,8 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
-    @MinimumJava21 // Because of `@Deprecated#forRemoval`
+    @MinimumJava21
+    @Test // Because of `@Deprecated#forRemoval`
     void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
         /*

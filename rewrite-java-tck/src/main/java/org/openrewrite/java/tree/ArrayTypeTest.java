@@ -180,8 +180,8 @@ class ArrayTypeTest implements RewriteTest {
     }
 
     @Disabled("Fails print idempotency test")
-    @Test
     @SuppressWarnings("CStyleArrayDeclaration")
+    @Test
     void annotatedCStyleArrayParameter() {
         rewriteRun(
           java(

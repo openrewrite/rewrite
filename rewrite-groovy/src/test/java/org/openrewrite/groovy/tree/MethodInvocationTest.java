@@ -45,8 +45,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    @Test
     void gradleWithParentheses() {
         rewriteRun(
           groovy(
@@ -80,8 +80,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("GroovyVariableNotAssigned")
+    @Test
     void nullSafeDereference() {
         rewriteRun(
           groovy(
@@ -244,8 +244,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
+    @Test
     void closureWithImplicitParameter() {
         rewriteRun(
           groovy(
@@ -354,8 +354,8 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
-    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
+    @Test
     void closureWithNamedParameter() {
         rewriteRun(
           groovy(
@@ -580,8 +580,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5729")
+    @Test
     void closureChainedCall() {
         rewriteRun(
           groovy(

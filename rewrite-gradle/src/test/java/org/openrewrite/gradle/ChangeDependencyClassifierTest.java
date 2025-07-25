@@ -68,8 +68,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void findDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -106,8 +106,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void findMapStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -144,8 +144,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksWithoutVersion(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -184,8 +184,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -226,8 +226,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksWithExt(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -311,8 +311,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void noPreviousClassifier_2(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
@@ -384,8 +384,8 @@ class ChangeDependencyClassifierTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void noNewClassifier_2(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, null, null)),

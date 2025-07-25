@@ -452,8 +452,8 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantSetter")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @SuppressWarnings("RedundantSetter")
     @Test
     void setter() {
         rewriteRun(

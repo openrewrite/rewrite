@@ -97,8 +97,8 @@ class WrappingAndBracesTest implements RewriteTest {
           )));
     }
 
-    @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions"})
     @Issue("https://github.com/openrewrite/rewrite/issues/804")
+    @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions"})
     @Test
     void conditionalsShouldStartOnNewLines() {
         rewriteRun(
