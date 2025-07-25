@@ -114,8 +114,8 @@ class SwitchExpressionTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantLabeledSwitchRuleCodeBlock")
     @Issue("https://github.com/openrewrite/rewrite/issues/2164")
+    @SuppressWarnings("RedundantLabeledSwitchRuleCodeBlock")
     @Test
     void yieldFromRule() {
         rewriteRun(

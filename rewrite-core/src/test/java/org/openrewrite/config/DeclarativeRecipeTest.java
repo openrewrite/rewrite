@@ -378,8 +378,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         assertThat(cycleCount).hasValue(3);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class MaxCycles extends Recipe {
         int maxCycles;
         List<Recipe> recipeList;
@@ -400,8 +400,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class RepeatedFindAndReplace extends Recipe {
         String find;
         String replace;

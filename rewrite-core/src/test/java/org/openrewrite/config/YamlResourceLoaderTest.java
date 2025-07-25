@@ -40,8 +40,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @Test
     @DocumentExample
+    @Test
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(

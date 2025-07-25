@@ -99,8 +99,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
+    @Test
     void replaceConstantInCurlyBracesInAnnotation() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
@@ -160,8 +160,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3555")
+    @Test
     void replaceConstantForAnnotatedParameter() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
@@ -188,8 +188,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    @Test
     void shouldUpdateWithinMethod() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
@@ -228,8 +228,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    @Test
     void shouldUpdateWithinMethod2() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
@@ -276,8 +276,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),
@@ -325,8 +325,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
     void shouldFullyQualifyWhenNewTypeIsAmbiguous2() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo3.Bar.QUX2")),
@@ -383,8 +383,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
     void shouldFullyQualifyWhenNewTypeIsAmbiguous3() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),

@@ -55,8 +55,8 @@ class MemberReferenceTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/608")
+    @Test
     void memberReferenceWithTypeParameter() {
         rewriteRun(
           java(

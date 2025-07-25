@@ -543,8 +543,8 @@ class BlankLinesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/314")
+    @Test
     void blankLinesBetweenTopLevelStatements() {
         rewriteRun(
           blankLines(),
@@ -871,8 +871,8 @@ class BlankLinesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/324")
+    @Test
     void fileAnnotation() {
         rewriteRun(
           blankLines(),

@@ -40,9 +40,9 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         spec.recipe(new FinalizeLocalVariables());
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     @ParameterizedTest
     @ValueSource(ints = { 11, 17, 21 })
-    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void missingTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
           s -> s.typeValidationOptions(TypeValidation.none()),
@@ -70,9 +70,9 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     @ParameterizedTest
     @ValueSource(ints = { 11, 17, 21 })
-    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void explicitTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
           s -> s.typeValidationOptions(TypeValidation.none()),
@@ -170,8 +170,8 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                          .getValue() instanceof J.ForLoop.Control;
         }
 
-        @Value
         @EqualsAndHashCode(callSuper = false)
+        @Value
         private static class FindAssignmentReferencesToVariable extends JavaIsoVisitor<AtomicBoolean> {
 
             J.VariableDeclarations.NamedVariable variable;

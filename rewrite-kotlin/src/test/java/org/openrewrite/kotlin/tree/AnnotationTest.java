@@ -424,8 +424,8 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/267")
+    @Test
     void expressionAnnotationInsideLambda() {
         rewriteRun(
           kotlin(

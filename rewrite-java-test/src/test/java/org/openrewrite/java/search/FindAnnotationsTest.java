@@ -60,8 +60,8 @@ class FindAnnotationsTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("NewClassNamingConvention")
     @Issue("https://github.com/openrewrite/rewrite/issues/357")
+    @SuppressWarnings("NewClassNamingConvention")
     @Test
     void matchesClassArgument() {
         rewriteRun(

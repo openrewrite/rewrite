@@ -68,8 +68,8 @@ class UpdateMavenWrapperTest implements RewriteTest {
         spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, Boolean.TRUE));
     }
 
-    @Test
     @DocumentExample("Add a new Maven wrapper")
+    @Test
     void addMavenWrapper() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))

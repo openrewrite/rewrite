@@ -366,8 +366,8 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+    @Nested
     class TolerateMissingPom {
 
         @Language("xml")

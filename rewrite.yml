@@ -88,7 +88,7 @@ recipeList:
   - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
   - org.openrewrite.staticanalysis.NeedBraces
 #  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
-#  - org.openrewrite.staticanalysis.ReorderAnnotations
+  - org.openrewrite.staticanalysis.ReorderAnnotations
   - org.openrewrite.java.UseStaticImport:
       methodPattern: 'org.openrewrite..Assertions *(..)'
 ---

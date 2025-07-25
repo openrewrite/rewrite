@@ -348,8 +348,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
+    @Test
     void replaceLambdaToMemberReference() {
         //noinspection Convert2MethodRef
         rewriteRun(

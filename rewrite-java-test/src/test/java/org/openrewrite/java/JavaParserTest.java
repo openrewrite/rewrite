@@ -124,8 +124,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantSuppression")
     @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    @SuppressWarnings("RedundantSuppression")
     @Test
     void annotationCommentWithNoSpaceParsesCorrectly() {
         rewriteRun(
@@ -184,8 +184,8 @@ class JavaParserTest implements RewriteTest {
         assertThat(updatedTemp.toFile().exists()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
+    @Test
     void parseFromByteArray() {
         try (ScanResult scan = new ClassGraph().scan()) {
             byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
@@ -238,8 +238,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1895")
+    @Test
     void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
@@ -309,8 +309,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
+    @Test
     void shouldParseComments() {
         rewriteRun(
           java(
@@ -394,8 +394,8 @@ class JavaParserTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5445")
+    @Test
     void parseSwitchBlock() {
         rewriteRun(
           java(

@@ -154,8 +154,8 @@ class IfTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/298")
+    @Test
     void functionCallCondition() {
         rewriteRun(
           kotlin(
