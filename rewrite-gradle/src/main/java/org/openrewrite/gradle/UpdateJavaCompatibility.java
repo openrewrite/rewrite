@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import java.util.ArrayList;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -34,6 +35,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
@@ -81,6 +83,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
     private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
     private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
+    private static final String JAVA_TOOLCHAIN_FOUND = "JAVA_TOOLCHAIN_FOUND";
 
     @Override
     public String getDisplayName() {
@@ -112,6 +115,9 @@ public class UpdateJavaCompatibility extends Recipe {
             if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
                 c = addCompatibilityTypeToSourceFile(c, "target", ctx);
             }
+            if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
+                c = addJavaToolchainToSourceFile(c, ctx);
+            }
             return c;
         }
 
@@ -126,6 +132,10 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+            if (compatibilityType == CompatibilityType.javaToolchain) {
+                return c;
+            }
+
             if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
                 G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
                         .parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
@@ -134,6 +144,60 @@ public class UpdateJavaCompatibility extends Recipe {
                 c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
             }
             return c;
+        }
+
+        private G.CompilationUnit addJavaToolchainToSourceFile(G.CompilationUnit c, ExecutionContext ctx) {
+            if (!(TRUE.equals(addIfMissing))) {
+                return c;
+            }
+
+            Optional<J.MethodInvocation> javaStatement = c.getStatements().stream().filter(s -> s instanceof J.MethodInvocation)
+                    .map(s -> (J.MethodInvocation) s)
+                    .filter(m -> m.getSimpleName().equals("java"))
+                    .findFirst();
+
+            if (javaStatement.isPresent()) {
+                List<Expression> args = javaStatement.get().getArguments();
+                J.Lambda jLambda = (J.Lambda) args.get(0);
+                J.Block body = (J.Block) jLambda.getBody();
+                Statement toolchainStatement = GradleParser.builder().build()
+                        .parse(ctx, "\ntoolchain {" +
+                            "\n  languageVersion = JavaLanguageVersion.of(" + version + ")" +
+                            "\n}")
+                        .map(G.CompilationUnit.class::cast)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                        .getStatements()
+                        .get(0);
+                J.Lambda newLambda = jLambda.withBody(body.withStatements(ListUtils.concat(toolchainStatement, body.getStatements())));
+                List<Expression> newArgs = new ArrayList<>();
+                newArgs.add(newLambda);
+                J.MethodInvocation newJavaStatement = javaStatement.get().withArguments(newArgs);
+                List<Statement> newStatements = new ArrayList<>();
+                for (Statement s : c.getStatements()) {
+                    if (s instanceof J.MethodInvocation) {
+                        J.MethodInvocation invocation = (J.MethodInvocation) s;
+                        if (invocation.getName().getSimpleName().equals("java")) {
+                            newStatements.add(newJavaStatement);
+                            continue;
+                        }
+                    }
+                    newStatements.add(s);
+                }
+                c = c.withStatements(newStatements);
+            } else {
+                G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
+                        .parse(ctx, "\n\njava {" +
+                                "\n    toolchain {" +
+                                "\n        languageVersion = JavaLanguageVersion.of(" + version + ")" +
+                                "\n    }" +
+                                "\n}")
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse Java toolchain as a Gradle file"));
+                c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+            }
+
+            return autoFormat(c, ctx);
         }
     }
 
@@ -146,6 +210,9 @@ public class UpdateJavaCompatibility extends Recipe {
             }
             if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
                 c = addCompatibilityTypeToSourceFile(c, "target", ctx);
+            }
+            if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
+                // todo : c = addJavaToolchainToSourceFile(c, ctx);
             }
             return super.visitCompilationUnit(c, ctx);
         }
@@ -161,6 +228,10 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         private K.CompilationUnit addCompatibilityTypeToSourceFile(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+            if (compatibilityType == CompatibilityType.javaToolchain) {
+                return c;
+            }
+
             if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
                 J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
                 if (withExistingJavaMethod != c) {
@@ -260,6 +331,11 @@ public class UpdateJavaCompatibility extends Recipe {
         if ("targetCompatibility".equals(m.getSimpleName())) {
             c.putMessageOnFirstEnclosing(enclosing, TARGET_COMPATIBILITY_FOUND, true);
         }
+
+        if ("toolchain".equals(m.getSimpleName())) {
+            c.putMessageOnFirstEnclosing(enclosing, JAVA_TOOLCHAIN_FOUND, true);
+        }
+
         if (isMethodInvocation(m, "JavaLanguageVersion", "of")) {
             List<Expression> args = m.getArguments();
 
@@ -472,7 +548,7 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     public enum CompatibilityType {
-        source, target
+        source, target, javaToolchain
     }
 
     public enum DeclarationStyle {
