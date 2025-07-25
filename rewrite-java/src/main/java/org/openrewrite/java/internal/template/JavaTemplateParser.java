@@ -270,13 +270,33 @@ public class JavaTemplateParser {
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
         Parser jp = parser.build();
-        return (stub.contains("@SubAnnotation") ?
+//        return (stub.contains("@SubAnnotation") ?
+//                jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
+//                jp.reset().parse(ctx, stub))
+//                .findFirst()
+//                .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
+//                .map(JavaSourceFile.class::cast)
+//                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
+
+        JavaSourceFile sourceFile = (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub))
                 .findFirst()
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
                 .map(JavaSourceFile.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
+                .orElse(null);
+
+        if (sourceFile == null) {
+            sourceFile = (stub.contains("@SubAnnotation") ?
+                    jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
+                    jp.reset().parse(ctx, stub))
+                    .findFirst()
+                    .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
+                    .map(JavaSourceFile.class::cast)
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
+        }
+
+        return sourceFile;
     }
 
     /**
