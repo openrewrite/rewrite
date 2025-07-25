@@ -50,7 +50,7 @@ class CreateXmlFileTest implements RewriteTest {
             null
           )),
           xml(
-            null,
+            doesNotExist(),
             fileContents,
             spec -> spec.path("test/test.xml")
           )
@@ -133,7 +133,7 @@ class CreateXmlFileTest implements RewriteTest {
             spec -> spec.path("test/test-file-1.xml")
           ),
           xml(
-            null,
+            doesNotExist(),
             "",
             spec -> spec.path("test/test-file-2.xml")
           )

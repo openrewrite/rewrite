@@ -82,8 +82,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        t = new ImportReorderingVisitor<>().visit(t, p, cursor.fork());
-        return t;
+        return new ImportReorderingVisitor<>().visit(t, p, cursor.fork());
     }
 
     @Override

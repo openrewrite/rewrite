@@ -504,8 +504,8 @@ public class GroovyParserVisitor {
                 methodName = method.getName();
             } else {
                 // Method name might be in quotes
-                char openingQuote = source.charAt(cursor);
-                methodName = openingQuote + method.getName() + openingQuote;
+                String delim = source.charAt(cursor) + "";
+                methodName = sourceSubstring(cursor, delim) + delim;
             }
             cursor += methodName.length();
             J.Identifier name = new J.Identifier(randomId(),
@@ -1021,6 +1021,18 @@ public class GroovyParserVisitor {
                     case "?=":
                         gBinaryOp = G.Binary.Type.ElvisAssignment;
                         break;
+                    case "**":
+                        gBinaryOp = G.Binary.Type.Power;
+                        break;
+                    case "**=":
+                        gBinaryOp = G.Binary.Type.PowerAssignment;
+                        break;
+                    case "===":
+                        gBinaryOp = G.Binary.Type.IdentityEquals;
+                        break;
+                    case "!==":
+                        gBinaryOp = G.Binary.Type.IdentityNotEquals;
+                        break;
                 }
 
                 cursor += binary.getOperation().getText().length();
@@ -1061,7 +1073,11 @@ public class GroovyParserVisitor {
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
-            boolean withinClosure = parent instanceof ClosureExpression || (parent instanceof ExpressionStatement && ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression);
+            boolean withinClosure = !(parent instanceof LambdaExpression) && parent instanceof ClosureExpression ||
+                                    (parent instanceof ExpressionStatement &&
+                                            !(((ExpressionStatement) parent).getExpression() instanceof LambdaExpression) &&
+                                            ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression
+                                    );
             if (isStaticInit) {
                 fmt = sourceBefore("static");
                 staticInitPadding = whitespace();
@@ -1281,7 +1297,9 @@ public class GroovyParserVisitor {
                     arrowPrefix,
                     body,
                     closureType));
-            skip("}");
+            if (cursor < source.length() && source.charAt(cursor) == '}') {
+                skip("}");
+            }
         }
 
         @Override
@@ -1324,23 +1342,11 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Char;
                 } else if (type == ClassHelper.double_TYPE || Double.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Double;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.float_TYPE || Float.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Float;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.int_TYPE || Integer.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Int;
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.long_TYPE || Long.class.getName().equals(type.getName())) {
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                     jType = JavaType.Primitive.Long;
                 } else if (type == ClassHelper.short_TYPE || Short.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Short;
@@ -1369,20 +1375,23 @@ public class GroovyParserVisitor {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
-                if (cursor < source.length() && source.charAt(cursor) == '+' && !text.startsWith("+")) {
-                    // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
-                    text = "+" + text;
-                }
-                cursor += text.length();
-                // Numeric literals may be followed by "L", "f", or "d" to indicate Long, float, or double respectively
-                if (jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
-                    if (source.startsWith("L", cursor) || source.startsWith("f", cursor) || source.startsWith("d", cursor)) {
-                        text += source.charAt(cursor);
-                        cursor++;
+                // Get the string literal from the source, as numeric literals may have a unary operator, underscores, dots and can be followed by "L", "f", or "d"
+                if (jType == JavaType.Primitive.Int || jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
+                    int i = cursor;
+                    if (source.charAt(cursor) == '-' || source.charAt(cursor) == '+') {
+                        i = indexOfNextNonWhitespace(cursor + 1, source);
                     }
+                    for (; i < source.length(); i++) {
+                        char c = source.charAt(i);
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && isJavaIdentifierPart(source.charAt(i + 1))))) {
+                            break;
+                        }
+                    }
+                    text = source.substring(cursor, i);
                 }
-                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
-                        null, jType);
+
+                skip(text);
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text, null, jType);
             }));
         }
 
@@ -1715,30 +1724,32 @@ public class GroovyParserVisitor {
                     }
                     select = JRightPadded.build(selectExpr).withAfter(afterSelect);
                 }
+                JContainer<Expression> typeParameters = call.getGenericsTypes() != null ? visitTypeParameterizations(call.getGenericsTypes()) : null;
                 // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
                 // closure() has implicitThis set to false
                 // So the "select" that was just parsed _may_ have actually been the method name
                 J.Identifier name;
 
-                String methodNameExpression = call.getMethodAsString();
+                String methodName = call.getMethodAsString();
+                // Check for escaped method name, often used in tests (def 'description'() {}) or to avoid clashing with Groovy keywords
                 if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
-                    // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
-                    // or to workaround names that are also keywords in groovy
-                    methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
+                    // TODO: Methods with string interpolation are parsed as just one method name instead of multiple LST elements
+                    String delim = source.charAt(cursor) + "";
+                    methodName = sourceSubstring(cursor, delim) + delim;
                 }
 
                 Space prefix = whitespace();
-                boolean implicitCall = (methodNameExpression != null && cursor < source.length() &&
-                        source.charAt(cursor) == '(' && (cursor + methodNameExpression.length() > source.length() ||
-                        !methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length())))
+                boolean implicitCall = (methodName != null && cursor < source.length() &&
+                        source.charAt(cursor) == '(' && (cursor + methodName.length() > source.length() ||
+                        !methodName.equals(source.substring(cursor, cursor + methodName.length())))
                 );
                 if (implicitCall) {
                     // This is an implicit call() method - create identifier but it doesn't get printed
                     name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), "", null, null);
                 } else {
-                    if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                        skip(methodNameExpression);
-                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
+                    if (methodName.equals(source.substring(cursor, cursor + methodName.length()))) {
+                        skip(methodName);
+                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodName, null, null);
                     } else if (select != null && select.getElement() instanceof J.Identifier) {
                         name = (J.Identifier) select.getElement();
                         select = null;
@@ -1826,11 +1837,10 @@ public class GroovyParserVisitor {
                             break;
                         }
                     }
-
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-                return new J.MethodInvocation(randomId(), fmt, markers, select, null, name, args, methodType);
+                return new J.MethodInvocation(randomId(), fmt, markers, select, typeParameters, name, args, methodType);
             }));
         }
 

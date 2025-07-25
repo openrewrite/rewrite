@@ -61,11 +61,9 @@ public class ExtractInterface {
                             c.getPackageDeclaration() == null ? emptyList() : c.getPackageDeclaration().getAnnotations()));
                 }
 
-                c = (JavaSourceFile) c.withSourcePath(c.getSourcePath()
+                return (JavaSourceFile) c.withSourcePath(c.getSourcePath()
                         .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
                         .normalize());
-
-                return c;
             }
             return super.postVisit(tree, ctx);
         }

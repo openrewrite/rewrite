@@ -102,9 +102,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            mi = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
+            return (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
                     .visitNonNull(mi, ctx, getCursor().getParentTreeCursor().fork());
-            return mi;
         }
 
         @Override
@@ -120,9 +119,8 @@ public class MethodParamPad extends Recipe {
                     );
                 }
             }
-            nc = (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
+            return (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
                     .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());
-            return nc;
         }
     }
 }

@@ -49,12 +49,10 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
                     stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
-        y = new NormalizeLineBreaksVisitor<>(
+        return new NormalizeLineBreaksVisitor<>(
                 Style.from(GeneralFormatStyle.class, docs, () -> Autodetect.generalFormat(docs)),
                 stopAfter)
                 .visitNonNull(y, p, cursor.fork());
-
-        return y;
     }
 
     @Override
@@ -68,12 +66,10 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
                 stopAfter)
                 .visitNonNull(y, p);
 
-        y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(
+        return (Yaml.Documents) new NormalizeLineBreaksVisitor<>(
                 Style.from(GeneralFormatStyle.class, documents, () -> Autodetect.generalFormat(documents)),
                 stopAfter)
                 .visitNonNull(y, p);
-
-        return y;
     }
 
     @Override

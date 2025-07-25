@@ -25,12 +25,23 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class LambdaTest implements RewriteTest {
 
     @Test
-    void lambdaExpressionNoParens() {
+    void lambdaExpression() {
         rewriteRun(
           groovy(
                 """
             def lambda = a -> a
             """
+          )
+        );
+    }
+
+    @Test
+    void lambdaExpressionWithCurlyBraces() {
+        rewriteRun(
+          groovy(
+            """
+              def lambda = a -> { a }
+              """
           )
         );
     }
@@ -45,6 +56,7 @@ class LambdaTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void lambdaExpressionWithArgument() {
         rewriteRun(

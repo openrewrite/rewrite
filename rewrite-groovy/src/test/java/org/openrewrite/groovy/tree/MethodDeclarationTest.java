@@ -212,7 +212,7 @@ class MethodDeclarationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3559")
-    void escapedMethodNameTest() {
+    void escapedMethodName() {
         rewriteRun(
           groovy(
             """
@@ -224,12 +224,24 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void escapedMethodNameWithSpacesTest() {
+    void escapedMethodNameWithSpaces() {
         rewriteRun(
           groovy(
             """
               def 'some test scenario description'() {}
               'some test scenario description'()
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedMethodNameWithDollarSign() {
+        rewriteRun(
+          groovy(
+            """
+              def "xMethod\\${regularText}"() {}
+              "xMethod\\${regularText}"()
               """
           )
         );
