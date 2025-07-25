@@ -30,8 +30,8 @@ class JacocoReportDeprecationsTest implements RewriteTest {
         spec.recipe(new JacocoReportDeprecations());
     }
 
-    @Test
     @DocumentExample
+    @Test
     void deprecationsInNormalSyntax() {
         rewriteRun(
           buildGradle(

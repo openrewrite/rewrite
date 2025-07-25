@@ -92,9 +92,9 @@ class FindSourceFilesTest implements RewriteTest {
         );
     }
 
+    @NullSource
     @ParameterizedTest
     @ValueSource(strings = {""})
-    @NullSource
     void blankMatchesEverything(String filePattern) {
         rewriteRun(
           spec -> spec.recipe(new FindSourceFiles(filePattern)),
@@ -151,8 +151,8 @@ class FindSourceFilesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3758")
+    @Test
     void eitherOr() {
         rewriteRun(
           spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),

@@ -19,7 +19,7 @@ bodyContent
     ;
 
 attribute
-    : Identifier ASSIGN expression
+    : (Identifier | NULL) ASSIGN expression
     ;
 
 block
@@ -87,7 +87,7 @@ object
     ;
 
 objectelem
-    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    : (Identifier | NULL | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
     ;
 
 // For Expressions

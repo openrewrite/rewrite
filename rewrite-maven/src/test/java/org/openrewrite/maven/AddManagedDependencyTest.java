@@ -76,7 +76,6 @@ class AddManagedDependencyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void propertiesAsGAVCoordinates() {
         rewriteRun(

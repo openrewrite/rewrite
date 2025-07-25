@@ -1638,8 +1638,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3607")
+    @Test
     void conflictWithRecord() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
@@ -1753,8 +1753,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3909")
+    @Test
     void importUsedOnlyInReturnType() {
         // language=java
         rewriteRun(
@@ -2070,8 +2070,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5498")
+    @Test
     void javaUtilMapEntry() {
         // language=java
         rewriteRun(

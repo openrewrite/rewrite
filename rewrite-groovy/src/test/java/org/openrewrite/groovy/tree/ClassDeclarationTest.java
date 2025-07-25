@@ -429,8 +429,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedClassWithoutParameters() {
         rewriteRun(
           groovy(
@@ -445,8 +445,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedClass() {
         rewriteRun(
           groovy(
@@ -465,8 +465,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedStaticClassWithoutParameters() {
         rewriteRun(
           groovy(
@@ -481,8 +481,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedStaticClass() {
         rewriteRun(
           groovy(

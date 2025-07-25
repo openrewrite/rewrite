@@ -436,8 +436,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantSuspendModifier")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/92")
+    @SuppressWarnings("RedundantSuspendModifier")
     @Test
     void receiverWithModifier() {
         rewriteRun(
@@ -628,8 +628,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void extensionFunctionCall() {
         rewriteRun(
           kotlin(
@@ -644,8 +644,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/233")
+    @Test
     void indexedAccess() {
         rewriteRun(
           kotlin(
@@ -657,8 +657,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/233")
+    @Test
     void customIndexedAccess() {
         rewriteRun(
           kotlin(
@@ -686,8 +686,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/297")
+    @Test
     void spaceAfterLambdaParameter() {
         rewriteRun(
           kotlin(
@@ -702,8 +702,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/308")
+    @Test
     void trailingLambdaAfterNullSafe() {
         rewriteRun(
           kotlin(
@@ -757,8 +757,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/417")
+    @Test
     void namedArgumentWithSpreadOperator() {
         rewriteRun(
           kotlin(

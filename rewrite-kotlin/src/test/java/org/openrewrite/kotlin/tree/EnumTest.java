@@ -138,8 +138,8 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/307")
+    @Test
     void enumWithFunction() {
         rewriteRun(
           kotlin(

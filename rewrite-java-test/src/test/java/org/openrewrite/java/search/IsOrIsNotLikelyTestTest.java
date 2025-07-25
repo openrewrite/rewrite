@@ -127,8 +127,8 @@ public class IsOrIsNotLikelyTestTest {
             );
         }
 
-        @Test
         @SuppressWarnings("SpellCheckingInspection")
+        @Test
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
@@ -184,8 +184,8 @@ public class IsOrIsNotLikelyTestTest {
             );
         }
 
-        @Test
         @SuppressWarnings("SpellCheckingInspection")
+        @Test
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),

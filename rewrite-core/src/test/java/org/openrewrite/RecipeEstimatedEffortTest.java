@@ -137,8 +137,8 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           .isEqualTo(expectedEstimatedEffort);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class CustomEstimatedEffortAppendToTextRecipe extends Recipe {
         @Option(displayName = "Search term",
           example = "before",
@@ -188,8 +188,8 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class CustomEstimatedEffortCreateTextFile extends ScanningRecipe<AtomicBoolean> {
         @Option(displayName = "File contents",
           description = "Multiline text content for the file.",

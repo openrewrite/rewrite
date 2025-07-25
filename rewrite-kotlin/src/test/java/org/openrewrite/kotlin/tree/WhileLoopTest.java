@@ -74,8 +74,8 @@ class WhileLoopTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("ControlFlowWithEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/561")
+    @SuppressWarnings("ControlFlowWithEmptyBody")
     @Test
     void noBody() {
         rewriteRun(

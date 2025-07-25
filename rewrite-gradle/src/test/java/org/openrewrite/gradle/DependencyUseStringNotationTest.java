@@ -70,7 +70,6 @@ class DependencyUseStringNotationTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void kotlinSupport() {
         rewriteRun(
@@ -478,8 +477,8 @@ class DependencyUseStringNotationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5702")
+    @Test
     void handleClassifierWithNoVersion() {
         rewriteRun(
           buildGradle(

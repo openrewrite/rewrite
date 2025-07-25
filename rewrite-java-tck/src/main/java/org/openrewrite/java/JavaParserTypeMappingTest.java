@@ -143,8 +143,8 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
-    @Test
     @MinimumJava11
+    @Test
     void methodInvocationWithUnknownTypeSymbol() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
@@ -285,8 +285,8 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
-    @SuppressWarnings("Convert2MethodRef")
     @Issue("https://github.com/openrewrite/rewrite/issues/2118")
+    @SuppressWarnings("Convert2MethodRef")
     @Test
     void multiMapWithSameLambdaParamNames() {
         rewriteRun(
