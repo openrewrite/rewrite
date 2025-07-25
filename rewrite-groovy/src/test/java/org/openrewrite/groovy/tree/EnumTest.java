@@ -37,7 +37,7 @@ class EnumTest implements RewriteTest {
     }
 
     @Test
-    void enumDefinitionTrailingSemicolon() {
+    void enumDefinitionUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
           groovy(
             """
@@ -50,7 +50,7 @@ class EnumTest implements RewriteTest {
     }
 
     @Test
-    void enumDefinitionTrailingComma() {
+    void enumDefinitionUnnecessarilyTerminatedWithComma() {
         rewriteRun(
           groovy(
             """
@@ -217,34 +217,6 @@ class EnumTest implements RewriteTest {
                   A(X x) {}
               }
               """
-          )
-        );
-    }
-
-    @Test
-    void enumWithoutParameters() {
-        rewriteRun(
-          groovy(
-            "enum A { ONE, TWO }"
-          )
-        );
-    }
-
-    @Test
-    void enumUnnecessarilyTerminatedWithSemicolon() {
-        rewriteRun(
-          groovy(
-            "enum A { ONE ; }"
-          )
-        );
-    }
-
-    @ExpectedToFail
-    @Test
-    void enumWithEmptyParameters() {
-        rewriteRun(
-          groovy(
-            "enum A { ONE ( ), TWO ( ) }"
           )
         );
     }

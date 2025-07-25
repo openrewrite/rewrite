@@ -643,7 +643,7 @@ public class GroovyParserVisitor {
                                     ((BlockStatement) method.getCode()).getVariableScope()
                             )
                     );
-                } else if (isConstructorOfEnum) {
+                } else if (isConstructorOfEnum && ((BlockStatement) method.getCode()).getStatements().size() > 1) {
                     org.codehaus.groovy.ast.stmt.Statement node = ((BlockStatement) method.getCode()).getStatements().get(1);
                     if (node instanceof BlockStatement) {
                         body = bodyVisitor.visit(node);
