@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class DelegationTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/145")
+    @Test
     void delegationByMap() {
         rewriteRun(
           kotlin(
@@ -38,8 +38,8 @@ class DelegationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/269")
+    @Test
     void delegationToProperty() {
         rewriteRun(
           kotlin(
@@ -59,8 +59,8 @@ class DelegationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/269")
+    @Test
     void classWithDelegation() {
         rewriteRun(
           kotlin(

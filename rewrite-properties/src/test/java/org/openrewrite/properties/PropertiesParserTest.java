@@ -128,8 +128,8 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty"})
     @Issue("https://github.com/openrewrite/rewrite/issues/2471")
+    @SuppressWarnings({"WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty"})
     @Test
     void escapedEndOfLine() {
         rewriteRun(
@@ -168,8 +168,8 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("WrongPropertyKeyValueDelimiter")
     @Issue("https://github.com/openrewrite/rewrite/issues/2501")
+    @SuppressWarnings("WrongPropertyKeyValueDelimiter")
     @Test
     void delimitedByWhitespace() {
         rewriteRun(

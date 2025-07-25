@@ -1316,8 +1316,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4275")
+    @Test
     void noActionForNonStringLiterals() {
         rewriteRun(
           buildGradle(
@@ -1341,8 +1341,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/pull/106")
+    @Test
     void isAcceptable() {
         // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
@@ -1361,8 +1361,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithExactPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-jre")),
@@ -1397,8 +1397,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithRegexPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-.*?droid")),
@@ -1523,8 +1523,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4655")
+    @Test
     void issue4655() {
         rewriteRun(
           buildGradle(

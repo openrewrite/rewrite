@@ -296,8 +296,8 @@ class AddImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
+    @Test
     void dontImportJavaLangWhenUsingDefaultPackage() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),

@@ -2822,8 +2822,8 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    @Test
     void preventKeysToBeAppendedToPreviousComment() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath
@@ -2862,8 +2862,8 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    @Test
     void preventKeysToBeAppendedToPreviousCommentIfManyLineBreaks() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath

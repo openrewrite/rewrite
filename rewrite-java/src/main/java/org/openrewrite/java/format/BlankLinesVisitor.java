@@ -250,8 +250,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block j = super.visitBlock(block, p);
-        j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
-        return j;
+        return j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
     }
 
     private <J2 extends J> J2 keepMaximumLines(J2 tree, int max) {

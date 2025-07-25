@@ -744,7 +744,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             }
 
-            m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+            return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 if (!(arg instanceof J.Lambda)) {
                     return arg;
                 }
@@ -757,7 +757,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return dependencies.withBody(body.withStatements(
                         ListUtils.concat(constraint, body.getStatements())));
             })), ctx, getCursor().getParentOrThrow());
-            return m;
         }
     }
 
@@ -845,7 +844,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (!"because".equals(m.getSimpleName())) {
                 return m;
             }
-            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+            return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                 if (arg instanceof J.Literal) {
                     char quote;
                     if (((J.Literal) arg).getValueSource() == null) {
@@ -858,7 +857,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
                 return arg;
             }));
-            return m;
         }
     }
 
@@ -917,8 +915,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             }
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
-            m = autoFormat(m, ctx, getCursor().getParentOrThrow());
-            return m;
+            return autoFormat(m, ctx, getCursor().getParentOrThrow());
         }
     }
 

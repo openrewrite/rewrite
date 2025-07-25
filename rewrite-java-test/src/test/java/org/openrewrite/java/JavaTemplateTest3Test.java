@@ -139,9 +139,9 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr"})
+    @Test
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -192,9 +192,9 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @SuppressWarnings({"ResultOfMethodCallIgnored", "ConstantConditions"})
+    @Test
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -242,8 +242,8 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
+    @Test
     void replaceStatementInLambdaBodyMultiStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -288,9 +288,9 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @SuppressWarnings({"ResultOfMethodCallIgnored", "SizeReplaceableByIsEmpty"})
+    @Test
     void replaceSingleExpressionInLambdaBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

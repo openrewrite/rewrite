@@ -101,8 +101,8 @@ class CreateTextFileTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-jenkins/issues/52")
+    @Test
     void shouldOverrideDifferentSourceFileType() {
         @Language("groovy")
         String after = """

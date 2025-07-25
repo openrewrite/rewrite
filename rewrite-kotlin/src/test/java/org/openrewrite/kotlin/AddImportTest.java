@@ -394,8 +394,8 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RemoveRedundantBackticks")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/493")
+    @SuppressWarnings("RemoveRedundantBackticks")
     @Test
     void addEscapedImport() {
         rewriteRun(

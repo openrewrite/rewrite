@@ -64,7 +64,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 randomId(),
                 Space.format(prefix),
                 Markers.EMPTY,
-                visitIdentifier(c.Identifier()),
+                c.Identifier() != null ? visitIdentifier(c.Identifier()) : visitIdentifier(c.NULL()),
                 new HclLeftPadded<>(
                         sourceBefore("="),
                         Hcl.Attribute.Type.Assignment,
@@ -495,6 +495,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 }
                 if (ctx.Identifier() != null) {
                     name = visitIdentifier(ctx.Identifier());
+                } else if (ctx.NULL() != null) {
+                    name = visitIdentifier(ctx.NULL());
                 } else if (ctx.expression(0) != null) {
                     name = (Expression) visit(ctx.expression(0));
                 } else {

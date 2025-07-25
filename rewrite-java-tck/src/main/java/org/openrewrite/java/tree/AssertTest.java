@@ -39,8 +39,8 @@ class AssertTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("PointlessBooleanExpression")
     @Issue("https://github.com/openrewrite/rewrite/issues/766")
+    @SuppressWarnings("PointlessBooleanExpression")
     @Test
     void assertDetail() {
         rewriteRun(

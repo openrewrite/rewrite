@@ -40,7 +40,7 @@ class IndependentCacheManagementTest {
         Map<String, Object> remoteObjects = new HashMap<>();
         Map<String, Object> localObjects = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Create object on server
         String objectId = "test-object-id";
         PlainText text = PlainText.builder()
@@ -49,15 +49,15 @@ class IndependentCacheManagementTest {
                 .markers(EMPTY)
                 .sourcePath(Paths.get("test.txt"))
                 .build();
-        
+
         localObjects.put(objectId, text);
 
         // Simulate GetObject request without lastKnownId (null)
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
+        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
-        
+
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, null));
-        
+
         // First data should be ADD state
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
@@ -69,7 +69,7 @@ class IndependentCacheManagementTest {
         Map<String, Object> remoteObjects = new HashMap<>();
         Map<String, Object> localObjects = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Create object on server
         String objectId = "test-object-id";
         PlainText text = PlainText.builder()
@@ -78,16 +78,16 @@ class IndependentCacheManagementTest {
                 .markers(EMPTY)
                 .sourcePath(Paths.get("test.txt"))
                 .build();
-        
+
         localObjects.put(objectId, text);
         // Intentionally don't put anything in remoteObjects to simulate cache miss
 
         // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
+        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
-        
+
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
+
         // Should return ADD since remote has no entry for this ID
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
@@ -99,7 +99,7 @@ class IndependentCacheManagementTest {
         Map<String, Object> remoteObjects = new HashMap<>();
         Map<String, Object> localObjects = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Create object on server
         String objectId = "test-object-id";
         PlainText text = PlainText.builder()
@@ -108,16 +108,16 @@ class IndependentCacheManagementTest {
                 .markers(EMPTY)
                 .sourcePath(Paths.get("test.txt"))
                 .build();
-        
+
         localObjects.put(objectId, text);
         remoteObjects.put(objectId, text); // Same object in remote
 
         // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
+        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
-        
+
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
+
         // Should return NO_CHANGE since objects are identical
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.NO_CHANGE);
@@ -129,7 +129,7 @@ class IndependentCacheManagementTest {
         Map<String, Object> remoteObjects = new HashMap<>();
         Map<String, Object> localObjects = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Create original object on server
         String objectId = "test-object-id";
         PlainText originalText = PlainText.builder()
@@ -138,19 +138,19 @@ class IndependentCacheManagementTest {
                 .markers(EMPTY)
                 .sourcePath(Paths.get("test.txt"))
                 .build();
-        
+
         // Create modified object 
         PlainText modifiedText = originalText.withText("Modified Text");
-        
+
         localObjects.put(objectId, modifiedText);
         remoteObjects.put(objectId, originalText); // Different object in remote
 
         // Simulate GetObject request with lastKnownId 
-        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects, 
+        TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
-        
+
         List<RpcObjectData> response = handler.handle(new GetObject(objectId, objectId));
-        
+
         // Should return CHANGE since objects are different
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.CHANGE);
@@ -160,7 +160,7 @@ class IndependentCacheManagementTest {
     void getRefRequest_whenRefExists_returnsCorrectObject() throws InterruptedException {
         Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Create a reference on server
         PlainText text = PlainText.builder()
                 .id(randomId())
@@ -168,21 +168,21 @@ class IndependentCacheManagementTest {
                 .markers(EMPTY)
                 .sourcePath(Paths.get("ref.txt"))
                 .build();
-        
+
         int refId = 42;
         localRefs.put(text, refId);
 
         // Test GetRef request
         GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1000), new AtomicBoolean(false));
         List<RpcObjectData> response = handler.handle(new GetRef(refId));
-        
+
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
         // For RpcCodec objects like PlainText, the first RpcObjectData has null value 
         // and the actual data is in subsequent RpcObjectData objects
         assertThat((Object) response.getFirst().getValue()).isNull();
         assertThat(response.getFirst().getValueType()).isEqualTo("org.openrewrite.text.PlainText");
-        
+
         // Should end with END_OF_OBJECT
         assertThat(response.getLast().getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
     }
@@ -191,11 +191,11 @@ class IndependentCacheManagementTest {
     void getRefRequest_whenRefDoesNotExist_returnsDELETE() throws InterruptedException {
         Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Test GetRef request for non-existent reference
         GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
         List<RpcObjectData> response = handler.handle(new GetRef(999));
-        
+
         assertThat(response).hasSize(2); // DELETE + END_OF_OBJECT
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
         assertThat(response.get(1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
@@ -205,11 +205,11 @@ class IndependentCacheManagementTest {
     void getRefRequest_whenInvalidRefId_returnsDELETE() throws InterruptedException {
         Map<Integer, Object> remoteRefs = new HashMap<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        
+
         // Test GetRef request with invalid ref ID format
         GetRef.Handler handler = new GetRef.Handler(remoteRefs, localRefs, new AtomicInteger(1), new AtomicBoolean(false));
         List<RpcObjectData> response = handler.handle(new GetRef(-1));
-        
+
         assertThat(response).hasSize(2); // DELETE + END_OF_OBJECT
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
         assertThat(response.get(1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
@@ -217,13 +217,13 @@ class IndependentCacheManagementTest {
 
     // Helper class to access protected method
     private static class TestableGetObjectHandler extends GetObject.Handler {
-        
+
         TestableGetObjectHandler(AtomicInteger batchSize, Map<String, Object> remoteObjects,
                 Map<String, Object> localObjects, IdentityHashMap<Object, Integer> localRefs,
                 AtomicBoolean trace) {
             super(batchSize, remoteObjects, localObjects, localRefs, trace);
         }
-        
+
         @Override
         public List<RpcObjectData> handle(GetObject request) {
             try {

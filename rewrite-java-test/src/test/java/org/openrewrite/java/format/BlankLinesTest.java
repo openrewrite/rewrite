@@ -909,8 +909,8 @@ class BlankLinesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    @Test
     void enumAnnotations() {
         rewriteRun(
           blankLines(),
@@ -927,8 +927,8 @@ class BlankLinesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4154")
+    @Test
     void eachMethodOnItsOwnLineAnonymousInnerClass() {
         rewriteRun(
           blankLines(),

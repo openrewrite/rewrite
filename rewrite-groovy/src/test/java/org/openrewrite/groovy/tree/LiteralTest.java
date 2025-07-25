@@ -296,9 +296,41 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               float a = 0.1
-              def b = 0.1f
-              double c = 1.0d
-              long d = 1L
+              def b = 0.10f
+              def c = -0.10f
+              double d = 1.0d
+              double e = -1.0d
+              long f = +1L
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2752")
+    @Test
+    void numericLiteralsWithUnderscores() {
+        rewriteRun(
+          groovy(
+            """
+              def l1 = 10_000L
+              def l2 = 10_000l
+              def i = 10_000
+              def d1 = 10_000d
+              def d2 = 10_000D
+              def f1 = 10_000f
+              def f2 = -10_000.0F
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericLiteralWithSpacing() {
+        rewriteRun(
+          groovy(
+            """
+              def a = -           0.10
+              def b = +           0.10
               """
           )
         );
@@ -411,8 +443,8 @@ class LiteralTest implements RewriteTest {
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
+    @Test
     void stringWithMultipleBackslashes() {
         rewriteRun(
           groovy(
