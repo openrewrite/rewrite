@@ -52,7 +52,7 @@ public enum Flag {
 
     private final long bitMask;
 
-    public static final long VALID_CLASS_FLAGS = Stream.of(Public, Private, Protected, Static,  Final, Interface, Abstract, Strictfp)
+    public static final long VALID_CLASS_FLAGS = Stream.of(Public, Private, Protected, Static,  Final, Interface, Abstract, Strictfp, Enum)
             .map(Flag::getBitMask).reduce(0L, (m1, m2) -> m1 | m2);
     public static final long VALID_FLAGS = Arrays.stream(Flag.values())
             .map(Flag::getBitMask)

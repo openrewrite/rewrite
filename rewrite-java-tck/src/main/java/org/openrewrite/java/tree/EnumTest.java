@@ -230,4 +230,18 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void enumClassHasJavaTypeClassEnumFlagEnabled() {
+        rewriteRun(
+          java(
+            """    
+              enum Color {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertTrue(requireNonNull(cu.getClasses().get(0).getType()).hasFlags(Flag.Enum));
+            })
+          )
+        );
+    }
 }
