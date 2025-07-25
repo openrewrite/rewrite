@@ -20,12 +20,14 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Objects.requireNonNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.java.Assertions.java;
 
 class EnumTest implements RewriteTest {
 
-    @SuppressWarnings("UnnecessarySemicolon")
     @Issue("https://github.com/openrewrite/rewrite/issues/379")
+    @SuppressWarnings("UnnecessarySemicolon")
     @Test
     void enumWithAnnotations() {
         rewriteRun(
@@ -179,8 +181,8 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5146")
+    @Test
     void noValuesJustSemicolon() {
         rewriteRun(
           java(
@@ -194,6 +196,50 @@ class EnumTest implements RewriteTest {
                 J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
                 assert enumValueStatement.getEnums().isEmpty();
                 assert enumValueStatement.isTerminatedWithSemicolon();
+            })
+          )
+        );
+    }
+
+    @Test
+    void enumConstantTypeIsFlagged() {
+        rewriteRun(
+          java(
+            """    
+              enum Color {
+                  RED,
+                  BLUE;
+                  public static final Color GREEN = RED;
+              }
+              
+              class Test {
+                  Color run() {
+                      return null;
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().get(0);
+                JavaType.Class colorEnumType = (JavaType.Class) requireNonNull(md.getReturnTypeExpression()).getType();
+
+                assertEquals(JavaType.FullyQualified.Kind.Enum, requireNonNull(colorEnumType).getKind());
+                assertFalse(colorEnumType.getMembers().get(0).hasFlags(Flag.Enum)); // GREEN
+                assertTrue(colorEnumType.getMembers().get(1).hasFlags(Flag.Enum)); // BLUE
+                assertTrue(colorEnumType.getMembers().get(2).hasFlags(Flag.Enum)); // RED
+            })
+          )
+        );
+    }
+
+    @Test
+    void enumClassHasJavaTypeClassEnumFlagEnabled() {
+        rewriteRun(
+          java(
+            """    
+              enum Color {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertTrue(requireNonNull(cu.getClasses().get(0).getType()).hasFlags(Flag.Enum));
             })
           )
         );

@@ -53,7 +53,6 @@ class RemoveTrailingSemicolonTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void doNotChangeVariableDeclarationsInSameLine() {
         rewriteRun(

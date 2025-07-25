@@ -315,8 +315,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
+    @Test
     void multipleBounds() {
         rewriteRun(
           kotlin(
@@ -567,8 +567,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void onlySecondaryConstructors() {
         rewriteRun(
           kotlin(
@@ -598,8 +598,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void secondaryConstructorWithBody() {
         rewriteRun(
           kotlin(
@@ -654,8 +654,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/301")
+    @Test
     void qualifiedSuperType() {
         rewriteRun(
           kotlin(

@@ -515,8 +515,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactId() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(
@@ -531,8 +531,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(
@@ -1328,8 +1328,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1717")
+    @Test
     void changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1411,8 +1411,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1751")
+    @Test
     void allowNewVersionToBeExpressedAsSemverSelector() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1558,8 +1558,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4779")
+    @Test
     void changePluginDependencyGroupIdAndArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(

@@ -348,8 +348,8 @@ class UnfoldPropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail("Comments are not supported yet")
+    @Test
     void mergeDuplicatedSectionsWitComments() {
         rewriteRun(
           yaml(

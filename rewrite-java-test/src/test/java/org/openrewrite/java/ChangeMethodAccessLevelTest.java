@@ -312,9 +312,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void methodPatternExactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
@@ -355,9 +355,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void matchOverrides() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true)),

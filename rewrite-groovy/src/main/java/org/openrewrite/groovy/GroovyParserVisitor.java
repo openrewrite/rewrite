@@ -1342,23 +1342,11 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Char;
                 } else if (type == ClassHelper.double_TYPE || Double.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Double;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.float_TYPE || Float.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Float;
-                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.int_TYPE || Integer.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Int;
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                 } else if (type == ClassHelper.long_TYPE || Long.class.getName().equals(type.getName())) {
-                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    }
                     jType = JavaType.Primitive.Long;
                 } else if (type == ClassHelper.short_TYPE || Short.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Short;
@@ -1387,20 +1375,23 @@ public class GroovyParserVisitor {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
-                if (cursor < source.length() && source.charAt(cursor) == '+' && !text.startsWith("+")) {
-                    // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
-                    text = "+" + text;
-                }
-                cursor += text.length();
-                // Numeric literals may be followed by "L", "f", or "d" to indicate Long, float, or double respectively
-                if (jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
-                    if (source.startsWith("L", cursor) || source.startsWith("f", cursor) || source.startsWith("d", cursor)) {
-                        text += source.charAt(cursor);
-                        cursor++;
+                // Get the string literal from the source, as numeric literals may have a unary operator, underscores, dots and can be followed by "L", "f", or "d"
+                if (jType == JavaType.Primitive.Int || jType == JavaType.Primitive.Long || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Double) {
+                    int i = cursor;
+                    if (source.charAt(cursor) == '-' || source.charAt(cursor) == '+') {
+                        i = indexOfNextNonWhitespace(cursor + 1, source);
                     }
+                    for (; i < source.length(); i++) {
+                        char c = source.charAt(i);
+                        if (!(isJavaIdentifierPart(c) || (c == '.' && source.length() > (i + 1) && isJavaIdentifierPart(source.charAt(i + 1))))) {
+                            break;
+                        }
+                    }
+                    text = source.substring(cursor, i);
                 }
-                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
-                        null, jType);
+
+                skip(text);
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text, null, jType);
             }));
         }
 
@@ -2530,11 +2521,11 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode
-                    && classNode.getUnresolvedSuperClass() != null
-                    && classNode.getUnresolvedSuperClass().isUsingGenerics()
-                    && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
-                    && classNode.getGenericsTypes() == null;
+            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode &&
+                    classNode.getUnresolvedSuperClass() != null &&
+                    classNode.getUnresolvedSuperClass().isUsingGenerics() &&
+                    !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder() &&
+                    classNode.getGenericsTypes() == null;
             if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :

@@ -167,8 +167,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4244")
+    @Test
     void negatedCallToIsNull() {
         rewriteRun(
           java(
@@ -197,8 +197,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4244")
+    @Test
     void comparisonOfCallToFalse() {
         rewriteRun(
           java(

@@ -514,8 +514,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3832")
+    @Test
     void retainDuplicateManagedDependenciesWithDifferentClassifier() {
         rewriteRun(
           pomXml(

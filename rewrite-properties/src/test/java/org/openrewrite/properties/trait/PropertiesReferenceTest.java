@@ -33,12 +33,12 @@ class PropertiesReferenceTest implements RewriteTest {
       c.type=Integer
       """;
 
-    @ParameterizedTest
     @CsvSource({
       "application.properties",
       "application-test.properties",
       "/foo/bar/application-test.properties",
     })
+    @ParameterizedTest
     void findJavaReferencesInApplicationProperties(String filename) {
         rewriteRun(
           properties(
@@ -60,7 +60,6 @@ class PropertiesReferenceTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "application-.properties",
       "application.test.properties",
@@ -68,6 +67,7 @@ class PropertiesReferenceTest implements RewriteTest {
       "other.properties",
       "/foo/bar/other.properties"
     })
+    @ParameterizedTest
     void noReferencesInMismatchedFilenames(String filename) {
         rewriteRun(
           properties(

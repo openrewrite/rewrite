@@ -59,7 +59,6 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("Upgrading a settings plugin")
     @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
@@ -79,7 +78,6 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("Upgrading a build plugin with version in gradle.properties")
     @Test
     void upgradePluginVersionInProperties() {
         rewriteRun(

@@ -607,8 +607,8 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @MethodSource("mavenCompilerPluginConfig")
+    @ParameterizedTest
     void skipsUpdateIfExistingMavenCompilerPluginConfigIsNewerThanRequestedJavaVersion(String mavenCompilerPluginConfig) {
         rewriteRun(
           //language=xml
