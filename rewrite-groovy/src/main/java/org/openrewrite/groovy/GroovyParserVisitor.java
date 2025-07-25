@@ -2660,11 +2660,11 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode
-                    && classNode.getUnresolvedSuperClass() != null
-                    && classNode.getUnresolvedSuperClass().isUsingGenerics()
-                    && !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder()
-                    && classNode.getGenericsTypes() == null;
+            boolean isAnonymousClassWithGenericSuper = classNode instanceof InnerClassNode &&
+                    classNode.getUnresolvedSuperClass() != null &&
+                    classNode.getUnresolvedSuperClass().isUsingGenerics() &&
+                    !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder() &&
+                    classNode.getGenericsTypes() == null;
             if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
