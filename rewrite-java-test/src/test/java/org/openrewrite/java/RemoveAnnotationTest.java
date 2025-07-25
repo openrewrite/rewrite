@@ -72,8 +72,8 @@ class RemoveAnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
+    @Test
     void removeFullyQualifiedJavaLangAnnotation() {
         rewriteRun(
           spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
@@ -102,8 +102,8 @@ class RemoveAnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
+    @Test
     void removeFullyQualifiedCustomAnnotation() {
         rewriteRun(
           spec -> spec.recipe(new RemoveAnnotation("@org.b.ThirdAnnotation")),

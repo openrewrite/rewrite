@@ -209,9 +209,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }, marketplace, timeout);
             } else {
                 // Use default installation directory if none provided (lazy-loaded)
-                Path effectiveInstallationDirectory = installationDirectory != null
-                        ? installationDirectory
-                        : getBundledInstallationDirectory();
+                Path effectiveInstallationDirectory = installationDirectory != null ?
+                        installationDirectory :
+                        getBundledInstallationDirectory();
 
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),

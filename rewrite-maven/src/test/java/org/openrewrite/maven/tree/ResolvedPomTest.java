@@ -366,8 +366,8 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+    @Nested
     class TolerateMissingPom {
 
         @Language("xml")
@@ -715,7 +715,7 @@ class ResolvedPomTest implements RewriteTest {
           )
         );
     }
-    
+
     @Test
     void circularProjectVersionInDependency() {
         // Test case where a property shadows project.version and is used in a dependency

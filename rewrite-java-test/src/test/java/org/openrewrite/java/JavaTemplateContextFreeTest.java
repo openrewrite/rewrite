@@ -142,8 +142,8 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               }
               """,
             sourceSpecs -> sourceSpecs.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @SuppressWarnings("DataFlowIssue")
                 @Override
+                @SuppressWarnings("DataFlowIssue")
                 public <M extends Marker> M visitMarker(Marker marker, Object o) {
                     if (marker instanceof SearchResult) {
                         J.Literal literal = getCursor().getValue();
@@ -233,8 +233,8 @@ class JavaTemplateContextFreeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("Requires renaming generic variables in JavaTemplate")
+    @Test
     void contextFreeTypeParameterConflictNames_broken() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {

@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class PropertyTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void genericTypeParameter() {
         rewriteRun(
           kotlin(
@@ -36,9 +36,9 @@ class PropertyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/325")
     @SuppressWarnings("RedundantGetter")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/325")
     void interfaceWithEmptyGetter() {
         rewriteRun(
           kotlin(
@@ -53,8 +53,8 @@ class PropertyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/299")
+    @Test
     void propertyAccessorsWithoutBody() {
         rewriteRun(
           kotlin(
@@ -75,8 +75,8 @@ class PropertyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
+    @Test
     void multipleTypeConstraints() {
         rewriteRun(
           kotlin(
@@ -88,9 +88,9 @@ class PropertyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/568")
     @SuppressWarnings({"TrailingWhitespacesInTextBlock", "RedundantSemicolon"})
     @Test
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/568")
     void propertyAccessorWithTrailingSemiColon() {
         rewriteRun(
           kotlin(

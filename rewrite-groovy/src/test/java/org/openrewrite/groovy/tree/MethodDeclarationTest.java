@@ -210,8 +210,8 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3559")
+    @Test
     void escapedMethodName() {
         rewriteRun(
           groovy(

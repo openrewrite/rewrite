@@ -49,8 +49,8 @@ class LockDependencyVersionsTest implements RewriteTest {
         spec.recipe(RewriteTest.toRecipe(() -> new UpdateDependencyLock(Collections.emptySet())));
     }
 
-    @Test
     @DocumentExample
+    @Test
     void updateGradleLock() {
         rewriteRun(spec ->
             spec.beforeRecipe(withToolingApi()),

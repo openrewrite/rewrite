@@ -75,7 +75,7 @@ class GetRefRequestTest {
         // Request a reference that doesn't exist
         GetRef getRefRequest = new GetRef(999);
         GetRefResponse response = server.send("GetRef", getRefRequest, GetRefResponse.class);
-        
+
         assertThat(response).hasSize(2);
         assertThat(response.get(0).getState()).isEqualTo(RpcObjectData.State.DELETE);
         assertThat(response.get(1).getState()).isEqualTo(RpcObjectData.State.END_OF_OBJECT);
@@ -104,10 +104,10 @@ class GetRefRequestTest {
         // Test that we can manipulate caches independently
         server.remoteObjects.put("test", "value");
         assertThat(server.remoteObjects).containsKey("test");
-        
+
         server.remoteObjects.clear();
         assertThat(server.remoteObjects).isEmpty();
-        
+
         // Client should be unaffected
         assertThat(client.remoteObjects).isEmpty();
     }

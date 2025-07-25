@@ -142,9 +142,9 @@ class RewriteTestTest implements RewriteTest {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -173,9 +173,9 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class MutateExecutionContext extends Recipe {
 
     @Override
@@ -200,9 +200,9 @@ class MutateExecutionContext extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ImproperCursorUsage extends Recipe {
 
     @Override
@@ -227,9 +227,9 @@ class ImproperCursorUsage extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -281,8 +281,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
 @NullMarked
+@SuppressWarnings({"FieldCanBeLocal", "unused"})
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;

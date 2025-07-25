@@ -368,8 +368,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void isAssignableToGenericTypeVariable2() {
         rewriteRun(
           java(
@@ -712,8 +712,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4405")
+    @Test
     void isWellFormedType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -833,8 +833,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void typeToString2() {
         rewriteRun(
           java(
@@ -865,8 +865,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    @Test
     void toStringRecursiveType() {
         rewriteRun(
           java(
@@ -911,8 +911,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("rawtypes")
+    @Test
     void isOfType() {
         rewriteRun(
           java(
@@ -1108,8 +1108,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("rawtypes")
+    @Test
     void isParameterizedAssignableTo() {
         rewriteRun(
           java(
@@ -1506,8 +1506,8 @@ class TypeUtilsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void intersectionTypes() {
         rewriteRun(
           java(

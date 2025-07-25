@@ -444,7 +444,7 @@ public class MavenSettings {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @With
-    @JsonIgnoreProperties(value = "httpHeaders")
+    @JsonIgnoreProperties("httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
         @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
