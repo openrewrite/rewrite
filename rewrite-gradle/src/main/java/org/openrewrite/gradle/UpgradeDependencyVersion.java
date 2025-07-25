@@ -1134,8 +1134,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         // Collect all transitive dependencies from both old and new versions
         Set<GroupArtifact> oldTransitiveGAs = withTransitives(oldDep);
         Set<GroupArtifact> newTransitiveGAs = withTransitives(newDep);
-        
-        // Also build a map of what versions are in the new dependency tree
+
+
         Map<GroupArtifact, String> newVersions = new HashMap<>();
         collectVersions(newDep, newVersions);
 
