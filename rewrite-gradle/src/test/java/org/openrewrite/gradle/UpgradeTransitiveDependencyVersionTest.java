@@ -402,8 +402,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("String interpolation with inline properties is not yet supported")
+    @Test
     void updateConstraintGStringInterpolation() {
         rewriteRun(
           buildGradle(
