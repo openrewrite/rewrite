@@ -530,12 +530,11 @@ public class GroovyParserVisitor {
                 // In our LST, we don't need this internal logic.
                 if (method.getDeclaringClass().isEnum()) {
                     /*
-                    For enums, there are two extra parameters and a super call:
+                    For enums, there are two extra parameters and wraps the block in a super call:
                     enum A {                                enum A {
                       A1                                      A1
                       A(String s) {           =>             A(String __str, int __int, String s) {
-                                              =>                super()
-                        println "ss"          =>                { println "ss" }
+                        println "ss"          =>                super() { println "ss" }
                       }                                       }
                     }                                       }
                     */
@@ -584,9 +583,16 @@ public class GroovyParserVisitor {
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
                 List<J.Modifier> paramModifiers = getModifiers();
-                TypeTree paramType = param.isDynamicTyped() ?
-                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
-                        visitTypeTree(param.getOriginType());
+                TypeTree paramType;
+                if (param.isDynamicTyped()) {
+                    if (sourceStartsWith("java.lang.Object")) {
+                        paramType = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), skip(name()), JavaType.ShallowClass.build("java.lang.Object"), null);
+                    } else {
+                        paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
+                    }
+                } else {
+                    paramType = visitTypeTree(param.getType());
+                }
 
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
@@ -638,7 +644,12 @@ public class GroovyParserVisitor {
                             )
                     );
                 } else if (isConstructorOfEnum) {
-                    body = bodyVisitor.visit(((BlockStatement) method.getCode()).getStatements().get(1));
+                    org.codehaus.groovy.ast.stmt.Statement node = ((BlockStatement) method.getCode()).getStatements().get(1);
+                    if (node instanceof BlockStatement) {
+                        body = bodyVisitor.visit(node);
+                    } else {
+                        body = bodyVisitor.visit(method.getCode());
+                    }
                 } else {
                     body = bodyVisitor.visit(method.getCode());
                 }

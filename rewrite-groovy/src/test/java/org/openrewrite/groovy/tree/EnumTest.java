@@ -128,8 +128,23 @@ class EnumTest implements RewriteTest {
             """
               enum A {
                   A1;
+                  A() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumConstructorWithStatements() {
+        rewriteRun(
+          groovy(
+            """
+              enum A {
+                  A1;
                   A() {
-                    println "some statement"
+                    println "statement"
+                    println "statement"
                   }
               }
               """
@@ -137,7 +152,20 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
+    @Test
+    void enumConstructorWithDynamicallyTypedParam() {
+        rewriteRun(
+          groovy(
+            """
+             enum A {
+                 A1;
+                 A(dynamicVar) {}
+              }
+             """
+          )
+        );
+    }
+
     @Test
     void noArguments() {
         rewriteRun(
@@ -159,8 +187,8 @@ class EnumTest implements RewriteTest {
             """
               enum A {
                   ONE(1, "A"),
-                  TWO(2, "B", "X"),
-                  THREE(3, "C", 1)
+                  TWO(2, "B", ")"),
+                  THREE(3, $/C/$, 1);
               
                   A(int n, String s) {
                     this(n, s, "ignore")
