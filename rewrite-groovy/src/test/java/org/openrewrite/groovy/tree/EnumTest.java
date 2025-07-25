@@ -85,9 +85,24 @@ class EnumTest implements RewriteTest {
               enum Test {
                   @Deprecated(since = "now")
                   One,
-                  
+              
                   @Deprecated(since = "now")
                   Two;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enumWithMethods() {
+        rewriteRun(
+          groovy(
+            """
+              enum Test {
+                  One, Two;
+              
+                  void test() {}
               }
               """
           )
@@ -110,11 +125,9 @@ class EnumTest implements RewriteTest {
                       @Deprecated
                       void foo() {}
                   };
-                  
+              
                   A() {}
                   A(int n) {}
-                  
-                  abstract void foo();
               }
               """
           )
