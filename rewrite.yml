@@ -36,7 +36,7 @@ recipeList:
   - org.openrewrite.staticanalysis.MissingOverrideAnnotation
   - org.openrewrite.staticanalysis.OperatorWrap:
       wrapOption: EOL
-  - org.openrewrite.staticanalysis.RemoveRedundantNullCheckBeforeInstanceof
+#  - org.openrewrite.staticanalysis.RemoveRedundantNullCheckBeforeInstanceof
 #  - org.openrewrite.staticanalysis.RemoveUnusedLocalVariables
 #  - org.openrewrite.staticanalysis.RemoveUnusedPrivateFields
 #  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods
