@@ -275,6 +275,32 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void constructorWithDynamicallyTypedParam() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  A(dynamicVar) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorWithDynamicallyTypedParamWithName() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  A(Object a, java.lang.Object b) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void constructorForClassInPackage() {
         rewriteRun(
           groovy(
@@ -403,8 +429,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedClassWithoutParameters() {
         rewriteRun(
           groovy(
@@ -419,8 +445,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedClass() {
         rewriteRun(
           groovy(
@@ -439,8 +465,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedStaticClassWithoutParameters() {
         rewriteRun(
           groovy(
@@ -455,8 +481,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    @Test
     void nestedStaticClass() {
         rewriteRun(
           groovy(

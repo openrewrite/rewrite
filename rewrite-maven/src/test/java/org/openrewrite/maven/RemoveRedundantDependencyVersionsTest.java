@@ -1005,8 +1005,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    @Test
     void unmanagedDependency() {
         rewriteRun(
           pomXml(
@@ -1028,8 +1028,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    @Test
     void unmanagedDependencyAnyMatch() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.ANY, null)),
@@ -1172,8 +1172,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    @Test
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
@@ -1582,8 +1582,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    @Test
     void noChangesIfManagedPluginVersionDoesNotMatch() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.EQ, null)),
@@ -1818,8 +1818,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({ "GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2" })
+    @ParameterizedTest
     void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
@@ -1867,8 +1867,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({ "LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2" })
+    @ParameterizedTest
     void onlyIfManagedVersionIs_nonremovals(String comparator, String projectVersion) {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
@@ -1946,8 +1946,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
+    @Test
     void dontOverrideDependencyConfigurations() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),

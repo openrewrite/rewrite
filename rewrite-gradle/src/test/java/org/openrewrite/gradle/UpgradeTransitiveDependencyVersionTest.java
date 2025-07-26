@@ -121,7 +121,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             spec.recipe(new UpgradeTransitiveDependencyVersion(
               "com.thoughtworks.xstream", "xstream", "1.4.21", null, null, null)),
           buildGradle(
-            String.format("""
+            """
               plugins {
                   id 'java'
               }
@@ -136,8 +136,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName),
-            String.format("""
+              """.formatted(configurationName),
+            """
               plugins {
                   id 'java'
               }
@@ -152,7 +152,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName)
+              """.formatted(configurationName)
           )
         );
     }
@@ -594,8 +594,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4228")
+    @Test
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
@@ -1073,8 +1073,75 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Value
+    @Test
+    void doesNotAddRedundantConstraintWhenImplementationAlreadyHasIt() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, List.of("testImplementation"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacesTestImplementationConstraintWithImplementation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.5')
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """
+          )
+        );
+    }
+
     @EqualsAndHashCode(callSuper = false)
+    @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
         @Override
         public String getDisplayName() {

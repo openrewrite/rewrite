@@ -62,8 +62,8 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(JavaType.Unknown.getInstance()));
     }
 
-    @Test
     @SuppressWarnings("rawtypes")
+    @Test
     void matchesSuperclassTypeOfInterfaces() {
         rewriteRun(
           java(
@@ -235,9 +235,9 @@ class MethodMatcherTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("RedundantMethodOverride")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     void strictMatchMethodOverride() {
         rewriteRun(
           java(
@@ -296,8 +296,8 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/492")
-    @Test
     @SuppressWarnings("SpellCheckingInspection")
+    @Test
     void matchesWildcardedMethodNameStartingWithJavaKeyword() {
         assertTrue(nameRegex("A assert*()").matcher("assertThat").matches());
     }

@@ -63,7 +63,6 @@ class CreateYamlFileTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(

@@ -295,8 +295,8 @@ class WhenTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/240")
+    @Test
     void subjectVariable() {
         rewriteRun(
           kotlin(

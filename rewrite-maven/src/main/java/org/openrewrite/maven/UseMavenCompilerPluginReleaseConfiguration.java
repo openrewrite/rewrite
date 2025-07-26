@@ -78,9 +78,9 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                 Optional<String> target = compilerPluginConfig.getChildValue("target");
                 Optional<String> release = compilerPluginConfig.getChildValue("release");
 
-                if (currentNewerThanProposed(source)
-                        || currentNewerThanProposed(target)
-                        || currentNewerThanProposed(release)) {
+                if (currentNewerThanProposed(source) ||
+                        currentNewerThanProposed(target) ||
+                        currentNewerThanProposed(release)) {
                     return t;
                 }
 

@@ -190,8 +190,8 @@ class BoomRecipe extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     boolean wrapAsRecipeRunException;

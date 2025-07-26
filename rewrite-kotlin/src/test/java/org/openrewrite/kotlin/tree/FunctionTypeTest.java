@@ -59,8 +59,8 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/310")
+    @Test
     void generic() {
         rewriteRun(
           kotlin(
@@ -82,8 +82,8 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/275")
+    @Test
     void parenthesizedNullableType() {
         rewriteRun(
           kotlin(
@@ -94,8 +94,8 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/365")
+    @Test
     void parenthesizedNullableTypeWithTrailingComment() {
         rewriteRun(
           kotlin(
@@ -106,8 +106,8 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/292")
+    @Test
     void functionTypeParentheses() {
         rewriteRun(
           kotlin(
@@ -133,8 +133,8 @@ class FunctionTypeTest implements RewriteTest {
     }
 
     @ExpectedToFail
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/553")
+    @Test
     void trailingAnnotation() {
         rewriteRun(
           kotlin(
@@ -149,8 +149,8 @@ class FunctionTypeTest implements RewriteTest {
     }
 
     @ExpectedToFail
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/571")
+    @Test
     void suspendBeforeParenthesized() {
         rewriteRun(
           kotlin(

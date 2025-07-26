@@ -91,10 +91,10 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
     @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
+    @Test
     void referenceFromWithinLambdaInIfCondition() {
         rewriteRun(
           templatedJava17(

@@ -120,10 +120,10 @@ public class ChangeParentPom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, "
-                + "and updating it to a new groupId, artifactId, version, and optional relativePath. "
-                + "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. "
-                + "Removes redundant dependency versions already managed by the new parent.";
+        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
+                "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
+                "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
+                "Removes redundant dependency versions already managed by the new parent.";
     }
 
     @Override
