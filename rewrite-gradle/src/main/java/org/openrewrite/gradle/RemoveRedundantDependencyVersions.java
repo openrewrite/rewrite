@@ -301,8 +301,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
 
                                 private boolean shouldRemoveRedundantDependency(@Nullable Dependency dependency, String configurationName, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern))
-                                                               || (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
+                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                                               (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
                                         return false;
                                     }
 
@@ -317,9 +317,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             if (d.getDependencies() == null) {
                                                 continue;
                                             }
-                                            if (matchesConfiguration(configurationName, entry.getKey())
-                                                && d.findDependency(dependency.getGroupId(), dependency.getArtifactId()) != null
-                                                && dependsOnNewerVersion(dependency.getGav(), d.getGav().asGroupArtifactVersion(), repositories, ctx)) {
+                                            if (matchesConfiguration(configurationName, entry.getKey()) &&
+                                                d.findDependency(dependency.getGroupId(), dependency.getArtifactId()) != null &&
+                                                dependsOnNewerVersion(dependency.getGav(), d.getGav().asGroupArtifactVersion(), repositories, ctx)) {
                                                 return true;
                                             }
                                         }

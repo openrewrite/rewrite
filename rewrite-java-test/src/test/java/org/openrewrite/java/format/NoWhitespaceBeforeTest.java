@@ -102,8 +102,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
+    @Test
     void packages() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -118,8 +118,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
+    @Test
     void imports() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -167,8 +167,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void methodDeclarationParametersDoNotAllowLineBreaks() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -197,8 +197,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void methodDeclarationParametersAllowLineBreaks() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
@@ -756,8 +756,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/233")
+    @Test
     void jenkinsLibrary() {
         rewriteRun(groovy("library 'someLibrary@version'"));
     }

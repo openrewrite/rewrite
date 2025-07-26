@@ -57,7 +57,6 @@ class CreateXmlFileTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         String fileContents = """

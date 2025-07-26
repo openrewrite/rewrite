@@ -62,7 +62,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void skipMissingTypeAttribution() {
         rewriteRun(
@@ -664,9 +663,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
-    // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
     @CsvSource(delimiterString = "//", textBlock = """
       a == null || a.isEmpty()                                 // a == null || a.isEmpty()
       a == null || !a.isEmpty()                                // a == null || !a.isEmpty()
@@ -717,6 +713,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null 
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
+    @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
+    // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
+    @ParameterizedTest
     void simplifyLiteralNull(String before, String after) {
         //language=java
         String template = """

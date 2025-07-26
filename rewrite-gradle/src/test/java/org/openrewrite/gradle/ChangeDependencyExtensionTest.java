@@ -68,8 +68,8 @@ class ChangeDependencyExtensionTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void findDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
@@ -106,8 +106,8 @@ class ChangeDependencyExtensionTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void findMapStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
@@ -144,8 +144,8 @@ class ChangeDependencyExtensionTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksWithoutVersion(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
@@ -184,8 +184,8 @@ class ChangeDependencyExtensionTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),

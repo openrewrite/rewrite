@@ -127,8 +127,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
+    @Test
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
           pomXml(
@@ -1327,8 +1327,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("LanguageMismatch")
     @Nested
+    @SuppressWarnings("LanguageMismatch")
     class Profiles {
 
         //language=xml
@@ -1391,9 +1391,9 @@ class MavenParserTest implements RewriteTest {
           """;
 
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should be active " +
           "unless there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
@@ -1423,9 +1423,9 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
           " if there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithPomLocalActiveProfile() {
             rewriteRun(
@@ -1583,8 +1583,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("CheckTagEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @SuppressWarnings("CheckTagEmptyBody")
     @Test
     void parseEmptyValueActivationTag() {
         rewriteRun(
@@ -2107,8 +2107,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(
           pomXml(
@@ -2125,8 +2125,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithParent() {
         rewriteRun(
           pomXml(
@@ -2165,8 +2165,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(
           pomXml(
@@ -2287,8 +2287,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
@@ -2449,8 +2449,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2373")
+    @Test
     void multipleCiFriendlyVersionPlaceholders() {
         rewriteRun(
           pomXml(
@@ -3262,8 +3262,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
+    @Test
     void circularImportDependency() {
         rewriteRun(
           mavenProject("root",
@@ -3380,8 +3380,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4319")
+    @Test
     void multiModulePropertyVersionShouldAddModules() {
         rewriteRun(
           mavenProject("root",

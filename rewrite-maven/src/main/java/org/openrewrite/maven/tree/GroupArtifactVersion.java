@@ -50,6 +50,14 @@ public class GroupArtifactVersion implements Serializable {
         return new GroupArtifact(groupId == null ? "" : groupId, artifactId);
     }
 
+    /**
+     * Cast to a ResolvedGroupArtifactVersion.
+     * Usable when repository of resolution or dated snapshot version are irrelevant.
+     */
+    public ResolvedGroupArtifactVersion asResolved() {
+        return new ResolvedGroupArtifactVersion(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
+    }
+
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
         if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
             return this;
