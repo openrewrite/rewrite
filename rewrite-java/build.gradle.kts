@@ -30,6 +30,18 @@ configurations.named("testImplementation").configure {
     extendsFrom(checkstyle)
 }
 
+recipeDependencies {
+    parserClasspath("org.springframework:spring-context:5.3.+")
+    parserClasspath("org.springframework.boot:spring-boot-starter:2.7.+")
+    parserClasspath("org.springframework:spring-web:5.3.+")
+    parserClasspath("org.springframework:spring-beans:5.3.+")
+    parserClasspath("org.springframework:spring-core:5.3.+")
+    parserClasspath("org.springframework.security:spring-security-core:5.8.+")
+    parserClasspath("org.springframework.security:spring-security-config:5.8.+")
+    parserClasspath("org.springframework.security:spring-security-web:5.8.+")
+    parserClasspath("org.apache.tomcat.embed:tomcat-embed-core:9.0.+")
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
@@ -67,6 +79,16 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testImplementation("io.moderne:jsonrpc:latest.integration")
+    testImplementation("org.openrewrite.recipe:rewrite-spring:latest.integration")
+    testImplementation("org.springframework:spring-context:5.3.+")
+    testImplementation("org.springframework.boot:spring-boot-starter:2.7.+")
+    testImplementation("org.springframework:spring-web:5.3.+")
+    testImplementation("org.springframework:spring-beans:5.3.+")
+    testImplementation("org.springframework:spring-core:5.3.+")
+    testImplementation("org.springframework.security:spring-security-core:5.8.+")
+    testImplementation("org.springframework.security:spring-security-config:5.8.+")
+    testImplementation("org.springframework.security:spring-security-web:5.8.+")
+    testImplementation("org.apache.tomcat.embed:tomcat-embed-core:9.0.+")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
