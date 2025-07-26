@@ -32,8 +32,8 @@ class ClassDeclarationTest implements RewriteTest {
     /**
      * @see <a href="https://docs.oracle.com/en/java/javase/17/language/sealed-classes-and-interfaces.html>Sealed classes</a> documentation.
      */
-    @MinimumJava17
     @Issue("https://github.com/openrewrite/rewrite/pull/2569")
+    @MinimumJava17
     @Test
     void sealedClasses() {
         rewriteRun(
@@ -62,8 +62,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @MinimumJava17
     @Issue("https://github.com/openrewrite/rewrite/pull/2569")
+    @MinimumJava17
     @Test
     void sealedInterfaces() {
         rewriteRun(
@@ -112,8 +112,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("class A {}~~(non-whitespace)~~>;<~~")
+    @Test
     void trailingSemicolon() {
         rewriteRun(
           java(
@@ -237,8 +237,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody() {
         rewriteRun(
           java(

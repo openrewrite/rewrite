@@ -27,7 +27,6 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -136,7 +135,7 @@ public class ChangeDependency extends Recipe {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         validated = validated.and(Validated.required("newGroupId", newGroupId).or(Validated.required("newArtifactId", newArtifactId)));
-        validated = validated.and(Validated.test(
+        return validated.and(Validated.test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -146,7 +145,6 @@ public class ChangeDependency extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override
@@ -185,7 +183,7 @@ public class ChangeDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId);
 

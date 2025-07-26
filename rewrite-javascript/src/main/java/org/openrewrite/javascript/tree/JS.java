@@ -25,7 +25,6 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
@@ -638,84 +637,6 @@ public interface JS extends J {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TrailingTokenStatement implements JS, Expression, Statement {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<TrailingTokenStatement.Padding> padding;
-
-        @With
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        JRightPadded<J> expression;
-
-        public J getExpression() {
-            return expression.getElement();
-        }
-
-        public TrailingTokenStatement withExpression(J expression) {
-            return getPadding().withExpression(JRightPadded.withElement(this.expression, expression));
-        }
-
-        @With
-        @Getter
-        @Nullable
-        JavaType type;
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitTrailingTokenStatement(this, p);
-        }
-
-        @Transient
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public TrailingTokenStatement.Padding getPadding() {
-            TrailingTokenStatement.Padding p;
-            if (this.padding == null) {
-                p = new TrailingTokenStatement.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new TrailingTokenStatement.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final TrailingTokenStatement t;
-
-            public JRightPadded<J> getExpression() {
-                return t.expression;
-            }
-
-            public TrailingTokenStatement withExpression(JRightPadded<J> expression) {
-                return t.expression == expression ? t :
-                        new TrailingTokenStatement(t.id, t.prefix, t.markers, expression, t.type);
-            }
         }
     }
 
@@ -2396,7 +2317,7 @@ public interface JS extends J {
             for (J.Modifier modifier : modifiers) {
                 allAnnotations.addAll(modifier.getAnnotations());
             }
-            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
+            if (typeExpression instanceof J.AnnotatedType) {
                 allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
             }
             return allAnnotations;

@@ -61,8 +61,8 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3736")
+    @Test
     void keepHeader() {
         rewriteRun(
           groovy(

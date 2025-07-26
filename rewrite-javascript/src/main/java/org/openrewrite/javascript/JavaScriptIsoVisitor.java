@@ -269,11 +269,6 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement statement, P p) {
-        return (JS.TrailingTokenStatement) super.visitTrailingTokenStatement(statement, p);
-    }
-
-    @Override
     public JS.Tuple visitTuple(JS.Tuple tuple, P p) {
         return (JS.Tuple) super.visitTuple(tuple, p);
     }

@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.gradle.trait.Traits.jvmTestSuite;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindJVMTestSuites extends Recipe {
@@ -54,7 +52,7 @@ public class FindJVMTestSuites extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean tableAvailable = this.insertRows == null || this.insertRows;
-        return Preconditions.check(new IsBuildGradle<>(), jvmTestSuite().asVisitor((suite, ctx) -> {
+        return Preconditions.check(new IsBuildGradle<>(), new JvmTestSuite.Matcher().asVisitor((suite, ctx) -> {
             if (tableAvailable) {
                 jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(suite.getName()));
             }
@@ -67,7 +65,7 @@ public class FindJVMTestSuites extends Recipe {
             return Collections.emptySet();
         }
 
-        return jvmTestSuite().lower(sourceFile)
+        return new JvmTestSuite.Matcher().lower(sourceFile)
                 .collect(Collectors.toSet());
     }
 }

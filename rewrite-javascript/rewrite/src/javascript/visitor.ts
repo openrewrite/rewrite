@@ -552,25 +552,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, p: P): Promise<J | undefined> {
-        const expression = await this.visitExpression(trailingTokenStatement, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TrailingTokenStatement) {
-               return expression;
-           }
-           trailingTokenStatement = expression as JS.TrailingTokenStatement;
-
-        const statement = await this.visitStatement(trailingTokenStatement, p);
-        if (!statement?.kind || statement.kind !== JS.Kind.TrailingTokenStatement) {
-            return statement;
-        }
-        trailingTokenStatement = statement as JS.TrailingTokenStatement;
-
-        return this.produceJavaScript<JS.TrailingTokenStatement>(trailingTokenStatement, p, async draft => {
-            draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, p);
-            draft.type = trailingTokenStatement.type && await this.visitType(trailingTokenStatement.type, p);
-        });
-    }
-
     protected async visitTuple(tuple: JS.Tuple, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(tuple, p);
            if (!expression?.kind || expression.kind !== JS.Kind.Tuple) {
@@ -987,8 +968,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitTemplateExpression(tree as unknown as JS.TemplateExpression, p);
                 case JS.Kind.TemplateExpressionSpan:
                     return this.visitTemplateExpressionSpan(tree as unknown as JS.TemplateExpression.Span, p);
-                case JS.Kind.TrailingTokenStatement:
-                    return this.visitTrailingTokenStatement(tree as unknown as JS.TrailingTokenStatement, p);
                 case JS.Kind.Tuple:
                     return this.visitTuple(tree as unknown as JS.Tuple, p);
                 case JS.Kind.TypeDeclaration:
