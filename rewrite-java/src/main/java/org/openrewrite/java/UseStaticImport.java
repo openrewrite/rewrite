@@ -103,11 +103,7 @@ public class UseStaticImport extends Recipe {
 
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
                     maybeRemoveImport(receiverType);
-
-                    maybeAddImport(
-                            receiverType.getFullyQualifiedName(),
-                            m.getSimpleName(),
-                            false);
+                    maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
                 }
 
                 if (m.getSelect() != null) {
@@ -133,6 +129,15 @@ public class UseStaticImport extends Recipe {
     }
 
     private static boolean methodNameConflicts(String methodName, Cursor cursor) {
+        J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
+        if (cu != null) {
+            for (J.Import imp : cu.getImports()) {
+                if (imp.isStatic() && methodName.equals(imp.getQualid().getSimpleName())) {
+                    return true;
+                }
+            }
+        }
+
         Cursor cdCursor = cursor.dropParentUntil(it -> it instanceof J.ClassDeclaration || it == Cursor.ROOT_VALUE);
         Object maybeCd = cdCursor.getValue();
         if (!(maybeCd instanceof J.ClassDeclaration)) {
@@ -144,7 +149,7 @@ public class UseStaticImport extends Recipe {
             return false;
         }
 
-        if(methodNameConflicts(methodName, ct)) {
+        if (methodNameConflicts(methodName, ct)) {
             return true;
         }
 
@@ -152,7 +157,7 @@ public class UseStaticImport extends Recipe {
     }
 
     private static boolean methodNameConflicts(String methodName, JavaType.@Nullable FullyQualified ct) {
-        if(ct == null) {
+        if (ct == null) {
             return false;
         }
         for (JavaType.Method method : ct.getMethods()) {
