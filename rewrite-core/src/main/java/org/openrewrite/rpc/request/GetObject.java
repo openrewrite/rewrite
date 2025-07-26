@@ -30,7 +30,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.openrewrite.rpc.RpcObjectData.State.*;
+import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
+import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @Value
 public class GetObject implements RpcRequest {

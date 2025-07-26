@@ -2121,8 +2121,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    @Test
     void wildcardImportsWithConflictingNames() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2),
@@ -2149,8 +2149,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    @Test
     void wildcardImportsWithSamePackageConflict() {
         rewriteRun(
           java(
@@ -2183,8 +2183,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    @Test
     void onlyFullyQualifiedUsageShouldRemoveWildcard() {
         rewriteRun(
           java(
@@ -2204,8 +2204,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5703")
+    @Test
     void keepImportWhenBothQualifiedAndUnqualifiedUsageExists() {
         rewriteRun(
           java(
