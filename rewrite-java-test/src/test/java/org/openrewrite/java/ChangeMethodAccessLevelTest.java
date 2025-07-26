@@ -155,23 +155,51 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               """,
             """
               package com.abc;
-                    
+              
               class A {
-                  // comment
-                  @SuppressWarnings("ALL")
+                  @SuppressWarnings("ALL") // comment
                   void aMethod(String s) {
                   }
-                    
+              
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                    
+              
                   // comment
                   void aMethod(Integer i) {
                   }
-                    
+              
                   void aMethod(Double i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void xxxxxx() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated protected static void aMethod(Double d) {
+                      System.out.print (  "foo");
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated static void aMethod(Double d) {
+                      System.out.print (  "foo");
                   }
               }
               """
@@ -186,20 +214,20 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+              
               class A {
                   // comment
                   public A(Integer i) {
                   }
-                      
+              
                   @Deprecated // comment
                   public A(Float f) {
                   }
-                      
+              
                   @Deprecated // comment
                   public void aMethod(String s) {
                   }
-                      
+              
                   // comment
                   public void aMethod(Integer i) {
                   }
@@ -213,13 +241,11 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   A(Integer i) {
                   }
                     
-                  // comment
-                  @Deprecated
+                  @Deprecated // comment
                   A(Float f) {
                   }
                     
-                  // comment
-                  @Deprecated
+                  @Deprecated // comment
                   void aMethod(String s) {
                   }
                     
@@ -398,6 +424,13 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
+    /**
+     * WHEN A MODIFIER IS REMOVED, THE COMMENTS AND ANNOTATIONS ARE MOVED TO ANOTHER LST ELEMENT.
+     * IDEALLY, WE CHANGE AS LITTLE AS POSSIBLE.
+     * TO KEEP THE RECIPE MAINTAINABLE, WE CALL maybeAutoFormat(<method>), WHICH RESULTS IN EXTRA CLEANUP, WHICH WE TAKE FOR GRANTED.
+     * THE NEXT TESTS PROVE THIS BEHAVIOR.
+     */
+
     @Test
     void dontAutoFormatBody() {
         rewriteRun(
@@ -418,9 +451,116 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
 
               class A {
                   // comment
-                  @Deprecated
-                  static void aMethod(Double d) {
+                  @Deprecated static void aMethod(Double d) {
                       System.out.print (  "foo");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void xx() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  // comment
+                  public @jdk.jfr.Name("A") void a(Integer i) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              class A {
+                  // comment
+                  @jdk.jfr.Name("A") void a(Integer i) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moveAnnotationAsLeadingAnnotationWhenModifierIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  final /* X */ @Deprecated // comment
+                  public @jdk.jfr.Name("A") void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              class A {
+                  /* X */ @Deprecated final // comment
+                  @jdk.jfr.Name("A") void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void yy() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   /* comment */ void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                  /* comment */ void aMethod(String s) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void cleanupSpaceWhenModifierIsRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+              
+              class A {
+                  @Deprecated final  // comment
+                  public                   void aMethod(String s) {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+                    
+              class A {                    
+                  @Deprecated final  // comment
+                  void aMethod(String s) {
                   }
               }
               """
