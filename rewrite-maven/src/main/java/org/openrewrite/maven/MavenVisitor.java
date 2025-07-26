@@ -304,7 +304,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     protected boolean isProperty(@Nullable String value) {
-        return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+        return !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value) && ResolvedPom.placeholderHelper.hasPlaceholders(value);
     }
 
     public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {
