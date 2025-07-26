@@ -28,6 +28,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
@@ -37,5 +38,11 @@ dependencies {
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_1_8
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name == "compileTestKotlin") {
+        kotlinOptions.jvmTarget = "21"
     }
 }
