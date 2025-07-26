@@ -2418,4 +2418,70 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void clashingNamesShouldKeepFqn() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.A", "x.y.A", true)),
+          java(
+            """
+              package a.b;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              package x.y;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              class A implements a.b.A {
+              }
+              """,
+            """
+              class A implements x.y.A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void clashingNamesShouldKeepFqnForInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.A", "x.y.A", true)),
+          java(
+            """
+              package a.b;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              package x.y;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              public class Foo {
+                  class A implements a.b.A {
+                  }
+              }
+              """,
+            """
+              public class Foo {
+                  class A implements x.y.A {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
