@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -472,14 +469,12 @@ public class RemoveUnusedImports extends Recipe {
         /**
          * Collect all fully qualified names of types that are used in unqualified form.
          * This is more efficient than checking each type individually during wildcard unfolding.
-         * Returns a set of fully qualified type names that have unqualified references.
+         * @return a set of fully qualified type names that have unqualified references.
          */
         private Set<String> collectUnqualifiedTypeNames(J.CompilationUnit cu) {
-            Set<String> unqualifiedTypeNames = new HashSet<>();
-            
-            new JavaIsoVisitor<Void>() {
+            return new JavaIsoVisitor<Set<String>>() {
                 @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Void unused) {
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> unqualifiedTypeNames) {
                     JavaType type = identifier.getType();
                     // Check for unqualified type references (not field references)
                     if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null) {
@@ -493,39 +488,30 @@ public class RemoveUnusedImports extends Recipe {
                 }
                 
                 @Override
-                public J.Import visitImport(J.Import import_, Void unused) {
+                public J.Import visitImport(J.Import import_, Set<String> unqualifiedTypeNames) {
                     // Don't traverse into import statements
                     return import_;
                 }
                 
                 private boolean isPartOfQualifiedReference(J.Identifier identifier) {
                     // Walk up the cursor to see if this identifier is part of a J.FieldAccess chain
-                    org.openrewrite.Cursor cursor = getCursor();
+                    Cursor cursor = getCursor();
                     while (cursor != null) {
                         Object value = cursor.getValue();
-                        if (value instanceof J.FieldAccess) {
-                            J.FieldAccess fieldAccess = (J.FieldAccess) value;
-                            if (fieldAccess.getName() == identifier) {
-                                // This identifier is the name part of a field access
-                                // Check if the target is a package/class reference (not a field)
-                                if (fieldAccess.getTarget() instanceof J.FieldAccess || 
-                                    fieldAccess.getTarget() instanceof J.Identifier) {
-                                    JavaType targetType = fieldAccess.getTarget().getType();
-                                    if (targetType instanceof JavaType.FullyQualified) {
-                                        return true; // This is a qualified reference
-                                    }
-                                }
-                            }
+                        // This identifier is the name part of a field access
+                        // Check if the target is a package/class reference (not a field)
+                        if (value instanceof J.FieldAccess &&
+                                ((J.FieldAccess) value).getName() == identifier &&
+                                ((J.FieldAccess) value).getTarget() instanceof J.FieldAccess &&
+                                ((J.FieldAccess) value).getTarget().getType() instanceof JavaType.FullyQualified) {
+                            return true; // This is a qualified reference
                         }
                         cursor = cursor.getParent();
                     }
                     return false;
                 }
-            }.visit(cu, null);
-            
-            return unqualifiedTypeNames;
+            }.reduce(cu, new HashSet<>());
         }
-
     }
 
     private static class ImportUsage {
