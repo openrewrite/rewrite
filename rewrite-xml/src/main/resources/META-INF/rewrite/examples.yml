@@ -116,6 +116,27 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.AddTagAttribute
+examples:
+  - description: Add an attribute to a tag if it doesn't already exist
+    parameters:
+      - bean
+      - scope
+      - singleton
+    sources:
+      - before: |
+          <beans>
+              <bean id="myBean"/>
+              <bean id="anotherBean" scope="prototype"/>
+          </beans>
+        after: |
+          <beans>
+              <bean id="myBean" scope="singleton"/>
+              <bean id="anotherBean" scope="prototype"/>
+          </beans>
+        language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagName
 examples:
 - description: ''
