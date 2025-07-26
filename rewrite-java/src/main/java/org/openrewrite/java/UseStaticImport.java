@@ -102,6 +102,19 @@ public class UseStaticImport extends Recipe {
                     }
 
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                    
+                    // Check if there's already a static import for a method with the same name from a different class
+                    J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+                    if (cu != null) {
+                        for (J.Import imp : cu.getImports()) {
+                            if (imp.isStatic() && imp.getQualid().getSimpleName().equals(m.getSimpleName())) {
+                                // There's already a static import for a method with this name
+                                // Don't add another one to avoid ambiguity
+                                return m;
+                            }
+                        }
+                    }
+                    
                     maybeRemoveImport(receiverType);
 
                     maybeAddImport(
