@@ -146,9 +146,9 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"test,compile"})
             @CsvSource({"provided,compile", "provided,test"})
+            @ParameterizedTest
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
@@ -159,10 +159,10 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"compile,compile", "compile,test"})
             @CsvSource({"runtime,compile", "runtime,test",})
             @CsvSource({"test,test"})
+            @ParameterizedTest
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
@@ -256,9 +256,9 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"test,compile"})
             @CsvSource({"provided,compile", "provided,test"})
+            @ParameterizedTest
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
@@ -269,10 +269,10 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"compile,compile", "compile,test"})
             @CsvSource({"runtime,compile", "runtime,test",})
             @CsvSource({"test,test"})
+            @ParameterizedTest
             void withScopeInDesiredScopeNotMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
@@ -331,9 +331,9 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"test,compile"})
             @CsvSource({"provided,compile", "provided,test"})
+            @ParameterizedTest
             void withScopeNotInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),
@@ -344,10 +344,10 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
                 );
             }
 
-            @ParameterizedTest
             @CsvSource({"compile,compile", "compile,test"})
             @CsvSource({"runtime,compile", "runtime,test",})
             @CsvSource({"test,test"})
+            @ParameterizedTest
             void withScopeInDesiredScopeMarked(String existingScope, String desiredScope) {
                 rewriteRun(
                   spec -> spec.recipe(defaultRecipeWithOnlyDirectAndScope(onlyDirect, desiredScope)),

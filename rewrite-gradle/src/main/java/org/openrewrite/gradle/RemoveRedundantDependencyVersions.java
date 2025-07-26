@@ -29,7 +29,10 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
@@ -301,8 +304,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
 
                                 private boolean shouldRemoveRedundantDependency(@Nullable Dependency dependency, String configurationName, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern))
-                                                               || (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
+                                    if (dependency == null || ((groupPattern != null && !matchesGlob(dependency.getGroupId(), groupPattern)) ||
+                                                               (artifactPattern != null && !matchesGlob(dependency.getArtifactId(), artifactPattern)))) {
                                         return false;
                                     }
 
@@ -317,9 +320,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             if (d.getDependencies() == null) {
                                                 continue;
                                             }
-                                            if (matchesConfiguration(configurationName, entry.getKey())
-                                                && d.findDependency(dependency.getGroupId(), dependency.getArtifactId()) != null
-                                                && dependsOnNewerVersion(dependency.getGav(), d.getGav().asGroupArtifactVersion(), repositories, ctx)) {
+                                            if (matchesConfiguration(configurationName, entry.getKey()) &&
+                                                d.findDependency(dependency.getGroupId(), dependency.getArtifactId()) != null &&
+                                                dependsOnNewerVersion(dependency.getGav(), d.getGav().asGroupArtifactVersion(), repositories, ctx)) {
                                                 return true;
                                             }
                                         }

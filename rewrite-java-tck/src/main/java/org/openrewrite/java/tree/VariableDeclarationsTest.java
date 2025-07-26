@@ -61,8 +61,8 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void finalVar() {
         rewriteRun(
           java(
@@ -266,8 +266,8 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void unknownVar() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),

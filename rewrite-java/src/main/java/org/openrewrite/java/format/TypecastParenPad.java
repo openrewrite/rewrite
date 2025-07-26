@@ -66,9 +66,8 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            tc = (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
+            return (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
                     .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
-            return tc;
         }
     }
 

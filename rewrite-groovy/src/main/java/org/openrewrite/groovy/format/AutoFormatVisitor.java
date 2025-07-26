@@ -81,8 +81,6 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         t = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-
-        return t;
+        return new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
     }
 }

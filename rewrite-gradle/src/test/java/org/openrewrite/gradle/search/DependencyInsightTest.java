@@ -119,8 +119,8 @@ class DependencyInsightTest implements RewriteTest {
             );
         }
 
-        @ParameterizedTest
         @MethodSource("configurationsAndMatches")
+        @ParameterizedTest
         void configurationsAreMatched(
           String configuration,
           boolean annotationProcessorMatch,

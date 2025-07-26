@@ -76,8 +76,8 @@ class ChangeMethodNameTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Issue("https://github.com/openrewrite/rewrite/issues/605")
+    @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Test
     void changeMethodNameForOverriddenMethod() {
         rewriteRun(
@@ -158,9 +158,9 @@ class ChangeMethodNameTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void changeMethodNameForOverriddenMethodMatchOverridesFalse() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodName("com.abc.Parent method(String)", "changed", false, null)),

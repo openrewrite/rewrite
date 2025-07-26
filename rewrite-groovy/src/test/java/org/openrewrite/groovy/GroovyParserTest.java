@@ -52,8 +52,8 @@ class GroovyParserTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4072")
+    @Test
     void groovySpecialCharacters() {
         rewriteRun(
           groovy(
@@ -129,8 +129,8 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
     void trailingCommaInMethodCall() {
         rewriteRun(
           groovy(
@@ -144,8 +144,8 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5730")
+    @Test
     void innerOuter() {
         rewriteRun(
           groovy(

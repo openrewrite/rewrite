@@ -1071,8 +1071,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throws_, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
-        md = isCompactConstructor ? md.withMarkers(md.getMarkers().addIfAbsent(new CompactConstructor(randomId()))) : md;
-        return md;
+        return isCompactConstructor ? md.withMarkers(md.getMarkers().addIfAbsent(new CompactConstructor(randomId()))) : md;
     }
 
     @Override
