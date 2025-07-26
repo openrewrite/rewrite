@@ -52,8 +52,9 @@ public class ChangeTaskToTasksRegister extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
-              @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                   if (tree == null) {
                       return null;
                   }
