@@ -211,21 +211,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         }
 
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
-        }
-
         private boolean withinDependenciesBlock(Cursor cursor) {
             return withinBlock(cursor, "dependencies");
         }
