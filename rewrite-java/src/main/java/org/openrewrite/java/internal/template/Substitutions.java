@@ -291,7 +291,7 @@ public class Substitutions {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                J param = maybeParameter(method.getName());
+                J param = maybeParameter(method.getName(), method);
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
                 } else if (param != null) {
@@ -323,10 +323,14 @@ public class Substitutions {
             }
 
             private @Nullable J maybeParameter(J j1) {
+                return maybeParameter(j1, j1);
+            }
+
+            private @Nullable J maybeParameter(J j1, J prefixedElem) {
                 Integer param = parameterIndex(j1.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
-                    return j2.withPrefix(j2.getPrefix().withWhitespace(j1.getPrefix().getWhitespace()));
+                    return j2.withPrefix(j2.getPrefix().withWhitespace(prefixedElem.getPrefix().getWhitespace()));
                 }
                 return null;
             }
