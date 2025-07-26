@@ -99,12 +99,6 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, P p) {
-        visitAndValidateNonNull(trailingTokenStatement.getExpression(), J.class, p);
-        return trailingTokenStatement;
-    }
-
-    @Override
     public JS.ExpressionWithTypeArguments visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, P p) {
         visitAndValidateNonNull(expressionWithTypeArguments.getClazz(), J.class, p);
         visitAndValidate(expressionWithTypeArguments.getTypeArguments(), Expression.class, p);

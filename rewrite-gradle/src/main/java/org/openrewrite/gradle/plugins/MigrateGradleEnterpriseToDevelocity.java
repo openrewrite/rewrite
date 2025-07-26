@@ -99,8 +99,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                                 .visitNonNull(g, ctx);
                         g = (G.CompilationUnit) new UpgradePluginVersion("com.gradle.common-custom-user-data-gradle-plugin", "2.x", null).getVisitor()
                                 .visitNonNull(g, ctx);
-                        g = (G.CompilationUnit) new MigrateConfigurationVisitor().visitNonNull(g, ctx);
-                        return g;
+                        return (G.CompilationUnit) new MigrateConfigurationVisitor().visitNonNull(g, ctx);
                     }
                 }
         );

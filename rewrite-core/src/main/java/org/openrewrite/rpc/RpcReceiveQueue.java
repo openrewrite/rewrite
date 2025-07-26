@@ -114,7 +114,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-        
+
         if (logFile != null && message.getTrace() != null) {
             logFile.println(message.withTrace(null));
             logFile.println("  " + message.getTrace());

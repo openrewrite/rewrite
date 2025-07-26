@@ -796,7 +796,11 @@ public interface G extends J {
             NotIn,
             Access,
             Spaceship,
-            ElvisAssignment
+            ElvisAssignment,
+            Power,
+            PowerAssignment,
+            IdentityEquals,
+            IdentityNotEquals
         }
 
         public Padding getPadding() {

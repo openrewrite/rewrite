@@ -362,7 +362,7 @@ public class RewriteRpc implements AutoCloseable {
         // Check if we have a cached version of this object
         Object localObject = localObjects.get(id);
         String lastKnownId = localObject != null ? id : null;
-        
+
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
         Object remoteObject = q.receive(localObject, null);
@@ -376,7 +376,7 @@ public class RewriteRpc implements AutoCloseable {
         //noinspection unchecked
         return (T) remoteObject;
     }
-    
+
     private Object getRef(Integer refId) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetRef",
                 new GetRef(refId), GetRefResponse.class), nestedRefId -> {
@@ -387,11 +387,11 @@ public class RewriteRpc implements AutoCloseable {
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
-        
+
         if (ref == null) {
             throw new IllegalStateException("Reference " + refId + " not found on remote");
         }
-        
+
         remoteRefs.put(refId, ref);
         localRefs.put(ref, refId);
 

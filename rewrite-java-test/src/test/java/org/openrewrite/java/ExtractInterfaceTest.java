@@ -121,7 +121,7 @@ class ExtractInterfaceTest implements RewriteTest {
               """
           ),
           java(
-            null,
+            doesNotExist(),
             """
               package org.openrewrite.interfaces;
                             

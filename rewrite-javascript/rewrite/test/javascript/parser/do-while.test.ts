@@ -54,11 +54,9 @@ describe('do-while mapping', () => {
         spec.rewriteRun(
             //language=typescript
             typescript(`
-                 function foo() {
-                     partition: do {
-                         break partition;
-                     } while (from < to)/*a*/;/*b*/
-                 }
+                 partition: do {
+                     break partition
+                 } while (from < to)/*a*/;/*b*/
              `)
         ));
 

@@ -45,12 +45,12 @@ class AddPlatformDependencyTest implements RewriteTest {
             }
       """;
 
-    @ParameterizedTest
     @CsvSource({
       "implementation",
       "compileOnly",
       "runtimeOnly",
       "annotationProcessor"})
+    @ParameterizedTest
     void addPlatformWithExplicitConfiguration(String configuration) {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, configuration, null)),
@@ -84,12 +84,12 @@ class AddPlatformDependencyTest implements RewriteTest {
             )));
     }
 
-    @ParameterizedTest
     @CsvSource({
       "implementation",
       "compileOnly",
       "runtimeOnly",
       "annotationProcessor"})
+    @ParameterizedTest
     void addEnforcedPlatformWithExplicitConfiguration(String configuration) {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, configuration, true)),
@@ -276,12 +276,12 @@ class AddPlatformDependencyTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "integrationTestImplementation,implementation",
       "integrationTestCompileOnly,compileOnly",
       "integrationTestRuntimeOnly,runtimeOnly",
       "integrationTestAnnotationProcessor,annotationProcessor"})
+    @ParameterizedTest
     void addPlatformDependencyWithExplicitConfiguration(String recipeConfiguration, String gradleConfiguration) {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, null)),
@@ -338,12 +338,12 @@ class AddPlatformDependencyTest implements RewriteTest {
             )));
     }
 
-    @ParameterizedTest
     @CsvSource({
       "integrationTestImplementation,implementation",
       "integrationTestCompileOnly,compileOnly",
       "integrationTestRuntimeOnly,runtimeOnly",
       "integrationTestAnnotationProcessor,annotationProcessor"})
+    @ParameterizedTest
     void addEnforcedPlatformDependencyWithExplicitConfiguration(String recipeConfiguration, String gradleConfiguration) {
         rewriteRun(
           spec -> spec.recipe(new AddPlatformDependency("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null, recipeConfiguration, true)),

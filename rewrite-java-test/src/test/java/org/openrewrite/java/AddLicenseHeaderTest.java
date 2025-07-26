@@ -81,8 +81,8 @@ class AddLicenseHeaderTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3198")
+    @Test
     void dontChangeJavadoc() {
         rewriteRun(
           java(
@@ -101,9 +101,9 @@ class AddLicenseHeaderTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3198")
+    @Test
     void dontChangeInvalidJavadoc() {
         rewriteRun(
           java(

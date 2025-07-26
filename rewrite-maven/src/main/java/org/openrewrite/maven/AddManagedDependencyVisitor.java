@@ -66,9 +66,8 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                     new MavenTagInsertionComparator(rootContent)).visitNonNull(doc, ctx);
         }
 
-        doc = (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, version,
+        return (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, version,
                 type, scope, classifier).visitNonNull(doc, ctx);
-        return doc;
     }
 
     private boolean documentHasManagedDependency(Xml.Document doc, ExecutionContext ctx) {

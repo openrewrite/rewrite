@@ -306,13 +306,6 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, RpcSendQueue q) {
-        q.getAndSend(trailingTokenStatement, el -> el.getPadding().getExpression(), el -> visitRightPadded(el, q));
-        q.getAndSend(trailingTokenStatement, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
-        return trailingTokenStatement;
-    }
-
-    @Override
     public J visitTuple(JS.Tuple tuple, RpcSendQueue q) {
         q.getAndSend(tuple, el -> el.getPadding().getElements(), el -> visitContainer(el, q));
         q.getAndSend(tuple, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));

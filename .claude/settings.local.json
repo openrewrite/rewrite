@@ -9,10 +9,14 @@
       "Bash(grep:*)",
       "Bash(mv:*)",
       "Bash(npm test:*)",
+      "Bash(rg:*)",
       "Bash(rm:*)",
       "Bash(timeout:*)",
       "WebFetch(domain:github.com)",
       "mcp__github__get_issue",
+      "mcp__github__get_issue_comments",
+      "mcp__github__get_pull_request",
+      "mcp__github__get_pull_request_comments",
       "mcp__idea__find_files_by_name_substring",
       "mcp__idea__get_file_text_by_path",
       "mcp__idea__get_open_in_editor_file_path",
@@ -23,7 +27,10 @@
       "mcp__idea__open_file_in_editor",
       "mcp__idea__replace_selected_text",
       "mcp__idea__replace_specific_text",
-      "mcp__idea__search_in_files_content"
+      "mcp__idea__search_in_files_content",
+      "Bash(cat:*)",
+      "Bash(../gradlew dependencies:*)",
+      "Bash(gradle:*)"
     ],
     "deny": []
   }

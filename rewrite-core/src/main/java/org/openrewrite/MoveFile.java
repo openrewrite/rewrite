@@ -23,6 +23,8 @@ import org.openrewrite.internal.StringUtils;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.openrewrite.PathUtils.*;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MoveFile extends Recipe {
@@ -79,9 +81,9 @@ public class MoveFile extends Recipe {
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     String originalSourcePath = ((SourceFile) tree).getSourcePath().toString();
-                    Path sourcePath = Paths.get(PathUtils.separatorsToSystem(originalSourcePath));
-                    boolean isWindowsPath = originalSourcePath.equals(PathUtils.separatorsToWindows(originalSourcePath));
-                    boolean isUnixPath = originalSourcePath.equals(PathUtils.separatorsToUnix(originalSourcePath));
+                    Path sourcePath = Paths.get(separatorsToSystem(originalSourcePath));
+                    boolean isWindowsPath = originalSourcePath.equals(separatorsToWindows(originalSourcePath));
+                    boolean isUnixPath = originalSourcePath.equals(separatorsToUnix(originalSourcePath));
                     boolean isFileOnRoot = sourcePath.getParent() == null;
                     if (!isFileOnRoot && (isWindowsPath && isUnixPath || (!isWindowsPath && !isUnixPath))) {
                         // This should never happen, but just in case
@@ -98,11 +100,11 @@ public class MoveFile extends Recipe {
                         destination = destination.resolve(sourcePath.getFileName().toString());
                         if (!destination.equals(sourcePath)) {
                             if (isFileOnRoot) {
-                                return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToSystem(destination.toString())));
+                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToSystem(destination.toString())));
                             } else if (isWindowsPath) {
-                                return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToWindows(destination.toString())));
+                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToWindows(destination.toString())));
                             } else {
-                                return ((SourceFile) tree).withSourcePath(Paths.get(PathUtils.separatorsToUnix(destination.toString())));
+                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToUnix(destination.toString())));
                             }
                         }
                     }
@@ -126,7 +128,7 @@ public class MoveFile extends Recipe {
 
                 Path currentFolder = sourcePath.getParent();
                 if (PathUtils.matchesGlob(sourcePath, folderPrefix) || folderPrefix.equals("/**")) {
-                    String subFolders = currentFolder == null ? "" : currentFolder.toString().substring(folder.length());
+                    String subFolders = currentFolder == null ? "" : separatorsToUnix(currentFolder.toString().substring(folder.length()));
                     if (subFolders.startsWith("/") || subFolders.startsWith("\\")) {
                         subFolders = subFolders.substring(1);
                     }
@@ -195,10 +197,10 @@ public class MoveFile extends Recipe {
             return null;
         }
 
-        return PathUtils.separatorsToUnix(this.folder.startsWith("/") || this.folder.startsWith("\\") ? this.folder.substring(1) : this.folder);
+        return separatorsToUnix(this.folder.startsWith("/") || this.folder.startsWith("\\") ? this.folder.substring(1) : this.folder);
     }
 
     private String moveTo() {
-        return PathUtils.separatorsToUnix(this.moveTo);
+        return separatorsToUnix(this.moveTo);
     }
 }

@@ -68,8 +68,8 @@ class UpdateMavenWrapperTest implements RewriteTest {
         spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, Boolean.TRUE));
     }
 
-    @Test
     @DocumentExample("Add a new Maven wrapper")
+    @Test
     void addMavenWrapper() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
@@ -93,7 +93,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
-            null,
+            doesNotExist(),
             withLicenseHeader("""
               distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
@@ -105,7 +105,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Add a new Maven wrapper with wrapper jar checksum enabled")
     void addMavenWrapperWithWrapperJarChecksumEnabled() {
         rewriteRun(
           spec -> spec.afterRecipe(run -> {
@@ -128,7 +127,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
               assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
           }),
           properties(
-            null,
+            doesNotExist(),
             withLicenseHeader("""
               distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.9/apache-maven-3.8.9-bin.zip
               distributionSha256Sum=e50133ba6d4333bea8f8bae137c13198c8c90ded959466e13252b820b52cb68b
@@ -141,7 +140,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Update existing Maven wrapper")
     void updateWrapper() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
@@ -187,7 +185,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Update existing Maven wrapper")
     void updateWrapperWithWrapperJarChecksumDisabledButChecksumAlreadyThere() {
         rewriteRun(
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
@@ -235,7 +232,6 @@ class UpdateMavenWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Update existing Maven wrapper with wrapper jar checksum enabled")
     void updateWrapperWithWrapperJarChecksumEnabled() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))

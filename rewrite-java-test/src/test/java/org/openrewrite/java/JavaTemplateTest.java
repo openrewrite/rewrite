@@ -87,8 +87,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (!cd.getLeadingAnnotations().isEmpty()) {
                       return cd;
                   }
-                  cd = template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
-                  return cd;
+                  return template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
               }
           })),
           java(
@@ -240,8 +239,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
+    @SuppressWarnings("InstantiationOfUtilityClass")
     @Test
     void lambdaIsNewClass() {
         rewriteRun(
@@ -387,9 +386,9 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3102")
     @SuppressWarnings({"ResultOfMethodCallIgnored"})
+    @Test
     void expressionAsStatementWithoutTerminatingSemicolon() {
         // NOTE: I am not convinced that we really need to support this case. It is not valid Java.
         // But since this has been working up until now, I am leaving it in.
@@ -437,8 +436,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceAnonymousClassObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -485,8 +484,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceGenericTypedObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -534,8 +533,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceParameterizedTypeObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -706,8 +705,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2540")
+    @Test
     void replaceMemberReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -893,8 +892,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2375")
+    @Test
     void arrayInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -947,9 +946,9 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     @SuppressWarnings("ALL")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     void multiDimensionalArrayInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1346,8 +1345,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-spring/pull/284")
+    @Test
     void replaceMethodInChainFollowedByGenericTypeParameters() {
         rewriteRun(
           spec -> spec
@@ -1479,8 +1478,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    @Test
     void recursiveType() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)

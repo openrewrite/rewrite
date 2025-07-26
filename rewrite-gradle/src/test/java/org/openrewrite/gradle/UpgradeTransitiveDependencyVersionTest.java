@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -74,16 +76,96 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample
-    void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
+    void addConstraintForDependenciesDeclaredInMultipleConfigurationsThatExtendFromDifferentResolvableConfigurations() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
           buildGradle(
             """
               plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  compileOnly 'org.openrewrite:rewrite-java:7.0.0'
+                  runtimeOnly 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      runtimeOnly('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                      compileOnly('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              
+                  compileOnly 'org.openrewrite:rewrite-java:7.0.0'
+                  runtimeOnly 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"compileOnly", "implementation", "runtimeOnly", "testCompileOnly", "testImplementation", "testRuntimeOnly"})
+    void updatesExistingConstraints(String configurationName) {
+        rewriteRun(spec ->
+            spec.recipe(new UpgradeTransitiveDependencyVersion(
+              "com.thoughtworks.xstream", "xstream", "1.4.21", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      %1$s 'com.thoughtworks.xstream:xstream:1.4.17'
+                  }
+              }
+              
+              dependencies {
+                  %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
+              }
+              """.formatted(configurationName),
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      %1$s 'com.thoughtworks.xstream:xstream:1.4.21'
+                  }
+              }
+              
+              dependencies {
+                  %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
+              }
+              """.formatted(configurationName)
+          )
+        );
+    }
+
+    @Test
+    void includedDefaultConfigurationsReceiveRuntimeConstraints() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("compileOnly", "runtimeOnly"))),
+          buildGradle(
+            """
+              plugins {
                   id 'java'
               }
               repositories { mavenCentral() }
@@ -91,15 +173,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """,
-                """
+            """
               plugins {
-                  id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
               }
               repositories { mavenCentral() }
               dependencies {
                   constraints {
-                      implementation('org.apache.commons:commons-lang3:3.14.0')
+                      compileOnly('org.apache.commons:commons-lang3:3.14.0')
                   }
               
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
@@ -471,7 +552,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
-                  deploy 'org.openrewrite:rewrite-java:7.0.0'
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
               
                   constraints {
                   }
@@ -482,7 +563,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
-                  deploy 'org.openrewrite:rewrite-java:7.0.0'
+                  earlib 'org.openrewrite:rewrite-java:7.0.0'
               
                   constraints {
                       earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
@@ -513,8 +594,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4228")
+    @Test
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
@@ -541,7 +622,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-                """
+            """
               plugins {
                   id 'java'
               }
@@ -585,7 +666,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """,
-                """
+            """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -620,7 +701,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """,
-                """
+            """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -992,8 +1073,75 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Value
+    @Test
+    void doesNotAddRedundantConstraintWhenImplementationAlreadyHasIt() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, List.of("testImplementation"))),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacesTestImplementationConstraintWithImplementation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.5')
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """
+          )
+        );
+    }
+
     @EqualsAndHashCode(callSuper = false)
+    @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
         @Override
         public String getDisplayName() {

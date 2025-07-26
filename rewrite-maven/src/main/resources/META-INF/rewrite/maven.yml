@@ -26,6 +26,7 @@ recipeList:
   - org.openrewrite.maven.RemoveDuplicateDependencies
   - org.openrewrite.maven.RemoveRedundantDependencyVersions
   - org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
+  - org.openrewrite.maven.UpdateScmFromGitOrigin
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.cleanup.PrefixlessExpressions
