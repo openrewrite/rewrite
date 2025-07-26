@@ -130,6 +130,158 @@ class RemoveDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeGradleDependencyWithCommentAfterPreviousDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
+                  // and more
+                  /* and more */ implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+                  def someStatementWithinDepBlock = 33  // some other comment
+                  implementation "com.google.guava:guava:29.0-jre"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
+                  def someStatementWithinDepBlock = 33  // some other comment
+                  implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeCommentsOfDependencyWhenDependencyIsRemoved() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  // Comment 1
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" /* comment 2 */ /* comment 3 */ // comment 4
+                  // and more
+                  implementation "com.google.guava:guava:29.0-jre" // some other comment
+                  implementation "org.yaml:snakeyaml:latest.release"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  // and more
+                  implementation "com.google.guava:guava:29.0-jre" // some other comment
+                  implementation "org.yaml:snakeyaml:latest.release"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeGradleDependencyWithCommentAfterSecondToLastDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" // comment 4 */ /* comment 5 */ // comment 6
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"        /* comment 1 */ /* comment 2 */ // comment 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeGradleDependencyWithCommentAfterLastDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0" // comment
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeGradleDependencyUsingMapNotation() {
         rewriteRun(
           buildGradle(
