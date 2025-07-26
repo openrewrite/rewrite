@@ -2420,9 +2420,23 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void clashingNamesShouldKeeFqn() {
+    void clashingNamesShouldKeepFqn() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.b.A", "x.y.A", true)),
+          java(
+            """
+              package a.b;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              package x.y;
+              public interface A {
+              }
+              """
+          ),
           java(
             """
               class A implements a.b.A {
@@ -2437,9 +2451,23 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void clashingNamesShouldKeeFqnForInnerClass() {
+    void clashingNamesShouldKeepFqnForInnerClass() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("a.b.A", "x.y.A", true)),
+          java(
+            """
+              package a.b;
+              public interface A {
+              }
+              """
+          ),
+          java(
+            """
+              package x.y;
+              public interface A {
+              }
+              """
+          ),
           java(
             """
               public class Foo {
