@@ -25,7 +25,9 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 @With
 @EqualsAndHashCode
 public class Dependency {
+    @Nullable
     String groupId;
+
     String artifactId;
 
     @Nullable
@@ -42,17 +44,28 @@ public class Dependency {
     }
 
     public String toStringNotation() {
-        StringBuilder builder = new StringBuilder();
-        builder.append(groupId).append(':').append(artifactId);
+        StringBuilder sb = new StringBuilder();
+        //Build against spec from gradle docs, all options are optional apart from name
+        //configurationName "group:name:version:classifier@extension"
+        if (groupId != null) {
+            sb.append(groupId);
+        }
+        sb.append(":").append(artifactId);
+
         if (version != null) {
-            builder.append(':').append(version);
-            if (classifier != null) {
-                builder.append(':').append(classifier);
-            }
+            sb.append(":").append(version);
+        } else if (classifier != null) {
+            sb.append(":");
         }
+
+        if (classifier != null) {
+            sb.append(":").append(classifier);
+        }
+
         if (ext != null) {
-            builder.append('@').append(ext);
+            sb.append("@").append(ext);
         }
-        return builder.toString();
+
+        return sb.toString();
     }
 }

@@ -78,8 +78,7 @@ public class DependencyConstraintToRule extends Recipe {
                 }
                 cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
                 cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                cu = (JavaSourceFile) new MaybeRemoveDependencyBlock(cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                return cu;
+                return (JavaSourceFile) new MaybeRemoveDependencyBlock(cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
             }
         });
     }
@@ -388,8 +387,7 @@ public class DependencyConstraintToRule extends Recipe {
                             .map(J.MethodInvocation.class::cast)
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    cu = cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
-                    return cu;
+                    return cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
                 } else {
                     K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
                     assert cu != null;
@@ -432,13 +430,12 @@ public class DependencyConstraintToRule extends Recipe {
                             })))
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
                     final int finalInsertionIndex = insertionIndex;
-                    cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
+                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
                         if (arg == block) {
                             return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
                         }
                         return arg;
                     }));
-                    return cu;
                 }
             }
             return super.visit(tree, ctx);

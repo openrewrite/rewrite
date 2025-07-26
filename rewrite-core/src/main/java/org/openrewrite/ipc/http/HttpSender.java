@@ -414,16 +414,26 @@ public interface HttpSender {
     class Response implements AutoCloseable {
         private final int code;
         private final InputStream body;
+        private final Map<String, List<String>> headers;
         private final Runnable onClose;
 
         public Response(int code, @Nullable InputStream body, Runnable onClose) {
+            this(code, body, Collections.emptyMap(), onClose);
+        }
+
+        public Response(int code, @Nullable InputStream body, Map<String, List<String>> headers, Runnable onClose) {
             this.code = code;
             this.body = body;
+            this.headers = headers;
             this.onClose = onClose;
         }
 
         public int getCode() {
             return code;
+        }
+
+        public Map<String, List<String>> getHeaders() {
+            return headers;
         }
 
         public InputStream getBody() {

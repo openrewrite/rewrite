@@ -25,12 +25,23 @@ recipeList:
   - org.openrewrite.recipes.JavaRecipeBestPracticesSubset
   - org.openrewrite.recipes.RecipeTestingBestPracticesSubset
   - org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
-  #- org.openrewrite.java.recipes.ExamplesExtractor
-  #- org.openrewrite.java.OrderImports
+#  - org.openrewrite.java.recipes.ExamplesExtractor
+#  - org.openrewrite.java.OrderImports
+  - org.openrewrite.java.RemoveUnusedImports
+  - org.openrewrite.java.SimplifySingleElementAnnotation
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
+  - org.openrewrite.java.format.RemoveTrailingWhitespace
   - org.openrewrite.staticanalysis.CompareEnumsWithEqualityOperator
   - org.openrewrite.staticanalysis.InlineVariable
+  - org.openrewrite.staticanalysis.LambdaBlockToExpression
   - org.openrewrite.staticanalysis.MissingOverrideAnnotation
+  - org.openrewrite.staticanalysis.OperatorWrap:
+      wrapOption: EOL
+#  - org.openrewrite.staticanalysis.RemoveRedundantNullCheckBeforeInstanceof
+#  - org.openrewrite.staticanalysis.RemoveUnusedLocalVariables
+#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateFields
+#  - org.openrewrite.staticanalysis.RemoveUnusedPrivateMethods
+#  - org.openrewrite.staticanalysis.UnwrapElseAfterReturn
   - org.openrewrite.staticanalysis.UseDiamondOperator
 ---
 type: specs.openrewrite.org/v1beta/recipe
@@ -43,12 +54,20 @@ preconditions:
       checkAssignability: true
 recipeList:
   - org.openrewrite.java.recipes.BlankLinesAroundFieldsWithAnnotations
-  #- org.openrewrite.java.recipes.ExecutionContextParameterName
+  - org.openrewrite.java.recipes.CorrectlySpacedDescriptions
+#  - org.openrewrite.java.recipes.ExecutionContextParameterName
+  - org.openrewrite.java.recipes.IsLiteralNullRecipe
   - org.openrewrite.java.recipes.MissingOptionExample
+  - org.openrewrite.java.recipes.NoMutableStaticFieldsInRecipes
   - org.openrewrite.java.recipes.RecipeEqualsAndHashCodeCallSuper
   - org.openrewrite.java.recipes.UseTreeRandomId
+  - org.openrewrite.java.recipes.migrate.RemoveTraitsUsageRecipes
   - org.openrewrite.staticanalysis.NeedBraces
-  #- org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+#  - org.openrewrite.java.RemoveAnnotation:
+#      annotationPattern: '@org.openrewrite.NlsRewrite.DisplayName'
+#  - org.openrewrite.java.RemoveAnnotation:
+#      annotationPattern: '@org.openrewrite.NlsRewrite.Description'
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.RecipeTestingBestPracticesSubset
@@ -60,14 +79,17 @@ preconditions:
       checkAssignability: true
 recipeList:
   - org.openrewrite.java.recipes.RewriteTestClassesShouldNotBePublic
-  #- org.openrewrite.java.recipes.SelectRecipeExamples
+#  - org.openrewrite.java.recipes.SelectRecipeExamples
+  - org.openrewrite.java.recipes.SingleDocumentExample
   - org.openrewrite.java.recipes.ReorderTestMethods
+  - org.openrewrite.java.recipes.ReplaceNullWithDoesNotExist
   - org.openrewrite.java.recipes.SourceSpecTextBlockNewLine
   - org.openrewrite.java.recipes.SourceSpecTextBlockIndentation
   - org.openrewrite.java.testing.cleanup.RemoveTestPrefix
   - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
   - org.openrewrite.staticanalysis.NeedBraces
-  #- org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+  - org.openrewrite.staticanalysis.ReorderAnnotations
   - org.openrewrite.java.UseStaticImport:
       methodPattern: 'org.openrewrite..Assertions *(..)'
 ---
@@ -76,9 +98,13 @@ name: org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset
 displayName: Recipe nullability best practices
 description: Use OpenRewrite internal nullability annotations; drop JetBrains annotations; use `package-info.java` instead.
 recipeList:
-  - org.openrewrite.staticanalysis.NullableOnMethodReturnType
+#  - org.openrewrite.java.jspecify.MigrateFromOpenRewriteAnnotations
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@org.jetbrains.annotations.NotNull'
+#  - org.openrewrite.java.RemoveAnnotation:
+#      annotationPattern: '@javax.annotation.Nonnull'
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
-  #- org.openrewrite.java.jspecify.MigrateToJspecify
+#  - org.openrewrite.java.jspecify.MigrateToJspecify
+  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+  - org.openrewrite.staticanalysis.NullableOnMethodReturnType
