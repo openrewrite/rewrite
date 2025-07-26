@@ -125,8 +125,8 @@ class FindDependencyTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/moderneinc/customer-requests/issues/895")
+    @Nested
     class WithInterpolatedVersion {
         @Test
         void withCurly() {
@@ -218,8 +218,8 @@ class FindDependencyTest implements RewriteTest {
 
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    @Test
     void ignoreConstraints() {
         rewriteRun(
           spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation")),
@@ -238,8 +238,8 @@ class FindDependencyTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    @Test
     void constraintsVsRegularDependencies() {
         rewriteRun(
           spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", null)),

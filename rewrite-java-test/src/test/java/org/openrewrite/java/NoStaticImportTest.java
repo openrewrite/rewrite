@@ -293,8 +293,8 @@ class NoStaticImportTest implements RewriteTest {
               ));
         }
 
-        @Test
         @ExpectedToFail("static import not yet replaced with Nested.foo()")
+        @Test
         void localImport() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),

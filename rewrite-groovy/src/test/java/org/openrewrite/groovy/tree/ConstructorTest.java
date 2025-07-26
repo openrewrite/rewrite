@@ -35,6 +35,28 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
+    void withGenerics() {
+        rewriteRun(
+          groovy(
+            """              
+              new ArrayList<String>()
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDiamondOperator() {
+        rewriteRun(
+          groovy(
+            """
+              new ArrayList<>()
+              """
+          )
+        );
+    }
+
+    @Test
     void declaration() {
         rewriteRun(
           groovy(

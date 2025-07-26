@@ -224,8 +224,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"com.google.guava:guava", "*:*"}, delimiter = ':')
+    @ParameterizedTest
     void upgradeVersion(String groupId, String artifactId) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion(groupId, artifactId, "latest.patch", null, null, null)),
@@ -329,8 +329,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
+    @Test
     void upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
@@ -460,8 +460,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
+    @Test
     void propertiesInDependencyGroupIdAndArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.patch", null, null, null)),
@@ -502,6 +502,36 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <version>${dependency.version}</version>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainReleaseOrLatestIfUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null, null, null)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.projectlombok</groupId>
+                    <artifactId>lombok</artifactId>
+                    <version>RELEASE</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.projectlombok</groupId>
+                    <artifactId>lombok</artifactId>
+                    <version>LATEST</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
               </project>
               """
           )
@@ -662,8 +692,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
+    @Test
     void upgradeGuavaWithExplicitBlankVersionPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.release", "", null, null)),
@@ -769,8 +799,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
+    @Test
     void upgradeDependencyOnlyTargetsSpecificDependencyProperty() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", null, null)),
@@ -1337,9 +1367,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4166")
     @ParameterizedTest
     @ValueSource(strings = {"3.0.12.RELEASE", "=3.0.12.RELEASE"})
-    @Issue("https://github.com/openrewrite/rewrite/issues/4166")
     void upgradeToExactVersion(String version) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", version, null,
@@ -1686,8 +1716,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
+    @Nested
     class RetainVersions {
         @DocumentExample
         @Test
@@ -1940,8 +1970,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         }
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0", "-jre", null, null)),
@@ -2074,4 +2104,53 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doesNotDowngradeRegularDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.1.33", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.tomcat.embed</groupId>
+                          <artifactId>tomcat-embed-core</artifactId>
+                          <version>10.1.43</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeManagedDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.1.33", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.tomcat.embed</groupId>
+                              <artifactId>tomcat-embed-core</artifactId>
+                              <version>10.1.43</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }

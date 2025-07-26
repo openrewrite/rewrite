@@ -885,8 +885,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3051")
+    @Test
     void doNotRenameMethods() {
         rewriteRun(
           spec -> spec.recipe(renameVariableTest("contains", "foobar", true)),
@@ -957,8 +957,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4059")
+    @Test
     void renameTypeCastedField() {
         rewriteRun(
           spec -> spec.recipe(renameVariableTest("objArray", "objects", false)),
@@ -997,8 +997,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    @Test
     void hiddenVariablesGetRenamedCorrectly() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1320,8 +1320,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    @Test
     void hiddenVariablesGetRenamedCorrectlyInBlocks() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1373,8 +1373,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/5369")
+    @Test
     void hiddenVariablesGetRenamedCorrectlyInClass() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

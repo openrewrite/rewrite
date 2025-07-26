@@ -19,11 +19,14 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,7 +36,9 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.VisitFunction2;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -74,6 +79,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<GradleDependency, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, P p) {
+                    GradleDependency dependency = test(getCursor());
+                    return dependency != null ?
+                            (J) visitor.visit(dependency, p) :
+                            super.visitMethodInvocation(method, p);
+                }
+            };
+        }
+
+        @Override
         protected @Nullable GradleDependency test(Cursor cursor) {
             Object object = cursor.getValue();
             if (object instanceof J.MethodInvocation) {
@@ -102,6 +120,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 Expression argument = methodInvocation.getArguments().get(0);
                 if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
                     dependency = parseDependency(methodInvocation.getArguments());
+                } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
+                    dependency = parseDependency(Arrays.asList(((J.Binary) argument).getLeft()));
                 } else if (argument instanceof J.MethodInvocation) {
                     if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
                             ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {

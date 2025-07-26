@@ -135,10 +135,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     private static Optional<JavaSourceFile> parseAsGradle(String snippet, boolean isKotlinDsl, ExecutionContext ctx) {
         return snippetCache(ctx)
                 .computeIfAbsent(snippet, s -> GradleParser.builder().build().parseInputs(Collections.singletonList(
-                        new Parser.Input(
-                                Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
-                                () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
-                        )), null, ctx)
+                                new Parser.Input(
+                                        Paths.get("build.gradle" + (isKotlinDsl ? ".kts" : "")),
+                                        () -> new ByteArrayInputStream(snippet.getBytes(StandardCharsets.UTF_8))
+                                )), null, ctx)
                         .findFirst()
                         .map(maybeCu -> {
                             maybeCu.getMarkers()
@@ -186,7 +186,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new JavaVisitor<ExecutionContext>() {
-            @Nullable
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
@@ -194,13 +194,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 return (sourceFile instanceof G.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle")) ||
-                        (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
+                       (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
             }
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
+                    gradleProject = tree.getMarkers().findFirst(GradleProject.class)
+                            .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
                     acc.modules.add(gradleProject);
                     acc.updatesPerProject.putIfAbsent(getGradleProjectKey(gradleProject), new HashMap<>());
 
@@ -258,7 +259,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                         }
                                                         if (c.getName().equals("testRuntimeOnly")) {
                                                             if (config.getName().equals("testImplementation") ||
-                                                                    config.getName().equals("implementation")) {
+                                                                config.getName().equals("implementation")) {
                                                                 return true;
                                                             }
                                                         }
@@ -407,7 +408,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         GradleProject gradleProject;
 
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
@@ -448,7 +449,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
                             cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                    update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
+                                    update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
                         }
                     }
 
@@ -508,7 +509,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     return dependencies.withBody(body.withStatements(
                             ListUtils.concat(constraints, statements)));
                 })), constraints, ctx, getCursor().getParentOrThrow());
-            } else if (isKotlinDsl && m.getSimpleName().equals("dependencies") && getCursor().getParent().firstEnclosing(J.MethodInvocation.class) == null) {
+            } else if (isKotlinDsl && m.getSimpleName().equals("dependencies") && getCursor().getParentTreeCursor().firstEnclosing(J.MethodInvocation.class) == null) {
                 K.CompilationUnit withConstraints = (K.CompilationUnit) parseAsGradle(
                         //language=kotlin
                         "plugins { id(\"java\") }\n" +
@@ -557,13 +558,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }
     }
 
-
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class AddConstraint extends JavaIsoVisitor<ExecutionContext> {
         boolean isKotlinDsl;
         String config;
         GroupArtifactVersion gav;
+        GradleProject gradleProject;
 
         @Nullable
         String because;
@@ -577,26 +578,68 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
             String existingConstraintVersion = null;
             J.MethodInvocation existingConstraint = null;
+            List<J.MethodInvocation> constraintsToRemove = new ArrayList<>();
             MethodMatcher constraintMatcher = new MethodMatcher(CONSTRAINT_MATCHER, true);
+
+            // Find the configuration being added
+            GradleDependencyConfiguration targetConfig = gradleProject.getConfiguration(config);
+
+            // Check all constraints
+            if (!(m.getArguments().get(0) instanceof J.Lambda) || !(((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block)) {
+                return m;
+            }
             for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
                 if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                    if (constraintMatcher.matches(m2)) {
-                        if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
-                            existingConstraint = m2;
-                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
-                        }
-                    } else if (isKotlinDsl && m.getSimpleName().equals("constraints")) {
-                        if (m2.getSimpleName().equals(config) && matchesConstraint(m2, ga)) {
-                            existingConstraint = m2;
-                            existingConstraintVersion = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue())).getVersion();
+                    if (constraintMatcher.matches(m2) || (isKotlinDsl && m.getSimpleName().equals("constraints"))) {
+                        if (matchesConstraint(m2, ga)) {
+                            if (m2.getSimpleName().equals(config)) {
+                                existingConstraint = m2;
+                                org.openrewrite.gradle.internal.Dependency notation = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) m2.getArguments().get(0)).getValue()));
+                                if (notation == null) {
+                                    continue;
+                                }
+                                existingConstraintVersion = notation.getVersion();
+                            } else if (targetConfig != null) {
+                                // Check if this constraint is on a configuration that extends from our target
+                                GradleDependencyConfiguration constraintConfig = gradleProject.getConfiguration(m2.getSimpleName());
+                                if (constraintConfig != null && constraintConfig.allExtendsFrom().contains(targetConfig)) {
+                                    constraintsToRemove.add(m2);
+                                }
+                            }
                         }
                     }
                 }
             }
+
             if (Objects.equals(gav.getVersion(), existingConstraintVersion)) {
                 return m;
             }
+
+            // Remove constraints from child configurations
+            if (!constraintsToRemove.isEmpty()) {
+                m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    if (!(arg instanceof J.Lambda)) {
+                        return arg;
+                    }
+                    J.Lambda lambda = (J.Lambda) arg;
+                    if (!(lambda.getBody() instanceof J.Block)) {
+                        return arg;
+                    }
+                    J.Block body = (J.Block) lambda.getBody();
+                    List<Statement> statements = new ArrayList<>(body.getStatements());
+                    statements.removeIf(statement -> {
+                        if (statement instanceof J.MethodInvocation) {
+                            return constraintsToRemove.contains(statement);
+                        } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
+                            return constraintsToRemove.contains(((J.Return) statement).getExpression());
+                        }
+                        return false;
+                    });
+                    return lambda.withBody(body.withStatements(statements));
+                }));
+            }
+
             if (existingConstraint == null) {
                 m = (J.MethodInvocation) new CreateConstraintVisitor(config, gav, because, isKotlinDsl)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
@@ -607,7 +650,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return m;
         }
 
-        private static boolean matchesConstraint(J.MethodInvocation m, String ga) {
+        private boolean matchesConstraint(J.MethodInvocation m, String ga) {
             Expression arg = m.getArguments().get(0);
             if (!(arg instanceof J.Literal) || ((J.Literal) arg).getValue() == null) {
                 return false;
@@ -744,7 +787,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
             }
 
-            m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+            return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 if (!(arg instanceof J.Lambda)) {
                     return arg;
                 }
@@ -757,7 +800,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return dependencies.withBody(body.withStatements(
                         ListUtils.concat(constraint, body.getStatements())));
             })), ctx, getCursor().getParentOrThrow());
-            return m;
         }
     }
 
@@ -845,7 +887,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (!"because".equals(m.getSimpleName())) {
                 return m;
             }
-            m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+            return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                 if (arg instanceof J.Literal) {
                     char quote;
                     if (((J.Literal) arg).getValueSource() == null) {
@@ -858,7 +900,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 }
                 return arg;
             }));
-            return m;
         }
     }
 
@@ -917,8 +958,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             }
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
-            m = autoFormat(m, ctx, getCursor().getParentOrThrow());
-            return m;
+            return autoFormat(m, ctx, getCursor().getParentOrThrow());
         }
     }
 

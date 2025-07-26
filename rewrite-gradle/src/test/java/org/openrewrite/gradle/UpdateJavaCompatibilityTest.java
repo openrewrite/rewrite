@@ -54,7 +54,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
       '1.8','1.8','11','11'
@@ -63,6 +62,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       1.8,"1.8",11,"11"
       JavaVersion.VERSION_1_8,"1.8",JavaVersion.VERSION_11,"11",
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
@@ -112,7 +112,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       Enum,1.8,JavaVersion.VERSION_1_8
       Enum,'1.8',JavaVersion.VERSION_1_8
@@ -126,6 +125,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       String,JavaVersion.VERSION_1_8,'1.8'
       String,JavaVersion.toVersion("1.8"),'1.8'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
@@ -210,13 +210,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/3255")
-    @ParameterizedTest
     @CsvSource(textBlock = """
       11,"1.8","11"
       11,1.8,11
       11,8,11
       """)
+    @Issue("https://github.com/openrewrite/rewrite/issues/3255")
+    @ParameterizedTest
     void handlesJavaVersionMethodInvocation(int version, String before, String after) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null, null)),
@@ -237,7 +237,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       source,Enum,JavaVersion.VERSION_11,1.8
       source,Number,11,1.8
@@ -246,6 +245,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       target,Number,1.8,11
       target,String,1.8,'11'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
@@ -354,7 +354,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       8,Enum,JavaVersion.VERSION_1_8,JavaVersion.VERSION_1_8
       8,Number,1.8,1.8
@@ -363,6 +362,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       11,Number,11,11
       11,String,'11','11'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void addSourceAndTargetCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility, String targetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true)),
@@ -429,8 +429,8 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
     void releaseValueGetsUpdated() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),

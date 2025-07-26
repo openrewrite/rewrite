@@ -56,8 +56,8 @@ class IndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    @Test
     void multilineString() {
         rewriteRun(
           yaml(
@@ -102,8 +102,8 @@ class IndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1135")
+    @Test
     void maintainIndentSpacingOnMixedTypeSequences() {
         rewriteRun(
           yaml(

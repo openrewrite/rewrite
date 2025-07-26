@@ -182,8 +182,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite/issues/788")
+    @SuppressWarnings("InstantiationOfUtilityClass")
     @Test
     void unnecessaryImport() {
         rewriteRun(
@@ -215,8 +215,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/868")
+    @SuppressWarnings("rawtypes")
     @Test
     void changeInnerClassToOuterClass() {
         rewriteRun(
@@ -276,8 +276,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/774")
+    @SuppressWarnings("rawtypes")
     @Test
     void replaceWithNestedType() {
         rewriteRun(
@@ -672,9 +672,9 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/704")
     @SuppressWarnings("UnnecessaryLocalVariable")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/704")
     void updateAssignments() {
         //noinspection UnnecessaryLocalVariable
         rewriteRun(
@@ -1939,8 +1939,8 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Disabled("requires correct Kind.")
-    @SuppressWarnings("StatementWithEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/2478")
+    @SuppressWarnings("StatementWithEmptyBody")
     @Test
     void changeJavaTypeClassKindEnum() {
         rewriteRun(
@@ -2136,9 +2136,9 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
     @Disabled("flaky on CI")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    @Test
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType(
@@ -2306,8 +2306,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4773")
+    @Test
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
@@ -2355,8 +2355,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4764")
+    @Test
     void changeTypeOfInnerClass() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))

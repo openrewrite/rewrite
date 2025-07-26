@@ -41,7 +41,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -209,9 +212,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }, marketplace, timeout);
             } else {
                 // Use default installation directory if none provided (lazy-loaded)
-                Path effectiveInstallationDirectory = installationDirectory != null
-                        ? installationDirectory
-                        : getBundledInstallationDirectory();
+                Path effectiveInstallationDirectory = installationDirectory != null ?
+                        installationDirectory :
+                        getBundledInstallationDirectory();
 
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),

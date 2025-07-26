@@ -124,8 +124,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void anonymousTypeAttribution() {
         rewriteRun(
           java(
@@ -202,8 +202,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1() {
         rewriteRun(
           java(
@@ -221,8 +221,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1WithComment() {
         rewriteRun(
           java(
@@ -240,8 +240,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2() {
         rewriteRun(
           java(
@@ -259,8 +259,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2WithComment() {
         rewriteRun(
           java(
