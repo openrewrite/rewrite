@@ -103,8 +103,8 @@ class PrintMavenAsDotTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void bigDot() {
         rewriteRun(
           pomXml(

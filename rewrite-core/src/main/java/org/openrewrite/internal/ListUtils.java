@@ -179,7 +179,7 @@ public final class ListUtils {
     /**
      * For backwards compatibility; prefer {@link #mapFirst(List, Function)}.
      */
-    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<T> mapFirst) {
         return mapFirst(ls, (Function<T, T>) mapFirst);
     }
 
@@ -218,6 +218,7 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
@@ -256,6 +257,7 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
@@ -338,6 +340,7 @@ public final class ListUtils {
             }
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 

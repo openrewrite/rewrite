@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 import org.openrewrite.table.SourcesFileErrors;
@@ -79,7 +80,20 @@ class RecipeSchedulerTest implements RewriteTest {
     @Test
     void exceptionDuringGenerate() {
         rewriteRun(
-          spec -> spec.recipe(new BoomGenerateRecipe())
+          spec -> spec.recipe(new BoomGenerateRecipe(false))
+            .executionContext(new InMemoryExecutionContext())
+            .dataTable(SourcesFileErrors.Row.class, rows ->
+              assertThat(rows)
+                .singleElement()
+                .extracting(SourcesFileErrors.Row::getRecipe)
+                .isEqualTo("org.openrewrite.BoomGenerateRecipe"))
+        );
+    }
+
+    @Test
+    void recipeRunExceptionDuringGenerate() {
+        rewriteRun(
+          spec -> spec.recipe(new BoomGenerateRecipe(true))
             .executionContext(new InMemoryExecutionContext())
             .dataTable(SourcesFileErrors.Row.class, rows ->
               assertThat(rows)
@@ -176,9 +190,11 @@ class BoomRecipe extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class BoomGenerateRecipe extends ScanningRecipe<Integer> {
+
+    boolean wrapAsRecipeRunException;
 
     @Override
     public String getDisplayName() {
@@ -202,7 +218,7 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
-        throw new BoomException();
+        throw wrapAsRecipeRunException ? new RecipeRunException(new BoomException(), null) : new BoomException();
     }
 }
 

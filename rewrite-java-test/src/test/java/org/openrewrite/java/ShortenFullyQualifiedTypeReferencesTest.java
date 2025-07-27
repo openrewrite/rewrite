@@ -377,8 +377,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("TypeParameterHidesVisibleType")
+    @Test
     void conflictGenericVariableOnMethod() {
         rewriteRun(
           //language=java

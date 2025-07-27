@@ -87,8 +87,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1133")
+    @Test
     void foldSequenceOfObjectsFormattedWithDashDirectlyUnderMappingKey() {
         rewriteRun(
           yaml(
@@ -145,8 +145,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void group() {
         rewriteRun(
           yaml(
@@ -163,8 +163,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void foldWithCommentsInPrefix() {
         rewriteRun(
           yaml(
@@ -186,8 +186,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void foldWithCommentsInPrefixWhenCommentsHaveDifferentIndentThanTheirElement() {
         rewriteRun(
           yaml(
@@ -212,8 +212,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void doNotFoldKeysWithCommentsInPrefix() {
         rewriteRun(
           yaml(
@@ -240,8 +240,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1142")
+    @Test
     void doNotShiftYamlCommentsInPrefixFollowingPreviousYamlObject() {
         rewriteRun(
           yaml(

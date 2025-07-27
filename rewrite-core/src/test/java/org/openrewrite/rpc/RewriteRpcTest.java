@@ -78,8 +78,8 @@ class RewriteRpcTest implements RewriteTest {
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @SneakyThrows
               @Override
+              @SneakyThrows
               public Tree preVisit(Tree tree, ExecutionContext ctx) {
                   Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();

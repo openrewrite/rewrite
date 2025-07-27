@@ -129,7 +129,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         validated = validated.and(required("newGroupId", newGroupId).or(required("newArtifactId", newArtifactId)));
-        validated = validated.and(test(
+        return validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -139,7 +139,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override

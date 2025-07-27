@@ -118,9 +118,9 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("DataFlowIssue")
     @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void changeTypeAttributionImplicitUsage() {
         rewriteRun(

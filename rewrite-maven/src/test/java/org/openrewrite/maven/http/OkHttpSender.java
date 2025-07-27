@@ -56,8 +56,8 @@ public class OkHttpSender implements HttpSender {
         if (entity.length > 0) {
             String contentType = request.getRequestHeaders().get("Content-Type");
             MediaType mediaType = contentType != null ?
-                    MediaType.get(contentType + "; charset=utf-8") :
-                    MEDIA_TYPE_APPLICATION_JSON;
+              MediaType.get(contentType + "; charset=utf-8") :
+              MEDIA_TYPE_APPLICATION_JSON;
             RequestBody body = RequestBody.create(entity, mediaType);
             requestBuilder.method(methodValue, body);
         } else {
@@ -73,7 +73,9 @@ public class OkHttpSender implements HttpSender {
             //noinspection resource
             okhttp3.Response response = client.newCall(requestBuilder.build()).execute();
             ResponseBody body = response.body();
-            return new Response(response.code(), body == null ? null : body.byteStream(), response::close);
+
+            return new Response(response.code(), body == null ? null : body.byteStream(),
+              response.headers().toMultimap(), response::close);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -52,8 +52,8 @@ class GroovyParserTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4072")
+    @Test
     void groovySpecialCharacters() {
         rewriteRun(
           groovy(
@@ -129,8 +129,8 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
     void trailingCommaInMethodCall() {
         rewriteRun(
           groovy(
@@ -139,6 +139,85 @@ class GroovyParserTest implements RewriteTest {
               System.out.println("Hello World with space before comma" ,)
               System.out.println("Hello World with space after comma", )
               System.out.println("Hello World with space before & after comma" , )
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5730")
+    @Test
+    void innerOuter() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def outer() {
+                  f(I<Void>) {
+                    innner() { }
+                  }
+                }
+                def outerWithSpaces() {
+                  g( I < Void > ) {
+                    innner() { }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleTypeParams() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(Map<String, Integer>) {
+                    println "test"
+                  }
+                }
+                def methodWithSpaces() {
+                  f( Map < String , Integer > ) {
+                    println "test"
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedArgOnly() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<String, Integer>)
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedClosureAfterGeneric() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<Void>) {
+                    first {
+                      second { }
+                    }
+                  }
+                }
+              }
               """
           )
         );
