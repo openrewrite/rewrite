@@ -24,8 +24,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -50,8 +48,6 @@ public class AddCommentToMethodInvocations extends Recipe {
             example = "java.util.List add*(..)")
     String methodPattern;
 
-    private static final Pattern NEWLINE = Pattern.compile("\\R");
-
     @Override
     public Validated<Object> validate() {
         return super.validate().and(MethodMatcher.validate(methodPattern));
@@ -64,24 +60,19 @@ public class AddCommentToMethodInvocations extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
                 if (methodMatcher.matches(m)) {
-                    return addCommentToTargetElement(m, comment);
+                    String prefixWhitespace = m.getPrefix().getWhitespace();
+                    String newCommentText = comment.trim()
+                            /* First Line * Second Line */
+                            .replaceAll("\\R", " * ")
+                            // Prevent closing the comment early
+                            .replaceAll("\\*/", "*");
+                    if (doesNotHaveComment(newCommentText, m.getComments())) {
+                        TextComment textComment = new TextComment(true, " " + newCommentText + " ", prefixWhitespace, Markers.EMPTY);
+                        return m.withComments(ListUtils.concat(m.getComments(), textComment));
+                    }
                 }
                 return m;
-            }
-
-            private <T extends J> T addCommentToTargetElement(T target, String comment) {
-                String prefixWhitespace = target.getPrefix().getWhitespace();
-                String newCommentText = comment.trim();
-                Matcher matcher = NEWLINE.matcher(newCommentText);
-                /* First Line * Second Line */
-                newCommentText = " " + matcher.replaceAll(" * ") + " ";
-                if (doesNotHaveComment(newCommentText, target.getComments())) {
-                    TextComment textComment = new TextComment(true, newCommentText, prefixWhitespace, Markers.EMPTY);
-                    return target.withComments(ListUtils.concat(target.getComments(), textComment));
-                }
-                return target;
             }
 
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {

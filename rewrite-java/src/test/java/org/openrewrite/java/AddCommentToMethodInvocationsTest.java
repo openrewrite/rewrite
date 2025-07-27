@@ -193,4 +193,34 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void escapeClosingTag() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToMethodInvocations("this is a */ terrible idea", "foo.Foo bar(..)")
+          ),
+          //language=java
+          java(
+            """
+              import foo.Foo;
+              
+              class Other {
+                  void method(Foo foo) {
+                      foo.bar("a");
+                  }
+              }
+              """,
+            """
+              import foo.Foo;
+              
+              class Other {
+                  void method(Foo foo) {
+                      /* this is a * terrible idea */
+                      foo.bar("a");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
