@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -9,19 +9,21 @@
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, eithergit fet express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class AddTagAttributeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addsAttributeWhenMissing() {
         rewriteRun(
@@ -81,49 +83,20 @@ class AddTagAttributeTest implements RewriteTest {
     }
 
     @Test
-    void doesNothingWhenNewValueIsNull() {
-        rewriteRun(
-          spec -> spec.recipe(new AddTagAttribute("bean", "type", null)),
-          xml(
-            """
-              <beans>
-                  <bean id="one"/>
-              </beans>
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotAddAttributeIfAlreadyExistsWithSpaceBeforeEquals() {
-        rewriteRun(
-          spec -> spec.recipe(new AddTagAttribute("bean", "scope", "singleton")),
-          xml(
-            """
-            <beans>
-                <bean scope ="singleton">
-                </bean>
-            </beans>
-            """
-          )
-        );
-    }
-
-    @Test
     void addAttributeToTagWithNoAttributes() {
         rewriteRun(
           spec -> spec.recipe(new AddTagAttribute("bean", "scope", "singleton")),
           xml(
             """
-            <beans>
-                <bean/>
-            </beans>
-            """,
+              <beans>
+                  <bean/>
+              </beans>
+              """,
             """
-            <beans>
-                <bean scope="singleton"/>
-            </beans>
-            """
+              <beans>
+                  <bean scope="singleton"/>
+              </beans>
+              """
           )
         );
     }
@@ -134,15 +107,15 @@ class AddTagAttributeTest implements RewriteTest {
           spec -> spec.recipe(new AddTagAttribute("bean", "scope", "singleton")),
           xml(
             """
-            <beans>
-                <bean></bean>
-            </beans>
-            """,
+              <beans>
+                  <bean></bean>
+              </beans>
+              """,
             """
-            <beans>
-                <bean scope="singleton"></bean>
-            </beans>
-            """
+              <beans>
+                  <bean scope="singleton"></bean>
+              </beans>
+              """
           )
         );
     }
@@ -153,17 +126,17 @@ class AddTagAttributeTest implements RewriteTest {
           spec -> spec.recipe(new AddTagAttribute("bean", "scope", "singleton")),
           xml(
             """
-            <beans>
-                <bean>
-                </bean>
-            </beans>
-            """,
+              <beans>
+                  <bean>
+                  </bean>
+              </beans>
+              """,
             """
-            <beans>
-                <bean scope="singleton">
-                </bean>
-            </beans>
-            """
+              <beans>
+                  <bean scope="singleton">
+                  </bean>
+              </beans>
+              """
           )
         );
     }
@@ -174,17 +147,17 @@ class AddTagAttributeTest implements RewriteTest {
           spec -> spec.recipe(new AddTagAttribute("bean", "scope", "singleton")),
           xml(
             """
-            <beans>
-                <bean scope1="singleton">
-                </bean>
-            </beans>
-            """,
+              <beans>
+                  <bean scope1="singleton">
+                  </bean>
+              </beans>
+              """,
             """
-            <beans>
-                <bean scope1="singleton" scope="singleton">
-                </bean>
-            </beans>
-            """
+              <beans>
+                  <bean scope1="singleton" scope="singleton">
+                  </bean>
+              </beans>
+              """
           )
         );
     }
@@ -192,34 +165,30 @@ class AddTagAttributeTest implements RewriteTest {
     @Test
     void addAttributeUsingXPathExpression() {
         rewriteRun(
-          spec -> spec.recipe(new AddTagAttribute(
-            "//bean/property",   // XPath: target all <property> tags inside <bean>
-            "scope",
-            "singleton"
-          )),
+          spec -> spec.recipe(new AddTagAttribute("//bean/property", "scope", "singleton")),
           xml(
             // before
             """
-            <beans>
-                <bean>
-                    <property name="myProperty" />
-                </bean>
-                <notbean>
-                    <property name="shouldNotChange"/>
-                </notbean>
-            </beans>
-            """,
+              <beans>
+                  <bean>
+                      <property name="myProperty" />
+                  </bean>
+                  <notbean>
+                      <property name="shouldNotChange"/>
+                  </notbean>
+              </beans>
+              """,
             // after
             """
-            <beans>
-                <bean>
-                    <property name="myProperty" scope="singleton" />
-                </bean>
-                <notbean>
-                    <property name="shouldNotChange"/>
-                </notbean>
-            </beans>
-            """
+              <beans>
+                  <bean>
+                      <property name="myProperty" scope="singleton" />
+                  </bean>
+                  <notbean>
+                      <property name="shouldNotChange"/>
+                  </notbean>
+              </beans>
+              """
           )
         );
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -44,18 +43,17 @@ public class AddTagAttribute extends Recipe {
 
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be added. Interpreted as an XPath expression.",
-            example = "property")
+            example = "//beans/bean")
     String elementName;
 
     @Option(displayName = "Attribute name",
             description = "The name of the new attribute.",
-            example = "name")
+            example = "attribute-name")
     String attributeName;
 
     @Option(displayName = "New value",
-            description = "The new value to be used for key specified by `attributeName`, Set to null if you want to remove the attribute.",
-            example = "newfoo.bar.attribute.value.string")
-    @Nullable
+            description = "The new value to be used for key specified by `attributeName`.",
+            example = "value-to-add")
     String newValue;
 
     @Override
@@ -64,43 +62,21 @@ public class AddTagAttribute extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                if (!new XPathMatcher(elementName).matches(getCursor())) {
+                    return t;
+                }
 
-                // Match the tag using XPath
-                if (new XPathMatcher(elementName).matches(getCursor())) {
-                    // Check if the attribute already exists
-                    boolean attributeExists = t.getAttributes().stream()
-                            .anyMatch(attr -> attr.getKeyAsString().equals(attributeName));
-
-                    // If attribute doesn't exist, add the new attribute
-                    if (!attributeExists && newValue != null) {
-                        Xml.Attribute newAttribute = new Xml.Attribute(
-                                randomId(),
-                                "",
-                                Markers.EMPTY,
-                                new Xml.Ident(
-                                        randomId(),
-                                        " ",
-                                        Markers.EMPTY,
-                                        attributeName
-                                ),
-                                "",
-                                new Xml.Attribute.Value(
-                                        randomId(),
-                                        "",
-                                        Markers.EMPTY,
-                                        Xml.Attribute.Value.Quote.Double,
-                                        newValue
-
-                                )
-                        );
-
-                        t = t.withAttributes(ListUtils.concat(t.getAttributes(), newAttribute));
+                for (Xml.Attribute attr : t.getAttributes()) {
+                    if (attributeName.equals(attr.getKeyAsString())) {
+                        return t;
                     }
                 }
 
-                return t;
+                Xml.Ident name = new Xml.Ident(randomId(), "", Markers.EMPTY, attributeName);
+                Xml.Attribute.Value value = new Xml.Attribute.Value(randomId(), "", Markers.EMPTY, Xml.Attribute.Value.Quote.Double, newValue);
+                return t.withAttributes(ListUtils.concat(t.getAttributes(),
+                        new Xml.Attribute(randomId(), " ", Markers.EMPTY, name, "", value)));
             }
         };
     }
-
 }
