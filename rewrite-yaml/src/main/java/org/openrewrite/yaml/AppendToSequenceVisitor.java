@@ -47,8 +47,11 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
         if (matcher.matches(parent) &&
-            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> value.equals(m.getFind())).isPresent() &&
-            checkExistingSequenceValues(existingSeq, parent)) {
+                existingSeq.getMarkers()
+                        .findAll(AlreadyReplaced.class).stream()
+                        .map(AlreadyReplaced::getFind)
+                        .noneMatch(value::equals) &&
+                checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
         return super.visitSequence(existingSeq, ctx);
@@ -115,6 +118,6 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return newSequence.withMarkers(Markers.EMPTY.addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+        return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
     }
 }
