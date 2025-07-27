@@ -25,7 +25,6 @@ import org.openrewrite.marker.Range;
 
 import java.util.List;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -67,7 +66,7 @@ class UpdateSourcePositionsTest {
                 }
             }
             """
-        ).collect(Collectors.toList());
+        ).toList();
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
@@ -98,7 +97,7 @@ class UpdateSourcePositionsTest {
                 }
             }
             """
-        ).collect(Collectors.toList());
+        ).toList();
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """

@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
@@ -232,7 +231,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             if (shouldCreate.get()) {
                 return PlainTextParser.builder().build().parse(fileContents)
                   .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
-                  .collect(toList());
+                  .toList();
             }
             return emptyList();
         }
