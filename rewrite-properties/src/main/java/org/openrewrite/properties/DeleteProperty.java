@@ -22,11 +22,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
@@ -56,60 +58,60 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(displayName = "Remove property comments",
-            description = "Remove all comments found before the property to removed. By convention, empty line is used to indicate start of property comments",
-            required = false)
-    @Nullable
-    Boolean removePropertyComments;
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                Properties.File f = (Properties.File) super.visitFile(file, ctx);
-
-                String prefix = null;
-                List<Properties.Content> contents = f.getContent();
-                List<Properties.Content> newContents = new ArrayList<>();
-                List<Properties.Content> currentEntryContents = new ArrayList<>();
-                for (int i = 0; i < contents.size(); i++) {
-                    Properties.Content content = contents.get(i);
-                    if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
-                        if (Boolean.TRUE.equals(removePropertyComments)) {
-                            if (!currentEntryContents.isEmpty()) {
-                                prefix = currentEntryContents.get(0).getPrefix();
-                            }
-                            currentEntryContents.clear();
-                        } else if (i == 0) {
-                            prefix = content.getPrefix();
-                        }
-                    } else if (! (content instanceof Properties.Entry) && i != contents.size() - 1) {
-                        if (content.getPrefix().matches("\\s{2,}")) {
-                            newContents.addAll(currentEntryContents);
-                            currentEntryContents.clear();
-                        }
-                        currentEntryContents.add(content);
-                    } else {
-                        currentEntryContents.add(content);
-                        if (prefix != null) {
-                            currentEntryContents.set(0, (Properties.Content) currentEntryContents.get(0).withPrefix(prefix));
-                            prefix = null;
-                        }
-                        newContents.addAll(currentEntryContents);
-                        currentEntryContents.clear();
+                Properties.File f1 = (Properties.File) super.visitFile(file, ctx);
+                AtomicReference<String> prefixOnNextEntry = new AtomicReference<>("\n");
+                AtomicBoolean deleted = new AtomicBoolean(false);
+                Properties.File mapped = f1.withContent(ListUtils.map(f1.getContent(), (index, current) -> {
+                    if (current instanceof Properties.Comment && nextEntryMatches(f1.getContent(), index)) {
+                        prefixOnNextEntry.compareAndSet("\n", current.getPrefix());
+                        return null;
                     }
+                    if (isMatch(current)) {
+                        deleted.set(true);
+                        return null;
+                    }
+                    if (deleted.getAndSet(false)) {
+                        String prefix = prefixOnNextEntry.getAndSet("\n");
+                        return (Properties.Content) current.withPrefix(prefix);
+                    }
+                    return current;
+                }));
+                if (f1 != mapped) {
+                   return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
                 }
-
-                return contents.size() == newContents.size() ? f : f.withContent(newContents);
+                return mapped;
             }
 
-            private boolean isMatch(String key) {
-                if (!Boolean.FALSE.equals(relaxedBinding)) {
+            private boolean isMatch(Properties.Content current) {
+                if (current instanceof Properties.Entry) {
+                    String key = ((Properties.Entry) current).getKey();
+                    if (Boolean.FALSE.equals(relaxedBinding)) {
+                        return StringUtils.matchesGlob(key, propertyKey);
+                    }
                     return StringUtils.matchesGlob(LOWER_CAMEL.format(key), LOWER_CAMEL.format(propertyKey));
-                } else {
-                    return StringUtils.matchesGlob(key, propertyKey);
                 }
+                return false;
+            }
+
+            /**
+             * @return true if the next entry not separated by two or more newlines matches the property key.
+             */
+            private boolean nextEntryMatches(List<Properties.Content> contents, int index) {
+                while (++index < contents.size()) {
+                    Properties.Content next = contents.get(index);
+                    if (next.getPrefix().matches("\\R{2,}")) {
+                        return false;
+                    }
+                    if (isMatch(next)) {
+                        return true;
+                    }
+                }
+                return false;
             }
         };
     }
