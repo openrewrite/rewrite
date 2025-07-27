@@ -66,7 +66,7 @@ public class AddCommentToMethodInvocations extends Recipe {
                             /* First Line * Second Line */
                             .replaceAll("\\R", " * ")
                             // Prevent closing the comment early
-                            .replaceAll("\\*/", "*");
+                            .replace("*/", "*");
                     if (doesNotHaveComment(newCommentText, m.getComments())) {
                         TextComment textComment = new TextComment(true, " " + newCommentText + " ", prefixWhitespace, Markers.EMPTY);
                         return m.withComments(ListUtils.concat(m.getComments(), textComment));
