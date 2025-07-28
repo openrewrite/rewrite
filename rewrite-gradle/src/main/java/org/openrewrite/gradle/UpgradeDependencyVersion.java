@@ -52,7 +52,6 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 
 import static java.util.Collections.*;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
