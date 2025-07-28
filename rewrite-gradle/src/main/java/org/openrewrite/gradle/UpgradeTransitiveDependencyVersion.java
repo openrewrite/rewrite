@@ -175,7 +175,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
     @Value
     public static class DependencyVersionState {
         Map<String, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>>> updatesPerProject = new LinkedHashMap<>();
-        Set<GradleProject> modules = new HashSet<>();
     }
 
     @Override
@@ -202,7 +201,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class)
                             .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
-                    acc.modules.add(gradleProject);
                     acc.updatesPerProject.putIfAbsent(getGradleProjectKey(gradleProject), new HashMap<>());
 
                     DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
@@ -341,11 +339,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         final DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc.getUpdatesPerProject());
-            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateGradle.isAcceptable(sf, ctx) || updateLockFile.isAcceptable(sf, ctx);
+                return updateGradle.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -357,15 +354,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         t = updateGradle.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
-                    if ((tree != t || updateLockFile.isAcceptable(sf, ctx)) && projectMarker.isPresent()) {
+                    if (tree != t && projectMarker.isPresent()) {
                         GradleProject gradleProject = projectMarker.get();
                         gradleProject = updatedModel(projectMarker.get(), acc.updatesPerProject.get(getGradleProjectKey(gradleProject)), ctx);
                         if (projectMarker.get() != gradleProject) {
                             t = t.withMarkers(t.getMarkers().setByType(gradleProject));
                         }
-                    }
-                    if (updateLockFile.isAcceptable(sf, ctx)) {
-                        t = updateLockFile.visitNonNull(t, ctx);
                     }
                 }
                 return t;
