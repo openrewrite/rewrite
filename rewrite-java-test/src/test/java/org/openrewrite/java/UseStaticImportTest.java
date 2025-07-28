@@ -388,6 +388,7 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5816")
     @Test
     void methodOverloads() {
         rewriteRun(

@@ -61,13 +61,11 @@ public class UseStaticImport extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> preconditions = new UsesMethod<>(methodPattern);
         if (!methodPattern.contains(" *(")) {
-            int indexSpace = methodPattern.indexOf(' ');
+            int indexSpace = Math.max(methodPattern.indexOf(' '), methodPattern.indexOf('#'));
             int indexBrace = methodPattern.indexOf('(', indexSpace);
             String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
-            preconditions = Preconditions.and(
-                    preconditions,
-                    Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)"))
-            );
+            preconditions = Preconditions.and(preconditions,
+                    Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)")));
         }
         return Preconditions.check(preconditions, new UseStaticImportVisitor());
     }
@@ -83,19 +81,16 @@ public class UseStaticImport extends Recipe {
                     return m;
                 }
 
-                if (methodNameConflicts(m.getSimpleName(), getCursor())) {
+                if (m.getMethodType() == null ||
+                        !m.getMethodType().hasFlags(Flag.Static) ||
+                        hasConflictingImport(m.getMethodType().getDeclaringType().getFullyQualifiedName(), m.getSimpleName(), getCursor()) ||
+                        hasConflictingMethod(m.getSimpleName(), getCursor())) {
                     return m;
                 }
 
-                if (m.getMethodType() != null) {
-                    if (!m.getMethodType().hasFlags(Flag.Static)) {
-                        return m;
-                    }
-
-                    JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-                    maybeRemoveImport(receiverType);
-                    maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
-                }
+                JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                maybeRemoveImport(receiverType);
+                maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
 
                 if (m.getSelect() != null) {
                     return m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
@@ -119,26 +114,31 @@ public class UseStaticImport extends Recipe {
         }
     }
 
-    private static boolean methodNameConflicts(String methodName, Cursor cursor) {
+    private static boolean hasConflictingImport(String typeName, String methodName, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
         if (cu != null) {
             for (J.Import imp : cu.getImports()) {
-                if (imp.isStatic() && methodName.equals(imp.getQualid().getSimpleName())) {
+                if (imp.isStatic() &&
+                        methodName.equals(imp.getQualid().getSimpleName()) &&
+                        !typeName.equals(imp.getTypeName())) {
                     return true;
                 }
             }
         }
+        return false;
+    }
 
+    private static boolean hasConflictingMethod(String methodName, Cursor cursor) {
         Cursor cdCursor = cursor.dropParentUntil(it -> it instanceof J.ClassDeclaration || it == Cursor.ROOT_VALUE);
         Object maybeCd = cdCursor.getValue();
         if (!(maybeCd instanceof J.ClassDeclaration)) {
             return false;
         }
-        return methodNameConflicts(methodName, ((J.ClassDeclaration) maybeCd).getType()) ||
-                methodNameConflicts(methodName, cdCursor);
+        return hasConflictingMethod(methodName, ((J.ClassDeclaration) maybeCd).getType()) ||
+                hasConflictingMethod(methodName, cdCursor);
     }
 
-    private static boolean methodNameConflicts(String methodName, JavaType.@Nullable FullyQualified ct) {
+    private static boolean hasConflictingMethod(String methodName, JavaType.@Nullable FullyQualified ct) {
         if (ct == null) {
             return false;
         }
@@ -147,11 +147,11 @@ public class UseStaticImport extends Recipe {
                 return true;
             }
         }
-        if (methodNameConflicts(methodName, ct.getSupertype())) {
+        if (hasConflictingMethod(methodName, ct.getSupertype())) {
             return true;
         }
         for (JavaType.FullyQualified intf : ct.getInterfaces()) {
-            if (methodNameConflicts(methodName, intf)) {
+            if (hasConflictingMethod(methodName, intf)) {
                 return true;
             }
         }
