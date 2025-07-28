@@ -22,7 +22,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class FindSourceFilesTest implements RewriteTest {
 

@@ -1482,6 +1482,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void removesTransitiveDependenciesFromGradleProjectMarker() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("io.vertx", "vertx-core", "5.0.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.vertx:vertx-core:3.9.8'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.vertx:vertx-core:5.0.1'
+              }
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                assertThat(maybeGp).isPresent();
+                GradleDependencyConfiguration compileClasspath = maybeGp.get().getConfiguration("compileClasspath");
+                assertThat(compileClasspath).isNotNull();
+
+                // Check that vertx-core is updated to 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should have vertx-core 5.0.1")
+                  .anySatisfy(dep -> {
+                      assertThat(dep.getGroupId()).isEqualTo("io.vertx");
+                      assertThat(dep.getArtifactId()).isEqualTo("vertx-core");
+                      assertThat(dep.getVersion()).isEqualTo("5.0.1");
+                  });
+
+                // Check that netty-codec is NOT listed amongst the dependencies as it is not a dependency of vertx-core 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should NOT contain netty-codec after upgrade to vertx-core 5.0.1")
+                  .noneMatch(dep -> dep.getGroupId().equals("io.netty") && dep.getArtifactId().equals("netty-codec"));
+            })
+          )
+        );
+    }
+
+    @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),

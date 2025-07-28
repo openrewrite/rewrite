@@ -15,8 +15,6 @@
  */
 package org.openrewrite.toml;
 
-import org.openrewrite.toml.tree.Toml;
-
 public class TomlIsoVisitor<P> extends TomlVisitor<P> {
 
 }

@@ -395,7 +395,6 @@ class AppendToSequenceTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3215")
     @Test
     void appendTwice() {
@@ -404,7 +403,7 @@ class AppendToSequenceTest implements RewriteTest {
             type: specs.openrewrite.org/v1beta/recipe
             name: "com.demo.migration-not-working"
             displayName: "this recipe only add first entry"
-            description: "blabla"
+            description: "blabla."
             recipeList:
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs

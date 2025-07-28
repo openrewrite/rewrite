@@ -275,6 +275,32 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void constructorWithDynamicallyTypedParam() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  A(dynamicVar) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorWithDynamicallyTypedParamWithName() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  A(Object a, java.lang.Object b) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void constructorForClassInPackage() {
         rewriteRun(
           groovy(
