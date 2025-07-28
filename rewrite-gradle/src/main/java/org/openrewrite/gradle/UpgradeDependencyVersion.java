@@ -395,13 +395,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             try {
                                 String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                if (resolvedVersion != null) {
-                                    acc.versionPropNameToGA
-                                            .computeIfAbsent(versionVariableName, k -> new HashMap<>())
-                                            .computeIfAbsent(ga, k -> new HashSet<>())
-                                            .add(m.getSimpleName());
-                                    acc.gaToNewVersion.put(ga, resolvedVersion);
-                                }
+                                acc.versionPropNameToGA
+                                        .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                                        .computeIfAbsent(ga, k -> new HashSet<>())
+                                        .add(m.getSimpleName());
+                                // It is fine for this value to be null, record it in the map to avoid future lookups
+                                //noinspection DataFlowIssue
+                                acc.gaToNewVersion.put(ga, resolvedVersion);
                             } catch (MavenDownloadingException e) {
                                 acc.gaToNewVersion.put(ga, e);
                             }
