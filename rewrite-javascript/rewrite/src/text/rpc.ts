@@ -16,6 +16,7 @@
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {PlainText} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
+import {TreeKind} from "../tree";
 
 async function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): Promise<PlainText.Snippet | undefined> {
     const draft: Draft<PlainText.Snippet> = createDraft(before);
@@ -51,12 +52,14 @@ const textCodec: RpcCodec<PlainText> = {
         await q.getAndSend(after, p => p.text);
         await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
             await q.getAndSend(snippet, p => p.id);
-            await q.sendMarkers(after, p => p.markers);
+            await q.sendMarkers(snippet, p => p.markers);
             await q.getAndSend(snippet, p => p.text);
         });
     }
 }
 
 Object.values(PlainText.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, textCodec);
+    if (!Object.values(TreeKind).includes(kind as any)) {
+        RpcCodecs.registerCodec(kind, textCodec);
+    }
 });

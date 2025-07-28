@@ -52,4 +52,4 @@ class PlainTextPrinter extends PlainTextVisitor<PrintOutputCapture> {
     }
 }
 
-TreePrinters.register(PlainText.Kind.PlainText, new PlainTextPrinter());
+TreePrinters.register(PlainText.Kind.PlainText, () => new PlainTextPrinter());

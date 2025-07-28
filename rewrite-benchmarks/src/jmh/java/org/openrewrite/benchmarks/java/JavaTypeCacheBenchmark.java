@@ -28,7 +28,7 @@ import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-@Fork(value = 1)
+@Fork(1)
 @Measurement(iterations = 3, time = 5)
 @Warmup(iterations = 3, time = 5)
 @BenchmarkMode(Mode.Throughput)

@@ -390,10 +390,8 @@ class JavaTemplateTest5Test implements RewriteTest {
               class Test {
                   void test() {
                       // the m
-                      @SuppressWarnings("other")
-                      int m;
-                      @SuppressWarnings("other")
-                      final int n;
+                      @SuppressWarnings("other") int m;
+                      @SuppressWarnings("other") final int n;
                   }
               }
               """
@@ -436,18 +434,12 @@ class JavaTemplateTest5Test implements RewriteTest {
                   @Deprecated
                   private final int m, a;
                   void test() {
-                      @SuppressWarnings("ALL")
-                      @Deprecated /* hello */
+                      @SuppressWarnings("ALL") @Deprecated /* hello */
                       Boolean z;
                       // comment n
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      int n;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      final Boolean b;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
+                      @SuppressWarnings("ALL") @Deprecated int n;
+                      @SuppressWarnings("ALL") @Deprecated final Boolean b;
+                      @SuppressWarnings("ALL") @Deprecated
                       // comment x, y
                       private Boolean x, y;
                   }

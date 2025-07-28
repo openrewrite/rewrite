@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
@@ -363,5 +364,23 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:2.6", )
+                  implementation platform("commons-lang:commons-lang3:3.0",)
+              }
+              """
+          )
+        );
     }
 }

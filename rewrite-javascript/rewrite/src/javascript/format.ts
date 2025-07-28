@@ -53,16 +53,6 @@ export class AutoformatVisitor<P> extends JavaScriptVisitor<P> {
 export class NormalizeWhitespaceVisitor<P> extends JavaScriptVisitor<P> {
     // called NormalizeFormat in Java
 
-    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
-        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
-        return produce(ret, draft => {
-            if (draft.scope) {
-                this.concatenatePrefix(draft, draft.scope!.before);
-                draft.scope!.before = emptySpace;
-            }
-        });
-    }
-
     private concatenatePrefix(node: Draft<J>, right: J.Space) {
         // TODO look at https://github.com/openrewrite/rewrite/commit/990a366fab9e5656812d81d0eb15ecb6bfd2fde0#diff-ec2e977fe8f1e189735e71b817f8f1ebaf79c1490c0210652e8a559f7f7877de
         // and possibly incorporate it here - some special logic needed to merge comments better (?)
@@ -206,11 +196,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         return produceAsync(ret, async draft => {
             draft.control.prefix.whitespace = this.style.beforeParentheses.forParentheses ? " " : "";
             draft.control.init = await Promise.all(draft.control.init.map(async (oneInit, index) => {
-                if (oneInit.element.kind === JS.Kind.ScopedVariableDeclarations) {
-                    const scopedVD = oneInit.element as Draft<JS.ScopedVariableDeclarations>;
-                    if (scopedVD.scope != undefined) {
-                        scopedVD.scope.before.whitespace = "";
-                        scopedVD.variables[scopedVD.variables.length - 1].after.whitespace = "";
+                if (oneInit.element.kind === J.Kind.VariableDeclarations) {
+                    const vd = oneInit.element as Draft<J.VariableDeclarations>;
+                    if (vd.modifiers && vd.modifiers.length > 0) {
+                        vd.modifiers[0].prefix.whitespace = "";
                     }
                 }
                 oneInit.after.whitespace = "";
@@ -301,7 +290,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitMethodInvocation(methodInv, p) as J.MethodInvocation;
         return produceAsync(ret, async draft => {
             if (draft.select) {
-                draft.select = await this.spaceAfterRightPadded(draft.select, this.style.beforeParentheses.functionCallParentheses);
+                draft.arguments = await this.spaceBeforeContainer(draft.arguments, this.style.beforeParentheses.functionCallParentheses);
             }
             if (ret.arguments.elements.length > 0 && ret.arguments.elements[0].element.kind != J.Kind.Empty) {
                 draft.arguments.elements = await Promise.all(draft.arguments.elements.map(async (arg, index) => {
@@ -355,7 +344,9 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 catch_ = await this.spaceBefore(catch_, this.style.beforeKeywords.catchKeyword);
                 catch_.parameter.prefix.whitespace = this.style.beforeParentheses.catchParentheses ? " " : "";
                 catch_.parameter.tree = await this.spaceAfterRightPadded(await this.spaceBeforeRightPaddedElement(catch_.parameter.tree, this.style.within.catchParentheses), this.style.within.catchParentheses);
-                catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                if (catch_.parameter.tree.element.variables.length > 0) {
+                    catch_.parameter.tree.element.variables[catch_.parameter.tree.element.variables.length - 1].after.whitespace = "";
+                }
                 catch_.body.prefix.whitespace = this.style.beforeLeftBrace.catchLeftBrace ? " " : "";
                 return catch_;
             }));
@@ -808,16 +799,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return r;
     }
 
-    protected async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, p: P): Promise<J | undefined> {
-        const ret = await super.visitScopedVariableDeclarations(scopedVariableDeclarations, p) as JS.ScopedVariableDeclarations;
-        return ret.scope && produce(ret, draft => {
-            if (draft.scope && draft.modifiers.length > 0) {
-                this.ensureSpace(draft.scope.before);
-            }
-            this.ensureSpace(draft.variables[0].element.prefix);
-        });
-    }
-
     protected async visitThrow(thrown: J.Throw, p: P): Promise<J | undefined> {
         const ret = await super.visitThrow(thrown, p) as J.Throw;
         return ret && produce(ret, draft => {
@@ -1049,7 +1030,11 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 
     private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
         if (node.prefix && !node.prefix.whitespace.includes("\n")) {
-            node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            if (node.kind === JS.Kind.ExpressionStatement) {
+                this.ensurePrefixHasNewLine((node as JS.ExpressionStatement).expression);
+            } else {
+                node.prefix.whitespace = "\n" + node.prefix.whitespace;
+            }
         }
     }
 

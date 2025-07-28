@@ -15,8 +15,8 @@
  */
 package org.openrewrite.gradle;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -27,7 +27,6 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -50,8 +49,15 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-@RequiredArgsConstructor
 public class ChangeDependency extends Recipe {
+
+    // Individual dependencies tend to appear in several places within a given dependency graph.
+    // Minimize the number of allocations by caching the updated dependencies.
+    @EqualsAndHashCode.Exclude
+    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
+
+    @EqualsAndHashCode.Exclude
+    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -82,9 +88,9 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "29.X",
             required = false)
     @Nullable
@@ -92,7 +98,7 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -100,17 +106,33 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "Override managed version",
             description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
-                          "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
-                          "The default for this flag is `false`.",
+                    "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
+                    "The default for this flag is `false`.",
             required = false)
     @Nullable
     Boolean overrideManagedVersion;
 
-    // Individual dependencies tend to appear in several places within a given dependency graph.
-    // Minimize the number of allocations by caching the updated dependencies.
-    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
-    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
-    transient MavenMetadataFailures mavenMetadataFailures = new MavenMetadataFailures(this);
+    @Option(displayName = "Update dependency management",
+            description = "Also update the dependency management section. The default for this flag is `true`.",
+            required = false)
+    @Nullable
+    Boolean changeManagedDependency;
+
+    @JsonCreator
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion, @Nullable Boolean changeManagedDependency) {
+        this.oldGroupId = oldGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newGroupId = newGroupId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.overrideManagedVersion = overrideManagedVersion;
+        this.changeManagedDependency = changeManagedDependency;
+    }
+
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, overrideManagedVersion, true);
+    }
 
     @Override
     public String getDisplayName() {
@@ -134,7 +156,7 @@ public class ChangeDependency extends Recipe {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         validated = validated.and(Validated.required("newGroupId", newGroupId).or(Validated.required("newArtifactId", newArtifactId)));
-        validated = validated.and(Validated.test(
+        return validated.and(Validated.test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -144,7 +166,6 @@ public class ChangeDependency extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override
@@ -173,8 +194,12 @@ public class ChangeDependency extends Recipe {
                     sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
                     if (sourceFile != tree) {
                         sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                        if (changeManagedDependency == null || changeManagedDependency) {
+                            doAfterVisit(new ChangeManagedDependency(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern).getVisitor());
+                        }
                     }
-                    return sourceFile;
+
+                    return super.visit(sourceFile, ctx);
                 }
                 return super.visit(tree, ctx);
             }
@@ -183,7 +208,7 @@ public class ChangeDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency()
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId);
 
@@ -195,8 +220,8 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
 
@@ -239,7 +264,7 @@ public class ChangeDependency extends Recipe {
                     G.GString gstring = (G.GString) depArgs.get(0);
                     List<J> strings = gstring.getStrings();
                     if (strings.size() >= 2 && strings.get(0) instanceof J.Literal &&
-                        ((J.Literal) strings.get(0)).getValue() != null) {
+                            ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
@@ -498,7 +523,7 @@ public class ChangeDependency extends Recipe {
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, gradleProject, null)
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                     .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
@@ -547,7 +572,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, gradleProject, null)
+                                    resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -579,14 +604,14 @@ public class ChangeDependency extends Recipe {
                         assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             requested = updatedRequested.computeIfAbsent(requested, r -> {
-                                GroupArtifactVersion gav = r .getGav();
+                                GroupArtifactVersion gav = r.getGav();
                                 if (newGroupId != null) {
                                     gav = gav.withGroupId(newGroupId);
                                 }
                                 if (newArtifactId != null) {
                                     gav = gav.withArtifactId(newArtifactId);
                                 }
-                                if (gav != r .getGav()) {
+                                if (gav != r.getGav()) {
                                     r = r.withGav(gav);
                                 }
                                 return r;

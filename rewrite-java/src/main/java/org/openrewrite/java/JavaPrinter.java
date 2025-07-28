@@ -409,19 +409,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         while (true) {
             if (s instanceof Assert ||
-                s instanceof Assignment ||
-                s instanceof AssignmentOperation ||
-                s instanceof Break ||
-                s instanceof Continue ||
-                s instanceof DoWhileLoop ||
-                s instanceof Empty ||
-                s instanceof MethodInvocation ||
-                s instanceof NewClass ||
-                s instanceof Return ||
-                s instanceof Throw ||
-                s instanceof Unary ||
-                s instanceof VariableDeclarations ||
-                s instanceof Yield) {
+                    s instanceof Assignment ||
+                    s instanceof AssignmentOperation ||
+                    s instanceof Break ||
+                    s instanceof Continue ||
+                    s instanceof DoWhileLoop ||
+                    s instanceof Empty ||
+                    s instanceof MethodInvocation ||
+                    s instanceof NewClass ||
+                    s instanceof Return ||
+                    s instanceof Throw ||
+                    s instanceof Unary ||
+                    s instanceof VariableDeclarations ||
+                    s instanceof Yield) {
                 p.append(';');
                 return;
             }
@@ -442,13 +442,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                             c instanceof SwitchExpression ||
-                                             c == Cursor.ROOT_VALUE
+                                                c instanceof SwitchExpression ||
+                                                c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
                     Case aCase = getCursor().getValue();
-                    if (!(aCase.getBody() instanceof Block)) {
+                    if (!(aCase.getBody() instanceof Block || s instanceof Block)) {
                         p.append(';');
                     }
                     return;
@@ -873,13 +873,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitModifier(m, p);
         }
         visit(multiVariable.getTypeExpression(), p);
-        // For backwards compatibility.
-        for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-            visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
-        }
         if (multiVariable.getVarargs() != null) {
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
             p.append("...");

@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,7 +65,7 @@ public class ChangePackageInStringLiteral extends Recipe {
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal lit = literal;
-                if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
+                if (lit.getValue() instanceof String) {
                     Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
                     if (matcher.find()) {
                         lit = lit.withValue(matcher.replaceAll(newPackageName))

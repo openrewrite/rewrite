@@ -154,8 +154,8 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2196")
-    @ParameterizedTest
     @NullAndEmptySource
+    @ParameterizedTest
     void noNPEWhenUsedFromDeprecatedUses(String typePattern) {
         rewriteRun(
           spec -> spec.recipe(new FindDeprecatedUses(typePattern, null, null)),

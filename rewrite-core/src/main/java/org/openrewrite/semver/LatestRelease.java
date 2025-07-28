@@ -21,6 +21,7 @@ import org.openrewrite.Validated;
 import java.util.regex.Matcher;
 
 public class LatestRelease implements VersionComparator {
+
     @Nullable
     private final String metadataPattern;
 
@@ -86,13 +87,13 @@ public class LatestRelease implements VersionComparator {
     public int compare(@Nullable String currentVersion, String v1, String v2) {
         if (v1.equalsIgnoreCase(v2)) {
             return 0;
-        } else if (v1.equalsIgnoreCase("LATEST")) {
+        } else if (v1.equalsIgnoreCase("LATEST") || v1.equalsIgnoreCase("latest.integration")) {
             return 1;
-        } else if (v2.equalsIgnoreCase("LATEST")) {
+        } else if (v2.equalsIgnoreCase("LATEST") || v2.equalsIgnoreCase("latest.integration")) {
             return -1;
-        } else if (v1.equalsIgnoreCase("RELEASE")) {
+        } else if (v1.equalsIgnoreCase("RELEASE") || v1.equalsIgnoreCase("latest.release")) {
             return 1;
-        } else if (v2.equalsIgnoreCase("RELEASE")) {
+        } else if (v2.equalsIgnoreCase("RELEASE") || v2.equalsIgnoreCase("latest.release")) {
             return -1;
         }
 
@@ -116,18 +117,19 @@ public class LatestRelease implements VersionComparator {
             nv1 = nv1Builder.toString();
         }
 
-        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1);
-        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2);
-
-        v1Gav.find();
-        v2Gav.find();
-
         // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
         // parts are the same:
         //
         // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
         String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
+
+        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized1);
+        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized2);
+
+        v1Gav.find();
+        v2Gav.find();
+
         try {
             for (int i = 1; i <= Math.max(vp1, vp2); i++) {
                 String v1Part = v1Gav.group(i);
@@ -149,7 +151,62 @@ public class LatestRelease implements VersionComparator {
             throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
         }
 
+        // When all numeric parts are equal, we need to handle pre-release versions properly
+        // A pre-release version should be considered less than a release version
+        // e.g., "3.5.0-RC1" < "3.5.0"
+        int v1Prio = qualifierPriority(v1Gav.group(6));
+        int v2Prio = qualifierPriority(v2Gav.group(6));
+
+        if (v1Prio != v2Prio) {
+            return Integer.compare(v1Prio, v2Prio);
+        }
+
+        // Both are either pre-release or release versions, do string comparison
         return normalized1.compareTo(normalized2);
+    }
+
+    private static int qualifierPriority(@Nullable String suffix) {
+        String qualifier = extractQualifier(suffix);
+        switch (qualifier) {
+            case "alpha":
+            case "a":
+                return 1;
+            case "beta":
+            case "b":
+                return 2;
+            case "milestone":
+            case "m":
+                return 3;
+            case "rc":
+            case "cr":
+                return 4;
+            case "snapshot":
+                return 5;
+            case "":
+            case "ga":
+            case "final":
+            case "release":
+                return 6;
+            case "sp":
+                return 7;
+            default:
+                return 8;
+        }
+    }
+
+    private static String extractQualifier(@Nullable String suffix) {
+        if (suffix == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 1; i < suffix.length(); i++) {
+            if (Character.isLetter(suffix.charAt(i))) {
+                builder.append(Character.toLowerCase(suffix.charAt(i)));
+            } else {
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     public static Validated<LatestRelease> buildLatestRelease(String toVersion, @Nullable String metadataPattern) {

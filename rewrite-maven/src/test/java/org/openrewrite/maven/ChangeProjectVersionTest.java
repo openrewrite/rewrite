@@ -303,4 +303,61 @@ class ChangeProjectVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotChangeProjectVersionIfRevisionPlaceholderProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "${revision}", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>${revision}</version>
+                  <properties>
+                      <revision>8.55.5</revision>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeProjectVersionIfSha1PlaceholderProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "${sha1}", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>${sha1}</version>
+                  <properties>
+                      <sha1>abc123</sha1>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeProjectVersionIfChangelistPlaceholderProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "${changelist}", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>${changelist}</version>
+                  <properties>
+                      <changelist>SNAPSHOT</changelist>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
 }

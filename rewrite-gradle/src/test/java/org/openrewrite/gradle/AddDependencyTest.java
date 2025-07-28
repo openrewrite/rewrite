@@ -1219,8 +1219,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3559")
+    @Test
     void defaultConfigurationEscaped() {
         String onlyIfUsing = "com.google.common.math.IntMath";
         rewriteRun(
@@ -1257,8 +1257,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4094")
+    @Test
     void doNotAddToIncorrectBlocks() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", null)),
@@ -1341,8 +1341,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/moderneinc/customer-requests/issues/792")
+    @Nested
     class AddToJVMTestSuite {
         @Test
         void addToJVMSuite() {
@@ -1370,8 +1370,6 @@ class AddDependencyTest implements RewriteTest {
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
                             }
                         }
                     }
@@ -1428,10 +1426,7 @@ class AddDependencyTest implements RewriteTest {
                     
                     testing {
                         suites {
-                            integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
-                            }
+                            integrationTest(JvmTestSuite)
                         }
                     }
                     """,
@@ -1453,72 +1448,19 @@ class AddDependencyTest implements RewriteTest {
                     
                     testing {
                         suites {
-                            integrationTest(JvmTestSuite) {
-                                dependencies {
-                                }
-                            }
+                            integrationTest(JvmTestSuite)
                         }
                     }
                     """
                 )));
         }
 
-        @Test
-        void actNormalForSuiteWithoutDependencyBlock() {
-            rewriteRun(
-              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
-              mavenProject("project",
-                srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
-                buildGradle(
-                  //language=groovy
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    testing {
-                        suites {
-                            integrationTest(JvmTestSuite) {
-                            }
-                        }
-                    }
-                    """,
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    testing {
-                        suites {
-                            integrationTest(JvmTestSuite) {
-                            }
-                        }
-                    }
-                    
-                    dependencies {
-                        integrationTestImplementation "com.google.guava:guava:29.0-jre"
-                    }
-                    """
-                )));
-        }
-
-        @ParameterizedTest
         @CsvSource({
           "integrationTestImplementation,implementation",
           "integrationTestCompileOnly,compileOnly",
           "integrationTestRuntimeOnly,runtimeOnly",
           "integrationTestAnnotationProcessor,annotationProcessor"})
+        @ParameterizedTest
         void withExplicitConfiguration(String recipeConfiguration, String gradleConfiguration) {
             rewriteRun(
               spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, recipeConfiguration)),

@@ -34,6 +34,12 @@ public class GroupArtifactVersion implements Serializable {
     @Nullable
     String version;
 
+    public GroupArtifactVersion(@Nullable String groupId, String artifactId, @Nullable String version) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+    }
+
     @Override
     public String toString() {
         return (groupId == null ? "" : groupId) + ':' + artifactId +
@@ -42,6 +48,14 @@ public class GroupArtifactVersion implements Serializable {
 
     public GroupArtifact asGroupArtifact() {
         return new GroupArtifact(groupId == null ? "" : groupId, artifactId);
+    }
+
+    /**
+     * Cast to a ResolvedGroupArtifactVersion.
+     * Usable when repository of resolution or dated snapshot version are irrelevant.
+     */
+    public ResolvedGroupArtifactVersion asResolved() {
+        return new ResolvedGroupArtifactVersion(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
     }
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {

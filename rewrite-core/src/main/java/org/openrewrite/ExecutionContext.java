@@ -122,12 +122,12 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
      * {@link Visit.Handler} implementation.
      */
     @Override
-    default void rpcSend(ExecutionContext after, RpcSendQueue q) {
+    default void rpcSend(ExecutionContext ctx, RpcSendQueue q) {
         // TODO send enough information for the remote to know which DataTableStore to use
     }
 
     @Override
-    default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
-        return before;
+    default ExecutionContext rpcReceive(ExecutionContext ctx, RpcReceiveQueue q) {
+        return ctx;
     }
 }

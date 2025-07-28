@@ -221,4 +221,14 @@ describe('method mapping', () => {
                 }
             `)
         ));
+
+    test('generator with computed property name', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript(`
+                class R {
+                    *[Symbol.iterator](): Generator<number> { yield 1;}
+                }
+            `)
+        ));
 });

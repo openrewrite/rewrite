@@ -13,35 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.marker;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
-
-import java.util.UUID;
-
-@Value
-@With
-public class PostFixOperator implements Marker {
-    UUID id;
-    Space prefix;
-    Operator operator;
-
-    public enum Operator {
-        Exclamation("!"),
-        QuestionDot("?."),
-        Question("?");
-
-        private final String value;
-
-        Operator(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return value;
-        }
-    }
+export function tap<T>(obj: T, fn: (x: T) => void) {
+    fn(obj);
 }

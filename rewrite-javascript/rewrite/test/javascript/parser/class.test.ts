@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
+import {tap} from "../../test-util";
 
 describe('class mapping', () => {
     const spec = new RecipeSpec();
@@ -563,4 +565,30 @@ describe('class mapping', () => {
                 })({hello: "world"});
             `)
         ));
+
+    test('class type mapping', async () => {
+        const spec = new RecipeSpec();
+        //language=typescript
+        const source = typescript(`
+            class Base {
+                s: string;
+
+                constructor(private n: number, s: string) {
+                    this.attrs = attrs;
+                    this.s = s;
+                }
+
+                m(): boolean {
+                    return true;
+                }
+            }
+            let base: Base;
+        `)
+        source.afterRecipe = tree => {
+            const varDecl = tree.statements[1].element as J.VariableDeclarations;
+            const ident = varDecl.variables[0].element.name as J.Identifier;
+            expect(ident.simpleName).toEqual("base");
+        }
+        await spec.rewriteRun(source);
+    })
 });

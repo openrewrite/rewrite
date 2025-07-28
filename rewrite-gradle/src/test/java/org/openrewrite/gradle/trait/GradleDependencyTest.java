@@ -15,7 +15,10 @@
  */
 package org.openrewrite.gradle.trait;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
@@ -23,14 +26,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.trait.Traits.gradleDependency;
 
 class GradleDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
-          .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
+          .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher().asVisitor(dep ->
             SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
 
@@ -38,6 +39,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void literal() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -69,9 +71,143 @@ class GradleDependencyTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      //"api",
+      "implementation",
+      "compileOnly",
+      "runtimeOnly",
+      "testImplementation",
+      "testCompileOnly",
+      "testRuntimeOnly",
+    })
+    void methods(String method) {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
+          )
+        );
+    }
+
+    @Disabled("Need additional plugins to test these methods")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      // Android
+      "debugImplementation",
+      "releaseImplementation",
+      "androidTestImplementation",
+      "featureImplementation",
+      // Kotlin
+      "annotationProcessor",
+      "kapt",
+      "ksp"
+    })
+    void methodsFromPlugins(String method) {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
+          )
+        );
+    }
+
+    @Disabled("Requires at most Java 15")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "compile", // deprecated
+      "runtime", // deprecated
+      "testCompile", // deprecated
+      "testRuntime" // deprecated
+    })
+    void decprecatedMethods(String method) {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi("6.9.4")),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  %s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method),
+            """
+              plugins {
+                  id "java"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
+              }
+              """.formatted(method)
+          )
+        );
+    }
+
     @Test
     void groovyString() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -108,6 +244,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void groovyMapEntry() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -142,6 +279,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void platform() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -176,6 +314,7 @@ class GradleDependencyTest implements RewriteTest {
     @Test
     void enforcedPlatform() {
         rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {

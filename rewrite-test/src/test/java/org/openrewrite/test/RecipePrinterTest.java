@@ -23,8 +23,8 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CompositeRecipe;
 
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
@@ -50,7 +50,7 @@ class RecipePrinterTest implements RewriteTest {
 
     @Test
     void printRecipeTreeForRecipeWithNestedRecipes() {
-        Recipe recipe = new CompositeRecipe(Arrays.asList(
+        Recipe recipe = new CompositeRecipe(List.of(
           new TestRecipe("the option"),
           new AnotherTestRecipe(),
           new CompositeRecipe(Collections.singletonList(new AnotherTestRecipe()))
@@ -75,8 +75,8 @@ class RecipePrinterTest implements RewriteTest {
         assertThat(output).isEqualTo(expected);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class TestRecipe extends Recipe {
 
         @Option(displayName = "An option",
@@ -95,8 +95,8 @@ class RecipePrinterTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class AnotherTestRecipe extends Recipe {
 
         @Override

@@ -364,8 +364,8 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/514")
+    @Test
     void addReleaseIfNoOtherChangeIsMade() {
         rewriteRun(
           //language=xml
@@ -458,6 +458,60 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                 </properties>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void doNotUpdateWhenMavenCompilerPluginUsesJavaVersionAlreadyHighEnough() {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <properties>
+                      <java.version>21</java.version>
+                  </properties>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.14.0</version>
+                              <configuration>
+                                  <release>${java.version}</release>
+                                  <parameters>true</parameters>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                        <java.version>21</java.version>
+                    </properties>
+                </project>
+                """
+            )
           )
         );
     }

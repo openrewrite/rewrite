@@ -61,10 +61,8 @@ class JavaTemplateTest6Test implements RewriteTest {
             """
               class Test {
                   void test() {
-                      @SuppressWarnings("ALL")
-                      final int m;
-                      @SuppressWarnings("ALL")
-                      int n;
+                      @SuppressWarnings("ALL") final int m;
+                      @SuppressWarnings("ALL") int n;
                   }
               }
               """
@@ -423,12 +421,12 @@ class JavaTemplateTest6Test implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "UnnecessaryBoxing",
       "CachedNumberConstructorCall",
       "ResultOfMethodCallIgnored"
       , "Convert2MethodRef"})
+    @Test
     void replaceNamedVariableInitializerMethodInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {

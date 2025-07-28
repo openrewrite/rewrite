@@ -386,8 +386,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageNullRecursiveImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -444,8 +444,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -502,8 +502,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageRecursiveImportedStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -701,8 +701,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgument() {
         rewriteRun(
           java(
@@ -753,8 +753,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamed() {
         rewriteRun(
           java(
@@ -803,8 +803,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentFullyQualified() {
         rewriteRun(
           java(
@@ -851,8 +851,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
           java(

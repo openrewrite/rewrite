@@ -182,8 +182,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite/issues/788")
+    @SuppressWarnings("InstantiationOfUtilityClass")
     @Test
     void unnecessaryImport() {
         rewriteRun(
@@ -215,8 +215,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/868")
+    @SuppressWarnings("rawtypes")
     @Test
     void changeInnerClassToOuterClass() {
         rewriteRun(
@@ -276,8 +276,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/774")
+    @SuppressWarnings("rawtypes")
     @Test
     void replaceWithNestedType() {
         rewriteRun(
@@ -672,9 +672,9 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/704")
     @SuppressWarnings("UnnecessaryLocalVariable")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/704")
     void updateAssignments() {
         //noinspection UnnecessaryLocalVariable
         rewriteRun(
@@ -1630,6 +1630,163 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Test
+    void renameWhenInitializerTypeMatches() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", false)),
+          //language=java
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new ArrayList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  void test() {
+                      List<Integer> list = new LinkedList<>();
+                      list.add(1);
+                      list.add(2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameRandomVariablesMatchingClassName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """,
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              
+              public class Example {
+                  public String method(A1 a, String a1) {
+                      return a1;
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public String method(A2 a, String a1) {
+                      return a1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeToVariableNameWithoutChangeToType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", true)),
+          java(
+            """
+              package a;
+              public class A1 {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+              public class A2 {
+              }
+              """
+          ),
+          java(
+            """
+              package org.foo;
+              
+              import a.A1;
+              import a.A2;
+              
+              public class Example {
+                  public A1 method1(A1 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """,
+            """
+              package org.foo;
+              
+              import a.A2;
+              
+              public class Example {
+                  public A2 method1(A2 a1) {
+                      return a1;
+                  }
+                  public A2 method2(A2 a1) {
+                      return a1; // Unchanged
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameVariableNeedlessly() {
+        // Comparison to java.util.Optional: this method is equivalent to Java 8's Optional.orElse(null).
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.awt.List", "java.util.List", false)),
+          //language=java
+          java(
+            """
+              import java.awt.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class A {
+                  List foo(List list) {
+                      return list;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void updateVariableType() {
         rewriteRun(
@@ -1782,8 +1939,8 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Disabled("requires correct Kind.")
-    @SuppressWarnings("StatementWithEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/2478")
+    @SuppressWarnings("StatementWithEmptyBody")
     @Test
     void changeJavaTypeClassKindEnum() {
         rewriteRun(
@@ -1979,9 +2136,9 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
     @Disabled("flaky on CI")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4452")
+    @Test
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType(
@@ -2149,8 +2306,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4773")
+    @Test
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
@@ -2198,8 +2355,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4764")
+    @Test
     void changeTypeOfInnerClass() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))

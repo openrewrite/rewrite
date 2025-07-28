@@ -22,6 +22,7 @@ import {
     Generate,
     GetObject,
     GetRecipes,
+    GetRef,
     Parse,
     PrepareRecipe,
     PrepareRecipeResponse,
@@ -33,20 +34,23 @@ import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
-import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
+import {ReferenceMap} from "./reference";
+import {Writable} from "node:stream";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
+    readonly localObjectGenerators: Map<string, (input: string) => any> = new Map<string, (input: string) => any>();
     readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
-    private readonly localObjectIds = new IdentityMap()
+    private readonly localObjectIds = new IdentityMap();
 
-    private readonly remoteObjects: Map<string, any> = new Map();
-    private readonly remoteRefs: Map<number, any> = new Map();
+    readonly remoteObjects: Map<string, any> = new Map();
+    readonly remoteRefs: Map<number, any> = new Map();
+    readonly localRefs: ReferenceMap = new ReferenceMap();
 
-    constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
+    constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
                 ),
@@ -54,7 +58,8 @@ export class RewriteRpc {
                     batchSize?: number,
                     registry?: RecipeRegistry,
                     traceGetObjectOutput?: boolean,
-                    traceGetObjectInput?: WriteStream
+                    traceGetObjectInput?: Writable,
+                    recipeInstallDir?: string
                 }) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -67,13 +72,14 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 10,
-            !!options?.traceGetObjectOutput);
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjectGenerators, this.localObjects,
+            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
+        GetRef.handle(this.connection, this.remoteRefs, this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
-        Parse.handle(this.connection, this.localObjects);
+        Parse.handle(this.connection, this.localObjectGenerators);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection, ".rewrite", registry);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry);
 
         this.connection.listen();
     }
@@ -84,18 +90,21 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string): Promise<P> {
+        const localObject = this.localObjects.get(id);
+        const lastKnownId = localObject ? id : undefined;
+        
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id)
+                new GetObject(id, lastKnownId)
             );
-        }, this.options.traceGetObjectInput);
+        }, this.options.traceGetObjectInput, (refId: number) => this.getRef(refId));
 
         const remoteObject = await q.receive<P>(this.localObjects.get(id));
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            throw new Error("Expected END_OF_OBJECT");
+            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
         this.remoteObjects.set(id, remoteObject);
@@ -116,11 +125,12 @@ export class RewriteRpc {
         return cursor;
     }
 
-    async parse(parser: "javascript", inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
+    async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
+        // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(parser, inputs, relativeTo)
+            new Parse(inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }
@@ -217,10 +227,23 @@ export class RewriteRpc {
             return cursorIds
         }
     }
+
+    private async getRef(refId: number): Promise<any> {
+        const refData = await this.connection.sendRequest(
+            new rpc.RequestType<{refId: string}, RpcObjectData, Error>("GetRef"),
+            {refId: refId.toString()}
+        );
+        if (refData.state === RpcObjectState.DELETE) {
+            throw new Error(`Reference ${refId} not found on remote`);
+        }
+        const ref = refData.value;
+        this.remoteRefs.set(refId, ref);
+        return ref;
+    }
 }
 
 class IdentityMap {
-    constructor(private readonly objectMap = new WeakMap<any, string>(),
+    constructor(private objectMap = new WeakMap<any, string>(),
                 private readonly primitiveMap = new Map<any, string>()) {
     }
 
@@ -246,5 +269,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear() {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }

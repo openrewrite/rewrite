@@ -26,14 +26,17 @@ import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class WrappingAndBracesTest implements RewriteTest {
@@ -41,7 +44,13 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-          new WrappingAndBracesStyle.IfStatement(false)))));
+          new WrappingAndBracesStyle.IfStatement(false),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(WrapAlways),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap),
+          new WrappingAndBracesStyle.Annotations(DoNotWrap)))));
     }
 
     @DocumentExample
@@ -80,7 +89,7 @@ class WrappingAndBracesTest implements RewriteTest {
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
-              Arrays.asList(
+              List.of(
                 spaces.apply(IntelliJ.spaces()),
                 wrapping.apply(IntelliJ.wrappingAndBraces())
               )
@@ -88,8 +97,8 @@ class WrappingAndBracesTest implements RewriteTest {
           )));
     }
 
-    @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions"})
     @Issue("https://github.com/openrewrite/rewrite/issues/804")
+    @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions"})
     @Test
     void conditionalsShouldStartOnNewLines() {
         rewriteRun(
@@ -152,7 +161,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               Object method() {
+                  Object method() {
                       return new Object();
                   }
               }
@@ -175,7 +184,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               public Object method() {
+                  public Object method() {
                       return new Object();
                   }
               }
@@ -198,7 +207,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               public final Object method() {
+                  public final Object method() {
                       return new Object();
                   }
               }
@@ -221,7 +230,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               <T> T method() {
+                  <T> T method() {
                       return null;
                   }
               }
@@ -244,8 +253,8 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               @Deprecated
-               Object method() {
+                  @Deprecated
+                  Object method() {
                       return new Object();
                   }
               }
@@ -267,8 +276,8 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings({"ALL"})
-               @Deprecated
-               Test() {
+                  @Deprecated
+                  Test() {
                   }
               }
               """
@@ -286,7 +295,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               @SuppressWarnings({"ALL"})
-               class Test {
+              class Test {
               }
               """
           )
@@ -316,7 +325,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               @SuppressWarnings({"ALL"})
-               public class Test {
+              public class Test {
               }
               """
           )
@@ -330,15 +339,15 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL") int foo;
+                      @SuppressWarnings("ALL")
+                      int foo;        
                   }
               }
               """,
             """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL")
-               int foo;        
+                      @SuppressWarnings("ALL") int foo;
                   }
               }
               """
@@ -353,8 +362,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   public void doSomething() {
-                      @SuppressWarnings("ALL")
-                      int foo;        
+                      @SuppressWarnings("ALL") int foo;        
                   }
               }
               """
@@ -374,7 +382,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   @SuppressWarnings("ALL")
-               private int foo;        
+                  private int foo;        
               }
               """
           )
@@ -503,6 +511,466 @@ class WrappingAndBracesTest implements RewriteTest {
               public enum Status {
                   NOT_STARTED,
                   STARTED
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrapping() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo @Foo class Test {
+                  @Foo @Foo int field;
+              
+                  @Foo @Foo void method(
+                          @Foo
+                          @Foo
+                          int param) {
+                      @Foo
+                      @Foo
+                      int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo
+                  @Foo
+                  VALUE
+              }
+              
+              record someRecord(
+                      @Foo
+                      @Foo
+                      String name) {
+              }
+              """,
+            """
+              @Foo
+              @Foo
+              class Test {
+                  @Foo
+                  @Foo
+                  int field;
+              
+                  @Foo
+                  @Foo
+                  void method(
+                          @Foo @Foo int param) {
+                      @Foo @Foo int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo @Foo VALUE
+              }
+              
+              record someRecord(
+                      @Foo @Foo String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo
+              @Foo
+              class Test {
+                  @Foo
+                  @Foo
+                  int field;
+              
+                  @Foo
+                  @Foo
+                  void method(@Foo @Foo int param) {
+                      @Foo @Foo int localVar;
+                  }
+              }
+              
+              enum MyEnum {
+                  @Foo @Foo VALUE
+              }
+              
+              record someRecord(
+                      @Foo @Foo String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingModifiers() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo @Foo final class Test {
+                  @Foo @Foo private int field;
+              
+                  @Foo @Foo public void method(
+                          @Foo
+                          @Foo
+                          final int param) {
+                      @Foo
+                      @Foo
+                      final int localVar;
+                  }
+              }
+              """,
+            """
+              @Foo
+              @Foo
+              final class Test {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  public void method(
+                          @Foo @Foo final int param) {
+                      @Foo @Foo final int localVar;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingModifiersAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+
+            """
+              @Foo
+              @Foo
+              final class Test {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  public void method(
+                          @Foo @Foo final int param) {
+                      @Foo @Foo final int localVar;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingGenerics() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo @Foo class Test<T> {
+                  @Foo @Foo private int field;
+              
+                  @Foo @Foo Test(int field) {
+                      this.field = field;
+                  }
+              
+                  @Foo @Foo T method(
+                          @Foo
+                          @Foo
+                          T param) {
+                      @Foo
+                      @Foo
+                      T localVar;
+                      return param;
+                  }
+              }
+              """,
+            """
+              @Foo
+              @Foo
+              class Test<T> {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  Test(int field) {
+                      this.field = field;
+                  }
+              
+                  @Foo
+                  @Foo
+                  T method(
+                          @Foo @Foo T param) {
+                      @Foo @Foo T localVar;
+                      return param;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingGenericsAlreadyCorrect() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              @Foo
+              @Foo
+              class Test<T> {
+                  @Foo
+                  @Foo
+                  private int field;
+              
+                  @Foo
+                  @Foo
+                  Test(int field) {
+                      this.field = field;
+                  }
+              
+                  @Foo
+                  @Foo
+                  T method(
+                          @Foo @Foo T param) {
+                      @Foo @Foo T localVar;
+                      return param;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingWithComments() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              class Test {
+                  @Foo //comment
+                  String method1(){
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  String method2(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  String method3(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  String method4(){
+                      return "test";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingWithCommentsWithModifiers() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              class Test {
+                  @Foo //comment
+                  final String method1(){
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  final String method2(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  final String method3(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  final String method4(){
+                      return "test";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationWrappingWithNulls() {
+        rewriteRun(spec ->
+            spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
+              new WrappingAndBracesStyle.IfStatement(false),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null)))),
+          java(
+            """
+              import java.lang.annotation.Repeatable;
+              
+              @Repeatable(Foo.Foos.class)
+              @interface Foo {
+                  @interface Foos {
+                      Foo[] value();
+                  }
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              class Test {
+                  @Foo //comment
+                  final String method1(){
+                      return "test";
+                  }
+              
+                  @Foo /* comment
+                  on multiple
+                  lines */
+                  final String method2(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  //comment
+                  final String method3(){
+                      return "test";
+                  }
+              
+                  @Foo
+                  /* comment
+                  on multiple
+                  lines */
+                  final String method4(){
+                      return "test";
+                  }
               }
               """
           )

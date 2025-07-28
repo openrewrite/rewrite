@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,6 +34,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ResolvedPomTest implements RewriteTest {
@@ -104,6 +107,79 @@ class ResolvedPomTest implements RewriteTest {
             spec -> spec.path("bar/pom.xml")
           )
         );
+    }
+
+    @Test
+    void projectVersion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>3.17.0</version>
+              </project>
+              """
+          ),
+          mavenProject(
+            "app",
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>${project.version}</version>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>3.17.0</version>
+                        <relativeParent>../pom.xml</relativeParent>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-lang3</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec
+                .afterRecipe(doc -> {
+                    List<ResolvedDependency> deps = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
+                      .get(Scope.Compile);
+                    assertThat(deps).hasSize(1);
+                    assertThat(deps.getFirst().getVersion()).isEqualTo("3.17.0");
+                })
+            )
+          )
+        );
+    }
+
+    @Test
+    void dependencyWithCircularProjectVersionReference() {
+        assertThatThrownBy(() -> rewriteRun(
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>${project.version}</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-lang3</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        )
+          .cause()
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessageContaining("org.apache.commons:commons-lang3:error.circular.project.version");
     }
 
     @Test
@@ -226,7 +302,7 @@ class ResolvedPomTest implements RewriteTest {
           pomXml(father, spec -> spec.path("father/pom.xml")),
           pomXml(child, spec -> spec.path("father/child/pom.xml").afterRecipe(doc -> {
                 List<Plugin> pluginManagement = doc.getMarkers().findFirst(MavenResolutionResult.class)
-                  .get().getPom().getPluginManagement();
+                  .orElseThrow().getPom().getPluginManagement();
                 assertThat(pluginManagement).hasSize(1);
                 Plugin plugin = pluginManagement.getFirst();
                 assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
@@ -290,8 +366,8 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+    @Nested
     class TolerateMissingPom {
 
         @Language("xml")
@@ -469,7 +545,7 @@ class ResolvedPomTest implements RewriteTest {
               pomXml(father, spec -> spec.path("pom.xml")),
               pomXml(childA, spec -> spec.path("childA/pom.xml")),
               pomXml(childB, spec -> spec.path("childB/pom.xml").afterRecipe(doc -> {
-                    ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                    ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     String version = pom.getManagedVersion("com.some", "some-artifact", null, null);
                     // Assert that version is not null!
                     assertThat(version).isEqualTo("1");
@@ -477,6 +553,222 @@ class ResolvedPomTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Test
+    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws IOException {
+        MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
+        createJarFile(localRepository, "com.some", "some-artifact", "1");
+
+        MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(List.of(mavenLocal));
+
+        rewriteRun(
+          spec -> spec.executionContext(ctx),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                          <version>1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child</artifactId>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.some</groupId>
+                            <artifactId>some-artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.some</groupId>
+                    <artifactId>some-artifact</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getDependencyManagement()).hasSize(1);
+              })
+          )
+        );
+    }
+
+    @Test
+    void firstUniqueManagedDependencyWins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.16.1</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.18.1</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec
+              .afterRecipe(doc -> {
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getManagedVersion("com.fasterxml.jackson.core", "jackson-core", null, null)).isEqualTo("2.16.1");
+              })
+          )
+        );
+    }
+
+    @Test
+    void circularProjectVersionReference() {
+        // Test case where a property is defined as project.version=${project.version}
+        // This creates a circular reference when resolving ${project.version}
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child-project</artifactId>
+                <properties>
+                  <!-- This creates a circular reference! -->
+                  <project.version>${project.version}</project.version>
+                </properties>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  // This should not throw a StackOverflowError
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  // When project.version property shadows the built-in one,
+                  // it should still resolve to the actual version
+                  String resolvedVersion = pom.getValue("${project.version}");
+                  assertThat(resolvedVersion).isEqualTo("1.0.0-SNAPSHOT");
+              })
+          )
+        );
+    }
+
+    @Test
+    void circularProjectVersionInDependency() {
+        // Test case where a property shadows project.version and is used in a dependency
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                <artifactId>child-project</artifactId>
+                <properties>
+                  <!-- This creates a circular reference! -->
+                  <project.version>${project.version}</project.version>
+                  <my.version>${project.version}</my.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.example</groupId>
+                      <artifactId>example-lib</artifactId>
+                      <version>${my.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+              .afterRecipe(doc -> {
+                  // This should not throw a StackOverflowError during dependency resolution
+                  ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  // The managed version should resolve correctly
+                  String managedVersion = pom.getManagedVersion("com.example", "example-lib", null, null);
+                  assertThat(managedVersion).isEqualTo("1.0.0-SNAPSHOT");
+              })
+          )
+        );
     }
 
     private static void createJarFile(Path localRepository1) throws IOException {
@@ -488,6 +780,78 @@ class ResolvedPomTest implements RewriteTest {
           groupId.replace('.', '/'), artifactId, version, artifactId, version));
         assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
         Files.writeString(localJar, "some content not to be empty");
+    }
+
+    @Test
+    void siblingDependencyWithTgzPackagingAndSnapshot() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>api-parent</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>pom</packaging>
+              
+                  <modules>
+                      <module>api-definitions</module>
+                      <module>api-codegen</module>
+                  </modules>
+              </project>
+              """
+          ),
+          mavenProject(
+            "api-definitions",
+            pomXml("""
+                <project>
+                    <artifactId>api-definitions</artifactId>
+                    <packaging>tgz</packaging>
+                
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>api-parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <relativePath>../pom.xml</relativePath>
+                    </parent>
+                </project>
+                """,
+              spec -> spec.path("api-definitions/pom.xml")
+            )
+          ),
+          mavenProject(
+            "api-codegen",
+            pomXml("""
+                <project>
+                    <artifactId>api-codegen</artifactId>
+                
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>api-parent</artifactId>
+                        <version>1.0.0-SNAPSHOT</version>
+                        <relativePath>../pom.xml</relativePath>
+                    </parent>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>api-definitions</artifactId>
+                            <version>${project.version}</version>
+                            <type>tgz</type>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.path("api-codegen/pom.xml").afterRecipe(pom -> {
+                  List<ResolvedDependency> deps = pom.getMarkers().findFirst(MavenResolutionResult.class)
+                    .orElseThrow().getDependencies().get(Scope.Compile);
+                  assertThat(deps).hasSize(1);
+                  assertThat(deps.getFirst().getArtifactId()).isEqualTo("api-definitions");
+                  assertThat(deps.getFirst().getVersion()).isEqualTo("1.0.0-SNAPSHOT");
+                  assertThat(deps.getFirst().getType()).isEqualTo("tgz");
+              })
+            )
+          )
+        );
     }
 
     private static MavenRepository createMavenRepository(Path localRepository, String name) {

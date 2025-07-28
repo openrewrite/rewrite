@@ -103,6 +103,14 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitAs(as_: JS.As, p: P): Promise<J | undefined> {
+        return this.produceJavaScript<JS.As>(as_, p, async draft => {
+            draft.left = await this.visitRightPadded<Expression>(as_.left, p);
+            draft.right = await this.visitDefined<Expression>(as_.right, p);
+            draft.type = as_.type && await this.visitType(as_.type, p);
+        });
+    }
+
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(await_, p);
            if (!expression?.kind || expression.kind !== JS.Kind.Await) {
@@ -142,7 +150,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitJsxExpression(expr: JSX.EmbeddedExpression, p: P): Promise<J | undefined> {
+    protected async visitJsxEmbeddedExpression(expr: JSX.EmbeddedExpression, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JSX.EmbeddedExpression>(expr, p, async draft => {
             draft.expression = await this.visitRightPadded(expr.expression, p);
         });
@@ -226,6 +234,27 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
+    protected async visitFunctionCall(functionCall: JS.FunctionCall, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(functionCall, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.FunctionCall) {
+            return expression;
+        }
+        functionCall = expression as JS.FunctionCall;
+
+        const statement = await this.visitStatement(functionCall, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.FunctionCall) {
+            return statement;
+        }
+        functionCall = statement as JS.FunctionCall;
+
+        return this.produceJava<JS.FunctionCall>(functionCall, p, async draft => {
+            draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
+            draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
+            draft.arguments = await this.visitContainer(functionCall.arguments, p);
+            draft.functionType = await this.visitType(functionCall.functionType, p) as JavaType.Method | undefined;
+        });
+    }
+
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(functionType, p);
            if (!expression?.kind || expression.kind !== JS.Kind.FunctionType) {
@@ -278,9 +307,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         jsImport = statement as JS.Import;
 
         return this.produceJavaScript<JS.Import>(jsImport, p, async draft => {
+            draft.modifiers = await mapAsync(jsImport.modifiers, item => this.visitDefined<J.Modifier>(item, p));
             draft.importClause = jsImport.importClause && await this.visitDefined<JS.ImportClause>(jsImport.importClause, p);
-            draft.moduleSpecifier = await this.visitLeftPadded(jsImport.moduleSpecifier, p);
+            draft.moduleSpecifier = jsImport.moduleSpecifier && await this.visitLeftPadded(jsImport.moduleSpecifier, p);
             draft.attributes = jsImport.attributes && await this.visitDefined<JS.ImportAttributes>(jsImport.attributes, p);
+            draft.initializer = jsImport.initializer && await this.visitLeftPadded(jsImport.initializer, p);
         });
     }
 
@@ -313,7 +344,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
             draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
-            draft.specifier = await this.visitDefined<Expression>(importSpecifier.specifier, p);
+            draft.specifier = await this.visitDefined<JS.Alias | J.Identifier>(importSpecifier.specifier, p);
             draft.type = importSpecifier.type && await this.visitType(importSpecifier.type, p);
         });
     }
@@ -385,7 +416,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, p: P): Promise<J | undefined> {
+    protected async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.MappedType.KeysRemapping>(keysRemapping, p, async draft => {
             draft.typeParameter = await this.visitRightPadded(keysRemapping.typeParameter, p);
             draft.nameType = keysRemapping.nameType && await this.visitRightPadded(keysRemapping.nameType, p);
@@ -399,19 +430,19 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitObjectBindingDeclarations(objectBindingDeclarations: JS.ObjectBindingDeclarations, p: P): Promise<J | undefined> {
-        const expression = await this.visitExpression(objectBindingDeclarations, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingDeclarations) {
+    protected async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(objectBindingPattern, p);
+           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingPattern) {
                return expression;
            }
-           objectBindingDeclarations = expression as JS.ObjectBindingDeclarations;
+           objectBindingPattern = expression as JS.ObjectBindingPattern;
 
-        return this.produceJavaScript<JS.ObjectBindingDeclarations>(objectBindingDeclarations, p, async draft => {
-            draft.leadingAnnotations = await mapAsync(objectBindingDeclarations.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
-            draft.modifiers = await mapAsync(objectBindingDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.typeExpression = objectBindingDeclarations.typeExpression && await this.visitDefined<TypedTree>(objectBindingDeclarations.typeExpression, p);
-            draft.bindings = await this.visitContainer(objectBindingDeclarations.bindings, p);
-            draft.initializer = objectBindingDeclarations.initializer && await this.visitLeftPadded(objectBindingDeclarations.initializer, p);
+        return this.produceJavaScript<JS.ObjectBindingPattern>(objectBindingPattern, p, async draft => {
+            draft.leadingAnnotations = await mapAsync(objectBindingPattern.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
+            draft.modifiers = await mapAsync(objectBindingPattern.modifiers, item => this.visitDefined<J.Modifier>(item, p));
+            draft.typeExpression = objectBindingPattern.typeExpression && await this.visitDefined<TypedTree>(objectBindingPattern.typeExpression, p);
+            draft.bindings = await this.visitContainer(objectBindingPattern.bindings, p);
+            draft.initializer = objectBindingPattern.initializer && await this.visitLeftPadded(objectBindingPattern.initializer, p);
         });
     }
 
@@ -451,7 +482,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
         return this.produceJavaScript<JS.ScopedVariableDeclarations>(scopedVariableDeclarations, p, async draft => {
             draft.modifiers = await mapAsync(scopedVariableDeclarations.modifiers, item => this.visitDefined<J.Modifier>(item, p));
-            draft.scope = scopedVariableDeclarations.scope && await this.visitLeftPadded(scopedVariableDeclarations.scope, p);
             draft.variables = await mapAsync(scopedVariableDeclarations.variables, item => this.visitRightPadded(item, p));
         });
     }
@@ -519,25 +549,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return this.produceJavaScript<JS.TemplateExpression.Span>(span, p, async draft => {
             draft.expression = await this.visitDefined<J>(span.expression, p);
             draft.tail = await this.visitDefined<J.Literal>(span.tail, p);
-        });
-    }
-
-    protected async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, p: P): Promise<J | undefined> {
-        const expression = await this.visitExpression(trailingTokenStatement, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TrailingTokenStatement) {
-               return expression;
-           }
-           trailingTokenStatement = expression as JS.TrailingTokenStatement;
-
-        const statement = await this.visitStatement(trailingTokenStatement, p);
-        if (!statement?.kind || statement.kind !== JS.Kind.TrailingTokenStatement) {
-            return statement;
-        }
-        trailingTokenStatement = statement as JS.TrailingTokenStatement;
-
-        return this.produceJavaScript<JS.TrailingTokenStatement>(trailingTokenStatement, p, async draft => {
-            draft.expression = await this.visitRightPadded(trailingTokenStatement.expression, p);
-            draft.type = trailingTokenStatement.type && await this.visitType(trailingTokenStatement.type, p);
         });
     }
 
@@ -618,7 +629,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         });
     }
 
-    protected async visitIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
+    protected async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JS.IndexedAccessType.IndexType>(indexType, p, async draft => {
             draft.element = await this.visitRightPadded(indexType.element, p);
             draft.type = indexType.type && await this.visitType(indexType.type, p);
@@ -883,6 +894,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitAlias(tree as unknown as JS.Alias, p);
                 case JS.Kind.ArrowFunction:
                     return this.visitArrowFunction(tree as unknown as JS.ArrowFunction, p);
+                case JS.Kind.As:
+                    return this.visitAs(tree as unknown as JS.As, p);
                 case JS.Kind.Await:
                     return this.visitAwait(tree as unknown as JS.Await, p);
                 case JS.Kind.CompilationUnit:
@@ -897,6 +910,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitExpressionStatement(tree as unknown as JS.ExpressionStatement, p);
                 case JS.Kind.ExpressionWithTypeArguments:
                     return this.visitExpressionWithTypeArguments(tree as unknown as JS.ExpressionWithTypeArguments, p);
+                case JS.Kind.FunctionCall:
+                    return this.visitFunctionCall(tree as unknown as JS.FunctionCall, p);
                 case JS.Kind.FunctionType:
                     return this.visitFunctionType(tree as unknown as JS.FunctionType, p);
                 case JS.Kind.InferType:
@@ -922,7 +937,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.JsxSpreadAttribute:
                     return this.visitJsxSpreadAttribute(tree as unknown as JSX.SpreadAttribute, p);
                 case JS.Kind.JsxEmbeddedExpression:
-                    return this.visitJsxExpression(tree as unknown as JSX.EmbeddedExpression, p);
+                    return this.visitJsxEmbeddedExpression(tree as unknown as JSX.EmbeddedExpression, p);
                 case JS.Kind.JsxNamespacedName:
                     return this.visitJsxNamespacedName(tree as unknown as JSX.NamespacedName, p);
                 case JS.Kind.JsxTag:
@@ -934,11 +949,11 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.MappedType:
                     return this.visitMappedType(tree as unknown as JS.MappedType, p);
                 case JS.Kind.MappedTypeKeysRemapping:
-                    return this.visitKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
+                    return this.visitMappedTypeKeysRemapping(tree as unknown as JS.MappedType.KeysRemapping, p);
                 case JS.Kind.MappedTypeParameter:
                     return this.visitMappedTypeParameter(tree as unknown as JS.MappedType.Parameter, p);
-                case JS.Kind.ObjectBindingDeclarations:
-                    return this.visitObjectBindingDeclarations(tree as unknown as JS.ObjectBindingDeclarations, p);
+                case JS.Kind.ObjectBindingPattern:
+                    return this.visitObjectBindingPattern(tree as unknown as JS.ObjectBindingPattern, p);
                 case JS.Kind.PropertyAssignment:
                     return this.visitPropertyAssignment(tree as unknown as JS.PropertyAssignment, p);
                 case JS.Kind.SatisfiesExpression:
@@ -953,8 +968,6 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitTemplateExpression(tree as unknown as JS.TemplateExpression, p);
                 case JS.Kind.TemplateExpressionSpan:
                     return this.visitTemplateExpressionSpan(tree as unknown as JS.TemplateExpression.Span, p);
-                case JS.Kind.TrailingTokenStatement:
-                    return this.visitTrailingTokenStatement(tree as unknown as JS.TrailingTokenStatement, p);
                 case JS.Kind.Tuple:
                     return this.visitTuple(tree as unknown as JS.Tuple, p);
                 case JS.Kind.TypeDeclaration:
@@ -968,7 +981,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                 case JS.Kind.IndexedAccessType:
                     return this.visitIndexedAccessType(tree as unknown as JS.IndexedAccessType, p);
                 case JS.Kind.IndexType:
-                    return this.visitIndexType(tree as unknown as JS.IndexedAccessType.IndexType, p);
+                    return this.visitIndexedAccessTypeIndexType(tree as unknown as JS.IndexedAccessType.IndexType, p);
                 case JS.Kind.TypeQuery:
                     return this.visitTypeQuery(tree as unknown as JS.TypeQuery, p);
                 case JS.Kind.TypeInfo:

@@ -1,9 +1,26 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 import * as ts from "typescript";
 import {JavaType} from "../java";
-import {Draft} from "immer";
+import {createDraft, Draft, finishDraft} from "immer";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {MarkersKind, ParseExceptionResult} from "../markers";
 
 export class JavaScriptTypeMapping {
-    private readonly typeCache: Map<string, JavaType> = new Map();
+    private readonly typeCache: Map<number, JavaType> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
 
     constructor(private readonly checker: ts.TypeChecker) {
@@ -36,9 +53,13 @@ export class JavaScriptTypeMapping {
         return result;
     }
 
-    private getSignature(type: ts.Type) {
+    private getSignature(type: ts.Type): number {
         // FIXME for classes we need to include the containing module / package in the signature and probably include in the qualified name
-        return this.checker.typeToString(type);
+        if ("id" in type) { // a private field returned by the type checker
+            return type.id as number;
+        } else {
+            throw new Error("no id property in type: " + JSON.stringify(type));
+        }
     }
 
     primitiveType(node: ts.Node): JavaType.Primitive {
@@ -60,7 +81,8 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
-    private createType(type: ts.Type, signature: string): JavaType {
+    private createType(type: ts.Type, cacheKey: number): JavaType {
+        const signature = this.checker.typeToString(type);
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {
                 return JavaType.Primitive.Double;
@@ -112,27 +134,6 @@ export class JavaScriptTypeMapping {
             return JavaType.Primitive.Boolean;
         }
 
-        if (type.isUnion()) {
-            let result: Draft<JavaType.Union> = {
-                kind: JavaType.Kind.Union,
-                bounds: []
-            };
-            this.typeCache.set(signature, result);
-
-            result.bounds = type.types.map(t => this.getType(t));
-            return result;
-        } else if (type.isClass()) {
-            // FIXME flags
-            let result = {
-                kind: JavaType.Kind.Class,
-                flags: 0,
-                name: type.symbol.name
-            };
-            this.typeCache.set(signature, result);
-            // FIXME unsafeSet
-            return result;
-        }
-
         // if (ts.isRegularExpressionLiteral(node)) {
         //     return JavaType.Primitive.String;
         // }
@@ -140,3 +141,13 @@ export class JavaScriptTypeMapping {
         return JavaType.unknownType;
     }
 }
+
+RpcCodecs.registerCodec(JavaType.Kind.Primitive, {
+    async rpcSend(after: JavaType.Primitive, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, p => p.keyword);
+    },
+    async rpcReceive(before: JavaType.Primitive, q: RpcReceiveQueue): Promise<JavaType.Primitive> {
+        const keyword: string = await q.receive(before.keyword);
+        return JavaType.Primitive.fromKeyword(keyword)!;
+    }
+});

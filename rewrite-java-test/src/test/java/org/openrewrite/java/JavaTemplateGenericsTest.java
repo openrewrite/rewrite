@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
@@ -50,7 +51,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().getFirst();
                   if ("o".equals(variable.getSimpleName())) {
                       Expression exp = Objects.requireNonNull(variable.getInitializer());
@@ -64,7 +65,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
                       assertThat(res4.getMethodType()).isNotNull();
                       return res3;
                   }
-                  return super.visitVariableDeclarations(multiVariable, executionContext);
+                  return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
           java(
@@ -134,8 +135,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -166,6 +167,88 @@ class JavaTemplateGenericsTest implements RewriteTest {
     }
 
     @Test
+    void setsDifferenceMultimapRecipe() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate template = JavaTemplate.builder("#{set:any(java.util.Set<T>)}.stream().filter(java.util.function.Predicate.not(#{multimap:any(com.google.common.collect.Multimap<K, V>)}::containsKey)).collect(com.google.common.collect.ImmutableSet.toImmutableSet())")
+                  .bindType("com.google.common.collect.ImmutableSet<T>")
+                  .genericTypes("T", "K", "V")
+                  .javaParser(JavaParser.fromJavaVersion().classpath("guava"))
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          java(
+            """
+              import com.google.common.collect.ImmutableSet;
+              import com.google.common.collect.ImmutableSetMultimap;
+              
+              import java.util.function.Predicate;
+              
+              class Test {
+                  void test() {
+                      ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
+                  }
+              }
+              """,
+            """
+              import com.google.common.collect.ImmutableSet;
+              import com.google.common.collect.ImmutableSetMultimap;
+              
+              import java.util.function.Predicate;
+              
+              class Test {
+                  void test() {
+                      /*~~>*/ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyStreamRecipe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate template = JavaTemplate.builder("java.util.stream.Stream.of()")
+                .bindType("java.util.stream.Stream<T>")
+                .genericTypes("T")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<String> test() {
+                      return Stream.of();
+                  }
+              }
+              """,
+            """
+              import java.util.stream.Stream;
+              
+              class Test {
+                  Stream<String> test() {
+                      return /*~~>*/Stream.of();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodModifiersMismatch() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -174,8 +257,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                 .build();
 
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, executionContext);
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -202,6 +285,177 @@ class JavaTemplateGenericsTest implements RewriteTest {
               class Test {
                   Stream<Integer> test() {
                       return /*~~>*/Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMemberReferenceToLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    void replaceLambdaToMemberReference() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberReferenceToLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("#{any(java.util.Set<T>)}::contains")
+                  .bindType("java.util.function.Predicate<T>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> #{any(java.util.Set<T>)}.contains(e)")
+                  .bindType("java.util.function.Predicate<T>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.*;
+              import java.util.function.*;
+              
+              class Foo {
+                  List<Integer> test(List<Integer> list) {
+                      Set<Integer> set = Set.of(1, 2, 3);
+                      return list.stream()
+                          .filter(set::contains)
+                          .toList();
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+              import java.util.function.*;
+              
+              class Foo {
+                  List<Integer> test(List<Integer> list) {
+                      Set<Integer> set = Set.of(1, 2, 3);
+                      return list.stream()
+                          .filter(e -> set.contains(e))
+                          .toList();
                   }
               }
               """

@@ -127,9 +127,9 @@ export namespace J {
         WhileLoop: "org.openrewrite.java.tree.J$WhileLoop",
         Wildcard: "org.openrewrite.java.tree.J$Wildcard",
         Yield: "org.openrewrite.java.tree.J$Yield",
-        Container: "org.openrewrite.java.tree.Container",
-        LeftPadded: "org.openrewrite.java.tree.LeftPadded",
-        RightPadded: "org.openrewrite.java.tree.RightPadded",
+        Container: "org.openrewrite.java.tree.JContainer",
+        LeftPadded: "org.openrewrite.java.tree.JLeftPadded",
+        RightPadded: "org.openrewrite.java.tree.JRightPadded",
         Space: "org.openrewrite.java.tree.Space",
     } as const;
 
@@ -265,7 +265,7 @@ export namespace J {
         }
     }
 
-    export interface ClassDeclaration extends J, TypedTree {
+    export interface ClassDeclaration extends J, Statement, TypedTree {
         readonly kind: typeof Kind.ClassDeclaration;
         readonly leadingAnnotations: Annotation[];
         readonly modifiers: Modifier[];
@@ -348,7 +348,7 @@ export namespace J {
     export namespace ForEachLoop {
         export interface Control extends J {
             readonly kind: typeof Kind.ForEachLoopControl;
-            readonly variable: RightPadded<VariableDeclarations>;
+            readonly variable: RightPadded<Statement>;
             readonly iterable: RightPadded<Expression>;
         }
     }
@@ -447,7 +447,7 @@ export namespace J {
         }
     }
 
-    export interface Literal extends J, TypedTree, Expression {
+    export interface Literal extends J, TypedTree, Expression, VariableDeclarator {
         readonly kind: typeof Kind.Literal;
         readonly value?: Object;
         readonly valueSource?: string;
@@ -900,7 +900,7 @@ Object.values(J.Kind).forEach(kind => {
                 }
             }
         );
-    } else {
+    } else if (!Object.values(TreeKind).includes(kind as any)) {
         RpcCodecs.registerCodec(kind, javaCodec);
     }
 });

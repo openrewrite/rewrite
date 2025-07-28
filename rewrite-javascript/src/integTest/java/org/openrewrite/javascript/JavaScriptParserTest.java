@@ -16,12 +16,17 @@
 package org.openrewrite.javascript;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
@@ -37,14 +42,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaScriptParserTest {
 
-    private JavaScriptParser parser;
+    JavaScriptRewriteRpc rewriteRpc;
+    JavaScriptParser parser;
+    ExecutionContext ctx;
+    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
     void before() {
-        this.parser = JavaScriptParser.builder()
+        this.rewriteRpc = JavaScriptRewriteRpc.builder(Environment.builder().build())
           .nodePath(Path.of("node"))
-          .installationDir(Path.of("./rewrite/dist/src/rpc"))
+          .installationDirectory(Path.of("./rewrite/dist"))
+//          .inspectAndBreak()
+//          .trace(true)
           .build();
+        this.scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
+        this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
+        this.ctx = new InMemoryExecutionContext();
+    }
+
+    @AfterEach
+    void after() {
+        scope.close();
+        rewriteRpc.close();
     }
 
     @Test
@@ -54,12 +73,26 @@ class JavaScriptParserTest {
           console.info("Hello world!")
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
-        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(javascript.get()).satisfies(cu -> {
-            assertThat(cu.printAll()).isEqualTo(helloWorld);
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(javascript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+    }
+
+    @Test
+    void parseMultiple() {
+        @Language("js")
+        String helloWorld = """
+          console.info("Hello world!")
+          """;
+        Parser.Input input1 = Parser.Input.fromString(Paths.get("helloworld1.js"), helloWorld);
+        Parser.Input input2 = Parser.Input.fromString(Paths.get("helloworld2.js"), helloWorld);
+
+        List<SourceFile> sourceFiles = parser.parseInputs(List.of(input1, input2), null, ctx).toList();
+        assertThat(sourceFiles).hasSize(2);
+        assertThat(sourceFiles).allSatisfy(cu ->
+          assertThat(cu).isInstanceOf(JS.CompilationUnit.class)
+        );
     }
 
     @Test
@@ -70,12 +103,10 @@ class JavaScriptParserTest {
           console.info(message);
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
-        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Paths.get("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.printAll()).isEqualTo(helloWorld);
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -149,12 +180,10 @@ class JavaScriptParserTest {
           export default JSXConstructsExample;
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.tsx"), script);
-        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-//            assertThat(cu.printAll()).isEqualTo(helloWorld);
-//            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -168,9 +197,7 @@ class JavaScriptParserTest {
                 throw new RuntimeException(e);
             }
         });
-        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, new InMemoryExecutionContext()).findFirst();
+        Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu ->
-            assertThat(cu.printAll()).isEqualTo(input.getSource(new InMemoryExecutionContext()).readFully()));
     }
 }

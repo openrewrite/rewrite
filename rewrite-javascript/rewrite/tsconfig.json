@@ -2,6 +2,8 @@
   "compilerOptions": {
     "target": "es2016",
     "module": "Node16",
+    "moduleResolution": "node16",
+    "isolatedModules": true,
     "declarationMap": true,
     "sourceMap": true,
     "esModuleInterop": true,
@@ -10,8 +12,7 @@
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "./dist",
-    "experimentalDecorators": true,
-    "moduleResolution": "node16"
+    "experimentalDecorators": true
   },
   "include": [
     "src/**/*",

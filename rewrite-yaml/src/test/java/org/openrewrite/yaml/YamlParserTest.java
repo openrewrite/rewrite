@@ -66,8 +66,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    @Test
     void listsAndListsOfLists() {
         rewriteRun(
           yaml(
@@ -105,8 +105,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ValueSource(strings = {
       "b",
       " 🛠",
@@ -406,6 +406,61 @@ class YamlParserTest implements RewriteTest {
             - #🦍COMMENT: 🎱unicode
             - action: Escape
             """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorScalar() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name This string will appear as the value.
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorMap() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name
+                anchor_key: 1
+                another_anchor_key: 2
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorSequence() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+                - item1
+                - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    @Test
+    void withAnchorSequenceOnRootLevel() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+              - item1
+              - item2
+              other_anchor: *anchor
+              """
           )
         );
     }

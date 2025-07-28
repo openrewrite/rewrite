@@ -792,8 +792,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/968")
+    @SuppressWarnings("JavadocReference")
     @Test
     void missingBracket() {
         rewriteRun(
@@ -825,8 +825,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/967")
+    @SuppressWarnings("JavadocReference")
     @Test
     void multilineLink() {
         rewriteRun(
@@ -1265,8 +1265,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/945")
+    @SuppressWarnings("JavadocReference")
     @Test
     void methodNotFound() {
         rewriteRun(
@@ -1284,8 +1284,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/944")
+    @SuppressWarnings("JavadocReference")
     @Test
     void typeNotFound() {
         rewriteRun(
@@ -1468,8 +1468,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocBlankLines")
     @Issue("https://github.com/openrewrite/rewrite/issues/2139")
+    @SuppressWarnings("JavadocBlankLines")
     @Test
     void javaDocEndsOnSameLine() {
         rewriteRun(
@@ -1792,8 +1792,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantThrows")
     @Issue("https://github.com/openrewrite/rewrite/issues/976")
+    @SuppressWarnings("RedundantThrows")
     @Test
     void multilineWithThrowsAndCRLF() {
         rewriteRun(
@@ -1843,8 +1843,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    @Test
     void arrayTypeLiterals() {
         rewriteRun(
           java("" +
@@ -1856,9 +1856,9 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
     @MinimumJava11
+    @Test
     void arrayTypeLiterals2() {
         rewriteRun(
           java("" +
@@ -1870,8 +1870,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void varargsMethod() {
         rewriteRun(
           java(
@@ -1895,8 +1895,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void varargsWithPrefix() {
         rewriteRun(
           // for some reason the compiler AST's type attribution is incomplete here
@@ -1922,8 +1922,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void arrayMethod() {
         rewriteRun(
           java(
@@ -2009,8 +2009,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
     void unicodeEscape() {
         rewriteRun(
           java(
@@ -2030,8 +2030,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5444")
+    @Test
     void whitespaceInGenericTypesInJavadocTags() {
         rewriteRun(
           java(
@@ -2053,8 +2053,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    @Test
     void multilineHtmlCommentInJavadoc() {
         rewriteRun(
           java(
@@ -2070,6 +2070,98 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                private static final String BAR = "bar";
+
+                /**
+                This is an incorrect reference {@value BAR}
+                */
+                public void foo() {}
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5443")
+    @Test
+    void parsingIncorrectJavadocValueReference2() {
+        rewriteRun(
+          spec-> spec.typeValidationOptions(TypeValidation.all().identifiers(false)),
+          // language=java
+          java(
+            """
+            public class Foo {
+                /**
+                 * The {@value DEFAULT_TABLE_NAME} default name for the locks table in the DynamoDB.
+                 */
+                public static final String DEFAULT_TABLE_NAME = "SpringIntegrationLockRegistry";
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5196")
+    @Test
+    void unclosedBraceOnLink() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                 /**   
+                  * {@link int
+                  * Some other text.
+                  * See {@link java.lang.String}
+                  * @param arg description
+                  */                  
+                  void method(String arg) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
+    void badlyClosedXmlTags() {
+        rewriteRun(
+          java(
+            """
+            /**
+             * <!--Optional:->
+             * <urn:portalId>?</urn:portalId-->
+             */
+            class Test { }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
+    void spaceStarAfterStartOfJavaDoc() {
+        rewriteRun(
+          java(
+            """
+            /** *
+             * @author x
+             */
+            class Test { }
+            """
           )
         );
     }

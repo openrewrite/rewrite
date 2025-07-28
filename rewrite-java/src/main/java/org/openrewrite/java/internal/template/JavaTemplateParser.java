@@ -63,14 +63,14 @@ public class JavaTemplateParser {
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(boolean contextSensitive, Parser.Builder parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports, String bindType) {
         this(
                 parser,
                 onAfterVariableSubstitution,
                 onBeforeParseTemplate,
                 imports,
                 contextSensitive,
-                new BlockStatementTemplateGenerator(imports, contextSensitive),
+                new BlockStatementTemplateGenerator(imports, contextSensitive, bindType),
                 new AnnotationTemplateGenerator(imports)
         );
     }

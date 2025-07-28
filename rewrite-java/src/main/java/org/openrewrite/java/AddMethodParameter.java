@@ -144,7 +144,6 @@ public class AddMethodParameter extends Recipe {
                     emptyList(),
                     typeTree,
                     null,
-                    emptyList(),
                     singletonList(
                             new JRightPadded<>(
                                     new J.VariableDeclarations.NamedVariable(

@@ -16,12 +16,44 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class LiteralTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void nullableStringIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                  assertThat(J.Literal.isLiteralValue(literal, null)).isTrue();
+                  return SearchResult.found(literal);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String s = null;
+              }
+              """,
+            """
+              class Test {
+                  String s = /*~~>*/null;
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void intentionallyBadUnicodeCharacter() {

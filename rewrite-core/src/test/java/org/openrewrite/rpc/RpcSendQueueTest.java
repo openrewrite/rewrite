@@ -17,6 +17,7 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.AccessMode;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -41,6 +42,28 @@ public class RpcSendQueueTest {
               new RpcObjectData(RpcObjectData.State.ADD, null, "E", null, null),
               new RpcObjectData(RpcObjectData.State.ADD, null, "F", null, null),
               new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, null) /* C */
+            );
+            latch.countDown();
+        }, new IdentityHashMap<>(), false);
+
+        q.sendList(after, before, Function.identity(), null);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void sendEnum() throws InterruptedException {
+        List<AccessMode> before = List.of(AccessMode.READ);
+        List<AccessMode> after = List.of(AccessMode.READ, AccessMode.WRITE);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t).containsExactly(
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1), null, null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, null) /* READ */,
+              new RpcObjectData(RpcObjectData.State.ADD, null, AccessMode.WRITE, null, null)
             );
             latch.countDown();
         }, new IdentityHashMap<>(), false);

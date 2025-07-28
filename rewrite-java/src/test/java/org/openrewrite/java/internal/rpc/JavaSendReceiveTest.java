@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -54,27 +53,31 @@ class JavaSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        server = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("server",
+          new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
+          .timeout(Duration.ofSeconds(10))
+          .build()
+          .batchSize(1);
 
-        JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        client = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("client",
+          new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
+          .timeout(Duration.ofSeconds(10))
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        server.shutdown();
-        client.shutdown();
+        server.close();
+        client.close();
     }
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            @SneakyThrows
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
                 return requireNonNull(t);
@@ -82,9 +85,9 @@ class JavaSendReceiveTest implements RewriteTest {
         }));
     }
 
+    @Disabled("Disabled until we've cleaned up the enum serialization")
     @DocumentExample
     @Test
-    @Disabled("Disabled until we've cleaned up the enum serialization")
     void sendReceiveIdempotence() {
         rewriteRun(
           java(

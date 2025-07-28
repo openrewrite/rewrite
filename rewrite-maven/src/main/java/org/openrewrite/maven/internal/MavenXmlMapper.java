@@ -31,6 +31,7 @@ import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.jspecify.annotations.Nullable;
 
 import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
@@ -90,7 +91,7 @@ public class MavenXmlMapper {
             addDeserializer(String.class, new StringDeserializer() {
                 @SuppressWarnings("ConstantConditions")
                 @Override
-                public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                public @Nullable String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
                     String value = super.deserialize(p, ctxt);
                     return value != null ? value.trim() : null;
                 }

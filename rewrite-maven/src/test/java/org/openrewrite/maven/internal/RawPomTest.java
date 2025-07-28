@@ -24,8 +24,10 @@ import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
+import java.io.UncheckedIOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RawPomTest {
 
@@ -201,6 +203,26 @@ class RawPomTest {
         }
     }
 
+    @Test
+    void pomAtOriginOfDeserializationExceptionIsPartOfExceptionMessage() {
+        assertThatThrownBy(() -> RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+            
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        )).isInstanceOf(UncheckedIOException.class)
+          .hasMessageContaining("Failed to parse pom: Illegal processing instruction target (\"xml\")");
+    }
+
 
     @SuppressWarnings("ConstantConditions")
     @Test
@@ -333,7 +355,7 @@ class RawPomTest {
                       </snapshots>
                       <name>Nexus Snapshots</name>
                       <id>snapshots-repo</id>
-                      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                      <url>https://central.sonatype.com/repository/maven-snapshots</url>
                       <layout>default</layout>
                     </repository>
                   </repositories>
@@ -480,7 +502,7 @@ class RawPomTest {
           .isEqualTo("Apache License, Version 2.0");
 
         assertThat(model.getRepositories().getFirst().getUri())
-          .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+          .isEqualTo("https://central.sonatype.com/repository/maven-snapshots");
 
         Profile java9Profile = model.getProfiles().stream()
           .filter(p -> "java9+".equals(p.getId()))

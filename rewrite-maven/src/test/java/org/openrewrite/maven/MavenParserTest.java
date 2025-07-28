@@ -127,8 +127,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
+    @Test
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
           pomXml(
@@ -1327,8 +1327,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("LanguageMismatch")
     @Nested
+    @SuppressWarnings("LanguageMismatch")
     class Profiles {
 
         //language=xml
@@ -1391,9 +1391,9 @@ class MavenParserTest implements RewriteTest {
           """;
 
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should be active " +
           "unless there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
@@ -1423,9 +1423,9 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
           " if there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithPomLocalActiveProfile() {
             rewriteRun(
@@ -1583,8 +1583,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("CheckTagEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @SuppressWarnings("CheckTagEmptyBody")
     @Test
     void parseEmptyValueActivationTag() {
         rewriteRun(
@@ -2107,15 +2107,13 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -2127,15 +2125,13 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithParent() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -2151,9 +2147,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
@@ -2171,15 +2165,13 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -2201,9 +2193,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-parent</artifactId>
                 <groupId>net.sample</groupId>
@@ -2233,9 +2223,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
@@ -2264,9 +2252,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("app/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
@@ -2283,9 +2269,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
@@ -2303,16 +2287,14 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -2334,9 +2316,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-parent</artifactId>
                 <groupId>net.sample</groupId>
@@ -2366,9 +2346,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
@@ -2401,9 +2379,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """,
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
@@ -2438,9 +2414,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("app/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
@@ -2457,9 +2431,7 @@ class MavenParserTest implements RewriteTest {
             spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
               
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
@@ -2477,14 +2449,13 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2373")
+    @Test
     void multipleCiFriendlyVersionPlaceholders() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
               
                 <groupId>bogus.example</groupId>
@@ -2505,8 +2476,7 @@ class MavenParserTest implements RewriteTest {
           ),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
               
                 <parent>
@@ -2527,8 +2497,7 @@ class MavenParserTest implements RewriteTest {
         rewriteRun(
           mavenProject("a",
             pomXml("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample.optional</groupId>
                 <artifactId>a</artifactId>
@@ -2538,8 +2507,7 @@ class MavenParserTest implements RewriteTest {
             )),
           mavenProject("b",
             pomXml("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample.optional</groupId>
                 <artifactId>b</artifactId>
@@ -2563,8 +2531,7 @@ class MavenParserTest implements RewriteTest {
           ),
           mavenProject("c",
             pomXml("""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample.optional</groupId>
                   <artifactId>c</artifactId>
@@ -3295,8 +3262,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
+    @Test
     void circularImportDependency() {
         rewriteRun(
           mavenProject("root",
@@ -3413,8 +3380,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4319")
+    @Test
     void multiModulePropertyVersionShouldAddModules() {
         rewriteRun(
           mavenProject("root",
@@ -4038,6 +4005,47 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @Test
+    void weirdImpalaPom() {
+        // Maven says:
+        // The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+        // But does not fail the build as it does not actually have any transitive dependencies
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>test</groupId>
+                  <artifactId>impala-test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>jar</packaging>
+              
+                  <name>Impala test</name>
+                  <description>The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details</description>
+              
+                  <dependencies>
+                      <dependency>
+                          <groupId>Impala</groupId>
+                          <artifactId>ImpalaJDBC42</artifactId>
+                          <version>2.6.26.1031</version>
+                      </dependency>
+                  </dependencies>
+              
+                  <repositories>
+                      <repository>
+                          <id>cloudera</id>
+                          <name>cloudera</name>
+                          <url>https://repository.cloudera.com/repository/cloudera-repos/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
+          )
+        );
+    }
+
     @Nested
     class DependencyManagement {
         // https://repo1.maven.org/maven2/org/apache/maven/plugins/maven-site-plugin/3.9.1/
@@ -4377,5 +4385,145 @@ class MavenParserTest implements RewriteTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void allDependencyManagementEntryVariants_allDependencyVariants() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                         <dependencies>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>pom</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>sources</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>javadoc</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>test-jar</type>
+                                 <scope>test</scope>
+                             </dependency>
+                         </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>pom</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>sources</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>javadoc</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>test-jar</type>
+                             <scope>test</scope>
+                           </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
     }
 }

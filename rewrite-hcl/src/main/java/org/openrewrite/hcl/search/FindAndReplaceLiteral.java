@@ -89,6 +89,9 @@ public class FindAndReplaceLiteral extends Recipe {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
+                if (literal.getValue() == null) {
+                    return literal;
+                }
                 Matcher matcher = pattern.matcher(literal.getValue().toString());
                 if (!matcher.find()) {
                     return literal;

@@ -26,7 +26,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -103,7 +103,7 @@ class ImplementInterfaceTest implements RewriteTest {
                   doAfterVisit(new ImplementInterface<>(
                     classDecl,
                     "b.B",
-                    Arrays.asList(
+                    List.of(
                       new J.Identifier(
                         randomId(),
                         Space.EMPTY,

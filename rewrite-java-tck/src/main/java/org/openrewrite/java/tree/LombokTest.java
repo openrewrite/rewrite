@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
@@ -190,6 +191,28 @@ class LombokTest implements RewriteTest {
                       }
                   }
                   """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/pull/5527")
+        @Test
+        void predefinedBuilderWithMultipleFields() {
+            rewriteRun(
+              spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
+              java(
+                    """
+                import lombok.Builder;
+
+                @Builder
+                public class Clazz {
+
+                    private final String accountID;
+                    private final String documentNumber;
+
+                    public static class ClazzBuilder {}
+                }
+                """
               )
             );
         }
@@ -549,8 +572,8 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
-    @Test
     @MinimumJava17
+    @Test
     void with() {
         rewriteRun(
           java(
@@ -574,8 +597,8 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
-    @Test
     @MinimumJava17
+    @Test
     void withWithParams() {
         rewriteRun(
           java(
@@ -604,8 +627,8 @@ class LombokTest implements RewriteTest {
     }
 
     //TODO fix for Java 8 and 11
-    @Test
     @MinimumJava17
+    @Test
     void withOnClass() {
         rewriteRun(
           java(
@@ -955,8 +978,8 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void jacksonized() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
@@ -997,8 +1020,8 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void onConstructor() {
         rewriteRun(
           java(
@@ -1032,8 +1055,8 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void onConstructorNoArgs() {
         rewriteRun(
           java(
@@ -1064,6 +1087,7 @@ class LombokTest implements RewriteTest {
         );
     }
 
+    @MinimumJava11
     @ParameterizedTest
     @ValueSource(strings = {
       "AllArgsConstructor",
@@ -1076,7 +1100,6 @@ class LombokTest implements RewriteTest {
       "Value",
       "With"
     })
-    @MinimumJava11
     void npeSeenOnMultipleAnnotations(String annotation) {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
@@ -1100,8 +1123,8 @@ class LombokTest implements RewriteTest {
      * These test lombok features that we do not fully support.
      * Code should still parse and print back to its original source code but type information may be missing.
      */
-    @SuppressWarnings("MismatchedReadAndWriteOfArray")
     @Nested
+    @SuppressWarnings("MismatchedReadAndWriteOfArray")
     class LessSupported {
         /*
          java 8 cannot figure out all type checking:

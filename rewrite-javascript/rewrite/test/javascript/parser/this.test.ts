@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J, JavaType} from "../../../src/java";
 
 describe('this mapping', () => {
     const spec = new RecipeSpec();
@@ -22,4 +23,19 @@ describe('this mapping', () => {
     test('simple', () => spec.rewriteRun(
         typescript('this')
     ));
+
+    test('this type mapping', () => spec.rewriteRun(
+        typescript(
+           `
+            class A {
+               m(): A { return this; }
+            }
+            class B {
+               m(): B { return this; }
+            }
+            const aa = new A().m();
+            const bb = new B().m();
+            `)
+        )
+    );
 });

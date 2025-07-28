@@ -16,7 +16,7 @@
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
 import fs, {readFileSync} from "node:fs";
-import {relative} from "path";
+import {isAbsolute, relative} from "path";
 import {ParseError, ParseErrorKind} from "./parse-error";
 import {markers, MarkersKind, ParseExceptionResult} from "./markers";
 import {randomId} from "./uuid";
@@ -55,13 +55,11 @@ export abstract class Parser {
     protected ctx: ExecutionContext;
     protected readonly relativeTo?: string;
 
-    abstract parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]>
+    abstract parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile>
 
     protected relativePath(sourcePath: ParserInput): string {
-        if (typeof sourcePath === "string") {
-            return relative(this.relativeTo || "", sourcePath);
-        }
-        return sourcePath.sourcePath;
+        const path = typeof sourcePath === "string" ? sourcePath : sourcePath.sourcePath;
+        return isAbsolute(path) && this.relativeTo ? relative(this.relativeTo, path) : path;
     }
 
     protected error(input: ParserInput, e: Error): ParseError {
@@ -70,10 +68,11 @@ export abstract class Parser {
             id: randomId(),
             markers: markers({
                 kind: MarkersKind.ParseExceptionResult,
+                id: randomId(),
                 parserType: this.constructor.name,
                 exceptionType: e.name,
                 message: e.message + ':\n' + e.stack,
-            } as ParseExceptionResult),
+            } satisfies ParseExceptionResult as ParseExceptionResult),
             text: parserInputRead(input),
             sourcePath: this.relativePath(input),
         }
@@ -130,7 +129,7 @@ export function readSourceSync(sourcePath: ParserInput) {
     return sourcePath.text;
 }
 
-type ParserConstructor<T extends Parser> = new (...args: any[]) => T;
+type ParserConstructor<T extends Parser> = new (options?: ParserOptions) => T;
 
 export type ParserType = "javascript";
 
@@ -144,11 +143,11 @@ export class Parsers {
         Parsers.registry.set(name, parserClass as ParserConstructor<Parser>);
     }
 
-    static createParser(name: ParserType, ...args: any[]): Parser {
+    static createParser(name: ParserType, options?: ParserOptions): Parser {
         const ParserClass = Parsers.registry.get(name);
         if (!ParserClass) {
             throw new Error(`No parser registered with name: ${name}`);
         }
-        return new ParserClass(...args);
+        return new ParserClass(options);
     }
 }

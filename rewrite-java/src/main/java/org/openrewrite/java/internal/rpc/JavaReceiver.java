@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.rpc;
 import org.jspecify.annotations.NonNull;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -29,10 +30,11 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
+@SuppressWarnings("DataFlowIssue")
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
-    public J preVisit(@NonNull J j, RpcReceiveQueue q) {
+    public J preVisit(J j, RpcReceiveQueue q) {
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
@@ -149,9 +151,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
         J.ClassDeclaration.Kind k = (J.ClassDeclaration.Kind) preVisit(kind, q);
-        k = k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
+        return k.withAnnotations(q.receiveList(kind.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withType(q.receiveAndGet(kind.getType(), toEnum(J.ClassDeclaration.Kind.Type.class)));
-        return k;
     }
 
     @Override
@@ -303,8 +304,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, RpcReceiveQueue q) {
         return intersectionType
-                .getPadding().withBounds(q.receive(intersectionType.getPadding().getBounds(), b -> visitContainer(b, q)))
-                .withType(q.receive(intersectionType.getType(), t -> visitType(t, q)));
+                .getPadding().withBounds(q.receive(intersectionType.getPadding().getBounds(), b -> visitContainer(b, q)));
     }
 
     @Override
@@ -352,10 +352,16 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodDeclaration(J.MethodDeclaration method, RpcReceiveQueue q) {
+        //noinspection ConstantValue
+        if (method.getAnnotations().getName() == null) {
+            // this workaround is here for the case when a new object is received and the `J.MethodDeclaration` was
+            // instantiated using Objenesis, in which case the `name` property will be `null`.
+            method = method.getAnnotations().withName(new J.MethodDeclaration.IdentifierWithAnnotations(null, null));
+        }
         return method
                 .withLeadingAnnotations(q.receiveList(method.getLeadingAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(method.getModifiers(), m -> (J.Modifier) visitNonNull(m, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitTypeParameters(tp, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> (J.TypeParameters) visitNonNull(tp, q)))
                 .withReturnTypeExpression(q.receive(method.getReturnTypeExpression(), rt -> (TypeTree) visitNonNull(rt, q)))
                 .getAnnotations().withName(method.getAnnotations().getName().withAnnotations(q.receiveList(method.getAnnotations().getName().getAnnotations(), a -> (J.Annotation) visitNonNull(a, q))))
                 .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
@@ -420,8 +426,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPackage(J.Package pkg, RpcReceiveQueue q) {
         return pkg
-                .withAnnotations(q.receiveList(pkg.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                .withExpression(q.receive(pkg.getExpression(), e -> (Expression) visitNonNull(e, q)));
+                .withExpression(q.receive(pkg.getExpression(), e -> (Expression) visitNonNull(e, q)))
+                .withAnnotations(q.receiveList(pkg.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)));
     }
 
     @Override
@@ -518,7 +524,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitTryResource(J.Try.Resource tryResource, RpcReceiveQueue q) {
         return tryResource
-                .withVariableDeclarations(q.receive(tryResource.getVariableDeclarations(), v -> (J.VariableDeclarations) visitNonNull(v, q)))
+                .withVariableDeclarations(q.receive(tryResource.getVariableDeclarations(), v -> (TypedTree) visitNonNull(v, q)))
                 .withTerminatedWithSemicolon(q.receive(tryResource.isTerminatedWithSemicolon()));
     }
 
@@ -527,7 +533,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return typeParam
                 .withAnnotations(q.receiveList(typeParam.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
                 .withModifiers(q.receiveList(typeParam.getModifiers(), a -> (J.Modifier) visitNonNull(a, q)))
-                .withName(q.receive(typeParam.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .withName(q.receive(typeParam.getName(), n -> (Expression) visitNonNull(n, q)))
                 .getPadding().withBounds(q.receive(typeParam.getPadding().getBounds(), b -> visitContainer(b, q)));
     }
 
@@ -549,7 +555,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitUnary(J.Unary unary, RpcReceiveQueue q) {
         return unary
-                .withOperator(q.receiveAndGet(unary.getOperator(), toEnum(J.Unary.Type.class)))
+                .getPadding().withOperator(q.receive(unary.getPadding().getOperator(), op -> visitLeftPadded(op, q, toEnum(J.Unary.Type.class))))
                 .withExpression(q.receive(unary.getExpression(), e -> (Expression) visitNonNull(e, q)))
                 .withType(q.receive(unary.getType(), t -> visitType(t, q)));
     }
@@ -584,7 +590,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitWildcard(J.Wildcard wildcard, RpcReceiveQueue q) {
         return wildcard
-                .withBound(q.receiveAndGet(wildcard.getBound(), toEnum(J.Wildcard.Bound.class)))
+                .getPadding().withBound(q.receive(wildcard.getPadding().getBound(), o -> visitLeftPadded(o, q, toEnum(J.Wildcard.Bound.class))))
                 .withBoundedType(q.receive(wildcard.getBoundedType(), b -> (TypeTree) visitNonNull(b, q)));
     }
 
@@ -657,8 +663,11 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
-                              RpcReceiveQueue rpcReceiveQueue) {
-        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        if (javaType instanceof RpcCodec) {
+            //noinspection unchecked
+            return ((RpcCodec<@NonNull JavaType>) javaType).rpcReceive(javaType, q);
+        }
+        return requireNonNull(super.visitType(javaType, q));
     }
 }
