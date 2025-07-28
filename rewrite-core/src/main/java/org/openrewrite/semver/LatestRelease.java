@@ -87,13 +87,13 @@ public class LatestRelease implements VersionComparator {
     public int compare(@Nullable String currentVersion, String v1, String v2) {
         if (v1.equalsIgnoreCase(v2)) {
             return 0;
-        } else if (v1.equalsIgnoreCase("LATEST")) {
+        } else if (v1.equalsIgnoreCase("LATEST") || v1.equalsIgnoreCase("latest.integration")) {
             return 1;
-        } else if (v2.equalsIgnoreCase("LATEST")) {
+        } else if (v2.equalsIgnoreCase("LATEST") || v2.equalsIgnoreCase("latest.integration")) {
             return -1;
-        } else if (v1.equalsIgnoreCase("RELEASE")) {
+        } else if (v1.equalsIgnoreCase("RELEASE") || v1.equalsIgnoreCase("latest.release")) {
             return 1;
-        } else if (v2.equalsIgnoreCase("RELEASE")) {
+        } else if (v2.equalsIgnoreCase("RELEASE") || v2.equalsIgnoreCase("latest.release")) {
             return -1;
         }
 

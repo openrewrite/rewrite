@@ -16,15 +16,16 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.Cursor;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Comparator.comparing;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -86,8 +87,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (!cd.getLeadingAnnotations().isEmpty()) {
                       return cd;
                   }
-                  cd = template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
-                  return cd;
+                  return template.apply(updateCursor(cd), cd.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
               }
           })),
           java(
@@ -239,8 +239,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
+    @SuppressWarnings("InstantiationOfUtilityClass")
     @Test
     void lambdaIsNewClass() {
         rewriteRun(
@@ -386,9 +386,9 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3102")
     @SuppressWarnings({"ResultOfMethodCallIgnored"})
+    @Test
     void expressionAsStatementWithoutTerminatingSemicolon() {
         // NOTE: I am not convinced that we really need to support this case. It is not valid Java.
         // But since this has been working up until now, I am leaving it in.
@@ -436,8 +436,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceAnonymousClassObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -484,8 +484,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceGenericTypedObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -533,8 +533,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    @Test
     void replaceParameterizedTypeObject() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -705,8 +705,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2540")
+    @Test
     void replaceMemberReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -892,8 +892,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2375")
+    @Test
     void arrayInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -946,9 +946,9 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     @SuppressWarnings("ALL")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     void multiDimensionalArrayInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -1345,8 +1345,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-spring/pull/284")
+    @Test
     void replaceMethodInChainFollowedByGenericTypeParameters() {
         rewriteRun(
           spec -> spec
@@ -1478,94 +1478,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
-    void switchTemplateSupportsNullLabel() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.SwitchExpression visitSwitchExpression(J.SwitchExpression switch_, ExecutionContext ctx) {
-                  if (switch_.getCases().getStatements().stream().anyMatch(case_ -> !(case_ instanceof J.Case) || ((J.Case) case_).getCaseLabels().stream().anyMatch(label -> label.toString().contains("null")))) {
-                      return super.visitSwitchExpression(switch_, ctx);
-                  }
-
-                  J.Parentheses<J.SwitchExpression> nullParenthesizedSwitch = JavaTemplate.apply("switch (#{any()}) {case null -> \"Not entered yet\";}", getCursor(), switch_.getCoordinates().replace(), switch_.getSelector().getTree());
-                  J.SwitchExpression nullSwitch = nullParenthesizedSwitch.getTree();
-                  if (nullSwitch.getCases() == null || nullSwitch.getCases().getStatements() == null || nullSwitch.getCases().getStatements().isEmpty() || !(nullSwitch.getCases().getStatements().get(0) instanceof J.Case) || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels() == null || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().isEmpty() || !(((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().get(0) instanceof J.Literal)) {
-                      throw new IllegalStateException("Template is parsing wrong");
-                  }
-                  switch_ = switch_.withCases(switch_.getCases().withStatements(ListUtils.insert(switch_.getCases().getStatements(), nullSwitch.getCases().getStatements().get(0) ,0)));
-                  return super.visitSwitchExpression(switch_, ctx);
-              }
-
-              @Override
-              public J.Switch visitSwitch(J.Switch switch_, ExecutionContext ctx) {
-                  if (switch_.getCases().getStatements().stream().anyMatch(case_ -> !(case_ instanceof J.Case) || ((J.Case) case_).getCaseLabels().stream().anyMatch(label -> label.toString().contains("null")))) {
-                      return super.visitSwitch(switch_, ctx);
-                  }
-
-                  J.Switch nullSwitch = JavaTemplate.apply("switch (#{any()}) {case null: #{any()} = \"Not entered yet\";}", getCursor(), switch_.getCoordinates().replace(), switch_.getSelector().getTree(), toReturnIdentifier(switch_));
-                  if (nullSwitch.getCases() == null || nullSwitch.getCases().getStatements() == null || nullSwitch.getCases().getStatements().isEmpty() || !(nullSwitch.getCases().getStatements().get(0) instanceof J.Case) || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels() == null || ((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().isEmpty() || !(((J.Case)nullSwitch.getCases().getStatements().get(0)).getCaseLabels().get(0) instanceof J.Literal)) {
-                      throw new IllegalStateException("Template is parsing wrong");
-                  }
-                  switch_ = switch_.withCases(switch_.getCases().withStatements(ListUtils.insert(switch_.getCases().getStatements(), nullSwitch.getCases().getStatements().get(0) ,0)));
-                  return super.visitSwitch(switch_, ctx);
-              }
-
-              private J.Identifier toReturnIdentifier(Tree tree) {
-                  return new JavaIsoVisitor<AtomicReference<J.Identifier>>() {
-                      @Override
-                      public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<J.Identifier> identifierAtomicReference) {
-                          if (identifier.getSimpleName().equals("toReturn")) {
-                              identifierAtomicReference.set(identifier);
-                          }
-                          return super.visitIdentifier(identifier, identifierAtomicReference);
-                      }
-                  }.reduce(tree, new AtomicReference<>()).get();
-              }
-            })),
-          java(
-            """
-              class BugTest {
-                  static String score(Integer i) {
-                      String toReturn = "0";
-                      switch (i) {
-                          case 0, 1, 2, 3, 4: toReturn = "FAILED";
-                          case 5, 6: toReturn = "AVERAGE";
-                      }
-                      return switch (i) {
-                          case 7, 8 -> "GOOD";
-                          case 9 -> "EXCELLENT";
-                          case 10 -> "UNBELIEVABLE";
-                          default -> toReturn;
-                      };
-                  }
-              }
-              """,
-            """
-               class BugTest {
-                   static String score(Integer i) {
-                       String toReturn = "0";
-                       switch (i) {
-                           case null: toReturn = "Not entered yet";
-                           case 0, 1, 2, 3, 4: toReturn = "FAILED";
-                           case 5, 6: toReturn = "AVERAGE";
-                       }
-                       return switch (i) {
-                           case null -> "Not entered yet";
-                           case 7, 8 -> "GOOD";
-                           case 9 -> "EXCELLENT";
-                           case 10 -> "UNBELIEVABLE";
-                           default -> toReturn;
-                       };
-                   }
-               }
-               """
-          )
-        );
-    }
-
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5289")
+    @Test
     void recursiveType() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)

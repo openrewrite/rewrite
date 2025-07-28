@@ -352,8 +352,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitClassInitializer(KtClassInitializer initializer, ExecutionContext data) {
         J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data).withPrefix(deepPrefix(initializer));
-        staticInit = staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
-        return staticInit;
+        return staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
     }
 
     @Override

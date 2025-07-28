@@ -29,11 +29,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class JavaTemplateTest7Test implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "CachedNumberConstructorCall",
       "Convert2MethodRef"
       , "removal"})
+    @Test
     void lambdaIsVariableInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -109,8 +109,8 @@ class JavaTemplateTest7Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/1821")
+    @SuppressWarnings("UnusedAssignment")
     @Test
     void assignmentNotPartOfVariableDeclaration() {
         rewriteRun(

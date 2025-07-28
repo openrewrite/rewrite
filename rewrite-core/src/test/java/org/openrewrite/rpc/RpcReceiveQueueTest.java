@@ -37,14 +37,13 @@ public class RpcReceiveQueueTest {
         batches = new ArrayDeque<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, false);
-        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst, refId -> {
+        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst, refId ->
             // Find the object with this ref ID in the send queue's local refs
-            return localRefs.entrySet().stream()
+            localRefs.entrySet().stream()
                     .filter(entry -> entry.getValue().equals(refId))
                     .map(Map.Entry::getKey)
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Reference " + refId + " not found in test"));
-        });
+                    .orElseThrow(() -> new IllegalStateException("Reference " + refId + " not found in test")));
     }
 
     @Test

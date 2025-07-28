@@ -582,6 +582,74 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesMultiModuleVariablesDefinedInExtraPropertiesInBuildscript() {
+        rewriteRun(
+          settingsGradle(
+            """
+              rootProject.name = 'test'
+              include 'module1'
+              include 'module2'
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              subprojects {
+                  apply plugin: 'java'
+              
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              subprojects {
+                  apply plugin: 'java'
+              
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("module1/build.gradle")
+          ), buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("module2/build.gradle")
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraPropertiesAlsoInBuildscript() {
         rewriteRun(
           buildGradle(
@@ -910,6 +978,111 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void versionInParentPropertiesFiles() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void versionInParentUsedInChildModules() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              ext {
+                guavaVersion = "29.0-jre"
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              """,
+              """              
+              plugins {
+                id 'java-library'
+              }
+              
+              ext {
+                guavaVersion = "30.1.1-jre"
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation "com.google.guava:guava:${guavaVersion}"
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
 
     @Test
     void versionOnlyInMultiModuleChildPropertiesFiles() {
@@ -1037,16 +1210,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void disallowDowngrade() {
+    void retainLatestReleaseOrLatestIntegrationIfUsed() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "*", "5.3.x", null)),
-          properties(
-            """
-              springBootVersion=3.0.0
-              springSecurityVersion=5.4.0
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null)),
           buildGradle(
             """
               plugins {
@@ -1058,8 +1224,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+                  implementation("org.projectlombok:lombok:latest.release")
+                  testImplementation("org.projectlombok:lombok:latest.integration")
               }
               """
           )
@@ -1150,8 +1316,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4275")
+    @Test
     void noActionForNonStringLiterals() {
         rewriteRun(
           buildGradle(
@@ -1175,8 +1341,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/pull/106")
+    @Test
     void isAcceptable() {
         // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
@@ -1195,8 +1361,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithExactPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-jre")),
@@ -1231,8 +1397,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithRegexPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-.*?droid")),
@@ -1316,6 +1482,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void removesTransitiveDependenciesFromGradleProjectMarker() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("io.vertx", "vertx-core", "5.0.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.vertx:vertx-core:3.9.8'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.vertx:vertx-core:5.0.1'
+              }
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                assertThat(maybeGp).isPresent();
+                GradleDependencyConfiguration compileClasspath = maybeGp.get().getConfiguration("compileClasspath");
+                assertThat(compileClasspath).isNotNull();
+
+                // Check that vertx-core is updated to 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should have vertx-core 5.0.1")
+                  .anySatisfy(dep -> {
+                      assertThat(dep.getGroupId()).isEqualTo("io.vertx");
+                      assertThat(dep.getArtifactId()).isEqualTo("vertx-core");
+                      assertThat(dep.getVersion()).isEqualTo("5.0.1");
+                  });
+
+                // Check that netty-codec is NOT listed amongst the dependencies as it is not a dependency of vertx-core 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should NOT contain netty-codec after upgrade to vertx-core 5.0.1")
+                  .noneMatch(dep -> dep.getGroupId().equals("io.netty") && dep.getArtifactId().equals("netty-codec"));
+            })
+          )
+        );
+    }
+
+    @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),
@@ -1357,8 +1579,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4655")
+    @Test
     void issue4655() {
         rewriteRun(
           buildGradle(
@@ -1983,6 +2205,139 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateVersionDefinedInExtraPropertiesWithInlineReferenceInDependenciesGradle() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation "com.google.guava:guava:${guavaVersion}"
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradle() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void ignoreVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradleWhenConcatenationLeftIsNotADependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:' + 'guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+              
+              plugins {
+                  id("java")
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeVersionInSettingsGradleExt() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
@@ -2010,6 +2365,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeRegularDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.1.33", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.1.43'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          //language=groovy
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath("com.google.guava:guava:30.1.1-jre")
+                  }
               }
               """
           )

@@ -31,13 +31,10 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-               
               } catch (RuntimeException e) {
-               
               } catch (Exception e) {
-                           
               }
-               """
+              """
           )
         );
     }
@@ -48,9 +45,20 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              
               } catch (all) {
-              
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifier() {
+        rewriteRun(
+          groovy(
+            """
+              try {
+              } catch (final RuntimeException e) {
               }
               """
           )
@@ -63,9 +71,7 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try {
-              
               } finally {
-                  // some comment
               }
               """
           )
@@ -78,19 +84,17 @@ class TryTest implements RewriteTest {
           groovy(
             """
              try {
-             
              } catch (Exception e) {
-             
              } finally {
                  def a = ""
              }
-              """
+             """
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @Test
     void multiCatch() {
         rewriteRun(
@@ -98,41 +102,55 @@ class TryTest implements RewriteTest {
             """
               try {
               } catch (IOException | UncheckedIOException e) {
-              
               }
               """
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResource() {
         rewriteRun(
           groovy(
             """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
-              
               } catch (Exception e) {
-              
               }
               """
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResources() {
         rewriteRun(
           groovy(
             """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
-              
               } catch (Exception e) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void whitespace() {
+        rewriteRun(
+          groovy(
+            """
+              try     {
               
+              }    catch(RuntimeException e)      {
+              
+              }catch (     final         Exception          e) {
+              
+              }finally{
+                  // some comment
               }
               """
           )
