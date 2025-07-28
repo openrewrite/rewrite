@@ -15,12 +15,16 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"UnnecessaryCallToStringValueOf", "UnnecessaryBoxing", "RedundantTypeArguments", "rawtypes"})
 class UseStaticImportTest implements RewriteTest {
@@ -62,6 +66,7 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void replaceWithStaticImports() {
         rewriteRun(
@@ -355,7 +360,7 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-              
+
               public class A {
                   public static void method() {}
               }
@@ -364,7 +369,7 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-              
+
               public class B {
                   public static void method() {}
               }
@@ -373,13 +378,51 @@ class UseStaticImportTest implements RewriteTest {
           java(
             """
               package test;
-              
+
               import static test.A.method;
-              
+
               public class Test {
                   public static void test() {
                       method();
                       test.B.method();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodOverloads() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipes(
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail()"),
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail(String)")
+            ),
+          java(
+            """
+              import org.junit.jupiter.api.Test;
+              import org.junit.jupiter.api.Assertions;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      Assertions.fail();
+                      Assertions.fail("Test failed");
+                  }
+              }
+              """,
+            """
+              import org.junit.jupiter.api.Test;
+
+              import static org.junit.jupiter.api.Assertions.fail;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      fail();
+                      fail("Test failed");
                   }
               }
               """

@@ -143,17 +143,8 @@ public class UseStaticImport extends Recipe {
         if (!(maybeCd instanceof J.ClassDeclaration)) {
             return false;
         }
-        J.ClassDeclaration cd = (J.ClassDeclaration) maybeCd;
-        JavaType.FullyQualified ct = cd.getType();
-        if (ct == null) {
-            return false;
-        }
-
-        if (methodNameConflicts(methodName, ct)) {
-            return true;
-        }
-
-        return methodNameConflicts(methodName, cdCursor);
+        return methodNameConflicts(methodName, ((J.ClassDeclaration) maybeCd).getType()) ||
+                methodNameConflicts(methodName, cdCursor);
     }
 
     private static boolean methodNameConflicts(String methodName, JavaType.@Nullable FullyQualified ct) {
