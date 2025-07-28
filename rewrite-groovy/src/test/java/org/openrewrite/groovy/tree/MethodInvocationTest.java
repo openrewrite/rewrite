@@ -288,8 +288,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
+    @Test
     void closureWithImplicitParameter() {
         rewriteRun(
           groovy(
