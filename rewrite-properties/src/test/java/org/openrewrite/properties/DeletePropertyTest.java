@@ -64,6 +64,57 @@ class DeletePropertyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void basicWithComment() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("delete.me", true)),
+
+          properties(
+            """
+              # Heading comment
+              
+              # Another heading comment
+              
+              # delete.me comment (previous empty line indicate property comment starts)
+              # on
+              # multiple line
+              delete.me = baz
+              # After comment 1
+              
+              # After comment 2
+              """,
+            """
+              # Heading comment
+              
+              # Another heading comment
+
+              # After comment 1
+              
+              # After comment 2
+              """
+          ),
+          properties(
+            """
+              # Preserve comment
+              preserve = foo
+              # Another comment preserved
+              
+              # delete.me comment
+              delete.me = baz
+              delete.me.not = bar
+              """,
+            """
+              # Preserve comment
+              preserve = foo
+              # Another comment preserved
+            
+              delete.me.not = bar
+              """
+
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -115,6 +166,7 @@ class DeletePropertyTest implements RewriteTest {
           properties(
             """
               acme.my-project.person.first-name=example
+              
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
@@ -156,17 +208,17 @@ class DeletePropertyTest implements RewriteTest {
     void matchesGlobWithRelaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty(propertyKey, true)),
-            properties(
+          properties(
+            """
+              acme.notMyProject.person=example
+              acme.my-project.person.first-name=example
+              acme.myProject.person.firstName=example
+              acme.my_project.person.first_name=example
+              """,
+            """
+              acme.notMyProject.person=example
               """
-                acme.notMyProject.person=example
-                acme.my-project.person.first-name=example
-                acme.myProject.person.firstName=example
-                acme.my_project.person.first_name=example
-                """,
-              """
-                acme.notMyProject.person=example
-                """
-            )
-          );
+          )
+        );
     }
 }
