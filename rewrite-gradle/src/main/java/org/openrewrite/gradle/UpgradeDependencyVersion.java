@@ -32,7 +32,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -1141,7 +1144,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         List<ResolvedDependency> updated = new ArrayList<>();
         boolean hasChanges = false;
-        
+
         for (int i = 0; i < directResolved.size(); i++) {
             ResolvedDependency dep = directResolved.get(i);
             GroupArtifact depGA = dep.getGav().asGroupArtifact();
@@ -1177,19 +1180,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
                     ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
 
-
-
+                    Set<GroupArtifact> existingTransitiveGAs = new HashSet<>();
                     for (ResolvedDependency existing : directResolved) {
                         existingTransitiveGAs.add(existing.getGav().asGroupArtifact());
                         collectTransitiveGAs(existing, existingTransitiveGAs);
                     }
-                    
+
                     List<ResolvedDependency> transitiveDependencies = filterTransitiveDependencies(
                             resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx),
                             existingTransitiveGAs,
                             newTransitiveGAs
                     );
-                    
+
                     ResolvedDependency updatedDep = ResolvedDependency.builder()
                             .gav(resolvedPom.getGav())
                             .requested(dep.getRequested())
@@ -1206,24 +1208,24 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 updated.add(dep);
             }
         }
-        
+
         return hasChanges ? updated : directResolved;
     }
-    
+
     private static void collectVersions(ResolvedDependency dep, Map<GroupArtifact, String> versions) {
         versions.put(dep.getGav().asGroupArtifact(), dep.getVersion());
         for (ResolvedDependency child : dep.getDependencies()) {
             collectVersions(child, versions);
         }
     }
-    
+
     private static void collectTransitiveGAs(ResolvedDependency dep, Set<GroupArtifact> gas) {
         for (ResolvedDependency child : dep.getDependencies()) {
             gas.add(child.getGav().asGroupArtifact());
             collectTransitiveGAs(child, gas);
         }
     }
-    
+
     private static List<ResolvedDependency> filterTransitiveDependencies(
             List<ResolvedDependency> dependencies,
             Set<GroupArtifact> existingGAs,

@@ -29,7 +29,6 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddOrUpdateChild;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
