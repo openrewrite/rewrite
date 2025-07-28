@@ -1332,7 +1332,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
-              val composeVersion: String by rootProject.extra
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {
@@ -1347,7 +1346,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
-              val composeVersion: String by rootProject.extra
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {

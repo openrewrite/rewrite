@@ -511,50 +511,48 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                if (gradleProject != null) {
-                    Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
-                    if (!projectRequiredUpdates.isEmpty()) {
-                        if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
-                            return cu;
-                        }
-                        cu = (JavaSourceFile) Preconditions.check(
-                                not(new JavaIsoVisitor<ExecutionContext>() {
-                                    @Override
-                                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                                        if (tree instanceof G.CompilationUnit) {
-                                            return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
-                                        }
-                                        // Kotlin is not type attributed, so do things more manually
-                                        return super.visit(tree, ctx);
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.get(getGradleProjectKey(gradleProject)) : null;
+                if (projectRequiredUpdates != null && !projectRequiredUpdates.isEmpty()) {
+                    if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
+                        return cu;
+                    }
+                    cu = (JavaSourceFile) Preconditions.check(
+                            not(new JavaIsoVisitor<ExecutionContext>() {
+                                @Override
+                                public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                    if (tree instanceof G.CompilationUnit) {
+                                        return new UsesMethod<>(CONSTRAINTS_MATCHER).visit(tree, ctx);
                                     }
+                                    // Kotlin is not type attributed, so do things more manually
+                                    return super.visit(tree, ctx);
+                                }
 
-                                    @Override
-                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                        if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
-                                            return SearchResult.found(m);
-                                        }
-                                        return m;
+                                @Override
+                                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                    J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                    if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
+                                        return SearchResult.found(m);
                                     }
-                                }),
-                                new AddConstraintsBlock(cu instanceof K.CompilationUnit)
-                        ).visitNonNull(cu, ctx);
+                                    return m;
+                                }
+                            }),
+                            new AddConstraintsBlock(cu instanceof K.CompilationUnit)
+                    ).visitNonNull(cu, ctx);
 
-                        for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
-                            if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                                continue;
-                            }
-                            Map<GradleDependencyConfiguration, String> configs = update.getValue();
-                            for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                                cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
-                                        update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
-                            }
+                    for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : projectRequiredUpdates.entrySet()) {
+                        if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
+                            continue;
                         }
+                        Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                        for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
+                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                                    update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
+                        }
+                    }
 
-                        // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
-                        if (gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
-                            cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
-                        }
+                    // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
+                    if (gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                        cu = (JavaSourceFile) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
                     }
                 }
                 if (cu != tree) {
