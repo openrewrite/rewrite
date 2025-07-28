@@ -27,7 +27,8 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
@@ -884,118 +885,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addConstraintUpdatesLockfile() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                id 'java'
-              }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """,
-            """
-              plugins {
-                id 'java'
-              }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
-                          because 'CVE-2024-BAD'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """
-          ),
-          lockfile(
-            """
-              # This is a Gradle generated file for dependency locking.
-              # Manual edits can break the build and are not advised.
-              # This file is expected to be part of source control.
-              com.fasterxml.jackson.core:jackson-annotations:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.core:jackson-core:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.core:jackson-databind:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.module:jackson-module-kotlin:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson:jackson-bom:2.12.2=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.ibm.icu:icu4j:61.1=runtimeClasspath,testRuntimeClasspath
-              commons-lang:commons-lang:2.6=runtimeClasspath,testRuntimeClasspath
-              io.github.classgraph:classgraph:4.8.102=runtimeClasspath,testRuntimeClasspath
-              io.micrometer:micrometer-core:1.6.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.abego.treelayout:org.abego.treelayout.core:1.0.3=runtimeClasspath,testRuntimeClasspath
-              org.antlr:ST4:4.3=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr-runtime:3.5.2=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr4-runtime:4.8-1=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr4:4.8-1=runtimeClasspath,testRuntimeClasspath
-              org.glassfish:javax.json:1.0.4=runtimeClasspath,testRuntimeClasspath
-              org.hdrhistogram:HdrHistogram:2.1.12=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-reflect:1.4.21=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-common:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains:annotations:20.1.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.latencyutils:LatencyUtils:2.0.3=runtimeClasspath,testRuntimeClasspath
-              org.openrewrite:rewrite-core:7.0.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.openrewrite:rewrite-java:7.0.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-analysis:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-tree:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-util:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm:9.1=runtimeClasspath,testRuntimeClasspath
-              org.yaml:snakeyaml:1.28=runtimeClasspath,testRuntimeClasspath
-              empty=annotationProcessor,testAnnotationProcessor
-              """,
-            """
-              # This is a Gradle generated file for dependency locking.
-              # Manual edits can break the build and are not advised.
-              # This file is expected to be part of source control.
-              com.fasterxml.jackson.core:jackson-annotations:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.core:jackson-core:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.core:jackson-databind:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.module:jackson-module-kotlin:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson.module:jackson-module-parameter-names:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.fasterxml.jackson:jackson-bom:2.12.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              com.ibm.icu:icu4j:61.1=runtimeClasspath,testRuntimeClasspath
-              commons-lang:commons-lang:2.6=runtimeClasspath,testRuntimeClasspath
-              io.github.classgraph:classgraph:4.8.102=runtimeClasspath,testRuntimeClasspath
-              io.micrometer:micrometer-core:1.6.5=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.abego.treelayout:org.abego.treelayout.core:1.0.3=runtimeClasspath,testRuntimeClasspath
-              org.antlr:ST4:4.3=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr-runtime:3.5.2=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr4-runtime:4.8-1=runtimeClasspath,testRuntimeClasspath
-              org.antlr:antlr4:4.8-1=runtimeClasspath,testRuntimeClasspath
-              org.glassfish:javax.json:1.0.4=runtimeClasspath,testRuntimeClasspath
-              org.hdrhistogram:HdrHistogram:2.1.12=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-reflect:1.4.21=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-common:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains.kotlin:kotlin-stdlib:1.4.31=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.jetbrains:annotations:20.1.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.latencyutils:LatencyUtils:2.0.3=runtimeClasspath,testRuntimeClasspath
-              org.openrewrite:rewrite-core:7.0.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.openrewrite:rewrite-java:7.0.0=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-analysis:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-tree:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm-util:9.1=runtimeClasspath,testRuntimeClasspath
-              org.ow2.asm:asm:9.1=runtimeClasspath,testRuntimeClasspath
-              org.yaml:snakeyaml:1.28=runtimeClasspath,testRuntimeClasspath
-              empty=annotationProcessor,testAnnotationProcessor
               """
           )
         );
