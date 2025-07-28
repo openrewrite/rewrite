@@ -145,7 +145,6 @@ public interface JavaParser extends Parser {
      * Builds a Java parser with a language level equal to that of the JDK running this JVM process.
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
-        JavaParser.Builder<? extends JavaParser, ?> javaParser;
         String[] versionParts = System.getProperty("java.version").split("[.-]");
         int version = Integer.parseInt(versionParts[0]);
         if (version == 1) {
@@ -154,11 +153,10 @@ public interface JavaParser extends Parser {
 
         if (version >= 21) {
             try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java21Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-                return javaParser;
             } catch (Exception e) {
                 //Fall through, look for a parser on an older version.
             }
@@ -166,11 +164,10 @@ public interface JavaParser extends Parser {
 
         if (version >= 17) {
             try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java17Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-                return javaParser;
             } catch (Exception e) {
                 //Fall through, look for a parser on an older version.
             }
@@ -178,22 +175,20 @@ public interface JavaParser extends Parser {
 
         if (version >= 11) {
             try {
-                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java11Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-                return javaParser;
             } catch (Exception e) {
                 //Fall through, look for a parser on an older version.
             }
         }
 
         try {
-            javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+            return (JavaParser.Builder<? extends JavaParser, ?>) Class
                     .forName("org.openrewrite.java.Java8Parser")
                     .getDeclaredMethod("builder")
                     .invoke(null);
-            return javaParser;
         } catch (Exception e) {
             //Fall through to an exception without making this the "cause".
         }

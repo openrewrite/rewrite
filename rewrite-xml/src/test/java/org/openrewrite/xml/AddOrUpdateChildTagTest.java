@@ -24,9 +24,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.xml.Assertions.xml;
 
 class AddOrUpdateChildTagTest implements RewriteTest {
-    @ParameterizedTest
-    @NullSource
     @CsvSource({"true", "false"})
+    @NullSource
+    @ParameterizedTest
     void addsTagEverywhereWhenAbsent(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
@@ -186,9 +186,9 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @NullSource
     @CsvSource("true")
+    @NullSource
+    @ParameterizedTest
     void updateTagEverywhere(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
@@ -416,9 +416,9 @@ class AddOrUpdateChildTagTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @NullSource
     @CsvSource({"true", "false"})
+    @NullSource
+    @ParameterizedTest
     void dontTouchAnythingElse(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +

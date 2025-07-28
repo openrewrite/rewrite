@@ -143,8 +143,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void multilineCommentStartPositionIsIndented() {
         rewriteRun(
@@ -599,8 +599,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    @Test
     void methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent() {
         rewriteRun(
           kotlin(
@@ -681,8 +681,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    @Test
     void lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent() {
         rewriteRun(
           kotlin(
@@ -2178,8 +2178,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/323")
+    @Test
     void resetIndentationAfterClosingParameterListParenthesis() {
         rewriteRun(
           kotlin(
@@ -2414,8 +2414,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/546")
+    @Test
     void annotationIndentation() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new KotlinIsoVisitor<>() {

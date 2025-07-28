@@ -64,8 +64,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
+    @Test
     void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
         rewriteRun(
           spec -> spec
@@ -204,8 +204,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstQualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -271,8 +271,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstUnqualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -340,8 +340,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstStaticallyImportedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -409,8 +409,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"UnnecessaryCallToStringValueOf", "RedundantCast"})
+    @Test
     void matchCompatibleTypes() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -457,8 +457,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("DataFlowIssue")
+    @Test
     void matchMethodInvocationParameter() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -538,8 +538,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ConstantValue")
+    @Test
     void matchExpressionInThrow() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -798,8 +798,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("RedundantCast")
+    @Test
     void matchSpecialPrimitives() {
         rewriteRun(
           spec -> spec
@@ -841,8 +841,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessaryBoxing")
+    @Test
     void matchBoxedTypes() {
         rewriteRun(
           spec -> {

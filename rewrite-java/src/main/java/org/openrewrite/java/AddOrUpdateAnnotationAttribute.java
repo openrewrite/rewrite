@@ -367,8 +367,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                     }
                 }
-                a = maybeAutoFormat(original, a, ctx);
-                return a;
+                return maybeAutoFormat(original, a, ctx);
             }
 
             private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {

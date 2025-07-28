@@ -26,8 +26,8 @@ import static org.openrewrite.test.SourceSpecs.text;
 class MoveFileTest implements RewriteTest {
 
 
-    @Test
     @DocumentExample
+    @Test
     void moveToRelativeToUnixFileName() {
         rewriteRun(
           spec -> spec.recipe(new MoveFile(null, "**/application*.yml", "../resources")),

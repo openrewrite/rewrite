@@ -45,8 +45,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    @Test
     void gradleWithParentheses() {
         rewriteRun(
           groovy(
@@ -80,8 +80,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("GroovyVariableNotAssigned")
+    @Test
     void nullSafeDereference() {
         rewriteRun(
           groovy(
@@ -193,6 +193,19 @@ class MethodInvocationTest implements RewriteTest {
           groovy(
             """
               foo(String    .class)
+              """
+          )
+        );
+    }
+
+    @Test
+    void dynamicMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              def xMethod() {}
+              def prefix = "x"
+              "${prefix}Method"()
               """
           )
         );
@@ -385,8 +398,8 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
-    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
+    @Test
     void closureWithNamedParameter() {
         rewriteRun(
           groovy(
@@ -611,8 +624,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5729")
+    @Test
     void closureChainedCall() {
         rewriteRun(
           groovy(
@@ -725,4 +738,19 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void generics() {
+        rewriteRun(
+          groovy(
+            """
+              class Util {
+                  static <T> boolean compare(T t1, T t2) {
+                      return t1 == t2
+                  }
+              }
+              Util.<String>compare("A", "B")
+              """
+          )
+        );
+    }
 }

@@ -18,7 +18,6 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -30,7 +29,6 @@ import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
@@ -123,7 +121,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             spec.recipe(new UpgradeTransitiveDependencyVersion(
               "com.thoughtworks.xstream", "xstream", "1.4.21", null, null, null)),
           buildGradle(
-            String.format("""
+            """
               plugins {
                   id 'java'
               }
@@ -138,8 +136,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName),
-            String.format("""
+              """.formatted(configurationName),
+            """
               plugins {
                   id 'java'
               }
@@ -154,7 +152,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
-              """, configurationName)
+              """.formatted(configurationName)
           )
         );
     }
@@ -403,188 +401,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("String interpolation with inline properties is not yet supported")
-    void updateConstraintGStringInterpolation() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              def jacksonCoreVersion = "2.12.0"
-              
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because 'some reason'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """,
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              def jacksonCoreVersion = "2.12.5"
-              
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because 'CVE-2024-BAD'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void updateConstraintInPropertiesFile() {
-        rewriteRun(
-          properties(
-            """
-              jacksonCoreVersion=2.12.0
-              """,
-            """
-              jacksonCoreVersion=2.12.5
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because 'some reason'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """,
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because 'CVE-2024-BAD'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void updateConstraintInPropertiesFileMapNotation() {
-        rewriteRun(
-          properties(
-            """
-              jacksonCoreVersion=2.12.0
-              """,
-            """
-              jacksonCoreVersion=2.12.5
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
-                          because 'some reason'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """,
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
-                          because 'CVE-2024-BAD'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void kotlinDslUpdateConstraintInPropertiesFile() {
-        rewriteRun(
-          properties(
-            """
-              jacksonCoreVersion=2.12.0
-              """,
-            """
-              jacksonCoreVersion=2.12.5
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradleKts(
-            """
-              plugins {
-                `java-library`
-              }
-              repositories { mavenCentral() }
-              
-              val jacksonCoreVersion: String by project
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because("some reason")
-                      }
-                  }
-              
-                  implementation("org.openrewrite:rewrite-java:7.0.0")
-              }
-              """,
-            """
-              plugins {
-                `java-library`
-              }
-              repositories { mavenCentral() }
-              
-              val jacksonCoreVersion: String by project
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
-                          because("CVE-2024-BAD")
-                      }
-                  }
-              
-                  implementation("org.openrewrite:rewrite-java:7.0.0")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void updateConstraintAddingBecause() {
         rewriteRun(
           buildGradle(
@@ -778,8 +594,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4228")
+    @Test
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
@@ -1258,55 +1074,74 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateConstraintForVersionInSettings() {
+    void doesNotAddRedundantConstraintWhenImplementationAlreadyHasIt() {
         rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, List.of("testImplementation"))),
           buildGradle(
             """
-              plugins { id 'java' }
+              plugins {
+                  id 'java'
+              }
               repositories { mavenCentral() }
               
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
-                          because 'some reason'
-                      }
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """,
-            """
-              plugins { id 'java' }
-              repositories { mavenCentral() }
-              
-              dependencies {
-                  constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
-                          because 'CVE-2024-BAD'
-                      }
-                  }
-              
-                  implementation 'org.openrewrite:rewrite-java:7.0.0'
-              }
-              """
-          ),
-          settingsGradle(
-            """
-              gradle.ext {
-                  jacksonCoreVersion = '2.12.0'
-              }
-              """,
-            """
-              gradle.ext {
-                  jacksonCoreVersion = '2.12.5'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
               }
               """
           )
         );
     }
 
-    @Value
+    @Test
+    void replacesTestImplementationConstraintWithImplementation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeTransitiveDependencyVersion(
+              "com.fasterxml.jackson.core", "jackson-databind", "2.12.5", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.5')
+                  }
+
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+              }
+              """
+          )
+        );
+    }
+
     @EqualsAndHashCode(callSuper = false)
+    @Value
     public static class ScanningAccumulatedUpgradeRecipe extends ScanningRecipe<UpgradeTransitiveDependencyVersion.DependencyVersionState> {
         @Override
         public String getDisplayName() {
@@ -1323,7 +1158,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
         @Override
         public UpgradeTransitiveDependencyVersion.DependencyVersionState getInitialValue(ExecutionContext ctx) {
-            return new UpgradeTransitiveDependencyVersion.DependencyVersionState("com.fasterxml*", "jackson-core");
+            return new UpgradeTransitiveDependencyVersion.DependencyVersionState();
         }
 
         @Override

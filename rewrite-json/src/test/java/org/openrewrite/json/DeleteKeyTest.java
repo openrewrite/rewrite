@@ -79,9 +79,9 @@ class DeleteKeyTest implements RewriteTest {
         );
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1175")
     @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/1175")
+    @Test
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.b.c.d")),

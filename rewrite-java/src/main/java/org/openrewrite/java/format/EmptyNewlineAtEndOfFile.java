@@ -28,13 +28,13 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
@@ -62,24 +62,20 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    GeneralFormatStyle generalFormatStyle = cu.getStyle(GeneralFormatStyle.class);
-                    if (generalFormatStyle == null) {
-                        generalFormatStyle = autodetectGeneralFormatStyle(cu);
-                    }
-                    String lineEnding = generalFormatStyle.isUseCRLFNewLines() ? "\r\n" : "\n";
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, cu, () -> autodetectGeneralFormatStyle(cu));
+                    String lineEnding = generalFormatStyle.newLine();
 
                     Space eof = cu.getEof();
                     if (StringUtils.isBlank(eof.getLastWhitespace()) &&
                         eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
-                        if (eof.getComments().isEmpty()) {
+                        List<Comment> comments = eof.getComments();
+                        if (comments.isEmpty()) {
                             return cu.withEof(Space.format(lineEnding));
                         } else {
-                            List<Comment> comments = cu.getEof().getComments();
-                            return cu.withEof(cu.getEof().withComments(ListUtils.map(comments,
-                                    (i, comment) -> i == comments.size() - 1 ? comment.withSuffix(lineEnding) : comment)));
+                            return cu.withEof(cu.getEof().withComments(ListUtils.mapLast(comments, it -> it.withSuffix(lineEnding))));
                         }
                     }
                     return cu;

@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ObjectExpressionTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/274")
+    @Test
     void referenceToObjectField() {
         rewriteRun(
           kotlin(

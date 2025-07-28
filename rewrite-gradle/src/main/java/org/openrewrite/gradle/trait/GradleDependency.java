@@ -19,11 +19,14 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,6 +36,7 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Arrays;
 import java.util.List;
@@ -72,6 +76,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         public Matcher artifactId(@Nullable String artifactId) {
             this.artifactId = artifactId;
             return this;
+        }
+
+        @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<GradleDependency, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, P p) {
+                    GradleDependency dependency = test(getCursor());
+                    return dependency != null ?
+                            (J) visitor.visit(dependency, p) :
+                            super.visitMethodInvocation(method, p);
+                }
+            };
         }
 
         @Override
