@@ -411,11 +411,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
-              def jacksonCoreVersion = "2.12.0"
+              def jacksonVersion = "2.12.0"
               
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'some reason'
                       }
                   }
@@ -427,11 +427,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
-              def jacksonCoreVersion = "2.12.5"
+              def jacksonVersion = "2.12.5"
               
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -448,10 +448,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           properties(
             """
-              jacksonCoreVersion=2.12.0
+              jacksonVersion=2.12.0
               """,
             """
-              jacksonCoreVersion=2.12.5
+              jacksonVersion=2.12.5
               """,
             spec -> spec.path("gradle.properties")
           ),
@@ -462,7 +462,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'some reason'
                       }
                   }
@@ -476,7 +476,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -493,10 +493,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           properties(
             """
-              jacksonCoreVersion=2.12.0
+              jacksonVersion=2.12.0
               """,
             """
-              jacksonCoreVersion=2.12.5
+              jacksonVersion=2.12.5
               """,
             spec -> spec.path("gradle.properties")
           ),
@@ -507,7 +507,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
+                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion, {
                           because 'some reason'
                       }
                   }
@@ -521,7 +521,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonCoreVersion, {
+                      implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion, {
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -538,10 +538,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(
           properties(
             """
-              jacksonCoreVersion=2.12.0
+              jacksonVersion=2.12.0
               """,
             """
-              jacksonCoreVersion=2.12.5
+              jacksonVersion=2.12.5
               """,
             spec -> spec.path("gradle.properties")
           ),
@@ -552,10 +552,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               repositories { mavenCentral() }
               
-              val jacksonCoreVersion: String by project
+              val jacksonVersion: String by project
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because("some reason")
                       }
                   }
@@ -569,10 +569,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               repositories { mavenCentral() }
               
-              val jacksonCoreVersion: String by project
+              val jacksonVersion: String by project
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonCoreVersion") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because("CVE-2024-BAD")
                       }
                   }
@@ -1332,9 +1332,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
+              val composeVersion: String by rootProject.extra
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {
                           because 'some reason'
                       }
                   }
@@ -1346,9 +1347,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               plugins { id 'java' }
               repositories { mavenCentral() }
               
+              val composeVersion: String by rootProject.extra
               dependencies {
                   constraints {
-                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonCoreVersion}") {
+                      implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -1360,12 +1362,36 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           settingsGradle(
             """
               gradle.ext {
-                  jacksonCoreVersion = '2.12.0'
+                  jacksonVersion = '2.12.0'
               }
               """,
             """
               gradle.ext {
-                  jacksonCoreVersion = '2.12.5'
+                  jacksonVersion = '2.12.5'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangesIfDependencyIsAlsoPresentOnProjectForVersionInSettings() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+    
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}"
+                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jacksonVersion}"
+              }
+              """
+          ),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jacksonVersion = '2.12.0'
               }
               """
           )
