@@ -38,12 +38,13 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Delete Property";
+        return "Delete property by key";
     }
 
     @Override
     public String getDescription() {
-        return "Deletes key/value pairs from properties files.";
+        return "Deletes key/value pairs from properties files, as well as any comments that immediately precede the key/value pair. " +
+                "Comments separated by two or more newlines from the deleted key/value pair are preserved." ;
     }
 
     @Option(displayName = "Property key matcher",
