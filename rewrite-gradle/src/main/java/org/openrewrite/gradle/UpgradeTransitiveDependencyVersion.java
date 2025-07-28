@@ -511,11 +511,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) tree;
                 GradleProject gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.get(getGradleProjectKey(gradleProject)) : null;
-                if (projectRequiredUpdates != null && !projectRequiredUpdates.isEmpty()) {
-                    if (projectRequiredUpdates.keySet().stream().noneMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
-                        return cu;
-                    }
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> projectRequiredUpdates = gradleProject != null ? acc.updatesPerProject.getOrDefault(getGradleProjectKey(gradleProject), emptyMap()) : emptyMap();
+                if (projectRequiredUpdates.keySet().stream().anyMatch(ga -> dependencyMatcher.matches(ga.getGroupId(), ga.getArtifactId()))) {
                     cu = (JavaSourceFile) Preconditions.check(
                             not(new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
