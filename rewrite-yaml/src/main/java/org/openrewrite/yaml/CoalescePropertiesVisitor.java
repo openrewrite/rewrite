@@ -32,6 +32,10 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
     private final List<JsonPathMatcher> exclusionMatchers;
     private final List<JsonPathMatcher> applyToMatchers;
 
+    public CoalescePropertiesVisitor() {
+        this(null, null);
+    }
+
     public CoalescePropertiesVisitor(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
         exclusionMatchers = exclusions == null ? emptyList() : exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         applyToMatchers = applyTo == null ? emptyList() : applyTo.stream().map(JsonPathMatcher::new).collect(toList());
