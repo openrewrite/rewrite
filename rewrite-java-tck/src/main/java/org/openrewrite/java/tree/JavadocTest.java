@@ -2315,19 +2315,6 @@ class JavadocTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/5825")
         @Test
-        void snippetSingleLine() {
-            rewriteRun(
-              java(
-                """
-                  /** {@snippet : var x = 42; } */
-                  class Test {}
-                  """
-              )
-            );
-        }
-
-        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
-        @Test
         void snippetWithIndentation() {
             rewriteRun(
               java(

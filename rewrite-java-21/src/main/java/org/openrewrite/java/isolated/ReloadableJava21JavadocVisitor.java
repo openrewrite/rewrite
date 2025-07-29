@@ -875,31 +875,32 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public Tree visitSnippet(SnippetTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("{@snippet"));
 
-
-        // Check for the colon separator
-        List<Javadoc> attributes = new ArrayList<>(whitespaceBefore());
+        // Parse attributes (e.g., lang=java, id="example")
+        List<Javadoc> attributes = new ArrayList<>();
+        if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
+            attributes.addAll(whitespaceBefore());
+            for (DocTree attr : node.getAttributes()) {
+                attributes.add((Javadoc) scan(attr, body));
+                attributes.addAll(whitespaceBefore());
+            }
+        }
+        
+        // Check for whitespace and colon separator
+        String spaceBeforeColon = whitespaceBeforeAsString();
         if (cursor < source.length() && source.charAt(cursor) == ':') {
+            // Found colon - add space before it to attributes if present
+            if (!spaceBeforeColon.isEmpty()) {
+                attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, spaceBeforeColon));
+            }
             attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
             cursor++;
-        }
-        // Parse attributes (e.g., lang=java)
-        if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
-            for (DocTree attr : node.getAttributes()) {
-                attributes.addAll(whitespaceBefore());
-                attributes.add((Javadoc) scan(attr, body));
-            }
         }
 
         // Parse snippet content
         List<Javadoc> content = new ArrayList<>();
         if (node.getBody() != null) {
-            List<Javadoc> beforeContent = whitespaceBefore();
-            content.addAll(beforeContent);
-            // Get the text content with proper handling of newlines
-            DCTree.DCText textNode = (DCTree.DCText) node.getBody();
-            if (textNode != null && textNode.getBody() != null) {
-                content.addAll(visitText(textNode.getBody()));
-            }
+            // Always use convertMultiline - it handles both single and multi-line properly
+            content.addAll(convertMultiline(singletonList(node.getBody())));
         }
 
         return new Javadoc.Snippet(
