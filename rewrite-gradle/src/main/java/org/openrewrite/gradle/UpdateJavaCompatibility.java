@@ -235,7 +235,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
-        int currentMajor = getMajorVersion(a.getAssignment());
+        Integer currentMajor = getMajorVersion(a.getAssignment());
         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
             return a.withAssignment(changeJavaVersion(a.getAssignment(), actualStyle));
@@ -244,8 +244,8 @@ public class UpdateJavaCompatibility extends Recipe {
         return a;
     }
 
-    private boolean shouldUpdateVersion(int currentMajor) {
-        return currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade);
+    private boolean shouldUpdateVersion(@Nullable Integer currentMajor) {
+        return currentMajor != null && (currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade));
     }
 
     private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
@@ -263,13 +263,11 @@ public class UpdateJavaCompatibility extends Recipe {
             List<Expression> args = m.getArguments();
 
             if (args.size() == 1) {
-                if (args.get(0) instanceof J.Literal) {
-                    int currentMajor = getMajorVersion(args.get(0));
+                if (args.get(0) instanceof J.Literal || ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                    Integer currentMajor = getMajorVersion(args.get(0));
                     if (shouldUpdateVersion(currentMajor)) {
                         return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, null)));
                     }
-                    return m;
-                } else if ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda) {
                     return m;
                 }
             }
@@ -287,7 +285,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
             if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
                 DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
-                int currentMajor = getMajorVersion(m.getArguments().get(0));
+                Integer currentMajor = getMajorVersion(m.getArguments().get(0));
                 if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
                     return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeJavaVersion(arg, actualStyle)));
@@ -313,7 +311,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
     }
 
-    private int getMajorVersion(Expression expression) {
+    private @Nullable Integer getMajorVersion(Expression expression) {
         if (expression instanceof J.Literal) {
             J.Literal argument = (J.Literal) expression;
             JavaType.Primitive type = argument.getType();
@@ -335,7 +333,7 @@ public class UpdateJavaCompatibility extends Recipe {
             }
         }
 
-        return -1;
+        return null;
     }
 
     private @Nullable DeclarationStyle getCurrentStyle(Expression expression) {
