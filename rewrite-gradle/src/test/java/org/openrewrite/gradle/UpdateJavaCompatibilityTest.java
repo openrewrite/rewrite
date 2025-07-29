@@ -558,6 +558,49 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     }
 
     @Test
+    void handlesKotlinJvmToolchainInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(8))
+                  }
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(11))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void handlesKotlinJvmToolchainShorthandInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain(8)
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain(11)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void toVersionInKotlinDSL() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
