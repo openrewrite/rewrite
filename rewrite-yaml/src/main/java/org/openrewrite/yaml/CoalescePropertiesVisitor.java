@@ -94,9 +94,8 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
             Cursor current = c;
             if (matchers.stream().anyMatch(it -> it.matches(current))) {
                 return true;
-            } else {
-                c = c.getParent();
             }
+            c = c.getParent();
         }
         return false;
     }
