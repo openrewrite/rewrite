@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
@@ -2166,25 +2167,293 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/5825")
-    @Test
-    void snippet() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  /**
-                   * This is a snippet:
-                   * {@snippet :
-                   *   int x = 1;
-                   *   int y = 2;
-                   *   System.out.println(x + y);
-                   * }
-                   */
-                  void method() {}
-              }
-              """
-          )
-        );
+    // Snippet tests based on https://docs.oracle.com/en/java/javase/21/javadoc/snippets.html
+    @Nested
+    class Snippet {
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippet() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * This is a snippet:
+                       * {@snippet :
+                       *   int x = 1;
+                       *   int y = 2;
+                       *   System.out.println(x + y);
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithLanguageAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Properties snippet:
+                       * {@snippet lang=properties :
+                       *   server.port=8080
+                       *   server.host=localhost
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithIdAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with ID:
+                       * {@snippet id="example-1" :
+                       *   String greeting = "Hello, World!";
+                       *   System.out.println(greeting);
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetEmpty() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Empty snippet:
+                       * {@snippet :
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithMarkupComments() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with markup:
+                       * {@snippet :
+                       *   public static void main(String[] args) {
+                       *       System.out.println("Hello!");  // @highlight substring="Hello"
+                       *       var text = "placeholder";      // @replace substring="placeholder" replacement="..."
+                       *       List<String> list = null;      // @link substring="List" target="java.util.List"
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetMultipleAttributes() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * External snippet reference:
+                       * {@snippet class="com.example.HelloWorld" region="main"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithFileAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * File snippet:
+                       * {@snippet file="example.properties" region="database"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetSingleLine() {
+            rewriteRun(
+              java(
+                """
+                  /** {@snippet : var x = 42; } */
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithIndentation() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Nested code:
+                       * {@snippet :
+                       *   class Inner {
+                       *       void method() {
+                       *           if (true) {
+                       *               System.out.println("nested");
+                       *           }
+                       *       }
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithSpecialCharacters() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Special characters:
+                       * {@snippet :
+                       *   String regex = "\\\\d+";  // Backslashes
+                       *   char quote = '"';         // Double quote
+                       *   String path = "C:\\\\temp"; // Windows path
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithBraces() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Balanced braces:
+                       * {@snippet :
+                       *   Map<String, List<Integer>> map = new HashMap<>() {{
+                       *       put("numbers", Arrays.asList(1, 2, 3));
+                       *   }};
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetNoColonAfterTag() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * External snippet without colon:
+                       * {@snippet class="Example"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithWhitespaceBeforeColon() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with space before colon:
+                       * {@snippet   :
+                       *   // Code here
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetMixedAttributesAndContent() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Hybrid snippet:
+                       * {@snippet lang=java id="hybrid-example" :
+                       *   public void hybridMethod() {
+                       *       // This combines attributes and inline content
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
     }
 }
