@@ -232,6 +232,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                 String resolvedScope = scope == null ? maybeScope : scope;
                 Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
+
+                Scope presentInScope = determineDirectDependencyAlreadyPresent(dependencies);
+                if (presentInScope != null) {
+                    if (Scope.maxPrecedence(presentInScope, resolvedScopeEnum).equals(resolvedScopeEnum)) {
+                        return (Xml) new ChangeDependencyScope(groupId, artifactId, resolvedScopeEnum.equals(Scope.Compile) ? null : resolvedScope).getVisitor().visitNonNull(document, ctx);
+                    } else {
+                        return maven; // already present in a wider scope
+                    }
+                }
+
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
                     for (ResolvedDependency d : dependencies.get(resolvedScopeEnum)) {
                         if (hasAcceptableTransitivity(d, acc) &&
@@ -251,6 +261,18 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 return new AddDependencyVisitor(
                         groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
+            }
+
+            private @Nullable Scope determineDirectDependencyAlreadyPresent(Map<Scope, List<ResolvedDependency>> dependencies) {
+                for (Map.Entry<Scope, List<ResolvedDependency>> entry : dependencies.entrySet()) {
+                    for (ResolvedDependency dependency : entry.getValue()) {
+                        if (dependency.isDirect() &&
+                            groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
+                            return entry.getKey();
+                        }
+                    }
+                }
+                return null;
             }
 
             private boolean isSubprojectOfParentInRepository(Scanned acc) {
