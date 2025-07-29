@@ -875,11 +875,9 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public Tree visitSnippet(SnippetTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("{@snippet"));
 
-        List<Javadoc> attributes = new ArrayList<>();
-        List<Javadoc> content = new ArrayList<>();
 
         // Check for the colon separator
-        attributes.addAll(whitespaceBefore());
+        List<Javadoc> attributes = new ArrayList<>(whitespaceBefore());
         if (cursor < source.length() && source.charAt(cursor) == ':') {
             attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
             cursor++;
@@ -894,6 +892,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         // Parse snippet content
+        List<Javadoc> content = new ArrayList<>();
         if (node.getBody() != null) {
             List<Javadoc> beforeContent = whitespaceBefore();
             content.addAll(beforeContent);
