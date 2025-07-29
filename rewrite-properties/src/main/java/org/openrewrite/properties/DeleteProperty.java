@@ -106,10 +106,13 @@ public class DeleteProperty extends Recipe {
                 while (++index < contents.size()) {
                     Properties.Content next = contents.get(index);
                     if (next.getPrefix().matches("\\R{2,}")) {
-                        return false;
+                        return false; // Two or more newlines, stop checking.
                     }
                     if (isMatch(next)) {
                         return true;
+                    }
+                    if (next instanceof Properties.Entry) {
+                        return false; // Unrelated entry, stop checking.
                     }
                 }
                 return false;
