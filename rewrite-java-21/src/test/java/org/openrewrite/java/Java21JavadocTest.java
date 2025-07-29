@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class Java21JavadocTest implements RewriteTest {
+class Java21JavadocTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5825")
     @Test
