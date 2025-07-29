@@ -20,6 +20,7 @@ import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.SnippetTree;
 import com.sun.source.doctree.UsesTree;
 import com.sun.source.tree.*;
 import com.sun.source.tree.IdentifierTree;
@@ -867,6 +868,49 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 convertMultiline(node.getAttributes()),
                 node.isSelfClosing(),
                 node.isSelfClosing() ? sourceBefore("/>") : sourceBefore(">")
+        );
+    }
+
+    @Override
+    public Tree visitSnippet(SnippetTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@snippet"));
+
+        List<Javadoc> attributes = new ArrayList<>();
+        List<Javadoc> content = new ArrayList<>();
+
+        // Check for the colon separator
+        attributes.addAll(whitespaceBefore());
+        if (cursor < source.length() && source.charAt(cursor) == ':') {
+            attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
+            cursor++;
+        }
+        
+        // Parse attributes (e.g., lang=java)
+        if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
+            for (DocTree attr : node.getAttributes()) {
+                attributes.addAll(whitespaceBefore());
+                attributes.add((Javadoc) scan(attr, body));
+            }
+        }
+
+        // Parse snippet content
+        if (node.getBody() != null) {
+            List<Javadoc> beforeContent = whitespaceBefore();
+            content.addAll(beforeContent);
+            
+            // Get the text content with proper handling of newlines
+            DCTree.DCText textNode = (DCTree.DCText) node.getBody();
+            if (textNode != null && textNode.getBody() != null) {
+                content.addAll(visitText(textNode.getBody()));
+            }
+        }
+
+        return new Javadoc.Snippet(
+                randomId(),
+                Markers.EMPTY,
+                attributes,
+                content,
+                endBrace()
         );
     }
 

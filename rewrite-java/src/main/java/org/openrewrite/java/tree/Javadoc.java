@@ -561,6 +561,24 @@ public interface Javadoc extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
+    class Snippet implements Javadoc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Markers markers;
+        List<Javadoc> attributes;
+        List<Javadoc> content;
+        List<Javadoc> endBrace;
+
+        @Override
+        public <P> Javadoc acceptJavadoc(JavadocVisitor<P> v, P p) {
+            return v.visitSnippet(this, p);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     class Summary implements Javadoc {
         @EqualsAndHashCode.Include
         UUID id;
