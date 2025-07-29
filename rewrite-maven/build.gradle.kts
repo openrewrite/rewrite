@@ -45,7 +45,6 @@ dependencies {
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
-    testRuntimeOnly("jakarta.annotation:jakarta.annotation-api:2.1.1")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

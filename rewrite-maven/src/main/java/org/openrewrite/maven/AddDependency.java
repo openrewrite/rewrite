@@ -238,9 +238,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (presentInScope != null) {
                     if (Scope.maxPrecedence(presentInScope, resolvedScopeEnum) == resolvedScopeEnum) {
                         return (Xml) new ChangeDependencyScope(groupId, artifactId, resolvedScopeEnum == Scope.Compile ? null : resolvedScope).getVisitor().visitNonNull(document, ctx);
-                    } else {
-                        return maven; // already present in a wider scope
                     }
+                    return maven; // already present in a wider scope
                 }
 
                 if ((resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) && dependencies.get(resolvedScopeEnum) != null) {
