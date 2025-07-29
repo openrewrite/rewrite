@@ -238,21 +238,6 @@ public class GradlePlugin implements Trait<J> {
             return null;
         }
 
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
-        }
-
         private boolean withinPlugins(Cursor cursor) {
             Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
             if (parent.isRoot() || !((J.MethodInvocation) parent.getValue()).getSimpleName().equals("plugins")) {

@@ -78,7 +78,7 @@ public class DependencyConstraintToRule extends Recipe {
                 }
                 cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
                 cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                return (JavaSourceFile) new MaybeRemoveDependencyBlock(cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
+                return new MaybeRemoveDependencyBlock().visitNonNull(cu, ctx);
             }
         });
     }
@@ -442,10 +442,7 @@ public class DependencyConstraintToRule extends Recipe {
         }
     }
 
-    @Value
     static class MaybeRemoveDependencyBlock extends JavaIsoVisitor<ExecutionContext> {
-        boolean isKotlinDsl;
-
         @Override
         public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
