@@ -42,6 +42,10 @@ public class CoalesceProperties extends Recipe {
             example = "$..[org.springframework.security]")
     List<String> applyTo;
 
+    public CoalesceProperties() {
+        this(null, null);
+    }
+
     public CoalesceProperties(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
         this.exclusions = exclusions == null ? emptyList() : exclusions;
         this.applyTo = applyTo == null ? emptyList() : applyTo;
