@@ -230,7 +230,7 @@ public class MavenResolutionResult implements Marker {
     }
 
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
-        projectPoms.put(requireNonNull(pom.getRequested().getSourcePath()), pom.getRequested());
+        projectPoms.putIfAbsent(requireNonNull(pom.getRequested().getSourcePath()), pom.getRequested());
         if (parent != null) {
             parent.getProjectPomsRecursive(projectPoms);
         }
