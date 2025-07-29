@@ -884,7 +884,6 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 attributes.addAll(whitespaceBefore());
             }
         }
-        
         // Check for whitespace and colon separator
         String spaceBeforeColon = whitespaceBeforeAsString();
         if (cursor < source.length() && source.charAt(cursor) == ':') {
