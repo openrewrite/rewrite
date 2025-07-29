@@ -179,8 +179,12 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @Test
-    void handlesJavaToolchains() {
+    @CsvSource(textBlock = """
+      1.8,11
+      '1.8','11'
+      """, quoteCharacter = '`')
+    @ParameterizedTest
+    void handlesJavaToolchains(String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
@@ -191,10 +195,10 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               
               java {
                   toolchain {
-                      languageVersion = JavaLanguageVersion.of(8)
+                      languageVersion = JavaLanguageVersion.of(%s)
                   }
               }
-              """,
+              """.formatted(beforeCompatibility),
             """
               plugins {
                   id "java"
@@ -202,10 +206,10 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               
               java {
                   toolchain {
-                      languageVersion = JavaLanguageVersion.of(11)
+                      languageVersion = JavaLanguageVersion.of(%s)
                   }
               }
-              """
+              """.formatted(afterCompatibility)
           )
         );
     }
@@ -551,6 +555,49 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(11))
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesKotlinJvmToolchainInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(8))
+                  }
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(11))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void handlesKotlinJvmToolchainShorthandInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain(8)
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain(11)
               }
               """
           )
