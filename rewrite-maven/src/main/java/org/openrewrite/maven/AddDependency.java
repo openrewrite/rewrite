@@ -158,8 +158,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public String getDescription() {
-        return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used." +
-               " If the dependency is already present directly with a narrower scope, the scope is widened.";
+        return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used. " +
+               "If the dependency is already present directly with a narrower scope, the scope is widened.";
     }
 
     public static class Scanned {
