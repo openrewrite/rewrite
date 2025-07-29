@@ -2165,4 +2165,26 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+    @Test
+    void snippet() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  /**
+                   * This is a snippet:
+                   * {@snippet :
+                   *   int x = 1;
+                   *   int y = 2;
+                   *   System.out.println(x + y);
+                   * }
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
 }
