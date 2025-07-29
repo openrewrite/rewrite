@@ -882,7 +882,6 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
             cursor++;
         }
-        
         // Parse attributes (e.g., lang=java)
         if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
             for (DocTree attr : node.getAttributes()) {
@@ -896,7 +895,6 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (node.getBody() != null) {
             List<Javadoc> beforeContent = whitespaceBefore();
             content.addAll(beforeContent);
-            
             // Get the text content with proper handling of newlines
             DCTree.DCText textNode = (DCTree.DCText) node.getBody();
             if (textNode != null && textNode.getBody() != null) {
