@@ -42,12 +42,12 @@ class AddDependencyTest implements RewriteTest {
 
     @Language("java")
     private final String usingGuavaIntMath = """
-          import com.google.common.math.IntMath;
-          public class A {
-              boolean getMap() {
-                  return IntMath.isPrime(5);
-              }
+      import com.google.common.math.IntMath;
+      public class A {
+          boolean getMap() {
+              return IntMath.isPrime(5);
           }
+      }
       """;
 
     @DocumentExample
