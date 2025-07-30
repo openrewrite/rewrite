@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 
 @RequiredArgsConstructor
@@ -46,7 +47,7 @@ public class Substitutions {
     private final PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
             "#{", "}", null);
     @Getter
-    private final Set<JavaType.GenericTypeVariable> typeVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
 
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
@@ -207,7 +208,7 @@ public class Substitutions {
         if (type == null) {
             return;
         }
-        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<JavaType> visited = newSetFromMap(new IdentityHashMap<>());
         new JavaTypeVisitor<Integer>() {
             @Override
             public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {

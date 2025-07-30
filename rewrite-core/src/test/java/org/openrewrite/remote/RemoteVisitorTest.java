@@ -23,9 +23,9 @@ import org.openrewrite.marker.Markers;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class RemoteVisitorTest {
@@ -50,7 +50,7 @@ class RemoteVisitorTest {
           false,
           null,
           "Gradle wrapper jar",
-          Collections.emptyList(),
+          emptyList(),
           null
         ), 0);
 

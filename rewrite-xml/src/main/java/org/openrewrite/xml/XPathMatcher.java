@@ -26,6 +26,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.reverse;
+
 /**
  * Supports a limited set of XPath expressions, specifically those documented on <a
  * href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
@@ -160,7 +162,7 @@ public class XPathMatcher {
             // we have matched the whole XPath, and it does not start with the root
             return true;
         } else {
-            Collections.reverse(path);
+            reverse(path);
 
             // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
             if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {

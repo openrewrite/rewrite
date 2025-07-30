@@ -28,7 +28,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -87,7 +86,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
     }
 
     private static List<NamedStyles> noWhitespaceAfterStyle(UnaryOperator<NoWhitespaceAfterStyle> with) {
-        return Collections.singletonList(
+        return singletonList(
           new NamedStyles(
             Tree.randomId(), "test", "test", "test", emptySet(),
             singletonList(with.apply(Checkstyle.noWhitespaceAfterStyle()))

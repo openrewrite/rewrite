@@ -20,9 +20,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
@@ -246,7 +246,7 @@ public class GitRemoteTest {
     @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);

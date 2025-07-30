@@ -39,10 +39,11 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
@@ -98,7 +99,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                     charsetBomMarked,
                     null,
                     fileAttributes,
-                    Collections.emptyList(),
+                    emptyList(),
                     Space.EMPTY
             );
         }
@@ -370,7 +371,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             return new Toml.Table(
                     randomId(),
                     prefix,
-                    Markers.build(Collections.singletonList(new InlineTable(randomId()))),
+                    Markers.build(singletonList(new InlineTable(randomId()))),
                     null,
                     elements
             );
@@ -416,7 +417,7 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
             return new Toml.Table(
                     randomId(),
                     prefix,
-                    Markers.build(Collections.singletonList(new ArrayTable(randomId()))),
+                    Markers.build(singletonList(new ArrayTable(randomId()))),
                     nameRightPadded,
                     elements
             );

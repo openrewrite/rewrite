@@ -33,8 +33,8 @@ import org.openrewrite.maven.tree.Version;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
@@ -204,7 +204,7 @@ public class VersionRequirement {
 
         @Override
         public String toString() {
-            return ranges.stream().map(Range::toString).collect(Collectors.joining(",", "RangeSet={", "}"));
+            return ranges.stream().map(Range::toString).collect(joining(",", "RangeSet={", "}"));
         }
     }
 

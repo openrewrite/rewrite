@@ -55,10 +55,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
@@ -229,7 +230,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     // Determine the configurations used to declare dependencies that requested dependencies in the build
                     List<GradleDependencyConfiguration> declaredConfigurations = gradleProject.getConfigurations().stream()
                             .filter(c -> c.isCanBeDeclared() && !c.getRequested().isEmpty())
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
@@ -472,7 +473,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 GradleProject gp = gradleProject;
                 Set<String> configNames = gp.getConfigurations().stream()
                         .map(GradleDependencyConfiguration::getName)
-                        .collect(Collectors.toSet());
+                        .collect(toSet());
                 Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
                     if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {

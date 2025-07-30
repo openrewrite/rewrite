@@ -33,9 +33,9 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
@@ -209,7 +209,7 @@ public class BlockStatementTemplateGenerator {
     @SuppressWarnings("DataFlowIssue")
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
-                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
+                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
         if (j instanceof J.Lambda && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +

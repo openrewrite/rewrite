@@ -44,6 +44,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
@@ -977,9 +978,9 @@ class MavenSettingsTest {
             """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(singletonList(httpHeader), 10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
-        MavenSettings.Servers servers = new MavenSettings.Servers(java.util.Collections.singletonList(server));
+        MavenSettings.Servers servers = new MavenSettings.Servers(singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

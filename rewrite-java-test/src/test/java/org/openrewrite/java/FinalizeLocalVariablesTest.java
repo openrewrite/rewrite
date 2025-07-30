@@ -28,9 +28,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 
@@ -151,7 +151,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                           mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(),
                                              new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
-                                                            J.Modifier.Type.Final, Collections.emptyList()))
+                                                            J.Modifier.Type.Final, emptyList()))
                           ), ctx);
                     }
 

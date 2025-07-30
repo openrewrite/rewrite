@@ -34,9 +34,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 /**
@@ -319,7 +319,7 @@ public class MethodMatcher {
                         .stream()
                         .map(MethodMatcher::variableDeclarationsType)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
         return matchesParameterTypes(parameterTypes);
     }
 
@@ -346,7 +346,7 @@ public class MethodMatcher {
                         .stream()
                         .map(MethodMatcher::variableDeclarationsType)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
         return matchesParameterTypes(parameterTypes);
     }
 

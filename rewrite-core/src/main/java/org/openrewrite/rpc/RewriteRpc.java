@@ -41,12 +41,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 /**
@@ -207,7 +207,7 @@ public class RewriteRpc implements AutoCloseable {
         if (!generated.isEmpty()) {
             return generated.stream()
                     .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -352,7 +352,7 @@ public class RewriteRpc implements AutoCloseable {
                         localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
-            }).collect(Collectors.toList());
+            }).collect(toList());
         }
         return cursorIds;
     }

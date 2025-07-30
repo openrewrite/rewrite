@@ -29,9 +29,9 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -131,7 +131,7 @@ public class FindDeprecatedMethods extends Recipe {
                                         method.getArguments().stream()
                                                 .map(Expression::getType)
                                                 .map(String::valueOf)
-                                                .collect(Collectors.joining(", "))
+                                                .collect(joining(", "))
                                 ));
                             }
                             m = SearchResult.found(m);

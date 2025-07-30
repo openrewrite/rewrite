@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -270,7 +270,7 @@ public class ChangeNamespaceValue extends Recipe {
                     }
                 } else {
                     Map<String, Xml.Attribute> attributeByKey = attributes.stream()
-                            .collect(Collectors.toMap(
+                            .collect(toMap(
                                     Xml.Attribute::getKeyAsString,
                                     a -> a
                             ));
