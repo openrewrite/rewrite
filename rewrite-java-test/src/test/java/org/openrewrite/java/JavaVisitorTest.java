@@ -51,7 +51,7 @@ class JavaVisitorTest implements RewriteTest {
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
                   public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if (method.getSimpleName().equals("allTheThings")) {
+                      if ("allTheThings".equals(method.getSimpleName())) {
                           return JavaTemplate.builder("Exception").contextSensitive().build()
                             .apply(getCursor(), method.getCoordinates().replaceThrows());
                       }
@@ -144,7 +144,7 @@ class JavaVisitorTest implements RewriteTest {
               toRecipe(() -> new JavaIsoVisitor<>() {
                   @Override
                   public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if (method.getSimpleName().equals("test")) {
+                      if ("test".equals(method.getSimpleName())) {
                           return JavaTemplate.builder("Exception").contextSensitive().build()
                             .apply(getCursor(), method.getCoordinates().replaceThrows());
                       }

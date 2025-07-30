@@ -178,7 +178,7 @@ class AnnotationServiceTest implements RewriteTest {
 
                 @Override
                 public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
-                    if (fieldAccess.getSimpleName().equals("Integer")) {
+                    if ("Integer".equals(fieldAccess.getSimpleName())) {
                         AnnotationService service = service(AnnotationService.class);
                         assertThat(service.getAllAnnotations(new Cursor(null, fieldAccess))).satisfiesExactly(
                           ann -> assertThat(ann.getSimpleName()).isEqualTo("Ann")

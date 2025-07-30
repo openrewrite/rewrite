@@ -611,7 +611,7 @@ public class CheckstyleConfigLoader {
                 name -> {
                     Object prop = properties.get(name);
                     return prop == null ?
-                            name.equals("config_loc") ? "config/checkstyle" : null :
+                            "config_loc".equals(name) ? "config/checkstyle" : null :
                             prop.toString();
                 },
                 ConfigurationLoader.IgnoredModulesOptions.OMIT);

@@ -996,7 +996,7 @@ public class Autodetect extends NamedStyles {
                 }
                 importedPackages.add(anImport.getPackageName() + ".");
 
-                if (anImport.getQualid().getSimpleName().equals("*")) {
+                if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
                         int count = 0;
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {

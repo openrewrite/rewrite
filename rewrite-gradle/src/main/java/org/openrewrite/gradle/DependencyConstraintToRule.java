@@ -395,7 +395,7 @@ public class DependencyConstraintToRule extends Recipe {
                     int insertionIndex = 0;
                     while (insertionIndex < block.getStatements().size()) {
                         Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSimpleName().equals("dependencies")) {
+                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
                             break;
                         }
                         insertionIndex++;
@@ -454,7 +454,7 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
-        if (!m.getSimpleName().equals("dependencies")) {
+        if (!"dependencies".equals(m.getSimpleName())) {
             return false;
         }
         if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -477,7 +477,7 @@ public class DependencyConstraintToRule extends Recipe {
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                        (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
+                        (value instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) value).getSimpleName())));
         if (!(c.getValue() instanceof J.MethodInvocation)) {
             return false;
         }
@@ -487,7 +487,7 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     private static boolean isInBuildscriptBlock(Cursor c) {
-        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("buildscript")));
+        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) value).getSimpleName())));
         return maybeBuildscript.getValue() != Cursor.ROOT_VALUE;
     }
 

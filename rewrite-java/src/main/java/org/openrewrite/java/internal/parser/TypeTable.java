@@ -546,7 +546,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                        @Nullable String signature,
                                        @Nullable List<String> parameterNames,
                                        String @Nullable [] exceptions) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !"<clinit>".equals(name)) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,

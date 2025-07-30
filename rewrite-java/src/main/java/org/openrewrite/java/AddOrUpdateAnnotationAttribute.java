@@ -286,7 +286,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return null;
                             }
 
-                            if (attributeName != null && !attributeValue.equals("value")) {
+                            if (attributeName != null && !"value".equals(attributeValue)) {
                                 return isAnnotationWithOnlyValueMethod(finalA) ? it : createAnnotationAssignment(finalA, "value", it);
                             }
 
@@ -397,7 +397,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         String effectiveName = attributeName == null ? "value" : attributeName;
         List<JavaType.Method> methods = ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods();
         for (JavaType.Method method : methods) {
-            if (effectiveName.equals(method.getName()) && method.getReturnType().toString().equals("java.lang.String[]")) {
+            if (effectiveName.equals(method.getName()) && "java.lang.String[]".equals(method.getReturnType().toString())) {
                 return true;
             }
         }
@@ -406,7 +406,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
         return ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().size() == 1 &&
-                ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().get(0).getName().equals("value");
+                "value".equals(((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().get(0).getName());
     }
 
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {

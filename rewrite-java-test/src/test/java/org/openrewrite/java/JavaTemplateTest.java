@@ -443,7 +443,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("asList")) {
+                  if ("asList".equals(method.getSimpleName())) {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
 
@@ -491,7 +491,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("asList")) {
+                  if ("asList".equals(method.getSimpleName())) {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
@@ -540,7 +540,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("asList")) {
+                  if ("asList".equals(method.getSimpleName())) {
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
                       return JavaTemplate.builder("Collections.singletonList(#{any()})")
@@ -756,7 +756,7 @@ class JavaTemplateTest implements RewriteTest {
 
               @Override
               public J visitFieldAccess(J.FieldAccess fa, ExecutionContext ctx) {
-                  if (fa.getSimpleName().equals("f")) {
+                  if ("f".equals(fa.getSimpleName())) {
                       return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
                         getCursor(), fa.getCoordinates().replace(), fa);
                   } else {
@@ -794,7 +794,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("clear")) {
+                  if ("clear".equals(method.getSimpleName())) {
                       return JavaTemplate.builder("words.add(\"jon\");")
                         .contextSensitive()
                         .build()
@@ -1299,7 +1299,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J.VariableDeclarations vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
-                  if (vd.getVariables().size() == 1 || vd.getVariables().getFirst().getSimpleName().equals("a")) {
+                  if (vd.getVariables().size() == 1 || "a".equals(vd.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.apply("String a();", getCursor(), vd.getCoordinates().replace());
                   }
                   return vd;

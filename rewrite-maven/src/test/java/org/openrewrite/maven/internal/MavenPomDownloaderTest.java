@@ -1203,7 +1203,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                         MockResponse response = new MockResponse();
                         if (recordedRequest.getHeaders().get("Authorization") != null) {
                             response.setResponseCode(401);
-                        } else if (recordedRequest.getMethod() == null || !recordedRequest.getMethod().equalsIgnoreCase("HEAD")) {
+                        } else if (recordedRequest.getMethod() == null || !"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
                             response.setBody(
                               //language=xml
                               """

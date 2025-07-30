@@ -180,7 +180,7 @@ public class UpdateJavaCompatibility extends Recipe {
             return new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    if (method.getSimpleName().equals("java")) {
+                    if ("java".equals(method.getSimpleName())) {
                         return new JavaIsoVisitor<ExecutionContext>() {
                             @Override
                             public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {

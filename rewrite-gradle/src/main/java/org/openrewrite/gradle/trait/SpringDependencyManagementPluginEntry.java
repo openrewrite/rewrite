@@ -187,7 +187,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             new JavaIsoVisitor<List<String>>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> entries) {
-                    if (method.getSimpleName().equals("entry") && method.getArguments().size() == 1) {
+                    if ("entry".equals(method.getSimpleName()) && method.getArguments().size() == 1) {
                         Expression argument = method.getArguments().get(0);
                         if (argument instanceof J.Literal) {
                             Object value = ((J.Literal) argument).getValue();

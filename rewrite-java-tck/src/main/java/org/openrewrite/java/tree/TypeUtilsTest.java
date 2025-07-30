@@ -389,7 +389,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    if (method.getSimpleName().equals("test")) {
+                    if ("test".equals(method.getSimpleName())) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), BOUND)).isFalse();
@@ -430,7 +430,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    if (method.getSimpleName().equals("test")) {
+                    if ("test".equals(method.getSimpleName())) {
                         J.Block block = getCursor().getParentTreeCursor().getValue();
                         J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
                         J.MethodDeclaration consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);

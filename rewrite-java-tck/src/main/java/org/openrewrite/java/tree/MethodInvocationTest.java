@@ -35,7 +35,7 @@ class MethodInvocationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("foo")) {
+                  if ("foo".equals(method.getSimpleName())) {
                       assertThat("foo").isEqualTo(method.getSimpleName());
                       assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(method.getType())
                         .getFullyQualifiedName());
@@ -70,7 +70,7 @@ class MethodInvocationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("generic")) {
+                  if ("generic".equals(method.getSimpleName())) {
                       var methType = method.getMethodType();
                       assertThat(TypeUtils.asFullyQualified(methType.getReturnType()).getFullyQualifiedName())
                         .isEqualTo("java.lang.Integer");

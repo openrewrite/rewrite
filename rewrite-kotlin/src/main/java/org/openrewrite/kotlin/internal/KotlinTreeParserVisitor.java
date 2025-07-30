@@ -3942,7 +3942,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static boolean isCRLF(ASTNode node) {
-        return node instanceof PsiErrorElementImpl && node.getText().equals("\r");
+        return node instanceof PsiErrorElementImpl && "\r".equals(node.getText());
     }
 
     private String nodeRangeText(@Nullable ASTNode first, @Nullable ASTNode last) {

@@ -119,7 +119,7 @@ public class VariableAccess implements Trait<J.Identifier> {
 
             J.Identifier ident = cursor.getValue();
             String name = ident.getSimpleName();
-            if (name.equals("this") || name.equals("super") ||
+            if ("this".equals(name) || "super".equals(name) ||
                 checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getName)) {
                 return null;
             }

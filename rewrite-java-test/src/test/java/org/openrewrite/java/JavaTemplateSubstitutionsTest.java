@@ -36,7 +36,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       var s = method.getBody().getStatements().getFirst();
                       return JavaTemplate.builder("test(#{any()})")
                         .contextSensitive()
@@ -80,7 +80,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       var s = method.getBody().getStatements().getFirst();
                       return JavaTemplate.builder("test(#{anyArray()})")
                         .contextSensitive()
@@ -123,7 +123,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("test")) {
+                  if ("test".equals(method.getSimpleName())) {
                       return JavaTemplate.builder("#{} void test2() {}")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
@@ -306,7 +306,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                  if (literal.getValue().equals("literal")) {
+                  if ("literal".equals(literal.getValue())) {
                       return JavaTemplate.builder("Some.method()")
                         .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
@@ -540,7 +540,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             if ("setScale".equals(m.getName().getSimpleName())) {
                 J.FieldAccess secondArgument = (J.FieldAccess) m.getArguments().get(1);
-                if (secondArgument.getName().getSimpleName().equals("ROUND_DOWN")) {
+                if ("ROUND_DOWN".equals(secondArgument.getName().getSimpleName())) {
                     maybeAddImport("java.math.RoundingMode");
                     return JavaTemplate.builder("#{any(int)}, #{}")
                       .imports("java.math.RoundingMode")
