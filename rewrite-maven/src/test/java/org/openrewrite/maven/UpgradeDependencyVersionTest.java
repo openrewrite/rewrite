@@ -1427,7 +1427,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """            
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>

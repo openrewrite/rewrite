@@ -518,7 +518,7 @@ class AutodetectTest implements RewriteTest {
             import kotlin.random.Random
 
             import javax.lang.model.type.ArrayType
-            
+
             import java.util.Map
             import java.util.Set
 
@@ -831,13 +831,13 @@ class AutodetectTest implements RewriteTest {
         var cus = kp().parse(
           """
             import java.util.function.BiConsumer
-                            
+
             class T {
                 companion object {
                     init {
                         val i0 = intArrayOf(1, 2)
                         val i1 = intArrayOf(2, 3)
-                            
+
                         val c0: BiConsumer<*, *> = BiConsumer { a, b -> }
                         val c1: BiConsumer<*, *> = BiConsumer { a, b -> }
                         val c2: BiConsumer<*, *> = BiConsumer { a, b -> }
@@ -1051,7 +1051,7 @@ class AutodetectTest implements RewriteTest {
               """
                 annotation class Foo
                 annotation class Foos(val value: Array<Foo>)
-                
+
                 class Test {
                     @Foos(
                        value = [Foo()])

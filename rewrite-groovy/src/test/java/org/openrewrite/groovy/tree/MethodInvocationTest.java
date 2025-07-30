@@ -30,11 +30,11 @@ class MethodInvocationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation 'org.hibernate:hibernate-core:3.6.7.Final'
                   api 'com.google.guava:guava:23.0'
@@ -268,7 +268,7 @@ class MethodInvocationTest implements RewriteTest {
                 Test child = new Test()
                 def acceptsClosure(Closure cl) {}
               }
-              
+
               new Test().child.acceptsClosure {}
               """
           )
@@ -462,7 +462,7 @@ class MethodInvocationTest implements RewriteTest {
                 static boolean isEmpty(String value) {
                   return value == null || value.isEmpty()
                 }
-              
+
                 static void main(String[] args) {
                   isEmpty("")
                 }
@@ -500,7 +500,7 @@ class MethodInvocationTest implements RewriteTest {
     void insideParentheses() {
         rewriteRun(
           groovy(
-            """              
+            """
               static def foo(Map map) {
                   ((map.containsKey("foo"))
                       && ((map.get("foo")).equals("bar")))
@@ -529,7 +529,7 @@ class MethodInvocationTest implements RewriteTest {
     void insideParenthesesWithNewline() {
         rewriteRun(
           groovy(
-            """              
+            """
               static def foo(Map map) {
                   ((
                   map.containsKey("foo"))

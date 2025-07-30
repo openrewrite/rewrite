@@ -31,7 +31,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -39,7 +39,7 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(int i) {
                   }
@@ -56,7 +56,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -64,7 +64,7 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(int i) {
                   }
@@ -81,7 +81,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -89,7 +89,7 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(int[] i) {
                   }
@@ -106,7 +106,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -114,10 +114,10 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               import java.util.List;
               import java.util.regex.Pattern;
-              
+
               public class Foo {
                   public void bar(List<Pattern> i) {
                   }
@@ -134,7 +134,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -142,9 +142,9 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               import java.util.List;
-              
+
               public class Foo {
                   public void bar(List<?> i) {
                   }
@@ -161,7 +161,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -169,9 +169,9 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               import java.util.List;
-              
+
               public class Foo {
                   public void bar(List<? extends Object> i) {
                   }
@@ -188,28 +188,28 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
-              
+
                   public void bar(int i) {
                   }
-              
+
                   public void bar(int j) {
                   }
               }
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(String i) {
                   }
-              
+
                   public void bar(int i) {
                   }
-              
+
                   public void bar(int j, String i) {
                   }
               }
@@ -225,22 +225,22 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
-              
+
                   public void bar(int j) {
                   }
               }
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(int i) {
                   }
-              
+
                   public void bar(int i, int j) {
                   }
               }
@@ -256,7 +256,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -266,13 +266,13 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               import java.util.regex.Pattern;
-              
+
               public class Foo {
                   public void bar(Pattern p) {
                   }
-              
+
                   public void bar(int j, Pattern p) {
                   }
               }
@@ -288,7 +288,7 @@ class AddMethodParameterTest implements RewriteTest {
           java(
             """
               package foo;
-              
+
               public class Foo {
                   public void bar() {
                   }
@@ -296,7 +296,7 @@ class AddMethodParameterTest implements RewriteTest {
               """,
             """
               package foo;
-              
+
               public class Foo {
                   public void bar(Object o) {
                   }

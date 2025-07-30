@@ -174,7 +174,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
           java(
             """
             package com.helloworld;
-            
+
             import java.util.Objects;
 
             class Hello {
@@ -204,7 +204,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
           java(
             """
             package com.helloworld;
-            
+
             import java.util.Objects;
 
             class Hello {

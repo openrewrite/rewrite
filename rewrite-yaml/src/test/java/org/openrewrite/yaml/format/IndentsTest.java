@@ -156,8 +156,8 @@ class IndentsTest implements RewriteTest {
               # under-indented
                   # over-indented
                 a : # no change
-              
-              
+
+
                 # under-indented
                     # over-indented
                   b : c
@@ -167,8 +167,8 @@ class IndentsTest implements RewriteTest {
                 # under-indented
                 # over-indented
                 a : # no change
-              
-              
+
+
                   # under-indented
                   # over-indented
                   b : c

@@ -114,7 +114,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               package com.sample;
               /**
                * {@link Stream<? extends Foo>}
-               */              
+               */
               class Test {
               }
               """

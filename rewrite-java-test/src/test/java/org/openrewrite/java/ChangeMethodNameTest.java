@@ -443,9 +443,9 @@ class ChangeMethodNameTest implements RewriteTest {
           java(
             """
               package com.abc;
-              
+
               import java.util.ArrayList;
-              
+
               class A {
                  public void test() {
                      com.abc.B.static1("boo");

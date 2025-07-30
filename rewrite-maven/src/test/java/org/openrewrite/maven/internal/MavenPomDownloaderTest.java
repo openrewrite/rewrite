@@ -77,7 +77,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       https://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
       https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
       http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-      
+
       https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
       https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
       https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
@@ -425,11 +425,11 @@ class MavenPomDownloaderTest implements RewriteTest {
                   """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                    
+
                         <groupId>org.openrewrite.test</groupId>
                         <artifactId>foo</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                    
+
                         <repositories>
                           <repository>
                             <id>snapshot</id>
@@ -446,7 +446,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                             <url>http://%s:%d</url>
                           </repository>
                         </repositories>
-                    
+
                         <dependencies>
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>
@@ -1303,11 +1303,11 @@ class MavenPomDownloaderTest implements RewriteTest {
                             return new MockResponse().setResponseCode(200).setBody(
                               //language=xml
                               """
-                                
+
                                 <?xml version="1.0" encoding="UTF-8"?>
                                 <project>
                                     <modelVersion>4.0.0</modelVersion>
-                                
+
                                     <groupId>com.mycompany.app</groupId>
                                     <artifactId>my-app</artifactId>
                                     <version>1</version>

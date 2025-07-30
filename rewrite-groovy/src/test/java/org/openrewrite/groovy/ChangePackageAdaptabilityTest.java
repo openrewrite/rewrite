@@ -54,14 +54,14 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Original
-              
+
               class A {
                   Original type
               }

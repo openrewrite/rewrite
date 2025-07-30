@@ -177,7 +177,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           java(
             """
               import java.util.Optional;
-              
+
               class Test {
                   <T extends Number> void test(T element) {
                       Optional<T> o = Optional.of(element);
@@ -186,7 +186,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               """,
             """
               import java.util.Optional;
-              
+
               class Test {
                   <T extends Number> void test(T element) {
                       var o = Optional.of(element);

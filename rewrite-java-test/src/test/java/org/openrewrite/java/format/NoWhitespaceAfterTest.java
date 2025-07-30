@@ -430,32 +430,32 @@ class NoWhitespaceAfterTest implements RewriteTest {
           java(
             """
               package sample;
-              
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               public class ArrayNotNull {
-              
+
                   byte[] bytes = new byte[0];
-              
+
                   public byte @NotNull [] getBytes() {
                       return bytes;
                   }
-              
+
                   int[] ints = new int[0];
-              
+
                   public int @NotNull [] getInts() {
                       return ints;
                   }
-              
+
                   Object[] objects = new Object[0];
-              
+
                   public Object @NotNull [] getObjects() {
                       return objects;
                   }
-              
+
               }
-              
+
               @Target(ElementType.TYPE_USE)
               @interface NotNull {}
               """,

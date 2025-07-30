@@ -279,13 +279,13 @@ class FindAnnotationsTest implements RewriteTest {
           java(
             """
               package com.foo;
-                          
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Inherited;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                          
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.TYPE})
               @Inherited
@@ -297,7 +297,7 @@ class FindAnnotationsTest implements RewriteTest {
           java(
             """
               package com.foo;
-                            
+
               @Example(Foo.class)
               public class Foo {}
               """,
@@ -316,7 +316,7 @@ class FindAnnotationsTest implements RewriteTest {
             """
               import com.fasterxml.jackson.annotation.JsonTypeInfo;
               import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-                            
+
               class PenetrationTesting {
                   @JsonTypeInfo(use = Id.CLASS)
                   Object name;
@@ -325,7 +325,7 @@ class FindAnnotationsTest implements RewriteTest {
             """
               import com.fasterxml.jackson.annotation.JsonTypeInfo;
               import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
-                            
+
               class PenetrationTesting {
                   /*~~>*/@JsonTypeInfo(use = Id.CLASS)
                   Object name;

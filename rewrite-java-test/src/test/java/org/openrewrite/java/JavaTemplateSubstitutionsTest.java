@@ -52,7 +52,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int n) {
                       value();
                   }
-              
+
                   int value() {
                       return 0;
                   }
@@ -63,7 +63,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int n) {
                       test(value());
                   }
-              
+
                   int value() {
                       return 0;
                   }
@@ -96,7 +96,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int[][] n) {
                       array();
                   }
-              
+
                   int[][] array() {
                       return new int[0][0];
                   }
@@ -107,7 +107,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int[][] n) {
                       test(array());
                   }
-              
+
                   int[][] array() {
                       return new int[0][0];
                   }
@@ -140,7 +140,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               class Test {
-              
+
                   @SuppressWarnings("ALL")
                   void test2() {
                   }
@@ -398,7 +398,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             """
               abstract class Test {
                   abstract String[] array();
-              
+
                   void test(boolean condition) {
                       Object any = condition ? array() : new String[]{"Hello!"};
                   }
@@ -406,10 +406,10 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               """,
             """
               import java.util.Arrays;
-              
+
               abstract class Test {
                   abstract String[] array();
-              
+
                   void test(boolean condition) {
                       Object any = Arrays.asList(condition ? array() : new String[]{"Hello!"});
                   }
@@ -488,7 +488,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           java(
             """
               import java.math.BigDecimal;
-              
+
               class A {
                   static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN));
               }
@@ -496,7 +496,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             """
               import java.math.BigDecimal;
               import java.math.RoundingMode;
-              
+
               class A {
                   static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, RoundingMode.DOWN));
               }
@@ -512,7 +512,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           java(
             """
               import java.math.BigDecimal;
-              
+
               class A {
                   public static void b() {
                       BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN);
@@ -522,7 +522,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             """
               import java.math.BigDecimal;
               import java.math.RoundingMode;
-              
+
               class A {
                   public static void b() {
                       BigDecimal.ONE.setScale(0, RoundingMode.DOWN);

@@ -144,11 +144,11 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try     {
-              
+
               }    catch(RuntimeException e)      {
-              
+
               }catch (     final         Exception          e) {
-              
+
               }finally{
                   // some comment
               }

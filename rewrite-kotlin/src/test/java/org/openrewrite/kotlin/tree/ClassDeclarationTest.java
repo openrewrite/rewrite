@@ -36,7 +36,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               import java . util . Collections as cs
               import java . io . *
-              
+
               class A
               """
           )
@@ -206,11 +206,11 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               public  @Deprecated ( "message 0" )   abstract    @Suppress("") class Test
-              
+
               @Deprecated ( "message 1" )
               @Suppress ( "" )
               class A
-              
+
               @Suppress ( "unused" , "unchecked" )
               @Deprecated ( "message 2" )
               class B
@@ -240,7 +240,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               interface A
               interface B
-              
+
               class KotlinTypeGoat < T : A , S : B>
               """
           )
@@ -325,7 +325,7 @@ class ClassDeclarationTest implements RewriteTest {
               interface B
               interface C
               interface D
-              
+
               class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
               """
           )
@@ -494,13 +494,13 @@ class ClassDeclarationTest implements RewriteTest {
                   val parent : T,
                   val root : R
               ) {
-                  
+
                   constructor ( parent : T , root : R , id : Int ) : this ( parent , root )
-                  
+
                   fun parent ( ) : T {
                       return parent
                   }
-                  
+
                   fun root ( ) : R {
                       return root
                   }
@@ -533,7 +533,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               @Repeatable
               annotation class A ( val s : String )
-              
+
               open @A ( "1" ) public @A ( "2" ) class TestA
               @A ( "1" ) open @A ( "2" ) public class TestB
               """

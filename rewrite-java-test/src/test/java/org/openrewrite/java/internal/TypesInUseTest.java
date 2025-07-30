@@ -35,7 +35,7 @@ class TypesInUseTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               public @interface YesOrNo {
                   Status status();
                   enum Status {
@@ -47,9 +47,9 @@ class TypesInUseTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               import static org.openrewrite.test.YesOrNo.Status.YES;
-              
+
               @YesOrNo(status = YES)
               public class Foo {}
               """,

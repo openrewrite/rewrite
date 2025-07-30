@@ -114,9 +114,9 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package bar;
-                            
+
               import foo.Super;
-                            
+
               class Test extends Super {
                   boolean classBlock;
               }
@@ -133,7 +133,7 @@ class VariableNameUtilsTest implements RewriteTest {
             """
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
-                            
+
               class Test {
                   boolean classBlock;
               }
@@ -345,7 +345,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.util.function.Supplier;
-                            
+
               class Test {
                   void method() {
                       boolean methodBlockA;
@@ -372,7 +372,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class SuperSuper {
                   public int superSuperPublic;
                   protected int superSuperProtected;
@@ -384,7 +384,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class Super extends SuperSuper {
                   public int superPublic;
                   protected int superProtected;
@@ -396,7 +396,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class Test extends Super {
                   boolean classBlock;
               }
@@ -453,7 +453,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.io.*;
-                            
+
               class Test {
                   void method() {
                       File methodBlockA = new File("file.txt");
@@ -483,7 +483,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.io.*;
-                            
+
               class Test {
                   void method(short methodParam) {
                       boolean methodBlockA;
@@ -522,7 +522,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.util.function.Consumer;
-              
+
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -537,7 +537,7 @@ class VariableNameUtilsTest implements RewriteTest {
               """,
             """
               import java.util.function.Consumer;
-              
+
               @SuppressWarnings("all")
               class Test {
                   void m() {

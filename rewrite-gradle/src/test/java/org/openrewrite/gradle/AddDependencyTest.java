@@ -72,7 +72,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -81,11 +81,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     testImplementation "com.google.guava:guava:29.0-jre"
                 }
@@ -111,11 +111,11 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
@@ -127,17 +127,17 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
                     }
                 }
-                
+
                 dependencies {
                     smokeTestImplementation "com.google.guava:guava:29.0-jre"
                 }
@@ -161,7 +161,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -170,11 +170,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
@@ -207,7 +207,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -216,11 +216,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
@@ -253,11 +253,11 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
@@ -269,17 +269,17 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
                     }
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
@@ -308,11 +308,11 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
@@ -324,17 +324,17 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
                     }
                 }
-                
+
                 dependencies {
                     testImplementation "com.google.guava:guava:29.0-jre"
                 }
@@ -363,11 +363,11 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "main"
@@ -379,20 +379,20 @@ class AddDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "main"
                     }
                 }
-                
+
                 dependencies {
                     smokeTestImplementation "com.google.guava:guava:29.0-jre"
-                
+
                     testImplementation "com.google.guava:guava:29.0-jre"
                 }
                 """
@@ -415,7 +415,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -424,11 +424,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "io.netty:netty-tcnative-boringssl-static:2.0.54.Final:linux-x86_64"
                 }
@@ -452,7 +452,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -461,11 +461,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "io.netty:netty-tcnative-boringssl-static"
                 }
@@ -490,7 +490,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -499,11 +499,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "io.netty:netty-tcnative-boringssl-static"
                 }
@@ -542,11 +542,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
                 }
@@ -555,11 +555,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                     implementation "commons-lang:commons-lang:1.0"
@@ -583,11 +583,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
                 }
@@ -596,14 +596,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
-                
+
                     testImplementation "com.google.guava:guava:29.0-jre"
                 }
                 """
@@ -625,11 +625,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.openrewrite:rewrite-core:7.40.8"
                     testImplementation "junit:junit:4.12"
@@ -639,11 +639,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.openrewrite:rewrite-core:7.40.8"
                     implementation "org.slf4j:slf4j-api:2.0.7"
@@ -663,7 +663,7 @@ class AddDependencyTest implements RewriteTest {
             srcMainJava(
               java("""
                 import lombok.Value;
-                
+
                 @Value
                 class A {
                     String b;
@@ -676,14 +676,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "commons-lang:commons-lang:2.6"
-                
+
                     testImplementation "junit:junit:4.13"
                 }
                 """,
@@ -691,16 +691,16 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     annotationProcessor "org.projectlombok:lombok:1.18.26"
-                
+
                     implementation "commons-lang:commons-lang:2.6"
-                
+
                     testImplementation "junit:junit:4.13"
                 }
                 """
@@ -722,14 +722,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
                 }
@@ -738,14 +738,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     testImplementation group: "com.google.guava", name: "guava", version: "29.0-jre"
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
@@ -769,14 +769,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
                 }
@@ -785,14 +785,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     testImplementation group: "com.google.guava", name: "guava"
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
@@ -816,14 +816,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
                 }
@@ -832,14 +832,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     testImplementation group: "com.google.guava", name: "guava", version: "29.0-jre", classifier: "test"
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
@@ -864,14 +864,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
                 }
@@ -880,14 +880,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     testImplementation group: "io.netty", name: "netty-tcnative-boringssl-static", classifier: "linux-x86_64"
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
@@ -911,11 +911,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
                 }
@@ -924,14 +924,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-                
+
                     testImplementation group: "com.google.guava", name: "guava", version: "29.0-jre"
                 }
                 """
@@ -953,11 +953,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:28.0-jre"
                 }
@@ -987,7 +987,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -996,11 +996,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     %s "com.fasterxml.jackson.core:jackson-core:2.12.0"
                 }
@@ -1034,7 +1034,7 @@ class AddDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
@@ -1043,11 +1043,11 @@ class AddDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   dependencies {
                       implementation "com.google.guava:guava:29.0-jre"
                   }
@@ -1087,7 +1087,7 @@ class AddDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
@@ -1096,11 +1096,11 @@ class AddDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   dependencies {
                       implementation "com.google.guava:guava:29.0-jre"
                   }
@@ -1127,7 +1127,7 @@ class AddDependencyTest implements RewriteTest {
               groovy(
                 """
                   import java.util.*
-                  
+
                   class MyClass {
                       static void main(String[] args) {
                           Date date = new Date()
@@ -1142,7 +1142,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -1151,11 +1151,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.openrewrite:rewrite-core:7.39.1"
                 }
@@ -1192,24 +1192,24 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 def guavaVersion = "29.0-jre"
                 """,
               """
                 plugins {
                     id 'java-library'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 def guavaVersion = "29.0-jre"
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:${guavaVersion}"
                 }
@@ -1234,7 +1234,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -1243,11 +1243,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     'default' "com.google.guava:guava:29.0-jre"
                 }
@@ -1272,11 +1272,11 @@ class AddDependencyTest implements RewriteTest {
                     id 'java'
                     id 'io.spring.dependency-management' version '1.1.5'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencyManagement {
                     dependencies {
                         dependency "org.openrewrite:rewrite-core:8.0.0"
@@ -1288,17 +1288,17 @@ class AddDependencyTest implements RewriteTest {
                     id 'java'
                     id 'io.spring.dependency-management' version '1.1.5'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencyManagement {
                     dependencies {
                         dependency "org.openrewrite:rewrite-core:8.0.0"
                     }
                 }
-                
+
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
@@ -1358,15 +1358,15 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
@@ -1379,15 +1379,15 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
@@ -1415,15 +1415,15 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite)
@@ -1435,17 +1435,17 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
-                    
+
                         testImplementation "com.google.guava:guava:29.0-jre"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite)
@@ -1474,15 +1474,15 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
@@ -1498,15 +1498,15 @@ class AddDependencyTest implements RewriteTest {
                         id "java-library"
                         id 'jvm-test-suite'
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                     }
-                    
+
                     testing {
                         suites {
                             integrationTest(JvmTestSuite) {
@@ -1533,11 +1533,11 @@ class AddDependencyTest implements RewriteTest {
                     plugins {
                         id "java-library"
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         if (project.hasProperty('x')) {
                             implementation "commons-lang:commons-lang:1.0"
@@ -1548,11 +1548,11 @@ class AddDependencyTest implements RewriteTest {
                     plugins {
                         id "java-library"
                     }
-                    
+
                     repositories {
                         mavenCentral()
                     }
-                    
+
                     dependencies {
                         if (project.hasProperty('x')) {
                             implementation "commons-lang:commons-lang:1.0"
@@ -1580,7 +1580,7 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     `java-library`
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -1589,11 +1589,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     `java-library`
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     testImplementation("com.google.guava:guava:29.0-jre")
                 }
@@ -1616,11 +1616,11 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     `java-library`
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation(group = "commons-lang", name = "commons-lang", version = "1.0")
                 }
@@ -1629,14 +1629,14 @@ class AddDependencyTest implements RewriteTest {
                 plugins {
                     `java-library`
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation(group = "commons-lang", name = "commons-lang", version = "1.0")
-                
+
                     testImplementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
                 }
                 """

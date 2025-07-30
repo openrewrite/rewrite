@@ -53,15 +53,15 @@ class MethodInvocationTest implements RewriteTest {
             //language=none
             """
               package pkg
-              
+
               import pkg.Callee.calleeMethod  /* C1 */
               import pkg.Callee.CALLEE_FIELD  /* C2 */
-              
+
               class Caller {
                   fun method(): Any = calleeMethod()
                   fun method2(): Any = CALLEE_FIELD
               }
-              
+
               /*42*/ object Callee {
                   const val CALLEE_FIELD = ""
                   fun calleeMethod(): Unit = Unit
@@ -101,19 +101,19 @@ class MethodInvocationTest implements RewriteTest {
 
               fun method ( ) {
                   DSL ( ) .
-                  
+
                   plugins {
                       `java-library`
-                  
+
                       id ( "nebula.release") version "16.0.0"
-                  
+
                       id ( "nebula.maven-manifest" ) version "18.4.0"
                       id ( "nebula.maven-nebula-publish" ) version "18.4.0"
                       id ( "nebula.maven-resolved-dependencies" ) version "18.4.0"
-                  
+
                       id ( "nebula.contacts" ) version "6.0.0"
                       id ( "nebula.info" ) version "11.3.3"
-                  
+
                       id ( "nebula.javadoc-jar" ) version "18.4.0"
                       id ( "nebula.source-jar" ) version "18.4.0"
                   }
@@ -246,9 +246,9 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               open class Test
-              
+
               fun test ( a : Test ) { }
-              
+
               fun method ( ) {
                   test ( object :  Test   ( ) {
                   } )
@@ -303,7 +303,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               fun String.modify(block: () -> Unit) = this
-              
+
               val spec = "test".modify( /*42*/  ) {
                   println("Hello, world!")
               }
@@ -320,12 +320,12 @@ class MethodInvocationTest implements RewriteTest {
             """
               @Suppress("UNUSED_PARAMETER")
               fun String.modify(block: ( Any? ) -> Any? ) = this
-              
+
               @Suppress("UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
               val spec = "test".modify {
                   (  i   ) ->
               }
-              
+
               operator fun Any?.component1(): Any {
                   return ""
               }
@@ -343,7 +343,7 @@ class MethodInvocationTest implements RewriteTest {
               class FreeSpec ( private val initializer : FreeSpec . ( ) -> Unit ) {
                 infix fun String . modify ( block : ( ) -> Unit ) : Nothing = TODO ( )
               }
-              
+
               val spec = FreeSpec {
                 "test" modify {
                   println ( "Hello, world!" )
@@ -360,7 +360,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               infix fun String.modify(block: () -> Unit) = this
-              
+
               val spec = "test"  modify   {
                   println("Hello, world!")
               }
@@ -381,7 +381,7 @@ class MethodInvocationTest implements RewriteTest {
                       result . add ( t )
                   return result
               }
-              
+
               val list = asList ( 1 , 2 , 3 , 4 )
               """
           )
@@ -400,7 +400,7 @@ class MethodInvocationTest implements RewriteTest {
                       result . add ( t )
                   return result
               }
-              
+
               val list = asList ( 1 , 2 , 3 , 4 )
               """
           )

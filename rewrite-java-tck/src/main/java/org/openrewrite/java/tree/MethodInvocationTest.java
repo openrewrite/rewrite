@@ -55,7 +55,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               public class A {
                   Integer m = foo ( 0, 1, 2 );
-              
+
                   public Integer foo(Integer n, Integer... ns) { return n; }
               }
               """
@@ -87,7 +87,7 @@ class MethodInvocationTest implements RewriteTest {
               public class A {
                   Integer o = generic ( 0, 1, 2 );
                   Integer p = this . < Integer > generic ( 0, 1, 2 );
-                            
+
                   public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
               }
               """,
@@ -120,7 +120,7 @@ class MethodInvocationTest implements RewriteTest {
               import java.util.Collections;
               import java.util.HashSet;
               import java.util.Set;
-              
+
               class A {
                   void m() {
                       Set<Class<?>> primitiveTypes = new HashSet<>(32);

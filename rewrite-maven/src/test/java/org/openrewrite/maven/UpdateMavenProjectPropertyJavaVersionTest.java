@@ -260,21 +260,21 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
               """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
-                
+
                     <parent>
                         <groupId>org.springframework.cloud</groupId>
                         <artifactId>spring-cloud-build</artifactId>
                         <version>4.1.5</version>
                         <relativePath/>
                     </parent>
-                
+
                     <artifactId>spring-cloud-kubernetes</artifactId>
                     <version>3.1.5</version>
                     <packaging>pom</packaging>
                     <modules>
                         <module>spring-cloud-kubernetes-integration-tests</module>
                     </modules>
-                
+
                     <build>
                         <plugins>
                             <plugin>
@@ -300,13 +300,13 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <artifactId>spring-cloud-kubernetes</artifactId>
                         <version>3.1.5</version>
                     </parent>
-                
+
                     <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
                     <packaging>pom</packaging>
-                
+
                     <name>Spring Cloud Kubernetes :: Integration Tests</name>
                     <description>Integration tests where SCK applications are run inside a Kubernetes cluster</description>
-                
+
                     <modules>
                         <module>spring-cloud-kubernetes-k8s-client-discovery-server</module>
                     </modules>
@@ -323,9 +323,9 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                         <version>3.1.5</version>
                     </parent>
                     <modelVersion>4.0.0</modelVersion>
-                
+
                     <artifactId>spring-cloud-kubernetes-k8s-client-discovery-server</artifactId>
-                
+
                 </project>"""
             )
           )

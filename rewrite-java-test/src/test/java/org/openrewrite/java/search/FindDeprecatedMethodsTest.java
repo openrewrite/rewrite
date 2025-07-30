@@ -92,7 +92,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   @Deprecated
                   void test(int n) {
                   }
-              
+
                   Test() {
                       int n = 1;
                       if(n == 1) {
@@ -197,7 +197,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                           test(n + 1);
                       }
                   }
-                  
+
                   @Deprecated
                   void foo(int n) {
                       if(n == 1) {
@@ -214,7 +214,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                           test(n + 1);
                       }
                   }
-                  
+
                   @Deprecated
                   void foo(int n) {
                       if(n == 1) {
@@ -244,7 +244,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
           java(
             """
               import com.yourorg.Foo;
-              
+
               class A {
                   void a() {
                       new Foo().foo();
@@ -253,7 +253,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
               """,
             """
               import com.yourorg.Foo;
-              
+
               class A {
                   void a() {
                       /*~~>*/new Foo().foo();
