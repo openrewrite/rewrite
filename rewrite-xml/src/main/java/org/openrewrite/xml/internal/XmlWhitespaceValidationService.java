@@ -29,30 +29,26 @@ public class XmlWhitespaceValidationService implements WhitespaceValidationServi
             @Override
             public Xml.Attribute visitAttribute(Xml.Attribute attribute, ExecutionContext executionContext) {
                 Xml.Attribute a = super.visitAttribute(attribute, executionContext);
-                a = a.withPrefix(withNonWhitespaceWarning(a.getPrefix()));
-                return a;
+                return a.withPrefix(withNonWhitespaceWarning(a.getPrefix()));
             }
 
             @Override
             public Xml.CharData visitCharData(Xml.CharData charData, ExecutionContext executionContext) {
                 Xml.CharData c = super.visitCharData(charData, executionContext);
                 c = c.withPrefix(withNonWhitespaceWarning(c.getPrefix()));
-                c = c.withAfterText(withNonWhitespaceWarning(c.getAfterText()));
-                return c;
+                return c.withAfterText(withNonWhitespaceWarning(c.getAfterText()));
             }
 
             @Override
             public Xml.Comment visitComment(Xml.Comment comment, ExecutionContext executionContext) {
                 Xml.Comment c = super.visitComment(comment, executionContext);
-                c = c.withPrefix(withNonWhitespaceWarning(c.getPrefix()));
-                return c;
+                return c.withPrefix(withNonWhitespaceWarning(c.getPrefix()));
             }
 
             @Override
             public Xml.DocTypeDecl visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, ExecutionContext executionContext) {
                 Xml.DocTypeDecl d = super.visitDocTypeDecl(docTypeDecl, executionContext);
-                d = d.withPrefix(withNonWhitespaceWarning(d.getPrefix()));
-                return d;
+                return d.withPrefix(withNonWhitespaceWarning(d.getPrefix()));
             }
 
             // Document can start with a byte order marker, which is not technically whitespace
@@ -67,43 +63,37 @@ public class XmlWhitespaceValidationService implements WhitespaceValidationServi
             @Override
             public Xml.Element visitElement(Xml.Element element, ExecutionContext executionContext) {
                 Xml.Element e = super.visitElement(element, executionContext);
-                e = e.withPrefix(withNonWhitespaceWarning(e.getPrefix()));
-                return e;
+                return e.withPrefix(withNonWhitespaceWarning(e.getPrefix()));
             }
 
             @Override
             public Xml.Ident visitIdent(Xml.Ident ident, ExecutionContext executionContext) {
                 Xml.Ident i = super.visitIdent(ident, executionContext);
-                i = i.withPrefix(withNonWhitespaceWarning(i.getPrefix()));
-                return i;
+                return i.withPrefix(withNonWhitespaceWarning(i.getPrefix()));
             }
 
             @Override
             public Xml.XmlDecl visitXmlDecl(Xml.XmlDecl xmlDecl, ExecutionContext executionContext) {
                 Xml.XmlDecl x = super.visitXmlDecl(xmlDecl, executionContext);
-                x = x.withPrefix(withNonWhitespaceWarning(x.getPrefix()));
-                return x;
+                return x.withPrefix(withNonWhitespaceWarning(x.getPrefix()));
             }
 
             @Override
             public Xml.ProcessingInstruction visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, ExecutionContext executionContext) {
                 Xml.ProcessingInstruction p = super.visitProcessingInstruction(processingInstruction, executionContext);
-                p = p.withPrefix(withNonWhitespaceWarning(p.getPrefix()));
-                return p;
+                return p.withPrefix(withNonWhitespaceWarning(p.getPrefix()));
             }
 
             @Override
             public Xml.Prolog visitProlog(Xml.Prolog prolog, ExecutionContext executionContext) {
                 Xml.Prolog p = super.visitProlog(prolog, executionContext);
-                p = p.withPrefix(withNonWhitespaceWarning(p.getPrefix()));
-                return p;
+                return p.withPrefix(withNonWhitespaceWarning(p.getPrefix()));
             }
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
                 Xml.Tag t = super.visitTag(tag, executionContext);
-                t = t.withPrefix(withNonWhitespaceWarning(t.getPrefix()));
-                return t;
+                return t.withPrefix(withNonWhitespaceWarning(t.getPrefix()));
             }
         };
     }

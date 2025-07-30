@@ -58,8 +58,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3552")
+    @Test
     void continuationIndentFromParameters() {
         var cus = jp().parse(
           """
@@ -79,8 +79,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3550")
+    @Test
     void alignParametersWhenMultiple() {
         var cus = jp().parse(
           """
@@ -754,8 +754,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    @Test
     void detectAfterCommaShouldIgnoreFirstElement() {
         var cus = jp().parse(
           """
@@ -778,8 +778,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    @Test
     void detectAfterCommaBasedOnLambdas() {
         var cus = jp().parse(
           """
@@ -1016,8 +1016,8 @@ class AutodetectTest implements RewriteTest {
 
     @Nested
     class ContinuationIndentForAnnotations {
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3568")
+        @Test
         void ignoreSpaceBetweenAnnotations() {
             var cus = jp().parse(
               """
@@ -1098,8 +1098,8 @@ class AutodetectTest implements RewriteTest {
               .isEqualTo(3);
         }
 
-        @Test
         @ExpectedToFail("existing visitor does not super-visit newArray trees")
+        @Test
         void includeAnnotationArgArrayElements() {
             var cus = jp().parse(
               """

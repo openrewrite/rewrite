@@ -20,6 +20,7 @@ import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.SnippetTree;
 import com.sun.source.doctree.UsesTree;
 import com.sun.source.tree.*;
 import com.sun.source.tree.IdentifierTree;
@@ -867,6 +868,46 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 convertMultiline(node.getAttributes()),
                 node.isSelfClosing(),
                 node.isSelfClosing() ? sourceBefore("/>") : sourceBefore(">")
+        );
+    }
+
+    @Override
+    public Tree visitSnippet(SnippetTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@snippet"));
+
+        // Parse attributes (e.g., lang=java, id="example")
+        List<Javadoc> attributes = new ArrayList<>();
+        if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
+            attributes.addAll(whitespaceBefore());
+            for (DocTree attr : node.getAttributes()) {
+                attributes.add((Javadoc) scan(attr, body));
+                attributes.addAll(whitespaceBefore());
+            }
+        }
+        // Check for whitespace and colon separator
+        String spaceBeforeColon = whitespaceBeforeAsString();
+        if (cursor < source.length() && source.charAt(cursor) == ':') {
+            // Found colon - add space before it to attributes if present
+            if (!spaceBeforeColon.isEmpty()) {
+                attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, spaceBeforeColon));
+            }
+            attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
+            cursor++;
+        }
+
+        // Parse snippet content
+        List<Javadoc> content = new ArrayList<>();
+        if (node.getBody() != null) {
+            // Always use convertMultiline - it handles both single and multi-line properly
+            content.addAll(convertMultiline(singletonList(node.getBody())));
+        }
+
+        return new Javadoc.Snippet(
+                randomId(),
+                Markers.EMPTY,
+                attributes,
+                content,
+                endBrace()
         );
     }
 

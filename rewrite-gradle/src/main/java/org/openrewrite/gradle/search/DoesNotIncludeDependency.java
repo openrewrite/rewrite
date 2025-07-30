@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.SearchResult;
 
 import static org.openrewrite.Validated.notBlank;
 
@@ -68,6 +69,23 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.not(new DependencyInsight(groupId, artifactId, null, configuration).getVisitor());
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final TreeVisitor<?, ExecutionContext> di = new DependencyInsight(groupId, artifactId, null, configuration).getVisitor();
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return di.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                Tree t2 = di.visit(tree, ctx);
+                // if Gradle file is unchanged, we found something without the dependency
+                if (t2 == tree) {
+                    return SearchResult.found(tree);
+                }
+                return tree;
+            }
+        };
     }
 }

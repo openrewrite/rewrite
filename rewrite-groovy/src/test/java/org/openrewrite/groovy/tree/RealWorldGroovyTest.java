@@ -26,8 +26,8 @@ import static org.openrewrite.groovy.Assertions.groovy;
  */
 class RealWorldGroovyTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4116")
+    @Test
     void jenkinsFile() {
         rewriteRun(
           groovy(
@@ -51,8 +51,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/settings.gradle")
+    @Test
     void springBootSettingsGradle() {
         rewriteRun(
           groovy(
@@ -110,8 +110,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/spring-boot-project/spring-boot-tools/spring-boot-cli/src/test/resources/classloader-test-app.groovy")
+    @Test
     void springBootClassloaderTestApp() {
         rewriteRun(
           groovy(
@@ -133,8 +133,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/JavadocOptionsPlugin.groovy")
+    @Test
     void springLdapJavadocOptionsPlugin() {
         rewriteRun(
           groovy(
@@ -157,8 +157,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
+    @Test
     void springLdapTheTest() {
         rewriteRun(
           groovy(
@@ -182,8 +182,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")
+    @Test
     void springTestDataGeodeSchemaZipPlugin() {
         rewriteRun(
           groovy(
@@ -251,8 +251,8 @@ class RealWorldGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/spring-projects/spring-webflow/blob/v3.4.1/gradle/docs.gradle")
+    @Test
     void springWebflowGradleDocs() {
         rewriteRun(
           groovy(

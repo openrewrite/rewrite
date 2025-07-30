@@ -206,7 +206,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 if (stat instanceof J.MethodInvocation) {
                     J.MethodInvocation m = (J.MethodInvocation) stat;
                     if (buildPluginsMatcher.matches(m) || settingsPluginsMatcher.matches(m)) {
-                        m = m.withArguments(ListUtils.map(m.getArguments(), a -> {
+                        return m.withArguments(ListUtils.map(m.getArguments(), a -> {
                             if (a instanceof J.Lambda) {
                                 J.Lambda l = (J.Lambda) a;
                                 J.Block b = (J.Block) l.getBody();
@@ -221,7 +221,6 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             }
                             return a;
                         }));
-                        return m;
                     }
                 }
                 return stat;

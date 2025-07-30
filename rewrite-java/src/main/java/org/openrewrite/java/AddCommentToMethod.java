@@ -31,7 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * This recipe adds a comment to a method in a Java source file. The comment can be a single line or a multiline comment.
+ * This recipe adds a comment to method declarations in a Java source file. The comment can be a single line or a multiline comment.
  * <p>
  * The {@link AddCommentToMethod#comment} must be supplied and is the comment to add.
  * <p>
@@ -44,12 +44,12 @@ import java.util.regex.Pattern;
 public class AddCommentToMethod extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Add comment";
+        return "Add comment to method declarations";
     }
 
     @Override
     public String getDescription() {
-        return "Add a comment to a Java source file.";
+        return "Add a comment to method declarations in a Java source file.";
     }
 
     @Option(displayName = "Comment",
@@ -58,7 +58,7 @@ public class AddCommentToMethod extends Recipe {
     String comment;
 
     @Option(displayName = "Method pattern",
-            description = "A pattern to match methods to add the comment to. " + MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = "A pattern to match methods to add the comment to. " + MethodMatcher.METHOD_PATTERN_DECLARATIONS_DESCRIPTION,
             example = "java.util.List add*(..)")
     String methodPattern;
 
@@ -81,22 +81,22 @@ public class AddCommentToMethod extends Recipe {
         return Preconditions.check(new DeclaresMethod<>(methodMatcher), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
                 J.ClassDeclaration cd = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
 
-                if (methodMatcher.matches(md, cd)) {
-                    String methodPrefixWhitespace = md.getPrefix().getWhitespace();
+                if (methodMatcher.matches(m, cd)) {
+                    String methodPrefixWhitespace = m.getPrefix().getWhitespace();
 
-                    boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethod.this.isMultiline);
+                    boolean createMultiline = Boolean.TRUE.equals(isMultiline);
                     Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace: " ") : comment;
+                    String newCommentText = matcher.find() ? matcher.replaceAll(createMultiline ? methodPrefixWhitespace: " ") : comment;
 
-                    if (doesNotHaveComment(newCommentText, md.getComments())) {
-                        TextComment textComment = new TextComment(isMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
-                        return md.withComments(ListUtils.concat(md.getComments(), textComment));
+                    if (doesNotHaveComment(newCommentText, m.getComments())) {
+                        TextComment textComment = new TextComment(createMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
+                        return m.withComments(ListUtils.concat(m.getComments(), textComment));
                     }
                 }
-                return md;
+                return m;
             }
 
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {

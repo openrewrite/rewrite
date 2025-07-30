@@ -17,6 +17,7 @@ package org.openrewrite.gradle.search;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
     private static final String marker = "/*~~>*/";
@@ -39,20 +41,32 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         return new DoesNotIncludeDependency("org.springframework", "spring-beans", configuration);
     }
 
+    @Test
+    void nonGradleFilesNotMarked() {
+        rewriteRun(
+          spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
+          java(
+            """
+              class SomeClass {}
+              """
+          )
+        );
+    }
+
     @Nested
     class DirectDependencyPresent {
         //language=groovy
         private static final String directDependencyTemplate = """
-            plugins {
-                id 'java-library'
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                %s 'org.springframework:spring-beans:6.0.0'
-            }
-            """;
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              %s 'org.springframework:spring-beans:6.0.0'
+          }
+          """;
 
         @ParameterizedTest
         @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
@@ -63,12 +77,12 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
         @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
         @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
         @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
         @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        @ParameterizedTest
         void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
@@ -79,7 +93,6 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
         @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
         @CsvSource({"compileOnly,compileClasspath"})
@@ -87,6 +100,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
         @CsvSource({"testCompileOnly,testCompileClasspath"})
         @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        @ParameterizedTest
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
@@ -99,16 +113,16 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     class TransitiveDependencyPresent {
         //language=groovy
         private static final String transitiveDependencyTemplate = """
-            plugins {
-                id 'java-library'
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
-            }
-            """;
+          plugins {
+              id 'java-library'
+          }
+          repositories {
+              mavenCentral()
+          }
+          dependencies {
+              %s 'org.springframework.boot:spring-boot-starter-actuator:3.0.0'
+          }
+          """;
 
         @ParameterizedTest
         @ValueSource(strings = {"api", "implementation", "compileOnly", "runtimeOnly", "testImplementation", "testCompileOnly", "testRuntimeOnly"})
@@ -119,12 +133,12 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
         @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
         @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
         @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
         @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        @ParameterizedTest
         void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
@@ -135,7 +149,6 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
         @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
         @CsvSource({"compileOnly,compileClasspath"})
@@ -143,6 +156,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
         @CsvSource({"testCompileOnly,testCompileClasspath"})
         @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        @ParameterizedTest
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
