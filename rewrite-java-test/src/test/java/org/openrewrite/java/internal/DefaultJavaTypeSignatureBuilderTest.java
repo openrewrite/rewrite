@@ -65,7 +65,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     @Override
     public String constructorSignature() {
         return signatureBuilder().methodSignature(goatCuType.getType().getMethods().stream()
-          .filter(m -> m.getName().equals("<constructor>"))
+          .filter(m -> "<constructor>".equals(m.getName()))
           .findAny()
           .orElseThrow());
     }

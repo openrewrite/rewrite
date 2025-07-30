@@ -254,7 +254,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }

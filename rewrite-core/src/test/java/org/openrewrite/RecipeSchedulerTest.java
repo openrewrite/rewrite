@@ -291,7 +291,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         Path workingDirectory = validateExecutionContext(ctx);
         assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
-        assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
+        assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
         assertDoesNotThrow(() -> {
             assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
         });
@@ -307,7 +307,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                   .view(ctx).getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
-                assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
+                assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
                 assertDoesNotThrow(() -> {
                     assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
                 });

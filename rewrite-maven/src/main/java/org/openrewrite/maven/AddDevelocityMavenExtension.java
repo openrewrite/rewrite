@@ -381,7 +381,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 tag = super.visitTag(tag, found);
                 if (xPathMatcher.matches(getCursor())) {
                     Optional<String> maybeArtifactId = tag.getValue();
-                    if (maybeArtifactId.isPresent() && (maybeArtifactId.get().equals(GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID) || maybeArtifactId.get().equals(DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID))) {
+                    if (maybeArtifactId.isPresent() && (GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID.equals(maybeArtifactId.get()) || DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID.equals(maybeArtifactId.get()))) {
                         found.set(true);
                     }
                 }

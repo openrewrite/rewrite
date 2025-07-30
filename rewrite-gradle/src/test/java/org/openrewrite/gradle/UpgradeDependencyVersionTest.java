@@ -1525,7 +1525,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 // Check that netty-codec is NOT listed amongst the dependencies as it is not a dependency of vertx-core 5.0.1
                 assertThat(compileClasspath.getResolved())
                   .as("GradleProject resolved dependencies should NOT contain netty-codec after upgrade to vertx-core 5.0.1")
-                  .noneMatch(dep -> dep.getGroupId().equals("io.netty") && dep.getArtifactId().equals("netty-codec"));
+                  .noneMatch(dep -> "io.netty".equals(dep.getGroupId()) && "netty-codec".equals(dep.getArtifactId()));
             })
           )
         );

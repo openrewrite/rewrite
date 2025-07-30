@@ -916,7 +916,7 @@ class AddImportTest implements RewriteTest {
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    if (method.getName().getSimpleName().equals("emptyList")) {
+                    if ("emptyList".equals(method.getName().getSimpleName())) {
                         return method.withSelect(null);
                     }
                     return method;

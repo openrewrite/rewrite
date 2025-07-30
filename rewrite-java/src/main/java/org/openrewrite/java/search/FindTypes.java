@@ -127,7 +127,7 @@ public class FindTypes extends Recipe {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
-                    fa.getName().getSimpleName().equals("class")) {
+                    "class".equals(fa.getName().getSimpleName())) {
                     ns.add(fieldAccess);
                 }
                 return fa;
@@ -197,7 +197,7 @@ public class FindTypes extends Recipe {
             J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                fa.getName().getSimpleName().equals("class")) {
+                "class".equals(fa.getName().getSimpleName())) {
                 return found(fa, ctx);
             }
             return fa;

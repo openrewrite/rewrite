@@ -79,7 +79,7 @@ class RenameVariableTest implements RewriteTest {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                if (classDecl.getSimpleName().equals("A")) {
+                if ("A".equals(classDecl.getSimpleName())) {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
@@ -1043,7 +1043,7 @@ class RenameVariableTest implements RewriteTest {
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
                   if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
-                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Base")) {
+                    target instanceof J.ClassDeclaration && "Base".equals(((J.ClassDeclaration) target).getSimpleName())) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
@@ -1138,7 +1138,7 @@ class RenameVariableTest implements RewriteTest {
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
                   if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
-                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Extended")) {
+                    target instanceof J.ClassDeclaration && "Extended".equals(((J.ClassDeclaration) target).getSimpleName())) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);

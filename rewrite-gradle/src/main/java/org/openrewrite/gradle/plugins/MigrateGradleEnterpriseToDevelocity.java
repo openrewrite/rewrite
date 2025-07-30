@@ -109,17 +109,17 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
         @Override
         public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (m.getSimpleName().equals("gradleEnterprise") && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+            if ("gradleEnterprise".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 return m.withName(m.getName().withSimpleName("develocity"));
             }
 
             if (m.getSimpleName().startsWith("publishAlways") && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildScan"))) {
-                if (m.getSimpleName().equals("publishAlways") && noArguments(m.getArguments())) {
+                if ("publishAlways".equals(m.getSimpleName()) && noArguments(m.getArguments())) {
                     // As of 3.17+, `publishAlways` is the default, so it is recommended to not configure anything
                     return null;
                 }
 
-                if (m.getSimpleName().equals("publishAlwaysIf")) {
+                if ("publishAlwaysIf".equals(m.getSimpleName())) {
                     J.MethodInvocation publishingTemplate = develocityPublishAlwaysIfDsl(getIndent(getCursor().firstEnclosing(G.CompilationUnit.class)), ctx);
                     if (publishingTemplate == null) {
                         return m;
@@ -148,11 +148,11 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                     return m;
                 }
 
-                if (m.getSimpleName().equals("publishOnFailure") && noArguments(m.getArguments())) {
+                if ("publishOnFailure".equals(m.getSimpleName()) && noArguments(m.getArguments())) {
                     return publishingTemplate;
                 }
 
-                if (m.getSimpleName().equals("publishOnFailureIf") && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Binary) {
+                if ("publishOnFailureIf".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Binary) {
                     return publishingTemplate.withArguments(ListUtils.mapFirst(publishingTemplate.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -178,11 +178,11 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
                 }
             }
 
-            if (m.getSimpleName().equals("remote") && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildCache"))) {
+            if ("remote".equals(m.getSimpleName()) && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildCache"))) {
                 return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                     if (arg instanceof J.FieldAccess) {
                         J.FieldAccess field = (J.FieldAccess) arg;
-                        if (field.getSimpleName().equals("buildCache") && field.getTarget() instanceof J.Identifier && ((J.Identifier) field.getTarget()).getSimpleName().equals("gradleEnterprise")) {
+                        if ("buildCache".equals(field.getSimpleName()) && field.getTarget() instanceof J.Identifier && "gradleEnterprise".equals(((J.Identifier) field.getTarget()).getSimpleName())) {
                             return field.withTarget(((J.Identifier) field.getTarget()).withSimpleName("develocity"));
                         }
                     }
@@ -196,7 +196,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
         public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
             J.Assignment a = super.visitAssignment(assignment, ctx);
 
-            if (a.getVariable() instanceof J.Identifier && ((J.Identifier) a.getVariable()).getSimpleName().equals("taskInputFiles") && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildScan", "capture"))) {
+            if (a.getVariable() instanceof J.Identifier && "taskInputFiles".equals(((J.Identifier) a.getVariable()).getSimpleName()) && withinMethodInvocations(Arrays.asList("gradleEnterprise", "buildScan", "capture"))) {
                 return a.withVariable(((J.Identifier) a.getVariable()).withSimpleName("fileFingerprints"));
             }
 

@@ -280,7 +280,7 @@ public class JvmTestSuite implements Trait<Statement> {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer ctx) {
                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                    if (m.getSimpleName().equals("dependencies")) {
+                    if ("dependencies".equals(m.getSimpleName())) {
                         return SearchResult.found(m);
                     }
                     return m;

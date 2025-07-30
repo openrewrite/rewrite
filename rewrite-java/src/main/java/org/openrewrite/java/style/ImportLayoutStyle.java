@@ -686,7 +686,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     JRightPadded<J.Import> toStar = importGroup.get(0);
                     int threshold = toStar.getElement().isStatic() ? nameCountToUseStarImport : classCountToUseStarImport;
                     boolean starImportExists = importGroup.stream()
-                            .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
+                            .anyMatch(it -> "*".equals(it.getElement().getQualid().getSimpleName()));
 
                     if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
                             (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {

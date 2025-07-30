@@ -329,7 +329,7 @@ public class ChangeParentPom extends Recipe {
 
             private boolean isGlobalProperty(String propertyName) {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
-                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                        propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
         }.reduce(pomXml, new HashMap<>());
     }

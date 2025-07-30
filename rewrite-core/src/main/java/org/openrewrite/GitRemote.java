@@ -155,7 +155,7 @@ public class GitRemote {
             }
 
             path = path.replaceFirst("^/", "");
-            boolean ssh = protocol.equals("ssh");
+            boolean ssh = "ssh".equals(protocol);
             switch (service) {
                 case Bitbucket:
                     if (!ssh) {
@@ -247,7 +247,7 @@ public class GitRemote {
 
             switch (match.service) {
                 case AzureDevOps:
-                    if (match.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
+                    if ("ssh.dev.azure.com".equalsIgnoreCase(match.matchedUri.getHost())) {
                         repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
                     } else {
                         repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");

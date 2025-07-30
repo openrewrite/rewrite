@@ -79,7 +79,7 @@ public class RemoveAnnotationAttribute extends Recipe {
                                 }
                                 return null;
                             }
-                        } else if (attributeName.equals("value")) {
+                        } else if ("value".equals(attributeName)) {
                             if (!didPassFirstAttribute.get()) {
                                 shouldTrimNextPrefix.set(true);
                             }

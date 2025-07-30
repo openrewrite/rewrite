@@ -99,7 +99,7 @@ public class BlockStatementTemplateGenerator {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
                 if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
-                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    ("__P__".equals(classDecl.getSimpleName()) || "__M__".equals(classDecl.getSimpleName()))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }

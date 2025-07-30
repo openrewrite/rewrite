@@ -156,7 +156,7 @@ public class Substitutions {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
-            if (!genericType.getName().equals("?")) {
+            if (!"?".equals(genericType.getName())) {
                 return genericType.getName();
             } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
@@ -230,7 +230,7 @@ public class Substitutions {
                 if (!visited.add(generic)) {
                     return generic;
                 }
-                if (!generic.getName().equals("?")) {
+                if (!"?".equals(generic.getName())) {
                     typeVariables.add(generic);
                 }
                 return super.visitGenericTypeVariable(generic, p);

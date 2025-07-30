@@ -688,7 +688,7 @@ public class ImportLayoutStyle implements KotlinStyle {
                     JRightPadded<J.Import> toStar = importGroup.get(0);
                     int threshold = toStar.getElement().isStatic() ? nameCountToUseStarImport : classCountToUseStarImport;
                     boolean starImportExists = importGroup.stream()
-                            .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
+                            .anyMatch(it -> "*".equals(it.getElement().getQualid().getSimpleName()));
 
                     // Disable folding imports in Kotlin due to https://github.com/openrewrite/rewrite-kotlin/issues/370
                     boolean disableFoldingImports = true;
