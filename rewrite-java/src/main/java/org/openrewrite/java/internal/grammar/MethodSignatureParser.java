@@ -40,14 +40,14 @@ public class MethodSignatureParser extends Parser {
 		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
 		Identifier=16;
 	public static final int
-		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
-		RULE_wildcard = 3, RULE_dotDot = 4, RULE_formalsPatternAfterDotDot = 5, 
-		RULE_optionalParensTypePattern = 6, RULE_targetTypePattern = 7, RULE_formalTypePattern = 8, 
+		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2,
+		RULE_wildcard = 3, RULE_dotDot = 4, RULE_formalsPatternAfterDotDot = 5,
+		RULE_optionalParensTypePattern = 6, RULE_targetTypePattern = 7, RULE_formalTypePattern = 8,
 		RULE_classNameOrInterface = 9, RULE_simpleNamePattern = 10;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"methodPattern", "formalParametersPattern", "formalsPattern", "wildcard", 
-			"dotDot", "formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
+			"methodPattern", "formalParametersPattern", "formalsPattern", "wildcard",
+			"dotDot", "formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern",
 			"formalTypePattern", "classNameOrInterface", "simpleNamePattern"
 		};
 	}
@@ -149,9 +149,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitMethodPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitMethodPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MethodPatternContext methodPattern() throws RecognitionException {
@@ -240,9 +240,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalParametersPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalParametersPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FormalParametersPatternContext formalParametersPattern() throws RecognitionException {
@@ -328,9 +328,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalsPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalsPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FormalsPatternContext formalsPattern() throws RecognitionException {
@@ -451,7 +451,7 @@ public class MethodSignatureParser extends Parser {
 						setState(78);
 						formalsPattern();
 						}
-						} 
+						}
 					}
 					setState(83);
 					_errHandler.sync(this);
@@ -498,9 +498,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitWildcard(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitWildcard(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final WildcardContext wildcard() throws RecognitionException {
@@ -541,9 +541,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitDotDot(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitDotDot(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DotDotContext dotDot() throws RecognitionException {
@@ -604,9 +604,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalsPatternAfterDotDot(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalsPatternAfterDotDot(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FormalsPatternAfterDotDotContext formalsPatternAfterDotDot() throws RecognitionException {
@@ -700,9 +700,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitOptionalParensTypePattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitOptionalParensTypePattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OptionalParensTypePatternContext optionalParensTypePattern() throws RecognitionException {
@@ -777,9 +777,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitTargetTypePattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitTargetTypePattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TargetTypePatternContext targetTypePattern() throws RecognitionException {
@@ -790,7 +790,6 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		TargetTypePatternContext _localctx = new TargetTypePatternContext(_ctx, _parentState);
-		TargetTypePatternContext _prevctx = _localctx;
 		int _startState = 14;
 		enterRecursionRule(_localctx, 14, RULE_targetTypePattern, _p);
 		try {
@@ -827,7 +826,6 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
-					_prevctx = _localctx;
 					{
 					setState(131);
 					_errHandler.sync(this);
@@ -904,9 +902,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalTypePattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalTypePattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FormalTypePatternContext formalTypePattern() throws RecognitionException {
@@ -917,7 +915,6 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		FormalTypePatternContext _localctx = new FormalTypePatternContext(_ctx, _parentState);
-		FormalTypePatternContext _prevctx = _localctx;
 		int _startState = 16;
 		enterRecursionRule(_localctx, 16, RULE_formalTypePattern, _p);
 		try {
@@ -954,7 +951,6 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
-					_prevctx = _localctx;
 					{
 					setState(148);
 					_errHandler.sync(this);
@@ -1043,9 +1039,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitClassNameOrInterface(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitClassNameOrInterface(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ClassNameOrInterfaceContext classNameOrInterface() throws RecognitionException {
@@ -1056,7 +1052,7 @@ public class MethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(154); 
+			setState(154);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -1080,7 +1076,7 @@ public class MethodSignatureParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(156); 
+				setState(156);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,20,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -1140,9 +1136,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitSimpleNamePattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitSimpleNamePattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final SimpleNamePatternContext simpleNamePattern() throws RecognitionException {
