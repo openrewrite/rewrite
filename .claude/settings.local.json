@@ -30,7 +30,8 @@
       "mcp__idea__search_in_files_content",
       "Bash(cat:*)",
       "Bash(../gradlew dependencies:*)",
-      "Bash(gradle:*)"
+      "Bash(gradle:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }
