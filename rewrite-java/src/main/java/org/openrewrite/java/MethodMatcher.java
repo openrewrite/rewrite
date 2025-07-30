@@ -554,6 +554,12 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
     }
 
     @Override
+    public String visitWildcard(MethodSignatureParser.WildcardContext ctx) {
+        arguments.add(Argument.WILDCARD);
+        return super.visitWildcard(ctx);
+    }
+
+    @Override
     public String visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
         arguments.add(new Argument.FormalType(ctx));
         return super.visitFormalTypePattern(ctx);
@@ -595,6 +601,13 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             @Override
             String getRegex() {
                 return "([^,]+,)*([^,]+)";
+            }
+        };
+
+        private static final Argument WILDCARD = new Argument() {
+            @Override
+            String getRegex() {
+                return "([^,]+)";
             }
         };
 

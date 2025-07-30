@@ -404,6 +404,13 @@ class MethodMatcherTest implements RewriteTest {
     void matchUnknownTypesSingleWildcardArgument() {
         var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
         assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(String, *)").matches(mi, true));
+    }
+
+    @Test
+    void matchUnknownTypesMultipleWildcardArgument() {
+        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
     }
 
     static J.MethodInvocation asMethodInvocation(String code) {
@@ -412,6 +419,12 @@ class MethodMatcherTest implements RewriteTest {
               class MyTest {
                   void test() {
                       %s
+                  }
+              
+                  class Foo {
+                      static String bar() {
+                          return "bar";
+                      }
                   }
               }
               """, code)
