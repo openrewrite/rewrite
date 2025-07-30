@@ -2612,6 +2612,8 @@ public interface J extends Tree, RpcCodec<J> {
         @Getter
         Markers markers;
 
+        List<J.Modifier> modifiers;
+
         List<J.Annotation> annotations;
 
         J.Parentheses<TypeTree> parenthesizedType;
