@@ -29,7 +29,6 @@ import java.util.Map;
 public class MockHttpSender implements HttpSender {
     final UncheckedSupplier<InputStream> is;
     int responseCode = 200;
-    Map<String, List<String>> responseHeaders = Collections.emptyMap();
 
     public MockHttpSender(UncheckedSupplier<InputStream> is) {
         this.is = is;
@@ -40,18 +39,13 @@ public class MockHttpSender implements HttpSender {
         this.responseCode = responseCode;
     }
 
-    public MockHttpSender withResponseHeaders(Map<String, List<String>> headers) {
-        this.responseHeaders = headers;
-        return this;
-    }
-
     @Override
     public Response send(Request request) {
         if (responseCode != 200) {
-            return new Response(responseCode, null, responseHeaders, () -> {
+            return new Response(responseCode, null, () -> {
             });
         } else {
-            return new Response(responseCode, is.get(), responseHeaders, () -> {
+            return new Response(responseCode, is.get(), () -> {
             });
         }
     }
