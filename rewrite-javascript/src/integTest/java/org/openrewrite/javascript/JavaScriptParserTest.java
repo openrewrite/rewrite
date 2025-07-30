@@ -166,6 +166,13 @@ class JavaScriptParserTest {
                   >
                     <p>This div uses regular attributes, spread attributes, and namespaced attributes</p>
                   </div>
+
+                  {/* JSX elements with generics */}
+                  <DataTable<User> data={[]} />
+                  <Component<string, number> prop="value" />
+                  <Form<FormData> onSubmit={() => {}}>
+                    <Input name="username" />
+                  </Form>
                 </div>
           
                 {/* Short fragment syntax */}
