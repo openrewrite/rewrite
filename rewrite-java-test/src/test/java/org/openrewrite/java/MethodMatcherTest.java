@@ -140,15 +140,49 @@ class MethodMatcherTest implements RewriteTest {
     void matchesArgumentsWithWildcards() {
         assertTrue(argRegex("A foo(java.util.*)").matcher("java.util.Map").matches());
         assertTrue(argRegex("A foo(java..*)").matcher("java.util.Map").matches());
+        assertTrue(argRegex("A foo(*.util.*)").matcher("java.util.Map").matches());
+        assertTrue(argRegex("A foo(*..*)").matcher("java.util.Map").matches());
+    }
+
+    @Test
+    void matchesExactlyOneWithWildcard() {
+        assertTrue(argRegex("A foo(*)").matcher("int").matches());
+        assertTrue(argRegex("A foo(*, int)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(*, int)").matcher("double,int").matches());
+        assertTrue(argRegex("A foo(int, *)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(int, *)").matcher("int,double").matches());
+        assertTrue(argRegex("A foo(*, *)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(int, *, double)").matcher("int,int,double").matches());
+        assertTrue(argRegex("A foo(int, *, double)").matcher("int,double,double").matches());
+
+        assertFalse(argRegex("A foo(*)").matcher("").matches());
+        assertFalse(argRegex("A foo(*)").matcher("int,int").matches());
+        assertFalse(argRegex("A foo(*, int)").matcher("int").matches());
+        assertFalse(argRegex("A foo(*, int)").matcher("int,double").matches());
+        assertFalse(argRegex("A foo(int, *)").matcher("int").matches());
+        assertFalse(argRegex("A foo(int, *)").matcher("double,int").matches());
+        assertFalse(argRegex("A foo(*, *)").matcher("").matches());
+        assertFalse(argRegex("A foo(*, *)").matcher("int").matches());
+        assertFalse(argRegex("A foo(int, *, double)").matcher("int,double").matches());
+        assertFalse(argRegex("A foo(int, *, double)").matcher("double,int,double").matches());
     }
 
     @Test
     void matchesArgumentsWithDotDot() {
         assertTrue(argRegex("A foo(.., int)").matcher("int").matches());
         assertTrue(argRegex("A foo(.., int)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(.., int)").matcher("double,int").matches());
+        assertFalse(argRegex("A foo(.., int)").matcher("int,double").matches());
 
         assertTrue(argRegex("A foo(int, ..)").matcher("int").matches());
         assertTrue(argRegex("A foo(int, ..)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(int, ..)").matcher("int,double").matches());
+        assertFalse(argRegex("A foo(int, ..)").matcher("double,int").matches());
+
+        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double").matches());
+        assertTrue(argRegex("A foo(int, .., double)").matcher("int,int,double").matches());
+        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double,double").matches());
+        assertFalse(argRegex("A foo(int, .., double)").matcher("double,int,double").matches());
 
         assertTrue(argRegex("A foo(..)").matcher("").matches());
         assertTrue(argRegex("A foo(..)").matcher("int").matches());
@@ -404,12 +438,10 @@ class MethodMatcherTest implements RewriteTest {
     void matchUnknownTypesSingleWildcardArgument() {
         var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
         assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, java.lang.String)").matches(mi, true));
         assertTrue(new MethodMatcher("org.junit.Assert assertTrue(String, *)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesMultipleWildcardArgument() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(double, *)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(java.lang.String, *)").matches(mi, true));
         assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
     }
 
@@ -419,12 +451,6 @@ class MethodMatcherTest implements RewriteTest {
               class MyTest {
                   void test() {
                       %s
-                  }
-              
-                  class Foo {
-                      static String bar() {
-                          return "bar";
-                      }
                   }
               }
               """, code)
