@@ -60,14 +60,36 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
         J j = removeMethods(m, 0, isLambdaBody(), new Stack<>());
         if (j != null) {
-            j = j.withPrefix(m.getPrefix());
-            // There should always be
-            if (!m.getArguments().isEmpty() && m.getArguments().stream().allMatch(ToBeRemoved::hasMarker)) {
-                return ToBeRemoved.withMarker(j);
-            }
+            preservePrefixAndCheckForRemoval(j, m.getPrefix(), m.getArguments());
         }
 
         //noinspection DataFlowIssue allow returning null to remove the element
+        return j;
+    }
+
+    @Override
+    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+        J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, ctx);
+
+        if (inMethodCallChain()) {
+            // TODO - remove chained methods
+        }
+
+        J j = removeNewClass(nc, isLambdaBody());
+        if (j != null) {
+            preservePrefixAndCheckForRemoval(j, nc.getPrefix(), nc.getArguments());
+        }
+
+        //noinspection DataFlowIssue allow returning null to remove the element
+        return j;
+    }
+
+    private J preservePrefixAndCheckForRemoval(J j, Space prefix, List<Expression> args) {
+        j = j.withPrefix(prefix);
+        // There should always be
+        if (!args.isEmpty() && args.stream().allMatch(ToBeRemoved::hasMarker)) {
+            return ToBeRemoved.withMarker(j);
+        }
         return j;
     }
 
@@ -125,8 +147,32 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         return method;
     }
 
+    private @Nullable J removeNewClass(@Nullable Expression expression, boolean isLambdaBody) {
+        if (!(expression instanceof J.NewClass) || ((J.NewClass) expression).getConstructorType() == null) {
+            return expression;
+        }
+
+        J.NewClass nc = (J.NewClass) expression;
+
+        if (matchers.entrySet().stream().anyMatch(entry -> matches(nc, entry.getKey(), entry.getValue()))) {
+            maybeRemoveImport(nc.getConstructorType().getDeclaringType());
+
+            if (isLambdaBody) {
+                return ToBeRemoved.withMarker(J.Block.createEmptyBlock());
+            } else {
+                return null;
+            }
+        }
+
+        return nc;
+    }
+
     private boolean matches(J.MethodInvocation m, MethodMatcher matcher, Predicate<List<Expression>> argsMatches) {
         return matcher.matches(m) && argsMatches.test(m.getArguments());
+    }
+
+    private boolean matches(J.NewClass nc, MethodMatcher matcher, Predicate<List<Expression>> argsMatches) {
+        return matcher.matches(nc) && argsMatches.test(nc.getArguments());
     }
 
     private boolean isStatement() {
