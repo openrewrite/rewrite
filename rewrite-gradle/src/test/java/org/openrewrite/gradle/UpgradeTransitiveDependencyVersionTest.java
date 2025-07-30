@@ -52,7 +52,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
@@ -62,14 +62,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -86,7 +86,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   compileOnly 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'org.openrewrite:rewrite-java:7.0.0'
@@ -97,7 +97,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       runtimeOnly('com.fasterxml.jackson.core:jackson-core:2.12.5') {
@@ -107,7 +107,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   compileOnly 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'org.openrewrite:rewrite-java:7.0.0'
               }
@@ -128,13 +128,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       %1$s 'com.thoughtworks.xstream:xstream:1.4.17'
                   }
               }
-              
+
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
@@ -144,13 +144,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       %1$s 'com.thoughtworks.xstream:xstream:1.4.21'
                   }
               }
-              
+
               dependencies {
                   %1$s 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client:4.2.0'
               }
@@ -184,7 +184,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       compileOnly('org.apache.commons:commons-lang3:3.14.0')
                   }
-              
+
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
@@ -202,7 +202,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               configurations.create("foo")
               repositories { mavenCentral() }
-              
+
               dependencies {
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
@@ -213,14 +213,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               configurations.create("foo")
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       foo('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -242,7 +242,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
@@ -260,7 +260,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
@@ -271,14 +271,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
@@ -296,7 +296,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
@@ -307,14 +307,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
@@ -333,7 +333,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'ear'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
@@ -346,7 +346,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'ear'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
@@ -356,7 +356,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
                   earlib 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
@@ -373,28 +373,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
                           because 'some reason'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -410,32 +410,32 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               def jacksonVersion = "2.12.0"
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'some reason'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               def jacksonVersion = "2.12.5"
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -459,28 +459,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'some reason'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion") {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -504,28 +504,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion, {
                           because 'some reason'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion, {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -551,7 +551,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 `java-library`
               }
               repositories { mavenCentral() }
-              
+
               val jacksonVersion: String by project
               dependencies {
                   constraints {
@@ -559,7 +559,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because("some reason")
                       }
                   }
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """,
@@ -568,7 +568,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 `java-library`
               }
               repositories { mavenCentral() }
-              
+
               val jacksonVersion: String by project
               dependencies {
                   constraints {
@@ -576,7 +576,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                           because("CVE-2024-BAD")
                       }
                   }
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
@@ -591,21 +591,21 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("org.openrewrite:rewrite-core:7.0.0")
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.0')
                       implementation("org.openrewrite:rewrite-xml:7.0.0")
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("org.openrewrite:rewrite-core:7.0.0")
@@ -614,7 +614,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       }
                       implementation("org.openrewrite:rewrite-xml:7.0.0")
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -629,10 +629,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                   }
               }
@@ -640,10 +640,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
@@ -662,10 +662,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'ear' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   earlib 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                   }
               }
@@ -673,10 +673,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'ear' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   earlib 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
@@ -695,10 +695,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core') {
                           because 'security'
@@ -712,10 +712,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
@@ -737,7 +737,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
                   earlib 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                   }
               }
@@ -748,7 +748,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               configurations.earlib.extendsFrom configurations.deploy
               dependencies {
                   earlib 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
@@ -769,7 +769,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               repositories { mavenCentral() }
               dependencies {
                   deploy 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                   }
               }
@@ -795,7 +795,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       implementation("org.apache.logging.log4j:log4j-core") {
                           version {
@@ -815,7 +815,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               }
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
@@ -860,7 +860,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       pitest('org.apache.commons:commons-lang3:3.14.0')
                   }
-              
+
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
@@ -896,7 +896,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       pitest('org.apache.commons:commons-lang3:3.14.0')
                       testImplementation('org.apache.commons:commons-lang3:3.14.0')
                   }
-              
+
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
@@ -914,9 +914,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'io.spring.dependency-management' version '1.1.5'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
@@ -934,9 +934,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       }
                   }
               }
-              
+
               dependencies {
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -953,7 +953,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation('com.fasterxml.jackson.core:jackson-core:2.12.0')
                   implementation('com.fasterxml.jackson.core:jackson-databind:2.12.0')
@@ -972,7 +972,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 `java-library`
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
@@ -982,14 +982,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 `java-library`
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
                           because("CVE-2024-BAD")
                       }
                   }
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
@@ -1004,28 +1004,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id("java") }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:2.12.0") {
                           because("some reason")
                       }
                   }
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """,
             """
               plugins { id("java") }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:2.12.5") {
                           because("CVE-2024-BAD")
                       }
                   }
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
@@ -1043,9 +1043,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id("io.spring.dependency-management") version "1.1.5"
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """,
@@ -1063,9 +1063,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       }
                   }
               }
-              
+
               dependencies {
-              
+
                   implementation("org.openrewrite:rewrite-java:7.0.0")
               }
               """
@@ -1085,7 +1085,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
@@ -1095,14 +1095,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -1120,7 +1120,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter-tomcat:3.3.12'
               }
@@ -1130,14 +1130,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('org.apache.tomcat.embed:tomcat-embed-core:10.1.42')
                       implementation('org.apache.tomcat.embed:tomcat-embed-el:10.1.42')
                       implementation('org.apache.tomcat.embed:tomcat-embed-websocket:10.1.42')
                   }
-              
+
                   implementation 'org.springframework.boot:spring-boot-starter-tomcat:3.3.12'
               }
               """
@@ -1157,7 +1157,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
@@ -1183,7 +1183,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.12.5'
@@ -1198,7 +1198,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   id 'java'
               }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-databind:2.12.5')
@@ -1219,28 +1219,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {
                           because 'some reason'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
                       implementation("com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}") {
                           because 'CVE-2024-BAD'
                       }
                   }
-              
+
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
@@ -1267,7 +1267,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-    
+
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-core:${gradle.jacksonVersion}"
                   implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jacksonVersion}"

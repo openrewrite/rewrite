@@ -153,13 +153,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               import java.util.ArrayList;
               import java.util.List;
               import java.util.stream.Collectors;
-                          
+
               class Test {
                   class Parent {
                   }
                   class Child extends Parent {
                   }
-                          
+
                   List<Parent> method(List<Parent> values) {
                       return values.stream()
                               .map(o -> {
@@ -243,7 +243,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.util.List;
               import java.util.stream.Collectors;
-                            
+
               @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
@@ -252,12 +252,12 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           if (i != null) {
                           }
                       });
-                            
+
                       multiMaps.forEach(m -> {
                           if (m != null) {
                           }
                       });
-                            
+
                       while (true) {
                           if (multiMaps.isEmpty()) {
                               Long l;
@@ -265,13 +265,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           }
                       }
                   }
-                            
+
                   static class MultiMap {
                       List<Inner> inners;
                       public List<Inner> getInners() {
                           return inners;
                       }
-                            
+
                       static class Inner {
                           List<Number> numbers;
                           public List<Number> getNumbers() {
@@ -308,7 +308,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.util.List;
               import java.util.stream.Collectors;
-              
+
               @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
@@ -317,13 +317,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           .map(it2 -> it2.stream().map(i -> i.getNumbers()))
                           .collect(Collectors.toList());
                   }
-              
+
                   static class MultiMap {
                       List<Inner> inners;
                       public List<Inner> getInners() {
                           return inners;
                       }
-              
+
                       static class Inner {
                           List<Number> numbers;
                           public List<Number> getNumbers() {
@@ -345,14 +345,14 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               class TypeAnnotationTest {
                   Integer @A1 [] @A2 [ ] annotatedArray;
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A1 {
                   }
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A2 {
                   }

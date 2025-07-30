@@ -424,7 +424,7 @@ class DeleteStatementTest implements RewriteTest {
                   public void a() {
                       boolean a = !b();
                   }
-                  
+
                   abstract boolean b();
               }
               """

@@ -154,13 +154,13 @@ class PropertiesParserTest implements RewriteTest {
               ########################
               #
               ########################
-              
+
               key1=value1
-              
+
               !!!!!!!!!!!!!!!!!!!!!!!
               !
               !!!!!!!!!!!!!!!!!!!!!!!
-              
+
               key2=value2
               """,
             containsValues("value1", "value2")
@@ -247,7 +247,7 @@ class PropertiesParserTest implements RewriteTest {
           properties(
             """
               foo=C:\\
-              
+
               """,
             spec -> spec.afterRecipe(file -> {
                 assertThat(file).isInstanceOf(Properties.File.class);

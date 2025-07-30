@@ -121,12 +121,12 @@ class JavaVisitorTest implements RewriteTest {
               class A {
                 public void method1() {
                 }
-              
+
                 @Deprecated
                 public String myMethod() {
                   return "hello";
                 }
-              
+
                 public void method2() {
                 }
               }

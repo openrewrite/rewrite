@@ -38,7 +38,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -46,7 +46,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 11
               targetCompatibility = 1.8
               """
@@ -71,7 +71,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(beforeSourceCompatibility, beforeTargetCompatibility),
@@ -79,7 +79,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(afterSourceCompatibility, afterTargetCompatibility)
@@ -96,7 +96,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -104,7 +104,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 11
               """
@@ -134,7 +134,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(beforeCompatibility, beforeCompatibility),
@@ -142,7 +142,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(afterCompatibility, afterCompatibility)
@@ -159,7 +159,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 1.8
                   targetCompatibility = 1.8
@@ -169,7 +169,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 11
                   targetCompatibility = 11
@@ -192,7 +192,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   toolchain {
                       languageVersion = JavaLanguageVersion.of(%s)
@@ -203,7 +203,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   toolchain {
                       languageVersion = JavaLanguageVersion.of(%s)
@@ -258,7 +258,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -266,7 +266,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(expectedSourceCompatibility, expectedTargetCompatibility)
@@ -309,7 +309,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 21
                   targetCompatibility = 21
@@ -331,7 +331,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 21
                   targetCompatibility = 21
@@ -345,7 +345,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 17
                   targetCompatibility = 17
@@ -375,7 +375,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
@@ -383,7 +383,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               }
               sourceCompatibility = %s
               targetCompatibility = %s
-              
+
               """.formatted(sourceCompatibility, targetCompatibility)
           )
         );
@@ -398,14 +398,14 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
                   id "java"
               }
               sourceCompatibility = 11
-              
+
               """
           )
         );
@@ -420,14 +420,14 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
                   id "java"
               }
               targetCompatibility = 11
-              
+
               """
           )
         );
@@ -443,38 +443,38 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               tasks.withType(JavaCompile) {
                   options.release = 8
               }
-              
+
               tasks.withType(JavaCompile).configureEach {
                   options.release = 8
               }
-              
+
               compileJava {
                   options.release = 8
               }
-              
+
               compileJava.options.release = 8
               """,
             """
               plugins {
                   id "java"
               }
-              
+
               tasks.withType(JavaCompile) {
                   options.release = 11
               }
-              
+
               tasks.withType(JavaCompile).configureEach {
                   options.release = 11
               }
-              
+
               compileJava {
                   options.release = 11
               }
-              
+
               compileJava.options.release = 11
               """
           )
@@ -490,7 +490,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               sourceCompatibility = JavaVersion.VERSION_1_8
               targetCompatibility = JavaVersion.VERSION_1_8
               """,
@@ -498,7 +498,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               sourceCompatibility = JavaVersion.VERSION_11
               targetCompatibility = JavaVersion.VERSION_1_8
               """
@@ -520,7 +520,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   sourceCompatibility = JavaVersion.VERSION_11
                   targetCompatibility = JavaVersion.VERSION_11
@@ -539,7 +539,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(8))
@@ -550,7 +550,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(11))

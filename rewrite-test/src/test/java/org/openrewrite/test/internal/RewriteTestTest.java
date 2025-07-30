@@ -109,7 +109,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-              
+
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }

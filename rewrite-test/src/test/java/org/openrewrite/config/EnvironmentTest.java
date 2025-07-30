@@ -510,7 +510,7 @@ class EnvironmentTest implements RewriteTest {
                 causesAnotherCycle: true
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
-                
+
                 """.getBytes()
             ),
             URI.create("rewrite.yml"),

@@ -196,7 +196,7 @@ class ClassDeclarationTest implements RewriteTest {
                       ONE,
                       TWO
                   }
-                            
+
                   private B b;
               }
               """

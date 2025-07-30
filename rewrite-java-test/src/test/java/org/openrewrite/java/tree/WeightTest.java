@@ -33,7 +33,7 @@ class WeightTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               /**
                * @author Jonathan
                */

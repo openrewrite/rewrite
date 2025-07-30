@@ -178,7 +178,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String ...params) {
                   }
               }
@@ -187,7 +187,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               class Test {
                   static void method0(String...params) {
                   }
-                  
+
                   static void method1(String...params) {
                   }
               }
@@ -209,7 +209,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String ...params) {
                   }
               }
@@ -219,7 +219,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String...params) {
                   }
               }

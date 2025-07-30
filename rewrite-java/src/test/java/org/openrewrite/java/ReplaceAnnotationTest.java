@@ -232,7 +232,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                   java(
                     """
                       import org.jetbrains.annotations.Nullable;
-                      
+
                       class A {
                           @Nullable("Test")
                           String testMethod() {}
@@ -249,7 +249,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                   java(
                     """
                       import org.jetbrains.annotations.Nullable;
-                      
+
                       class A {
                           @Nullable("Other")
                           String testMethod() {}

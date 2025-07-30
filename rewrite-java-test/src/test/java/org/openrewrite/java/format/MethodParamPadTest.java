@@ -162,17 +162,17 @@ class MethodParamPadTest implements RewriteTest {
                   E1
                           ()
               }
-                            
+
               class B {
               }
-                            
+
               class A extends B {
                   A
                           () {
                       super
                               ();
                   }
-                            
+
                   static void method
                           (int x, int y) {
                       A a = new A
@@ -198,17 +198,17 @@ class MethodParamPadTest implements RewriteTest {
                   E1
                           ()
               }
-                            
+
               class B {
               }
-                            
+
               class A extends B {
                   A
                           () {
                       super
                               ();
                   }
-                            
+
                   static void method
                           (int x, int y) {
                       A a = new A

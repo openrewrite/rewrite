@@ -98,23 +98,23 @@ class ExtractInterfaceTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-                            
+
               import org.openrewrite.interfaces.ITest;
-                            
+
               class Test implements ITest {
                   int f;
-                  
+
                   public Test() {
                   }
-                            
+
                   @Override
                   public final int test() {
                       return 0;
                   }
-                  
+
                   private int privateTest() {
                   }
-                  
+
                   public static int staticTest() {
                   }
               }
@@ -124,9 +124,9 @@ class ExtractInterfaceTest implements RewriteTest {
             doesNotExist(),
             """
               package org.openrewrite.interfaces;
-                            
+
               interface ITest {
-                            
+
                   int test();
               }
               """,

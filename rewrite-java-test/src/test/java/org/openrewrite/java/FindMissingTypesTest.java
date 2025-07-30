@@ -201,8 +201,8 @@ class FindMissingTypesTest implements RewriteTest {
             """
               /**
                * See {@code #baz}.
-               * 
-               * @see #baz() 
+               *
+               * @see #baz()
                */
               interface Foo {
                   void bar();
@@ -211,8 +211,8 @@ class FindMissingTypesTest implements RewriteTest {
             """
               /**
                * See {@code #baz}.
-               * 
-               * @see ~~(MethodInvocation type is missing or malformed)~~>#baz() 
+               *
+               * @see ~~(MethodInvocation type is missing or malformed)~~>#baz()
                */
               interface Foo {
                   void bar();
@@ -230,8 +230,8 @@ class FindMissingTypesTest implements RewriteTest {
             """
               /**
                * See {@code #baz}.
-               * 
-               * @see #bar() 
+               *
+               * @see #bar()
                */
               interface Foo {
                   void bar();

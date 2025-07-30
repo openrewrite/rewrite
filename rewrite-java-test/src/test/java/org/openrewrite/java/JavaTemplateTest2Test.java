@@ -118,7 +118,7 @@ class JavaTemplateTest2Test implements RewriteTest {
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
-                            
+
               class Test {
                   File getFile(File testDir, List<String> compileClassPath ) throws IOException {
                       assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
@@ -131,7 +131,7 @@ class JavaTemplateTest2Test implements RewriteTest {
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
-                            
+
               class Test {
                   File getFile(File testDir, List<String> compileClassPath ) throws IOException {
                       assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
@@ -199,12 +199,12 @@ class JavaTemplateTest2Test implements RewriteTest {
             """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
-                            
+
               class Test {
                   ByteArrayInputStream createBis(byte[] bytes) {
                       return new ByteArrayInputStream(bytes);
                   }
-                  
+
                   void doSomething() {
                       String sout = "";
                       try (BufferedReader br = new BufferedReader(new FileReader(null))) {
@@ -218,12 +218,12 @@ class JavaTemplateTest2Test implements RewriteTest {
             """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
-                            
+
               class Test {
                   ByteArrayInputStream createBis(byte[] bytes) {
                       return new ByteArrayInputStream(bytes);
                   }
-                  
+
                   void doSomething() {
                       String sout = "";
                       try (BufferedReader br = new BufferedReader(new FileReader(null))) {

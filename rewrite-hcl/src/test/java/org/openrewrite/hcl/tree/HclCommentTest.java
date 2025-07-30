@@ -71,7 +71,7 @@ class HclCommentTest implements RewriteTest {
                   myvar = {
                     # below {attributes}
                     myattribute = "myvalue"
-              
+
                     # add more attributes {here}
                   }
               }

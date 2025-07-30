@@ -287,7 +287,7 @@ class XmlParserTest implements RewriteTest {
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
-              
+
               <configuration scan="true">
                   <root>
                       <level>WARN</level>

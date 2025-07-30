@@ -97,7 +97,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               class Test {
-              
+
                   int test2(int n) {
                       return n;
                   }
@@ -123,14 +123,14 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Test {
                   Function<Object, String> toString = it -> it.toString();
               }
               """,
             """
               import java.util.function.Function;
-              
+
               class Test {
                   Function<Object, String> toString = Object::toString;
               }
@@ -164,10 +164,10 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   int n;
-              
+
                   void method(Stream<Object> obj) {
                       obj.filter(o -> {
                           return n == 0;
@@ -177,10 +177,10 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   int n;
-              
+
                   void method(Stream<Object> obj) {
                       obj.filter(o -> {
                           return n == 1;
@@ -216,7 +216,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<Object> obj) {
                       obj.filter(o -> {
@@ -228,7 +228,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<Object> obj) {
                       obj.filter(o -> {
@@ -260,7 +260,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<String> obj) {
                       obj.map(o -> {
@@ -273,7 +273,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<String> obj) {
                       obj.map(o -> {
@@ -306,7 +306,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<String> obj) {
                       obj.filter(o -> o.toLowerCase().length() > 0);
@@ -315,7 +315,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   static void method(Stream<String> obj) {
                       obj.filter(o -> o.toUpperCase().length() > 0);
@@ -345,7 +345,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   enum Abc {A,B,C}
                   static void method(Stream<Abc> obj) {
@@ -355,7 +355,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   enum Abc {A,B,C}
                   static void method(Stream<Abc> obj) {
@@ -398,7 +398,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+
               public class Foo<N extends Number> {
                   void foo(N n) {
                       new A().someOtherMethod()
@@ -409,7 +409,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               package org.openrewrite;
-              
+
               public class Foo<N extends Number> {
                   void foo(N n) {
                       new A().someOtherMethod()
@@ -490,7 +490,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.function.Predicate;
-              
+
               class A {
                   public Predicate<String> foo() {
                       return new Predicate<String>() {
@@ -505,7 +505,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.function.Predicate;
-              
+
               class A {
                   public Predicate<String> foo() {
                       return new Predicate<String>() {
@@ -538,10 +538,10 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Test {
                   Function<Object, String> toString = getToString();
-              
+
                   static Function<Object, String> getToString() {
                       return Object::toString;
                   }
@@ -549,10 +549,10 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-              
+
               class Test {
                   Function<Object, String> toString = Object::toString;
-              
+
                   static Function<Object, String> getToString() {
                       return Object::toString;
                   }

@@ -145,7 +145,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.LinkedList;
               import java.util.List;
-              
+
               public class A {
                  private List<?> list;
                  private static List<String> list1 = new ArrayList<>();
@@ -158,7 +158,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.LinkedList;
               import java.util.List;
-              
+
               public class A {
                  /*~~>*/private List<?> list;
                  /*~~>*/private static List<String> list1 = new ArrayList<>();

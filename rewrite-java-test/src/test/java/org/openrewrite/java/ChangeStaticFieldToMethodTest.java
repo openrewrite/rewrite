@@ -314,9 +314,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
           java(
             """
               package com.example;
-              
+
               import constants.Constants;
-              
+
               class Test {
                   public static String testMe() {
                       return Constants.SUCCESS_CODE;
@@ -325,9 +325,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
               """,
             """
               package com.example;
-              
+
               import io.netty.handler.codec.http.HttpResponseStatus;
-              
+
               class Test {
                   public static String testMe() {
                       return HttpResponseStatus.OK.codeAsText();

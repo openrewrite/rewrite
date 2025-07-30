@@ -60,7 +60,7 @@ class FindTypeMappingsTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               public class Test {
                   List<String> l = new ArrayList<>();
               }
