@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -84,6 +85,12 @@ public class TypesInUse {
                 } else if (javaType instanceof JavaType.Method) {
                     if (cursor.getValue() instanceof J.MethodDeclaration) {
                         declaredMethods.add((JavaType.Method) javaType);
+                    } else if (cursor.getValue() instanceof J.MethodInvocation) {
+                        Expression expression = ((J.MethodInvocation) cursor.getValue()).getSelect();
+                        usedMethods.add(maybeRelocateMethod((JavaType.Method) javaType, expression));
+                    } else if (cursor.getValue() instanceof J.MemberReference) {
+                        Expression expression = ((J.MemberReference) cursor.getValue()).getContaining();
+                        usedMethods.add(maybeRelocateMethod((JavaType.Method) javaType, expression));
                     } else {
                         usedMethods.add((JavaType.Method) javaType);
                     }
@@ -93,6 +100,14 @@ public class TypesInUse {
                 }
             }
             return javaType;
+        }
+
+        private JavaType.Method maybeRelocateMethod(JavaType.Method methodType, @Nullable Expression expression) {
+            if (expression != null && expression.getType() instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified declaringType = (JavaType.FullyQualified) expression.getType();
+                return methodType.withDeclaringType(declaringType);
+            }
+            return methodType;
         }
     }
 }
