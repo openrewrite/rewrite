@@ -25,6 +25,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collections;
@@ -78,8 +79,9 @@ public class RemoveRedundantProperties extends Recipe {
                             return t;
                         }
                         if (!Boolean.TRUE.equals(onlyIfValuesMatch) || valuesMatch(tag, parentProperty)) {
-                            System.out.println("@@@ " + tag.getName() + " - " + tag.getValue() + " --> " + parentProperty);
-                            return null;
+                            doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                            maybeUpdateModel();
+                            return t;
                         }
                     } catch (MavenDownloadingException e) {
                         // just continue, try to do no harm on error
