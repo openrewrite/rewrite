@@ -383,6 +383,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
         await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
@@ -962,6 +963,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitJsxTag(tag: JSX.Tag, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(tag);
         draft.openName = await q.receive(draft.openName, el => this.visitLeftPadded(el, q));
+        draft.typeArguments = await q.receive(draft.typeArguments, el => this.visitContainer(el, q));
         draft.afterName = await q.receive(draft.afterName, space => this.visitSpace(space, q));
         draft.attributes = await q.receiveListDefined(draft.attributes, attr => this.visitRightPadded(attr, q));
 
