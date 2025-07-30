@@ -16,6 +16,7 @@
 
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
@@ -36,6 +37,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
         this(null, null);
     }
 
+    @JsonCreator
     public CoalescePropertiesVisitor(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
         exclusionMatchers = exclusions == null ? emptyList() : exclusions.stream().map(JsonPathMatcher::new).collect(toList());
         applyToMatchers = applyTo == null ? emptyList() : applyTo.stream().map(JsonPathMatcher::new).collect(toList());

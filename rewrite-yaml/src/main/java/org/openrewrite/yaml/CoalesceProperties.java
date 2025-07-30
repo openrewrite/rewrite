@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +47,7 @@ public class CoalesceProperties extends Recipe {
         this(null, null);
     }
 
+    @JsonCreator
     public CoalesceProperties(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
         this.exclusions = exclusions == null ? emptyList() : exclusions;
         this.applyTo = applyTo == null ? emptyList() : applyTo;
