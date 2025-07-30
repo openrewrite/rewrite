@@ -265,9 +265,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             private @Nullable Scope determineDirectDependencyAlreadyPresent(Map<Scope, List<ResolvedDependency>> dependencies) {
                 for (Map.Entry<Scope, List<ResolvedDependency>> entry : dependencies.entrySet()) {
-                    for (ResolvedDependency dependency : entry.getValue()) {
-                        if (dependency.isDirect() &&
-                            groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
+                    for (ResolvedDependency dep : entry.getValue()) {
+                        if (dep.isDirect() && groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())) {
                             return entry.getKey();
                         }
                     }

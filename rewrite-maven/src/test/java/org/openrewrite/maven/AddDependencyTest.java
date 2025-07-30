@@ -1738,6 +1738,54 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyWithDuplicateDependencyWithBroaderScopeChangesExistingScopeImplicit() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void addDependencyWithBroaderScopeChangesExistingScopeExplicit() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, "provided", null, null, null, null, null, null, null)),
