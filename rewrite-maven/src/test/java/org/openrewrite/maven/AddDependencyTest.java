@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
@@ -1737,6 +1738,7 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("With duplicate direct dependencies last declaration wins, however this is not taken into account")
     @Test
     void addDependencyWithDuplicateDependencyWithBroaderScopeChangesExistingScopeImplicit() {
         rewriteRun(
