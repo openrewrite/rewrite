@@ -60,7 +60,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
             if (entry.getValue() instanceof Yaml.Mapping) {
                 Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
                 if (valueMapping.getEntries().size() == 1) {
-                    Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
+                    Yaml.Mapping.Entry subEntry = valueMapping.getEntries().get(0);
                     if (!subEntry.getPrefix().contains("#") && !isExcluded(entry, subEntry) && isApplied(entry)) {
                         int indentToUse = findIndent.getMostCommonIndent() > 0 ? findIndent.getMostCommonIndent() : 4;
                         doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
