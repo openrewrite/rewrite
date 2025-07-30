@@ -47,6 +47,14 @@ dependencies {
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
+configurations {
+    testRuntimeClasspath {
+        resolutionStrategy {
+            force("org.projectlombok:lombok:1.18.30")
+        }
+    }
+}
+
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 

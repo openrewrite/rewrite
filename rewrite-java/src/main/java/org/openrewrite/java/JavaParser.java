@@ -29,7 +29,10 @@ import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -397,6 +400,35 @@ class RuntimeClasspathCache {
                     .filter(uri -> "file".equals(uri.getScheme()))
                     .map(Paths::get)
                     .collect(toList());
+        }
+        if (runtimeClasspath.stream().anyMatch(p -> p.toString().contains("rewrite-java-lombok")) &&
+                runtimeClasspath.stream().anyMatch(p -> p.toString().contains("org.projectlombok/lombok"))) {
+            runtimeClasspath = runtimeClasspath.stream()
+                    .filter(p -> !p.toString().contains("org.projectlombok/lombok"))
+                    .collect(toList());
+            
+            // Add lombok.jar from resources folder
+            try {
+                // Try to find lombok.jar in the classpath
+                URL lombokResource = RuntimeClasspathCache.class.getResource("/META-INF/rewrite/lombok.jar");
+                if (lombokResource != null) {
+                    if ("file".equals(lombokResource.getProtocol())) {
+                        // Resource is a file on disk
+                        Path lombokPath = Paths.get(lombokResource.toURI());
+                        runtimeClasspath.add(lombokPath);
+                    } else if ("jar".equals(lombokResource.getProtocol())) {
+                        // Resource is inside a JAR - extract it to a temp file
+                        Path lombok = Files.createTempDirectory("lombok");
+                        Path tempLombok = Files.createFile(Paths.get(lombok.toString(), "lombok.jar"));
+                        try (java.io.InputStream is = lombokResource.openStream()) {
+                            java.nio.file.Files.copy(is, tempLombok, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        }
+                        runtimeClasspath.add(tempLombok);
+                    }
+                }
+            } catch (URISyntaxException | java.io.IOException e) {
+                // If we can't load the resource lombok.jar, continue without it
+            }
         }
         return runtimeClasspath;
     }
