@@ -147,13 +147,20 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matchesExactlyOneWithWildcard() {
         assertTrue(argRegex("A foo(*)").matcher("int").matches());
+        assertTrue(argRegex("A foo(*)").matcher("java.lang.String").matches());
         assertTrue(argRegex("A foo(*, int)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(*,int)").matcher("int,int").matches());
         assertTrue(argRegex("A foo(*, int)").matcher("double,int").matches());
+        assertTrue(argRegex("A foo(*, int)").matcher("java.lang.String,int").matches());
+        assertTrue(argRegex("A foo(*, String)").matcher("java.lang.String,java.lang.String").matches());
         assertTrue(argRegex("A foo(int, *)").matcher("int,int").matches());
         assertTrue(argRegex("A foo(int, *)").matcher("int,double").matches());
+        assertTrue(argRegex("A foo(int,*)").matcher("int,double").matches());
         assertTrue(argRegex("A foo(*, *)").matcher("int,int").matches());
+        assertTrue(argRegex("A foo(*,*)").matcher("int,int").matches());
         assertTrue(argRegex("A foo(int, *, double)").matcher("int,int,double").matches());
         assertTrue(argRegex("A foo(int, *, double)").matcher("int,double,double").matches());
+        assertTrue(argRegex("A foo(int,*,double)").matcher("int,double,double").matches());
 
         assertFalse(argRegex("A foo(*)").matcher("").matches());
         assertFalse(argRegex("A foo(*)").matcher("int,int").matches());
@@ -187,6 +194,9 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(argRegex("A foo(..)").matcher("").matches());
         assertTrue(argRegex("A foo(..)").matcher("int").matches());
         assertTrue(argRegex("A foo(..)").matcher("int,int").matches());
+
+        assertTrue(argRegex("A foo(.., int)").matcher("double,double,int").matches());
+        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double,java.lang.String,int,double").matches());
     }
 
     @Test
