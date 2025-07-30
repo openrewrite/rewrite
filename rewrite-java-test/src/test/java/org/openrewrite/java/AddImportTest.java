@@ -33,10 +33,10 @@ import org.openrewrite.test.SourceSpecs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -607,7 +607,7 @@ class AddImportTest implements RewriteTest {
 
                     class A {}
                     """,
-                  expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
+                  expectedImports.stream().map(i -> "import " + i + ";").collect(joining("\n"))
                 )
               )
             );

@@ -33,7 +33,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -402,7 +401,7 @@ public class DependencyConstraintToRule extends Recipe {
                     }
                     J.MethodInvocation m = GradleParser.builder()
                             .build()
-                            .parseInputs(Collections.singletonList(
+                            .parseInputs(singletonList(
                                     new Parser.Input(
                                             Paths.get("build.gradle.kts"),
                                             () -> new ByteArrayInputStream(

@@ -28,7 +28,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -47,7 +48,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
     private static final List<XPathMatcher> JAVA_VERSION_XPATH_MATCHERS =
             JAVA_VERSION_PROPERTIES.stream()
                     .map(property -> "/project/properties/" + property)
-                    .map(XPathMatcher::new).collect(Collectors.toList());
+                    .map(XPathMatcher::new).collect(toList());
 
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build//plugins");
 

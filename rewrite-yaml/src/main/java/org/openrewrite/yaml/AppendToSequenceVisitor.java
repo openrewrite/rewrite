@@ -24,10 +24,10 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.sort;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
@@ -66,10 +66,10 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                     .map(Yaml.Sequence.Entry::getBlock)
                     .map(block -> convertBlockToString(block, cursor))
                     .sorted()
-                    .collect(Collectors.toList());
+                    .collect(toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
                 List<String> sorted = new ArrayList<>(this.existingSequenceValues);
-                Collections.sort(sorted);
+                sort(sorted);
                 return values.equals(sorted);
             } else {
                 return values.equals(this.existingSequenceValues);

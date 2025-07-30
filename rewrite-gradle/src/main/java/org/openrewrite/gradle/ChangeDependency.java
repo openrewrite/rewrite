@@ -45,6 +45,7 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -292,7 +293,7 @@ public class ChangeDependency extends Recipe {
                                 String replacement = updated.toStringNotation();
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                m = m.withArguments(Collections.singletonList(newLiteral));
+                                m = m.withArguments(singletonList(newLiteral));
                             }
                         }
                     }
@@ -585,7 +586,7 @@ public class ChangeDependency extends Recipe {
                                 String replacement = updated.toStringNotation();
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                m = m.withArguments(Collections.singletonList(newLiteral));
+                                m = m.withArguments(singletonList(newLiteral));
                             }
                         }
                     }

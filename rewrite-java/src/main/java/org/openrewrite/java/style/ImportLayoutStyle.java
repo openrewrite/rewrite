@@ -42,12 +42,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StreamUtils.distinctBy;
 
 /**
@@ -91,7 +89,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = layout.stream()
-                .collect(Collectors.partitioningBy(block -> block instanceof Block.AllOthers));
+                .collect(partitioningBy(block -> block instanceof Block.AllOthers));
         blocksNoCatchalls = blockGroups.get(false);
         blocksOnlyCatchalls = blockGroups.get(true);
     }
@@ -677,7 +675,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         .collect(groupingBy(
                                 ImportLayoutStyle::packageOrOuterClassName,
                                 LinkedHashMap::new, // Use an ordered map to preserve sorting
-                                Collectors.toList()
+                                toList()
                         ));
 
                 List<JRightPadded<J.Import>> ordered = new ArrayList<>(imports.size());
@@ -696,7 +694,7 @@ public class ImportLayoutStyle implements JavaStyle {
 
                         Set<String> typeNamesInThisGroup = importGroup.stream()
                                 .map(im -> im.getElement().getClassName())
-                                .collect(Collectors.toSet());
+                                .collect(toSet());
 
                         Optional<String> oneOfTheTypesIsInAnotherGroupToo = groupedImports.values().stream()
                                 .filter(group -> group != importGroup)

@@ -34,10 +34,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -390,7 +390,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private String getAttributeValuesAsString() {
         return getAttributeValues().stream()
                 .map(String::valueOf)
-                .collect(Collectors.joining("\", \"", "{\"", "\"}"));
+                .collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private boolean isArray(J.Annotation annotation) {

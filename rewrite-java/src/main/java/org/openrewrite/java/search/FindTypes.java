@@ -32,7 +32,8 @@ import org.openrewrite.trait.Trait;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -79,7 +80,7 @@ public class FindTypes extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
-                    Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
+                    Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(toSet());
                     return new ReferenceVisitor(matches).visit(tree, ctx);
                 }
                 return tree;

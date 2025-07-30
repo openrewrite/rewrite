@@ -24,8 +24,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Collections.singleton;
 
 public class FindEmptyClasses extends Recipe {
 
@@ -41,7 +42,7 @@ public class FindEmptyClasses extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S2094");
+        return singleton("RSPEC-S2094");
     }
 
     @Override

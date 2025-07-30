@@ -33,7 +33,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -94,7 +93,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     }
 
     private static List<NamedStyles> noWhitespaceBeforeStyle(UnaryOperator<NoWhitespaceBeforeStyle> with) {
-        return Collections.singletonList(
+        return singletonList(
           new NamedStyles(
             Tree.randomId(), "test", "test", "test", emptySet(),
             singletonList(with.apply(Checkstyle.noWhitespaceBeforeStyle()))

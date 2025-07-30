@@ -61,11 +61,11 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -3960,7 +3960,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private List<J.Annotation> mapAnnotations(List<KtAnnotationEntry> ktAnnotationEntries, ExecutionContext data) {
         return ktAnnotationEntries.stream()
                 .map(annotation -> (J.Annotation) annotation.accept(this, data))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {

@@ -40,8 +40,8 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -233,7 +233,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
                         .stream()
                         .map(e -> (Expression) e)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
                 return getMapEntriesDependency(arguments);

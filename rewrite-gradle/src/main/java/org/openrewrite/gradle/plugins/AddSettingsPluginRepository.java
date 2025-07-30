@@ -31,11 +31,11 @@ import org.openrewrite.java.tree.Statement;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -134,9 +134,9 @@ public class AddSettingsPluginRepository extends Recipe {
                            "}";
                 }
 
-                return (J.MethodInvocation) GradleParser.builder().build().parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
+                return (J.MethodInvocation) GradleParser.builder().build().parseInputs(singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
                         .map(G.CompilationUnit.class::cast)
-                        .collect(Collectors.toList()).get(0).getStatements().get(0);
+                        .collect(toList()).get(0).getStatements().get(0);
             }
 
             private J.MethodInvocation extractRepository(J.MethodInvocation pluginManagement) {

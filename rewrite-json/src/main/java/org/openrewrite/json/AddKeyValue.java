@@ -26,10 +26,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -86,7 +86,7 @@ public class AddKeyValue extends Recipe {
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
 
                     if (jsonIsEmpty) {
-                        return autoFormat(obj.withMembers(Collections.singletonList(newMember)), ctx, getCursor().getParent());
+                        return autoFormat(obj.withMembers(singletonList(newMember)), ctx, getCursor().getParent());
                     }
 
                     List<Json> newMembers = prepend ?

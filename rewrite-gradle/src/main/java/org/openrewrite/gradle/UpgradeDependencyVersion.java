@@ -1233,7 +1233,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep) {
-        return withTransitives(dep, Collections.singleton(dep.getGav().asGroupArtifact()));
+        return withTransitives(dep, singleton(dep.getGav().asGroupArtifact()));
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep, Set<GroupArtifact> gas) {
