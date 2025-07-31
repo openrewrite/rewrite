@@ -276,7 +276,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
                         if (t.getChild("version").isPresent()) {
-                            t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                            t = changeChildTagValue(t, "version", newerVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
@@ -337,7 +337,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (groupId != null && artifactId != null && version != null) {
                     String newerVersion = findNewerVersion(groupId, artifactId, resolveVersion(version), ctx);
                     if (newerVersion != null) {
-                        t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                        t = changeChildTagValue(t, "version", newerVersion, ctx);
                     }
                 }
                 return t;
