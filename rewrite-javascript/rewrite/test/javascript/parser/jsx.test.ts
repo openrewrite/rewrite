@@ -154,11 +154,19 @@ describe("jsx mapping", () => {
         spec.rewriteRun(
             //language=tsx
             tsx(
-                `
-                <MenuItemWithOverlay<DrawerProps>
-                >
-                    <span>You didn't expect it, did you?</span>
-                </MenuItemWithOverlay>
+         `
+                <Ruud>
+                    <MenuItemWithOverlay<DrawerProps>
+                    >
+                        <span>You didn't expect it, did you?</span>
+                    </MenuItemWithOverlay>
+                    <AnotherTag<Param>
+                        slots={{
+                            container: Drawer
+                        }}
+                    >
+                    </AnotherTag>
+                </Ruud>
                 `
         )
     ));
