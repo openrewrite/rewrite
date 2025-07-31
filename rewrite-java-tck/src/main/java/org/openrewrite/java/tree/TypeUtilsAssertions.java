@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 
 import java.util.*;
 
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.BOUND;
 import static org.openrewrite.java.tree.TypeUtils.ComparisonContext.INFER;
 
@@ -31,7 +32,7 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
 
     public TypeUtilsAssertions(J.CompilationUnit cu) {
         EnumSet.complementOf(EnumSet.of(JavaType.Primitive.String, JavaType.Primitive.None))
-          .forEach(e -> types.put(e.getKeyword(), new ArrayList<>(Collections.singletonList(e))));
+          .forEach(e -> types.put(e.getKeyword(), new ArrayList<>(singletonList(e))));
         new JavaIsoVisitor<Integer>() {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer o) {

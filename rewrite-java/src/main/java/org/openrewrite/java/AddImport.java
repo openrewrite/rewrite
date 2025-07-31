@@ -33,11 +33,11 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
@@ -169,7 +169,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
                     .map(JavaSourceSet::getClasspath)
-                    .orElse(Collections.emptyList());
+                    .orElse(emptyList());
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 

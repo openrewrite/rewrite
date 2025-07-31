@@ -55,10 +55,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
@@ -229,7 +230,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     // Determine the configurations used to declare dependencies that requested dependencies in the build
                     List<GradleDependencyConfiguration> declaredConfigurations = gradleProject.getConfigurations().stream()
                             .filter(c -> c.isCanBeDeclared() && !c.getRequested().isEmpty())
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     configurations:
                     for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
@@ -269,12 +270,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                         }
 
                                                         // TODO there has to be a better way!
-                                                        if (c.getName().equals("runtimeOnly")) {
-                                                            if (config.getName().equals("implementation")) {
+                                                        if ("runtimeOnly".equals(c.getName())) {
+                                                            if ("implementation".equals(config.getName())) {
                                                                 return true;
                                                             }
-                                                        } else if (c.getName().equals("testRuntimeOnly")) {
-                                                            if (config.getName().equals("testImplementation") || config.getName().equals("implementation")) {
+                                                        } else if ("testRuntimeOnly".equals(c.getName())) {
+                                                            if ("testImplementation".equals(config.getName()) || "implementation".equals(config.getName())) {
                                                                 return true;
                                                             }
                                                         }
@@ -472,7 +473,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 GradleProject gp = gradleProject;
                 Set<String> configNames = gp.getConfigurations().stream()
                         .map(GradleDependencyConfiguration::getName)
-                        .collect(Collectors.toSet());
+                        .collect(toSet());
                 Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
                     if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
@@ -521,7 +522,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                                    if (m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies")) {
+                                    if ("constraints".equals(m.getSimpleName()) && withinBlock(getCursor(), "dependencies")) {
                                         return SearchResult.found(m);
                                     }
                                     return m;
@@ -626,7 +627,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .stream()
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
-                        .filter(m2 -> m2.getSimpleName().equals("constraints"))
+                        .filter(m2 -> "constraints".equals(m2.getSimpleName()))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Unable to find constraints block"))
                         .withMarkers(Markers.EMPTY);
@@ -646,7 +647,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     return dependencies.withBody(body.withStatements(
                             ListUtils.concat(constraints, statements)));
                 })), constraints, ctx, getCursor().getParentOrThrow());
-            } else if (isKotlinDsl && m.getSimpleName().equals("dependencies") && getCursor().getParentTreeCursor().firstEnclosing(J.MethodInvocation.class) == null) {
+            } else if (isKotlinDsl && "dependencies".equals(m.getSimpleName()) && getCursor().getParentTreeCursor().firstEnclosing(J.MethodInvocation.class) == null) {
                 K.CompilationUnit withConstraints = (K.CompilationUnit) parseAsGradle(
                         //language=kotlin
                         "plugins { id(\"java\") }\n" +
@@ -661,11 +662,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         .flatMap(block -> block.getStatements().stream())
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
-                        .filter(m2 -> m2.getSimpleName().equals("dependencies"))
+                        .filter(m2 -> "dependencies".equals(m2.getSimpleName()))
                         .flatMap(dependencies -> ((J.Block) ((J.Lambda) dependencies.getArguments().get(0)).getBody()).getStatements().stream())
                         .filter(J.MethodInvocation.class::isInstance)
                         .map(J.MethodInvocation.class::cast)
-                        .filter(m2 -> m2.getSimpleName().equals("constraints"))
+                        .filter(m2 -> "constraints".equals(m2.getSimpleName()))
                         .findFirst()
                         .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -709,7 +710,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (!CONSTRAINTS_MATCHER.matches(m) && !(isKotlinDsl && m.getSimpleName().equals("constraints") && withinBlock(getCursor(), "dependencies"))) {
+            if (!CONSTRAINTS_MATCHER.matches(m) && !(isKotlinDsl && "constraints".equals(m.getSimpleName()) && withinBlock(getCursor(), "dependencies"))) {
                 return m;
             }
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
@@ -728,7 +729,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
                 if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                    if ((!isKotlinDsl && constraintMatcher.matches(m2)) || (isKotlinDsl && m.getSimpleName().equals("constraints"))) {
+                    if ((!isKotlinDsl && constraintMatcher.matches(m2)) || (isKotlinDsl && "constraints".equals(m.getSimpleName()))) {
                         if (matchesConstraint(m2, ga)) {
                             if (m2.getSimpleName().equals(config)) {
                                 existingConstraint = m2;
@@ -808,9 +809,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     if (entry.getValue() instanceof J.Literal) {
                         J.Literal value = (J.Literal) entry.getValue();
                         if (value.getValue() instanceof String) {
-                            if (keyValue.equals("group")) {
+                            if ("group".equals(keyValue)) {
                                 declaredGroupId = (String) value.getValue();
-                            } else if (keyValue.equals("name")) {
+                            } else if ("name".equals(keyValue)) {
                                 declaredArtifactId = (String) value.getValue();
                             }
                         }

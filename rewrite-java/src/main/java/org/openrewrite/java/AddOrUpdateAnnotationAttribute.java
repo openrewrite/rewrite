@@ -34,10 +34,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -286,7 +286,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return null;
                             }
 
-                            if (attributeName != null && !attributeValue.equals("value")) {
+                            if (attributeName != null && !"value".equals(attributeValue)) {
                                 return isAnnotationWithOnlyValueMethod(finalA) ? it : createAnnotationAssignment(finalA, "value", it);
                             }
 
@@ -390,14 +390,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private String getAttributeValuesAsString() {
         return getAttributeValues().stream()
                 .map(String::valueOf)
-                .collect(Collectors.joining("\", \"", "{\"", "\"}"));
+                .collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private boolean isArray(J.Annotation annotation) {
         String effectiveName = attributeName == null ? "value" : attributeName;
         List<JavaType.Method> methods = ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods();
         for (JavaType.Method method : methods) {
-            if (effectiveName.equals(method.getName()) && method.getReturnType().toString().equals("java.lang.String[]")) {
+            if (effectiveName.equals(method.getName()) && "java.lang.String[]".equals(method.getReturnType().toString())) {
                 return true;
             }
         }
@@ -406,7 +406,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
         return ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().size() == 1 &&
-                ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().get(0).getName().equals("value");
+                "value".equals(((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods().get(0).getName());
     }
 
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {

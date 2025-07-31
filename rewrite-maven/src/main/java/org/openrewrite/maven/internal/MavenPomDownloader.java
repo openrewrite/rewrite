@@ -50,8 +50,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
@@ -199,7 +198,7 @@ public class MavenPomDownloader {
     private List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
         if (parentPom == null) {
-            return Collections.singletonList(projectPom);
+            return singletonList(projectPom);
         } else {
             return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
         }

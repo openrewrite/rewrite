@@ -1539,7 +1539,7 @@ class MergeYamlTest implements RewriteTest {
               "$",
               //language=yaml
               """
-                
+
                   # new stuff
                 new-property: value
                 """,
@@ -1575,10 +1575,10 @@ class MergeYamlTest implements RewriteTest {
               "$.groups",
               //language=yaml
               """
-                
+
                 # comment
                 - id: 3
-                
+
                   # foo bar
                   foo: bar
                 """,
@@ -1601,7 +1601,7 @@ class MergeYamlTest implements RewriteTest {
                 - id: 2
                 # comment
                 - id: 3
-              
+
                   # foo bar
                   foo: bar
               """
@@ -1736,7 +1736,7 @@ class MergeYamlTest implements RewriteTest {
               """
                 deep:
                   object:
-                
+
                     script: | # yaml comment
                        #!/bin/bash
                         echo "hello"
@@ -1763,7 +1763,7 @@ class MergeYamlTest implements RewriteTest {
                   deep:
                     object:
                       with: An existing value
-              
+
                       script: | # yaml comment
                          #!/bin/bash
                           echo "hello"
@@ -2887,9 +2887,9 @@ class MergeYamlTest implements RewriteTest {
               foo:
                 existing-key: existing-value
               # A simple comment with trailing line breaks
-              
-              
-              
+
+
+
               bar: bar-value
               """,
             // language=yaml
@@ -2899,9 +2899,9 @@ class MergeYamlTest implements RewriteTest {
                 existing-key: existing-value
                 new-key: new-value
               # A simple comment with trailing line breaks
-              
-              
-              
+
+
+
               bar: bar-value
               """
           )

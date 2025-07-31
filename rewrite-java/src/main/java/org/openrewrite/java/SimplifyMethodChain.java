@@ -24,9 +24,10 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.reverse;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -69,8 +70,8 @@ public class SimplifyMethodChain extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<MethodMatcher> matchers = methodPatternChain.stream()
                 .map(matcher -> new MethodMatcher(matcher, matchOverrides))
-                .collect(Collectors.toList());
-        Collections.reverse(matchers);
+                .collect(toList());
+        reverse(matchers);
 
         return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override

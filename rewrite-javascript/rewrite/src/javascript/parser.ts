@@ -3548,6 +3548,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
+            typeArguments: node.openingElement.typeArguments && this.mapTypeArguments(this.suffix(node.openingElement.tagName), node.openingElement.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
@@ -3571,6 +3572,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.tagName), this.visit(node.tagName)),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.suffix(node.tagName), node.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,

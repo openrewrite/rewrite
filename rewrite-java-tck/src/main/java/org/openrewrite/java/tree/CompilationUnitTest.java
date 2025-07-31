@@ -51,7 +51,7 @@ class CompilationUnitTest implements RewriteTest {
               /* Comment */
               package a;
               import java.util.List;
-                            
+
               public class A { }
               // comment
               """,

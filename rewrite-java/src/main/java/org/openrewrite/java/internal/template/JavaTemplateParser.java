@@ -34,9 +34,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
@@ -110,7 +111,7 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(Collectors.toList()), Expression.class, imports),
+        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -171,7 +172,7 @@ public class JavaTemplateParser {
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(Collectors.toList()), expected, imports),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), expected, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
@@ -200,7 +201,7 @@ public class JavaTemplateParser {
 
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
-        String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
+        String methodWithReplacementArgs = method.withArguments(emptyList()).printTrimmed(cursor.getParentOrThrow())
                 .replaceAll("\\)$", template + (isStatement(cursor) ? ");" : ")"));
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with

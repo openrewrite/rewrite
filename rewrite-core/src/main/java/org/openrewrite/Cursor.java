@@ -21,9 +21,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.StreamSupport.stream;
 
 /**
@@ -187,7 +187,7 @@ public class Cursor {
                        .map(t -> t instanceof Tree ?
                                t.getClass().getSimpleName() :
                                t.toString())
-                       .collect(Collectors.joining("->")) +
+                       .collect(joining("->")) +
                "}";
     }
 

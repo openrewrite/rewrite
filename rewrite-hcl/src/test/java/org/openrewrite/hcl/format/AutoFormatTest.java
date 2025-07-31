@@ -75,7 +75,7 @@ class AutoFormatTest implements RewriteTest {
             """
               locals {
                 object = {
-                       string_attr = "value1"   ,   
+                       string_attr = "value1"   ,
                        int_attr = 2,
                 }
               }
@@ -114,16 +114,16 @@ class AutoFormatTest implements RewriteTest {
             """
               r1 {
               }
-              
-              
-              
+
+
+
               r2 {
               }
               """,
             """
               r1 {
               }
-              
+
               r2 {
               }
               """

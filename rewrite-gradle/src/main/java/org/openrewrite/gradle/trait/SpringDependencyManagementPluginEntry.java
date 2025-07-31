@@ -44,9 +44,9 @@ import org.openrewrite.trait.Trait;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toCollection;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -155,7 +155,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         .orElseGet(() -> importedBomGroupVersion.map(GroupArtifactVersion::getGroupId).orElse(null));
                 String version = dependencyGroupVersion.map(GroupArtifactVersion::getVersion)
                         .orElseGet(() -> importedBomGroupVersion.map(GroupArtifactVersion::getVersion).orElse(null));
-                Set<String> artifacts = dependencies.stream().map(GroupArtifactVersion::getArtifactId).collect(Collectors.toCollection(HashSet::new));
+                Set<String> artifacts = dependencies.stream().map(GroupArtifactVersion::getArtifactId).collect(toCollection(HashSet::new));
                 if (importedBom != null) {
                     artifacts.add(importedBom.getArtifactId());
                 }
@@ -187,7 +187,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             new JavaIsoVisitor<List<String>>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<String> entries) {
-                    if (method.getSimpleName().equals("entry") && method.getArguments().size() == 1) {
+                    if ("entry".equals(method.getSimpleName()) && method.getArguments().size() == 1) {
                         Expression argument = method.getArguments().get(0);
                         if (argument instanceof J.Literal) {
                             Object value = ((J.Literal) argument).getValue();

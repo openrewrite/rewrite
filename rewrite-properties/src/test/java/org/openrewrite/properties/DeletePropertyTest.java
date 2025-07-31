@@ -76,7 +76,7 @@ class DeletePropertyTest implements RewriteTest {
                   # Preserve comment
                   preserve = foo
                   # Another comment preserved
-                  
+
                   # delete.me comment
                   delete.me = baz
                   delete.me.not = bar
@@ -85,7 +85,7 @@ class DeletePropertyTest implements RewriteTest {
                   # Preserve comment
                   preserve = foo
                   # Another comment preserved
-                
+
                   delete.me.not = bar
                   """
               )
@@ -99,24 +99,24 @@ class DeletePropertyTest implements RewriteTest {
               properties(
                 """
                   # Heading comment
-                  
+
                   # Another heading comment
-                  
+
                   # delete.me comment (previous empty line indicate property comment starts)
                   # on
                   # multiple line
                   delete.me = baz
                   # After comment 1
-                  
+
                   # After comment 2
                   """,
                 """
                   # Heading comment
-                  
+
                   # Another heading comment
-    
+
                   # After comment 1
-                  
+
                   # After comment 2
                   """
               )
@@ -197,7 +197,7 @@ class DeletePropertyTest implements RewriteTest {
           properties(
             """
               acme.my-project.person.first-name=example
-              
+
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,

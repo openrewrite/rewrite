@@ -38,7 +38,7 @@ class FunctionTypeTest implements RewriteTest {
               class TestInitializer(
                   val resourcesDir: String
               )
-              
+
               fun runTest() {
                   val builder = GradleSpigotDependencyLoaderTestBuilder()
                   builder.init(TestInitializer("null"))

@@ -82,7 +82,7 @@ class IndependentCacheManagementTest {
         localObjects.put(objectId, text);
         // Intentionally don't put anything in remoteObjects to simulate cache miss
 
-        // Simulate GetObject request with lastKnownId 
+        // Simulate GetObject request with lastKnownId
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
 
@@ -112,7 +112,7 @@ class IndependentCacheManagementTest {
         localObjects.put(objectId, text);
         remoteObjects.put(objectId, text); // Same object in remote
 
-        // Simulate GetObject request with lastKnownId 
+        // Simulate GetObject request with lastKnownId
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
 
@@ -139,13 +139,13 @@ class IndependentCacheManagementTest {
                 .sourcePath(Paths.get("test.txt"))
                 .build();
 
-        // Create modified object 
+        // Create modified object
         PlainText modifiedText = originalText.withText("Modified Text");
 
         localObjects.put(objectId, modifiedText);
         remoteObjects.put(objectId, originalText); // Different object in remote
 
-        // Simulate GetObject request with lastKnownId 
+        // Simulate GetObject request with lastKnownId
         TestableGetObjectHandler handler = new TestableGetObjectHandler(new AtomicInteger(1), remoteObjects,
                 localObjects, localRefs, new AtomicBoolean(false));
 
@@ -178,7 +178,7 @@ class IndependentCacheManagementTest {
 
         assertThat(response).isNotEmpty();
         assertThat(response.getFirst().getState()).isEqualTo(RpcObjectData.State.ADD);
-        // For RpcCodec objects like PlainText, the first RpcObjectData has null value 
+        // For RpcCodec objects like PlainText, the first RpcObjectData has null value
         // and the actual data is in subsequent RpcObjectData objects
         assertThat((Object) response.getFirst().getValue()).isNull();
         assertThat(response.getFirst().getValueType()).isEqualTo("org.openrewrite.text.PlainText");

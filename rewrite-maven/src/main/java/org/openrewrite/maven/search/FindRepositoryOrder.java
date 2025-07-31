@@ -28,8 +28,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 public class FindRepositoryOrder extends Recipe {
     transient MavenRepositoryOrder repositoryOrder = new MavenRepositoryOrder(this);
@@ -59,7 +61,7 @@ public class FindRepositoryOrder extends Recipe {
                         .getRepositories(
                                 mrr.getMavenSettings(),
                                 StreamSupport.stream(mrr.getPom().getActiveProfiles().spliterator(), false)
-                                        .collect(Collectors.toList())
+                                        .collect(toList())
                         )) {
                     repositories.put(repository.getUri(), repository);
                 }
@@ -76,7 +78,7 @@ public class FindRepositoryOrder extends Recipe {
 
                 return SearchResult.found(document, repositories.values().stream()
                         .map(MavenRepository::getUri)
-                        .collect(Collectors.joining("\n")));
+                        .collect(joining("\n")));
             }
         };
     }

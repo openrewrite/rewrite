@@ -441,7 +441,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       "" == null || !"".isEmpty()                              // false
       "" != null && "".isEmpty()                               // true
       "" != null && !"".isEmpty()                              // false
-      
+
       "b" == null || "b".isEmpty()                             // false
       "b" == null || !"b".isEmpty()                            // true
       "b" != null && "b".isEmpty()                             // false
@@ -459,9 +459,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() || "" == null || !"".isEmpty() // a == null || !a.isEmpty()
       a == null || !a.isEmpty() || "" != null && "".isEmpty()  // true
       a == null || !a.isEmpty() || "" != null && !"".isEmpty() // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true 
+      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true
       a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null
-      a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty() 
+      a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty()
       a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null
 
       a == null || a.isEmpty() || "b" == null || "b".isEmpty()   // a == null || a.isEmpty()
@@ -476,9 +476,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() || "b" == null || !"b".isEmpty() // true
       a == null || !a.isEmpty() || "b" != null && "b".isEmpty()  // a == null || !a.isEmpty()
       a == null || !a.isEmpty() || "b" != null && !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null
       a == null || !a.isEmpty() && "b" == null || !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
     @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")

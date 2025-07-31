@@ -36,7 +36,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+
               /**
                *   {@link List#add(Object) } refers to import
                * @param Something that spans
@@ -45,13 +45,13 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**   the position of the first body element or tag is relative to the index beginning after the last contiguous whitespace following '**' */
                   Integer n;
-                            
+
                   /**
                    * {@link int}
                    */
                   class Inner {
                       Integer n;
-                      
+
                       /**
                        * {@link #n} refers to Inner
                        */
@@ -313,7 +313,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               package org.foo;
-                            
+
               /**
                * Type of an Opening Time.
                * <ul>
@@ -500,7 +500,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              /**   
+              /**
                  {@link int}
               */
               class Test {}
@@ -516,7 +516,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /**   
+                  /**
                      {@link int}
                   */
                   String s;
@@ -559,7 +559,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.Map;
-                            
+
               /**
                * {@link Map< String , Integer > }
                */
@@ -623,7 +623,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.nio.charset.StandardCharsets;
-                            
+
               /**
                *   {@link StandardCharsets#UTF_8 }
                *   {@linkplain StandardCharsets#UTF_8 }
@@ -726,7 +726,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.Map;
-                            
+
               /**
                * {@link Map<String, Map<String, Integer>>} multiple parameterized type
                */
@@ -744,7 +744,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+
               class Test {
                   /**
                    * @return - {@link List<String>} - description.
@@ -949,7 +949,7 @@ class JavadocTest implements RewriteTest {
                   /**
                    * @param <
                    *   T> t hi
-                   * @param 
+                   * @param
                    *   val
                    */
                   <T> boolean test(int val);
@@ -1091,7 +1091,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
@@ -1116,7 +1116,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 abstract class HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
@@ -1141,15 +1141,15 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface HtmlMarkupI {
                     Tag H1 = Tag.H1;
                 }
-                
+
                 abstract class HtmlMarkup2 implements HtmlMarkupI {
                     String H1 = "aa";
                 }
-                
+
                 abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
                 }
                 """
@@ -1236,15 +1236,15 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface SomeInterface {
                     int test();
                 }
-                
+
                 abstract class SomeParent2 implements SomeInterface {
                     abstract boolean test();
                 }
-                
+
                 abstract class SomeParent extends SomeParent2 implements SomeInterface {
                 }
                 """
@@ -1425,7 +1425,7 @@ class JavadocTest implements RewriteTest {
                    * The value of this constant is {@value}.
                    */
                   public static final String SCRIPT_START = "<script>";
-                            
+
                   /**
                    * {@value Test#SCRIPT_START}
                    */
@@ -1460,7 +1460,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              /**   
+              /**
                 *       Line 1
                 */
               class Test<T> {}
@@ -1496,8 +1496,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * Text with trailing whitespace.    
-                   * 
+                   * Text with trailing whitespace.
+                   *
                    * @param arg desc
                    */
                   void method(String arg) {
@@ -1516,8 +1516,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * Text with trailing whitespace.    
-                   * More trailing whitespace    
+                   * Text with trailing whitespace.
+                   * More trailing whitespace
                    */
                   void method() {
                   }
@@ -1535,8 +1535,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * @param arg test text.    
-                   * More trailing whitespace    
+                   * @param arg test text.
+                   * More trailing whitespace
                    */
                   void method(String arg) {
                   }
@@ -1553,7 +1553,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /** 
+                  /**
                    * JavaDoc
                       1st new line.
                       2nd new line.
@@ -1576,8 +1576,8 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**
                   * JavaDocs treats whitespace differently when new lines exist
-                  
-                  
+
+
                   * with whitespace that is contained in pure text.
                   */
                   void method() {}
@@ -1596,8 +1596,8 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**
                    * New lines with whitespace followed by a param.
-                   
-                   
+
+
                    * @return void
                    */
                   void method() {
@@ -1615,9 +1615,9 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /** 
+                  /**
                    * @param oboFile the file to be parsed
-                            
+
                    * @return the ontology represented as a BioJava ontology file
                    */
                   void test() {
@@ -1671,7 +1671,7 @@ class JavadocTest implements RewriteTest {
               interface Test {
                   /**
                    * Returns something.
-                   * 
+                   *
                    * @return true
                    */
                   boolean test();
@@ -1689,9 +1689,9 @@ class JavadocTest implements RewriteTest {
             """
               interface Test {
                   /**
-                   * Text followed by whitespace, and multiple new lines with/without whitespace.        
+                   * Text followed by whitespace, and multiple new lines with/without whitespace.
                    *
-                   * 
+                   *
                    */
                   void method();
               }
@@ -1707,17 +1707,17 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.lang.Math;
-                            
+
               interface Test {
                   /**
                    * @see Math#pow(
-                   * 
-                   *    double   
-                   * 
                    *
-                   *    ,    
+                   *    double
+                   *
+                   *
+                   *    ,
                    * double
-                   * 
+                   *
                    * )
                    */
                   boolean test();
@@ -2019,7 +2019,7 @@ class JavadocTest implements RewriteTest {
               interface Test {
               	/**
               	 * <p>Ř\\u00e9t\\u00FBrn:</p>
-              	 * 
+              	 *
               	 * {@code \\u0040Override
                  * public void method() {}
                  * }
@@ -2060,9 +2060,9 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              /** 
+              /**
               * First line of comment
-              * <!-- comment 
+              * <!-- comment
               *   Second line of comment
               * -->
               * <!-- another comment -->
@@ -2122,12 +2122,12 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                 /**   
+                 /**
                   * {@link int
                   * Some other text.
                   * See {@link java.lang.String}
                   * @param arg description
-                  */                  
+                  */
                   void method(String arg) {
                   }
               }

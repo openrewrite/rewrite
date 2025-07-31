@@ -26,8 +26,9 @@ import org.openrewrite.hcl.tree.HclLeftPadded;
 import org.openrewrite.internal.StringUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.singletonList;
 
 public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     @Nullable
@@ -99,7 +100,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     private List<Hcl.Attribute> attributesInGroup(List<Hcl.Attribute> siblings, Hcl.Attribute attribute) {
         boolean isAttributeMultiline = attribute.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
        if (isAttributeMultiline) {
-            return Collections.singletonList(attribute);
+            return singletonList(attribute);
         }
 
         List<Hcl.Attribute> groupAttributes = new ArrayList<>();

@@ -219,7 +219,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-              
+
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");
@@ -243,7 +243,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-              
+
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");

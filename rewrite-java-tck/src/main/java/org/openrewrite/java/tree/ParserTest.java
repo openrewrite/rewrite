@@ -26,7 +26,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 class ParserTest implements RewriteTest {
 
@@ -38,6 +39,6 @@ class ParserTest implements RewriteTest {
         @SuppressWarnings("SimplifyStreamApiCallChains") List<SourceFile> ignore = JavaParser.fromJavaVersion()
           .build()
           .parse(new String(Files.readAllBytes(targetFile)))
-          .collect(Collectors.toList());
+          .collect(toList());
     }
 }

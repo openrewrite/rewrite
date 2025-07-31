@@ -75,15 +75,15 @@ class RealWorldGroovyTest implements RewriteTest {
                       }
                   }
               }
-              
+
               plugins {
                   id "io.spring.develocity.conventions" version "0.0.22"
               }
-              
+
               rootProject.name="spring-boot-build"
-              
+
               enableFeaturePreview("STABLE_CONFIGURATION_CACHE")
-              
+
               settings.gradle.projectsLoaded {
                   develocity {
                       buildScan {
@@ -95,13 +95,13 @@ class RealWorldGroovyTest implements RewriteTest {
                       }
                   }
               }
-              
+
               include "spring-boot-system-tests:spring-boot-image-tests"
-              
+
               file("${rootDir}/spring-boot-project/spring-boot-starters").eachDirMatch(~/spring-boot-starter.*/) {
                   include "spring-boot-project:spring-boot-starters:${it.name}"
               }
-              
+
               file("${rootDir}/spring-boot-tests/spring-boot-smoke-tests").eachDirMatch(~/spring-boot-smoke-test.*/) {
                   include "spring-boot-tests:spring-boot-smoke-tests:${it.name}"
               }
@@ -117,16 +117,16 @@ class RealWorldGroovyTest implements RewriteTest {
           groovy(
             """
               import org.springframework.util.*
-              
+
               @Component
               public class Test implements CommandLineRunner {
-              
+
                   public void run(String... args) throws Exception {
                       println "HasClasses-" + ClassUtils.isPresent("missing", null) + "-" +
                               ClassUtils.isPresent("org.springframework.boot.SpringApplication", null) + "-" +
                               ClassUtils.isPresent(args[0], null)
                   }
-              
+
               }
               """
           )
@@ -142,9 +142,9 @@ class RealWorldGroovyTest implements RewriteTest {
               import org.gradle.api.Plugin
               import org.gradle.api.Project
               import org.gradle.api.tasks.javadoc.Javadoc
-              
+
               public class JavadocOptionsPlugin implements Plugin<Project> {
-              
+
               	@Override
               	public void apply(Project project) {
               		project.getTasks().withType(Javadoc).all { t->
@@ -165,7 +165,7 @@ class RealWorldGroovyTest implements RewriteTest {
             """
               import org.springframework.core.Ordered
               import spock.lang.Specification
-              
+
               class TheTest extends Specification {
                   def "has Ordered"() {
                       expect: 'Loads Ordered fine'
@@ -193,7 +193,7 @@ class RealWorldGroovyTest implements RewriteTest {
               import org.gradle.api.file.DuplicatesStrategy
               import org.gradle.api.plugins.JavaPlugin
               import org.gradle.api.tasks.bundling.Zip
-              
+
               /**
                * Zips all Spring XML schemas (XSD) files.
                *
@@ -203,40 +203,40 @@ class RealWorldGroovyTest implements RewriteTest {
                * @see org.gradle.api.Project
                */
               class SchemaZipPlugin implements Plugin<Project> {
-              
+
                   @Override
                   void apply(Project project) {
-              
+
                       Zip schemaZip = project.tasks.create('schemaZip', Zip)
-              
+
                       schemaZip.archiveBaseName = project.rootProject.name
                       schemaZip.archiveClassifier = 'schema'
                       schemaZip.description = "Builds -${schemaZip.archiveClassifier} archive containing all XSDs" +
                               " for deployment to static.springframework.org/schema."
                       schemaZip.group = 'Distribution'
-              
+
                       project.rootProject.subprojects.each { module ->
-              
+
                           module.getPlugins().withType(JavaPlugin.class).all {
-              
+
                               Properties schemas = new Properties();
-              
+
                               module.sourceSets.main.resources
                                       .find { it.path.endsWith('META-INF/spring.schemas') }
                                       ?.withInputStream { schemas.load(it) }
-              
+
                               for (def key : schemas.keySet()) {
-              
+
                                   def zipEntryName = key.replaceAll(/http.*schema.(.*).spring-.*/, '$1')
-              
+
                                   assert zipEntryName != key
-              
+
                                   File xsdFile = module.sourceSets.main.resources.find {
                                       it.path.endsWith(schemas.get(key))
                                   }
-              
+
                                   assert xsdFile != null
-              
+
                                   schemaZip.into(zipEntryName) {
                                       duplicatesStrategy DuplicatesStrategy.EXCLUDE
                                       from xsdFile.path
@@ -258,15 +258,15 @@ class RealWorldGroovyTest implements RewriteTest {
           groovy(
             """
               apply plugin: "maven-publish"
-              
+
               configurations {
                   asciidoctorExtensions
               }
-              
+
               dependencies {
                   asciidoctorExtensions "io.spring.asciidoctor.backends:spring-asciidoctor-backends:0.0.7"
               }
-              
+
               asciidoctorPdf {
                   baseDirFollowsSourceFile()
                   asciidoctorj {
@@ -283,7 +283,7 @@ class RealWorldGroovyTest implements RewriteTest {
                               'project-version': project.version
                   }
               }
-              
+
               asciidoctor {
                   baseDirFollowsSourceFile()
                   configurations "asciidoctorExtensions"
@@ -294,7 +294,7 @@ class RealWorldGroovyTest implements RewriteTest {
                       include 'index.adoc'
                   }
                   options doctype: 'book'
-              
+
                   attributes 'docinfo': 'shared',
                           stylesdir: 'css/',
                           stylesheet: 'spring.css',
@@ -313,7 +313,7 @@ class RealWorldGroovyTest implements RewriteTest {
                           revnumber: project.version,
                           'project-version': project.version
               }
-              
+
               task api(type: Javadoc) {
                   group = "Documentation"
                   description = "Generates aggregated Javadoc API documentation."
@@ -331,14 +331,14 @@ class RealWorldGroovyTest implements RewriteTest {
                   })
                   maxMemory = "1024m"
               }
-              
+
               task docsZip(type: Zip) {
                   group = "Distribution"
                   archiveBaseName = "spring-webflow"
                   archiveClassifier = "docs"
                   description = "Builds -${archiveClassifier.get()} archive containing api and reference " +
                           "for deployment at static.springframework.org/spring-webflow/docs."
-              
+
                   from (api) {
                       into "api"
                   }
@@ -349,23 +349,23 @@ class RealWorldGroovyTest implements RewriteTest {
                       into "reference"
                   }
               }
-              
+
               task schemaZip(type: Zip) {
                   group = "Distribution"
                   archiveBaseName = "spring-webflow"
                   archiveClassifier = "schema"
                   description = "Builds -${archiveClassifier.get()} archive containing all " +
                           "XSDs for deployment at static.springframework.org/schema."
-              
+
                   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-              
+
                   subprojects.each { subproject ->
                       Properties schemas = new Properties()
-              
+
                       subproject.sourceSets.main.resources.find {
                           it.path.endsWith("META-INF/spring.schemas")
                       }?.withInputStream { schemas.load(it) }
-              
+
                       for (def key : schemas.keySet()) {
                           def shortName = key.replaceAll(/http.*schema.(.*).spring-.*/, '$1')
                           assert shortName != key
@@ -378,7 +378,7 @@ class RealWorldGroovyTest implements RewriteTest {
                           }
                       }
                   }
-              
+
                   project(":spring-webflow").sourceSets.main.resources.matching {
                       include '**/engine/model/builder/xml/*.xsd'
                   }.each { File file ->
@@ -387,16 +387,16 @@ class RealWorldGroovyTest implements RewriteTest {
                       }
                   }
               }
-              
+
               task distZip(type: Zip, dependsOn: [docsZip, schemaZip]) {
                   group = "Distribution"
                   archiveBaseName = "spring-webflow"
                   archiveClassifier = "dist"
                   description = "Builds -${archiveClassifier.get()} archive, containing all jars and docs, " +
                           "suitable for community download page."
-              
+
                   def baseDir = "${archiveBaseName.get()}-${project.version}"
-              
+
                   from("src/dist") {
                       include "notice.txt"
                       into "${baseDir}"
@@ -414,7 +414,7 @@ class RealWorldGroovyTest implements RewriteTest {
                   from(zipTree(schemaZip.archiveFile)) {
                       into "${baseDir}/schema"
                   }
-              
+
                   subprojects.each { subproject ->
                       into ("${baseDir}/libs") {
                           from subproject.jar
@@ -427,7 +427,7 @@ class RealWorldGroovyTest implements RewriteTest {
                       }
                   }
               }
-              
+
               publishing {
                   publications {
                       mavenJava(MavenPublication) {

@@ -45,7 +45,7 @@ class TypeCastTest implements RewriteTest {
             """
               import java.io.Serializable;
               import java.util.function.BiFunction;
-              
+
               class Test {
                   Serializable s = (Serializable & BiFunction<Integer, Integer, Integer>) Integer::sum;
               }
@@ -62,7 +62,7 @@ class TypeCastTest implements RewriteTest {
             """
               import java.io.Serializable;
               import java.util.function.BiFunction;
-              
+
               class Test {
                   void m() {
                       var s = (Serializable & BiFunction<Integer, Integer, Integer>) Integer::sum;
