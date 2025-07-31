@@ -399,8 +399,8 @@ public class MethodMatcher {
 
         final String argumentSignature = argumentsFromExpressionTypes(method);
         final Pattern relaxedArgumentPattern = Pattern.compile(
-                argumentPattern.pattern().replaceAll("((?:[a-zA-Z0-9]+\\.?)+)",
-                        "($1|" + JavaType.Unknown.getInstance().getFullyQualifiedName() + ")"));
+                argumentPattern.pattern().replaceAll("((?:(?:[a-zA-Z0-9]+(?:\\[\\.\\$])?)+(,)?)+)",
+                        "($1|" + JavaType.Unknown.getInstance().getFullyQualifiedName() + "$2)"));
         return relaxedArgumentPattern.matcher(argumentSignature).matches();
     }
 
@@ -554,6 +554,12 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
     }
 
     @Override
+    public String visitWildcard(MethodSignatureParser.WildcardContext ctx) {
+        arguments.add(Argument.WILDCARD);
+        return super.visitWildcard(ctx);
+    }
+
+    @Override
     public String visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
         arguments.add(new Argument.FormalType(ctx));
         return super.visitFormalTypePattern(ctx);
@@ -577,7 +583,10 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
                     argumentPatterns.add("(" + argument.getRegex() + ",)?");
                 }
             } else { // FormalType
-                if (i > 0 && arguments.get(i - 1) != Argument.DOT_DOT) {
+                // We cannot start with a comma
+                if (i == 1 && arguments.get(0) == Argument.DOT_DOT) {
+                    argumentPatterns.add(argument.getRegex());
+                } else if (i > 0) {
                     argumentPatterns.add("," + argument.getRegex());
                 } else {
                     argumentPatterns.add(argument.getRegex());
@@ -595,6 +604,13 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             @Override
             String getRegex() {
                 return "([^,]+,)*([^,]+)";
+            }
+        };
+
+        private static final Argument WILDCARD = new Argument() {
+            @Override
+            String getRegex() {
+                return "([^,]+)";
             }
         };
 
