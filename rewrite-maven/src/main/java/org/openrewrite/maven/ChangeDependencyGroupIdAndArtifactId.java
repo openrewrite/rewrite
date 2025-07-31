@@ -153,8 +153,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
-            @Nullable
-            private Collection<String> availableVersions;
             private boolean isNewDependencyPresent;
 
             @Override
@@ -193,9 +191,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         artifactId = artifactIdFromTag.get();
                     }
                     if (newVersion != null) {
-                        String currentVersion = t.getChildValue("version").orElse(null);
                         try {
-                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
+                            String version = t.getChildValue("version").orElse(newVersion);
+                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, version);
                             Optional<Xml.Tag> scopeTag = t.getChild("scope");
                             Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -255,20 +253,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
-                if (versionComparator == null) {
-                    return newVersion;
-                }
-                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                if (availableVersions == null) {
-                    availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(finalCurrentVersion, v)) {
-                            availableVersions.add(v);
-                        }
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, String version) throws MavenDownloadingException {
+                List<String> availableVersions = new ArrayList<>();
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                for (String v : mavenMetadata.getVersioning().getVersions()) {
+                    if (versionComparator.isValid(version, v)) {
+                        availableVersions.add(v);
                     }
-
                 }
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
