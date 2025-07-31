@@ -45,8 +45,6 @@ dependencies {
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
-    testRuntimeOnly("io.swagger:swagger-annotations:1.5.16")
-    testRuntimeOnly("io.swagger.core.v3:swagger-annotations:2.2.34")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

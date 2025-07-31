@@ -1681,7 +1681,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Test
     void changeVersionPropertyInParentPom() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId("io.swagger", "swagger-annotations", "io.swagger.core.v3", null, "2.2.x", null, null, null)),
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "jakarta.activation", "jakarta.activation-api", "1.2.x", null, null, null)),
           mavenProject("project",
             //language=xml
             pomXml(
@@ -1691,7 +1691,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>parent-project</artifactId>
                   <version>1</version>
                   <properties>
-                    <version.swagger>1.5.16</version.swagger>
+                    <activation.api>1.2.0</activation.api>
                   </properties>
                   <modules>
                     <module>sub-project</module>
@@ -1704,7 +1704,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>parent-project</artifactId>
                   <version>1</version>
                   <properties>
-                    <version.swagger>2.2.34</version.swagger>
+                    <activation.api>1.2.2</activation.api>
                   </properties>
                   <modules>
                     <module>sub-project</module>
@@ -1729,9 +1729,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </parent>
                     <dependencies>
                       <dependency>
-                        <groupId>io.swagger</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>${version.swagger}</version>
+                        <groupId>javax.activation</groupId>
+                        <artifactId>javax.activation-api</artifactId>
+                        <version>${activation.api}</version>
                       </dependency>
                     </dependencies>
                   </project>
@@ -1749,9 +1749,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </parent>
                     <dependencies>
                       <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>${version.swagger}</version>
+                        <groupId>jakarta.activation</groupId>
+                        <artifactId>jakarta.activation-api</artifactId>
+                        <version>${activation.api}</version>
                       </dependency>
                     </dependencies>
                   </project>
