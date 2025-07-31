@@ -90,7 +90,7 @@ public class VersionRequirement {
                 // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
                 // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
                 if (!(requested.contains("]") || requested.contains(")"))) {
-                    requested = requested + "]";
+                    requested += "]";
                 }
 
                 VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(

@@ -238,7 +238,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else {
                             valueStart = lastEnd + fmt.length();
                         }
-                        valueStart = valueStart - newLine.length();
+                        valueStart -= newLine.length();
                         newLine = "";
 
                         Yaml.Tag tag = null;
@@ -257,7 +257,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 indexOfSpaceAfterTag++;
                             }
                             String tagSuffix = potentialScalarValue.substring(indexOfTagName, indexOfSpaceAfterTag);
-                            valueStart = valueStart + indexOfSpaceAfterTag;
+                            valueStart += indexOfSpaceAfterTag;
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
 

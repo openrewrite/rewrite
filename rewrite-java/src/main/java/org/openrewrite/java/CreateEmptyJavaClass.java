@@ -135,7 +135,7 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
         }
 
         if (!path.isEmpty() && !path.endsWith("/")) {
-            path = path + "/";
+            path += "/";
         }
 
         return Paths.get(String.format(
