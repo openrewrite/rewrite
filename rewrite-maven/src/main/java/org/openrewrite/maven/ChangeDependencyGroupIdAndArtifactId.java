@@ -360,19 +360,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     }
 
     public static class Accumulator {
+        Set<PomProperty> pomProperties = new HashSet<>();
         boolean isNewDependencyPresent;
-
-
-
-
-
-
         @Nullable String changeGroupId;
         @Nullable String changeArtifactId;
         boolean removeVersionTag;
         @Nullable String createVersion;
         @Nullable String changeVersion;
-        Set<PomProperty> pomProperties = new HashSet<>();
     }
 
     @Value
