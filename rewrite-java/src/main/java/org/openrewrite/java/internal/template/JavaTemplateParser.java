@@ -271,13 +271,26 @@ public class JavaTemplateParser {
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
         Parser jp = parser.build();
+        return getJavaSourceFile(stub, jp, ctx)
+                // In some specific and rare cases, the parser fails to parse what is a valid program. This has been
+                // investigated for several days to no avail, so the workaround is to retry parsing, which is known to
+                // address the issue.
+                // Context:
+                // - https://github.com/openrewrite/rewrite-spring/pull/757
+                // - also a thread in private Moderne slack mentioning this PR
+                // - https://github.com/openrewrite/rewrite/pull/5801 which is a unit test that reproduces the issue
+                // TLDR: I suspect either a bug in Java Compiler, or some fault in how we call its internals.
+                .orElseGet(() -> getJavaSourceFile(stub, jp, ctx)
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub)));
+    }
+
+    private static Optional<JavaSourceFile> getJavaSourceFile(@Language("java") String stub, Parser jp, ExecutionContext ctx) {
         return (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub))
                 .findFirst()
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
-                .map(JavaSourceFile.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java:\n" + stub));
+                .map(JavaSourceFile.class::cast);
     }
 
     /**
