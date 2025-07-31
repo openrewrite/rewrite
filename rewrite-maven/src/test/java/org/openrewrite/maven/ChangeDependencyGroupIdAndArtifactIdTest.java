@@ -1697,7 +1697,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>parent-project</artifactId>
                   <version>1</version>
                   <properties>
-                    <activation.api>1.2.0</activation.api>
+                    <activation.api.groupId>javax.activation</activation.api.groupId>
+                    <activation.api.artifact>javax.activation-api</activation.api.artifact>
+                    <activation.api.version>1.2.0</activation.api.version>
                   </properties>
                   <modules>
                     <module>sub-project</module>
@@ -1710,7 +1712,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>parent-project</artifactId>
                   <version>1</version>
                   <properties>
-                    <activation.api>1.2.2</activation.api>
+                    <activation.api.groupId>jakarta.activation</activation.api.groupId>
+                    <activation.api.artifact>jakarta.activation-api</activation.api.artifact>
+                    <activation.api.version>1.2.2</activation.api.version>
                   </properties>
                   <modules>
                     <module>sub-project</module>
@@ -1735,29 +1739,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </parent>
                     <dependencies>
                       <dependency>
-                        <groupId>javax.activation</groupId>
-                        <artifactId>javax.activation-api</artifactId>
-                        <version>${activation.api}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>sub-project</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relatiavePath>../pom.xml</relatiavePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>jakarta.activation</groupId>
-                        <artifactId>jakarta.activation-api</artifactId>
-                        <version>${activation.api}</version>
+                        <groupId>${activation.api.groupId}</groupId>
+                        <artifactId>${activation.api.artifact}</artifactId>
+                        <version>${activation.api.version}</version>
                       </dependency>
                     </dependencies>
                   </project>

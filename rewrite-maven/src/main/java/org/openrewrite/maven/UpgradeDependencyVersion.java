@@ -32,7 +32,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.util.*;
 
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
