@@ -406,7 +406,7 @@ public class MavenPomDownloader {
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
         while (start > 0) {
-            start = start + 9;
+            start += 9;
             int end = responseBody.indexOf("\">", start);
             if (end < 0) {
                 break;
