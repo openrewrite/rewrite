@@ -361,6 +361,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     public static class Accumulator {
         boolean isNewDependencyPresent;
+
+
+
+
+
+
         @Nullable String changeGroupId;
         @Nullable String changeArtifactId;
         boolean removeVersionTag;
