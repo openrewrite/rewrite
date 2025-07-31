@@ -149,4 +149,17 @@ describe("jsx mapping", () => {
             tsx(`<Components.Table<UserData> columns={columns} />`)
         )
     );
+
+    test("nesting angle brackets with newline break", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(
+                `
+                <MenuItemWithOverlay<DrawerProps>
+                >
+                    <span>You didn't expect it, did you?</span>
+                </MenuItemWithOverlay>
+                `
+        )
+    ));
 });
