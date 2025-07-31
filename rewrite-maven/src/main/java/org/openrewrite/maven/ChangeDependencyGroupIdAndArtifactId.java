@@ -170,32 +170,31 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     return t;
                 }
                 if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
-                    String groupId = newGroupId;
-                    if (groupId != null) {
+                    Optional<String> groupIdFromTag = t.getChildValue("groupId");
+                    Optional<String> artifactIdFromTag = t.getChildValue("artifactId");
+                    if (!groupIdFromTag.isPresent() ||  !artifactIdFromTag.isPresent()) {
+                        return t;
+                    }
+
+                    String groupId = groupIdFromTag.get();
+                    if (newGroupId != null) {
+                        storeParentPomProperty(groupId, newGroupId);
+                        groupId = newGroupId;
                         acc.changeGroupId = groupId;
-                    } else {
-                        Optional<String> groupIdFromTag = t.getChildValue("groupId");
-                        if (!groupIdFromTag.isPresent()) {
-                            return t;
-                        }
-                        groupId = groupIdFromTag.get();
                     }
-                    String artifactId = newArtifactId;
-                    if (artifactId != null) {
-                        acc.changeArtifactId = artifactId;;
-                    } else {
-                        Optional<String> artifactIdFromTag = t.getChildValue("artifactId");
-                        if (!artifactIdFromTag.isPresent()) {
-                            return t;
-                        }
-                        artifactId = artifactIdFromTag.get();
+
+                    String artifactId = artifactIdFromTag.get();
+                    if (newArtifactId != null) {
+                        storeParentPomProperty(artifactId, newArtifactId);
+                        artifactId = newArtifactId;
+                        acc.changeArtifactId = artifactId;
                     }
+
                     if (newVersion != null) {
                         try {
-                            String version = t.getChildValue("version").orElse(newVersion);
-                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, version);
-                            Optional<Xml.Tag> scopeTag = t.getChild("scope");
-                            Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
+                            Optional<String> currentVersion = t.getChildValue("version");
+                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion.orElse(newVersion));
+                            Scope scope = t.getChild("scope").map(xml -> Scope.fromName(xml.getValue().orElse(null))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             boolean configuredToOverrideManageVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
@@ -209,13 +208,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                     acc.removeVersionTag = true;
                                 } else {
                                     // Otherwise, change the version to the new value.
-                                    String oldValue = versionTag.get().getValue().orElse(null);
-                                    if (isProperty(oldValue)) {
-                                        String propertyName = oldValue.substring(2, oldValue.length() - 1);
-                                        if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                                            storeParentPomProperty(getResolutionResult(), propertyName, resolvedNewVersion);
-                                        }
-                                    }
+                                    storeParentPomProperty(currentVersion.orElse(null), resolvedNewVersion);
                                     acc.changeVersion = resolvedNewVersion;
                                 }
                             } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
@@ -264,14 +257,23 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
 
+            private void storeParentPomProperty(@Nullable String currentValue, String newValue) {
+                if (isProperty(currentValue)) {
+                    String name = currentValue.substring(2, currentValue.length() - 1);
+                    if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(name)) {
+                        storeParentPomProperty(getResolutionResult(), name, newValue);
+                    }
+                }
+            }
+
             /**
              * Recursively look for a parent POM that's still part of the sources, which contains the version property.
              * If found, store the property in the accumulator, such that we can update that source file later.
              * @param currentMavenResolutionResult the current Maven resolution result parent to search for the property
-             * @param propertyName the name of the property to update, if found in any the parent pom source file
-             * @param newerVersion the resolved newer version that any matching parent pom property should be updated to
+             * @param name the name of the property to update, if found in any the parent pom source file
+             * @param value the resolved newer version that any matching parent pom property should be updated to
              */
-            private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String propertyName, String newerVersion) {
+            private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String name, String value) {
                 if (currentMavenResolutionResult == null) {
                     return; // No parent contained the property; might then be in the same source file, or an import BOM
                 }
@@ -279,11 +281,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (pom.getSourcePath() == null) {
                     return; // Not a source file, so nothing to update
                 }
-                if (pom.getProperties().containsKey(propertyName)) {
-                    acc.pomProperties.add(new PomProperty(pom.getSourcePath(), propertyName, newerVersion));
+                if (pom.getProperties().containsKey(name)) {
+                    acc.pomProperties.add(new PomProperty(pom.getSourcePath(), name, value));
                     return; // Property found, so no further searching is needed
                 }
-                storeParentPomProperty(currentMavenResolutionResult.getParent(), propertyName, newerVersion);
+                storeParentPomProperty(currentMavenResolutionResult.getParent(), name, value);
             }
         };
     }

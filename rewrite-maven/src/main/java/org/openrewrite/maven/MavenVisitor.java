@@ -296,10 +296,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      * @return              The potentially updated tag.
      */
     protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
-        return changeChildTagValue(tag, childTagName, newValue, false, p);
-    }
-
-    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
         Optional<Xml.Tag> childTag = tag.getChild(childTagName);
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
@@ -307,7 +303,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 if (isProperty(oldValue)) {
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
+                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, false, false).getVisitor());
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
