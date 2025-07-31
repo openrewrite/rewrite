@@ -132,10 +132,10 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitIdentifier(ident, p);
         }
 
+        // Returns true if the identifier is part of a class literal (e.g., Fizz.class)
         private boolean isClassLiteralReference(Cursor cursor) {
             Cursor parent = cursor.getParentTreeCursor();
             if (parent.getValue() instanceof J.FieldAccess) {
-                System.out.println("CLASS LITERAL REFERENCE");
                 return ((J.FieldAccess) parent.getValue()).getName().getSimpleName().equals("class");
             }
             return false;
