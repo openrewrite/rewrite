@@ -31,6 +31,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.max;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -269,7 +270,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     }
 
                 }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
+                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
 
             /**

@@ -108,7 +108,7 @@ class JsonSendReceiveTest implements RewriteTest {
     static class ChangeValue extends JsonVisitor<Integer> {
         @Override
         public Json visitLiteral(Json.Literal literal, Integer p) {
-            if (literal.getValue().equals("value")) {
+            if ("value".equals(literal.getValue())) {
                 return literal.withValue("changed").withSource("\"changed\"");
             }
             return literal;

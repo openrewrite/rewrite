@@ -24,10 +24,11 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.SourceFile;
 
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
+import static java.util.Collections.newSetFromMap;
 
 @Fork(1)
 @Measurement(iterations = 2)
@@ -56,7 +57,7 @@ public class WeighingJavaAstsBenchmark {
 
     @Benchmark
     public void identitySet(JavaCompilationUnitState state, Blackhole blackhole) {
-        Set<Object> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Object> uniqueTypes = newSetFromMap(new IdentityHashMap<>());
         long weight = 0;
         for (SourceFile sourceFile : state.getSourceFiles()) {
             weight += sourceFile.getWeight(uniqueTypes::add);

@@ -31,10 +31,10 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.singleton;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class EmptyNewlineAtEndOfFile extends Recipe {
@@ -50,7 +50,7 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S113");
+        return singleton("RSPEC-S113");
     }
 
     @Override

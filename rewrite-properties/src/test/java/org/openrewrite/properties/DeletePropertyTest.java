@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -64,55 +65,85 @@ class DeletePropertyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void basicWithComment() {
-        rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("delete.me", true)),
+    @Nested
+    class Comments {
+        @Test
+        void basicWithComment() {
+            rewriteRun(
+              spec -> spec.recipe(new DeleteProperty("delete.me", true)),
+              properties(
+                """
+                  # Preserve comment
+                  preserve = foo
+                  # Another comment preserved
 
-          properties(
-            """
-              # Heading comment
-              
-              # Another heading comment
-              
-              # delete.me comment (previous empty line indicate property comment starts)
-              # on
-              # multiple line
-              delete.me = baz
-              # After comment 1
-              
-              # After comment 2
-              """,
-            """
-              # Heading comment
-              
-              # Another heading comment
+                  # delete.me comment
+                  delete.me = baz
+                  delete.me.not = bar
+                  """,
+                """
+                  # Preserve comment
+                  preserve = foo
+                  # Another comment preserved
 
-              # After comment 1
-              
-              # After comment 2
-              """
-          ),
-          properties(
-            """
-              # Preserve comment
-              preserve = foo
-              # Another comment preserved
-              
-              # delete.me comment
-              delete.me = baz
-              delete.me.not = bar
-              """,
-            """
-              # Preserve comment
-              preserve = foo
-              # Another comment preserved
-            
-              delete.me.not = bar
-              """
+                  delete.me.not = bar
+                  """
+              )
+            );
+        }
 
-          )
-        );
+        @Test
+        void multilineComment() {
+            rewriteRun(
+              spec -> spec.recipe(new DeleteProperty("delete.me", true)),
+              properties(
+                """
+                  # Heading comment
+
+                  # Another heading comment
+
+                  # delete.me comment (previous empty line indicate property comment starts)
+                  # on
+                  # multiple line
+                  delete.me = baz
+                  # After comment 1
+
+                  # After comment 2
+                  """,
+                """
+                  # Heading comment
+
+                  # Another heading comment
+
+                  # After comment 1
+
+                  # After comment 2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void retainUnrelatedComments() {
+            rewriteRun(
+              spec -> spec.recipe(new DeleteProperty("delete.me", true)),
+              properties(
+                """
+                  unrelated=entry
+
+                  # unrelated comment
+                  retain.me = bar
+                  delete.me = baz
+                  """,
+                """
+                  unrelated=entry
+
+                  # unrelated comment
+                  retain.me = bar
+                  """
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
@@ -166,7 +197,7 @@ class DeletePropertyTest implements RewriteTest {
           properties(
             """
               acme.my-project.person.first-name=example
-              
+
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,

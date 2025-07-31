@@ -27,7 +27,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
           java(
-            """ 
+            """
               package a;
               public class A {
                  public void foo() {}
@@ -45,7 +45,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
           java(
             """
               import a.*;
-                            
+
               import b.B;
               public class C {
                  A a;

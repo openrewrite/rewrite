@@ -179,7 +179,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               """,
             """
               import java.nio.charset.StandardCharsets;
-              
+
               public class Test {
                   byte[] test() {
                       String s = "hello";

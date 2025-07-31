@@ -32,14 +32,14 @@ class UsesFieldTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class T {
                   Object o = Collections.EMPTY_LIST;
               }
               """,
             """
               /*~~>*/import java.util.Collections;
-              
+
               class T {
                   Object o = Collections.EMPTY_LIST;
               }
@@ -55,14 +55,14 @@ class UsesFieldTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.EMPTY_LIST;
-              
+
               class T {
                   Object o = EMPTY_LIST;
               }
               """,
             """
               /*~~>*/import static java.util.Collections.EMPTY_LIST;
-              
+
               class T {
                   Object o = EMPTY_LIST;
               }

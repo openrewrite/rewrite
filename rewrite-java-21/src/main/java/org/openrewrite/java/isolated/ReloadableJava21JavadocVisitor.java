@@ -20,6 +20,7 @@ import com.sun.source.doctree.ErroneousTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
 import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.SnippetTree;
 import com.sun.source.doctree.UsesTree;
 import com.sun.source.tree.*;
 import com.sun.source.tree.IdentifierTree;
@@ -39,11 +40,13 @@ import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -356,7 +359,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     }
                     // Add trailing linebreaks if they exist.
                     if (!lineBreaks.isEmpty()) {
-                        int pos = Collections.min(lineBreaks.keySet());
+                        int pos = min(lineBreaks.keySet());
                         if (lineBreaks.containsKey(pos)) {
                             body.add(lineBreaks.get(pos));
                             lineBreaks.remove(pos);
@@ -871,6 +874,46 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     @Override
+    public Tree visitSnippet(SnippetTree node, List<Javadoc> body) {
+        body.addAll(sourceBefore("{@snippet"));
+
+        // Parse attributes (e.g., lang=java, id="example")
+        List<Javadoc> attributes = new ArrayList<>();
+        if (node.getAttributes() != null && !node.getAttributes().isEmpty()) {
+            attributes.addAll(whitespaceBefore());
+            for (DocTree attr : node.getAttributes()) {
+                attributes.add((Javadoc) scan(attr, body));
+                attributes.addAll(whitespaceBefore());
+            }
+        }
+        // Check for whitespace and colon separator
+        String spaceBeforeColon = whitespaceBeforeAsString();
+        if (cursor < source.length() && source.charAt(cursor) == ':') {
+            // Found colon - add space before it to attributes if present
+            if (!spaceBeforeColon.isEmpty()) {
+                attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, spaceBeforeColon));
+            }
+            attributes.add(new Javadoc.Text(randomId(), Markers.EMPTY, ":"));
+            cursor++;
+        }
+
+        // Parse snippet content
+        List<Javadoc> content = new ArrayList<>();
+        if (node.getBody() != null) {
+            // Always use convertMultiline - it handles both single and multi-line properly
+            content.addAll(convertMultiline(singletonList(node.getBody())));
+        }
+
+        return new Javadoc.Snippet(
+                randomId(),
+                Markers.EMPTY,
+                attributes,
+                content,
+                endBrace()
+        );
+    }
+
+    @Override
     public Tree visitSummary(SummaryTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("{@summary"));
 
@@ -1145,12 +1188,12 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         @SuppressWarnings("SimplifyStreamApiCallChains")
         List<Integer> linebreakIndexes = lineBreaks.keySet().stream()
                 .filter(o -> o <= cursor)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         List<Javadoc> referenceLineBreaks = linebreakIndexes.stream()
                 .sorted()
                 .map(lineBreaks::get)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         for (Integer key : linebreakIndexes) {
             lineBreaks.remove(key);

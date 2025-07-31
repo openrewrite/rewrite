@@ -96,4 +96,57 @@ describe("jsx mapping", () => {
             `)
         )
     );
+
+    test("jsx element with single generic type argument", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<SeeHowToRunGraphQL<DevCenterQueryVariables> />`)
+        )
+    );
+
+    test("jsx element with multiple generic type arguments", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<Component<string, number> prop="value" />`)
+        )
+    );
+
+    test("jsx element with generic type arguments and children", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`
+                <Container<ItemType>>
+                    <Item />
+                </Container>
+            `)
+        )
+    );
+
+    test("jsx self-closing element with complex generic types", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<DataTable<{ id: number; name: string }> data={items} />`)
+        )
+    );
+
+    test("jsx element with nested generics", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<List<Array<Record<string, any>>> items={data} />`)
+        )
+    );
+
+    test("jsx element with union type generic", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<Component<string | number> props={data} />`)
+        )
+    );
+
+    test("jsx element with member expression and generics", () =>
+        spec.rewriteRun(
+            //language=tsx
+            tsx(`<Components.Table<UserData> columns={columns} />`)
+        )
+    );
 });

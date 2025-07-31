@@ -124,7 +124,7 @@ class AnnotationTest implements RewriteTest {
               @Target (  AnnotationTarget . PROPERTY   )
               @Retention  ( AnnotationRetention . SOURCE )
               annotation class Anno ( val values : Array <  String > )
-              
+
               @Anno( values =  [   "a"    ,     "b" ,  "c"   ]    )
               val a = 42
               """
@@ -312,7 +312,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class Anno
-              
+
               class Example {
                   @setparam : Anno
                   @set: Anno
@@ -330,7 +330,7 @@ class AnnotationTest implements RewriteTest {
             """
               @file:Suppress("UNUSED_VARIABLE")
               annotation class Anno
-              
+
               fun example ( ) {
                 val (  @Anno   a , @Anno b , @Anno c ) = Triple ( 1 , 2 , 3 )
               }
@@ -363,7 +363,7 @@ class AnnotationTest implements RewriteTest {
               )
               @Retention(AnnotationRetention.SOURCE)
               annotation class Ann
-              
+
               @Suppress("RedundantSetter","RedundantSuppression")
               @Ann
               open class Test < @Ann in Number > ( @Ann val s : String ) {
@@ -372,7 +372,7 @@ class AnnotationTest implements RewriteTest {
                       @Ann set ( @Ann value ) {
                           field = value
                       }
-              
+
                   @Ann inline fun < @Ann reified T > m ( @Ann s : @Ann String ) : String {
                       @Ann return (@Ann s)
                   }
@@ -414,7 +414,7 @@ class AnnotationTest implements RewriteTest {
               @Target(AnnotationTarget.EXPRESSION)
               @Retention(AnnotationRetention.SOURCE)
               annotation class Anno
-              
+
               fun method ( ) {
                   val list = listOf ( 1 , 2 , 3 )
                   list  .  filterIndexed { index  ,   _    -> @Anno  index   %    2 == 0 }
@@ -530,7 +530,7 @@ class AnnotationTest implements RewriteTest {
               @Target(AnnotationTarget.TYPE)
               @Retention(AnnotationRetention.SOURCE)
               annotation class Anno
-              
+
               class Foo(
                 private val option:  @Anno   () -> Unit
               )
@@ -568,11 +568,11 @@ class AnnotationTest implements RewriteTest {
               @Target(AnnotationTarget.FIELD)
               @Retention(AnnotationRetention.SOURCE)
               annotation class A1
-              
+
               @Target(AnnotationTarget.FIELD)
               @Retention(AnnotationRetention.SOURCE)
               annotation class A2 (val name: String)
-              
+
               class Test {
                   @field :  [   A1    A2 (  "numberfield "   )    ]
                   var field: Long = 0

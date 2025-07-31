@@ -54,7 +54,7 @@ class DataTableFieldTest implements RewriteTest {
               import java.util.Date;
               class Test {
                   private Date today;
-                            
+
                   public Test() {
                       this.today = new Date();
                   }

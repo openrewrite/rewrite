@@ -32,10 +32,10 @@ import org.openrewrite.xml.tree.Xml;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
@@ -103,7 +103,7 @@ public class MavenParser implements Parser {
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
-        List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(Collectors.toList());
+        List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(toList());
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
@@ -204,7 +204,7 @@ public class MavenParser implements Parser {
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions
             if (profiles != null) {
-                Collections.addAll(this.activeProfiles, profiles);
+                addAll(this.activeProfiles, profiles);
             }
             return this;
         }

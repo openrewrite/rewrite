@@ -39,6 +39,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -295,7 +296,7 @@ public interface JavaParser extends Parser {
         @Incubating(since = "8.18.3")
         public B addClasspathEntry(Path entry) {
             if (classpath.isEmpty()) {
-                classpath = Collections.singletonList(entry);
+                classpath = singletonList(entry);
             } else if (!classpath.contains(entry)) {
                 classpath = new ArrayList<>(classpath);
                 classpath.add(entry);

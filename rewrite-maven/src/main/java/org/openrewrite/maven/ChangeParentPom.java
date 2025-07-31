@@ -34,11 +34,9 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toCollection;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.RemoveRedundantDependencyVersions.Comparator.GTE;
 import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
@@ -329,7 +327,7 @@ public class ChangeParentPom extends Recipe {
 
             private boolean isGlobalProperty(String propertyName) {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
-                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                        propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
         }.reduce(pomXml, new HashMap<>());
     }
@@ -374,7 +372,7 @@ public class ChangeParentPom extends Recipe {
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
                 .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                .collect(Collectors.toSet());
+                .collect(toSet());
 
         return depsWithoutExplicitVersion.stream()
                 .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))

@@ -47,8 +47,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
@@ -496,7 +495,7 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     private static int commentAwareIndexOf(char target, String s) {
-        return commentAwareIndexOf(Collections.singleton(target), s);
+        return commentAwareIndexOf(singleton(target), s);
     }
 
     private static int commentAwareIndexOf(Collection<Character> anyOf, String s) {
