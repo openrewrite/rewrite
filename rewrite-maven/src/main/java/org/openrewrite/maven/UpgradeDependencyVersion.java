@@ -249,7 +249,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (isManagedDependencyImportTag(groupId, artifactId)) {
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
-                                retainVersions();
+                                RetainVersions.plan(this, retainVersions).forEach(this::doAfterVisit);
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
@@ -260,11 +260,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return e.warn(t);
                     }
                     return t;
-                }
-
-                private void retainVersions() {
-                    RetainVersions.plan(this, retainVersions == null ? emptyList() : retainVersions)
-                            .forEach(it -> doAfterVisit(it.getVisitor()));
                 }
             }
 
