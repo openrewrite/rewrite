@@ -18,6 +18,10 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaIsoVisitor;
+import static org.junit.jupiter.api.Assertions.*;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
@@ -951,6 +955,36 @@ class RenameVariableTest implements RewriteTest {
               class FooBarBaz {}
               class A {
                   ArrayList<FooBarBaz> fooBarBaz = new ArrayList<FooBarBaz>();
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5843")
+    @Test
+    void doNotRenameClassLiterals() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("Fizz", "fizz", true)),
+          java(
+            """
+              class Fizz {}
+              class Test {
+                  void method() {
+                      Fizz Fizz = new Fizz();
+                      // Only the variable should be renamed, not the class reference
+                      Class<?> clazz = Fizz.class;
+                  }
+              }
+              """,
+            """
+              class Fizz {}
+              class Test {
+                  void method() {
+                      Fizz fizz = new Fizz();
+                      // Class literal should remain unchanged
+                      Class<?> clazz = Fizz.class;
+                  }
               }
               """
           )
