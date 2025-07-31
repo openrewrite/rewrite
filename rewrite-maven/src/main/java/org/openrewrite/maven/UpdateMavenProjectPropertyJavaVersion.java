@@ -93,7 +93,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
                         if ("org.apache.maven.plugins".equals(plugin.getGroupId()) && "maven-compiler-plugin".equals(plugin.getArtifactId()) && plugin.getConfiguration() != null) {
                             for (String property : JAVA_VERSION_PROPERTIES) {
-                                if (getResolutionResult().getPom().getProperties().get(property) != null) {
+                                if (getResolutionResult().getPom().getRequested().getProperties().get(property) != null) {
                                     try {
                                         float parsed = Float.parseFloat(getResolutionResult().getPom().getProperties().get(property));
                                         if (parsed < version &&

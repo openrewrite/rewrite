@@ -120,9 +120,9 @@ public class MoveFile extends Recipe {
                 String folderPrefix = folder;
                 if (!folderPrefix.endsWith("/**")) {
                     if (folderPrefix.endsWith("/")) {
-                        folderPrefix = folderPrefix + "**";
+                        folderPrefix += "**";
                     } else {
-                        folderPrefix = folderPrefix + "/**";
+                        folderPrefix += "/**";
                     }
                 }
 
