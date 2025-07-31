@@ -253,6 +253,79 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateParentProperty() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <properties>
+                      <java.version>11</java.version>
+                  </properties>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <properties>
+                      <java.version>17</java.version>
+                  </properties>
+              </project>
+              """
+          ),
+          mavenProject("example-child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void doNotCrashOnImplicitVersion() {
         rewriteRun(
           mavenProject("spring-cloud-kubernetes",
