@@ -253,7 +253,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
     }
 
     @Test
-    void updateParentProperty() {
+    void updateLocalParentWithMavenCompilerPlugin() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -318,6 +318,9 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     <artifactId>example-child</artifactId>
                     <version>1.0.0</version>
                     <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <other.property>value</other.property>
+                    </properties>
                 </project>
                 """
             )
