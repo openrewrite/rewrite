@@ -266,26 +266,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
             }
 
-            /**
-             * Recursively look for a parent POM that's still part of the sources, which contains the version property.
-             * If found, store the property in the accumulator, such that we can update that source file later.
-             * @param currentMavenResolutionResult the current Maven resolution result parent to search for the property
-             * @param name the name of the property to update, if found in any the parent pom source file
-             * @param value the resolved newer version that any matching parent pom property should be updated to
-             */
-            private void storeParentPomProperty(@Nullable MavenResolutionResult currentMavenResolutionResult, String name, String value) {
-                if (currentMavenResolutionResult == null) {
-                    return; // No parent contained the property; might then be in the same source file, or an import BOM
-                }
-                Pom pom = currentMavenResolutionResult.getPom().getRequested();
-                if (pom.getSourcePath() == null) {
-                    return; // Not a source file, so nothing to update
-                }
-                if (pom.getProperties().containsKey(name)) {
+            private void storeParentPomProperty(MavenResolutionResult resolutionResult, String name, String value) {
+                Pom pom = resolutionResult.getPom().getRequested();
+                if (pom.getSourcePath() != null && pom.getProperties().containsKey(name)) {
                     acc.pomProperties.add(new PomProperty(pom.getSourcePath(), name, value));
-                    return; // Property found, so no further searching is needed
+                } else if (resolutionResult.getParent() != null) {
+                    storeParentPomProperty(resolutionResult.getParent(), name, value);
                 }
-                storeParentPomProperty(currentMavenResolutionResult.getParent(), name, value);
             }
         };
     }
