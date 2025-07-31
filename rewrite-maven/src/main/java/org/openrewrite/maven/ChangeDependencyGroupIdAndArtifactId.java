@@ -172,7 +172,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
                     Optional<String> groupIdFromTag = t.getChildValue("groupId");
                     Optional<String> artifactIdFromTag = t.getChildValue("artifactId");
-                    if (!groupIdFromTag.isPresent() ||  !artifactIdFromTag.isPresent()) {
+                    if (!groupIdFromTag.isPresent() || !artifactIdFromTag.isPresent()) {
                         return t;
                     }
 
@@ -342,11 +342,20 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     public static class Accumulator {
         Set<PomProperty> pomProperties = new HashSet<>();
         boolean isNewDependencyPresent;
-        @Nullable String changeGroupId;
-        @Nullable String changeArtifactId;
+
+        @Nullable
+        String changeGroupId;
+
+        @Nullable
+        String changeArtifactId;
+
         boolean removeVersionTag;
-        @Nullable String createVersion;
-        @Nullable String changeVersion;
+
+        @Nullable
+        String createVersion;
+
+        @Nullable
+        String changeVersion;
     }
 
     @Value
