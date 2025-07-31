@@ -1681,7 +1681,14 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Test
     void changeVersionPropertyInParentPom() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "jakarta.activation", "jakarta.activation-api", "1.2.x", null, null, null)),
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null
+          )),
           mavenProject("project",
             //language=xml
             pomXml(
