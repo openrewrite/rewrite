@@ -38,4 +38,8 @@ public class Traits {
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }
+
+    public static GradleDependencyConstraint.Matcher gradleDependencyConstraint() {
+        return new GradleDependencyConstraint.Matcher();
+    }
 }
