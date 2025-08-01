@@ -1392,7 +1392,11 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               package org.example;
 
               public class Const {
-                    public static final String HI = "hi";
+                  public class A {
+                      public class B {
+                          public static final String HI = "hi";
+                      }
+                  }
               }
               """
           ),
@@ -1409,7 +1413,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               import org.example.Const;
 
-              @Foo(value = Const.HI)
+              @Foo(value = Const.A.B.HI)
               public class A {
               }
               """,
