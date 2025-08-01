@@ -1605,8 +1605,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             );
         }
 
-        @Test
         @ExpectedToFail("We can't support this right now, as there is no reference to the actual string literal of the constant")
+        @Test
         void matchConstantLiteral() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", "hi", false, null)),
