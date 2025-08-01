@@ -162,4 +162,21 @@ class CompilationUnitTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @SuppressWarnings("GrUnnecessarySemicolon")
+    void unnecessarySemicolons() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.List;;
+              class A {
+                  def test() {
+                      def some = 'statement';;;;;
+                  };;
+              };;
+              """
+          )
+        );
+    }
 }
