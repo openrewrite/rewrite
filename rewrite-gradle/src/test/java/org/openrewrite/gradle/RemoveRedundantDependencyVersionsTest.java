@@ -70,6 +70,43 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void remove_duplicate_when_no_version_present() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void mapEntry() {
         rewriteRun(
           buildGradle(
