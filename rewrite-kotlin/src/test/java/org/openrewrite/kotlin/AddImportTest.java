@@ -98,7 +98,7 @@ public class AddImportTest implements RewriteTest {
               import java.lang.Integer
               import java.lang.Integer.MAX_VALUE
               import java.lang.Long
-              
+
               class A
               """
           )
@@ -124,7 +124,7 @@ public class AddImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type : Original = Original()
               }
@@ -132,7 +132,7 @@ public class AddImportTest implements RewriteTest {
             """
               import a.b.Original
               import a.b.Target
-              
+
               class A {
                   val type : Original = Original()
               }
@@ -156,7 +156,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               import java.io.*
-              
+
               class A
               """
           )
@@ -196,7 +196,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               import java.util.regex.Pattern.*
-              
+
               class A
               """
           )
@@ -225,7 +225,7 @@ public class AddImportTest implements RewriteTest {
 
               import java.util.regex.Pattern.CASE_INSENSITIVE as i
               import java.util.regex.Pattern.COMMENTS as x
-              
+
               class A
               """
           )
@@ -251,7 +251,7 @@ public class AddImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type : Original = Original()
               }
@@ -259,7 +259,7 @@ public class AddImportTest implements RewriteTest {
             """
               import a.b.Original
               import a.b.method
-              
+
               class A {
                   val type : Original = Original()
               }
@@ -336,7 +336,7 @@ public class AddImportTest implements RewriteTest {
           kotlin(
             """
               import java.util.HashMap
-              
+
               import java.util.Calendar as CA
               import java.util.StringJoiner as MyStringJoiner
 
@@ -345,7 +345,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               import java.util.HashMap
-              
+
               import java.util.Calendar as CA
               import java.util.LinkedList as MyList
               import java.util.StringJoiner as MyStringJoiner
@@ -387,7 +387,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               import org.junit.jupiter.api.Assertions.assertFalse
-              
+
               class Foo
               """
           )
@@ -406,7 +406,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               import `java`.`util`.`List`
-              
+
               class A
               """,
             spec -> spec.afterRecipe(cu -> {

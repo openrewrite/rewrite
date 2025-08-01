@@ -177,7 +177,7 @@ class FieldAccessTest implements RewriteTest {
           kotlin(
             """
               import java.nio.ByteBuffer
-              
+
               private val crlf : ByteBuffer = ByteBuffer . wrap( "\\r\\n" . toByteArray ( ) )
               """
           )

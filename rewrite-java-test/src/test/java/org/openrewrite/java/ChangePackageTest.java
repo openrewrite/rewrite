@@ -714,12 +714,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-              
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-              
+
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -1440,7 +1440,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import static org.openrewrite.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();
@@ -1449,7 +1449,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import static org.openrewrite.test.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();

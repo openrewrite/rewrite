@@ -444,6 +444,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitJsxTag(JSX.Tag tag, RpcReceiveQueue q) {
         return tag
                 .getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name1 -> visitLeftPadded(name1, q)))
+                .withTypeArguments(q.receive(tag.getTypeArguments(), el -> visitContainer(el, q)))
                 .withAfterName(q.receive(tag.getAfterName(), space2 -> visitSpace(space2, q)))
                 .getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)))
                 .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))

@@ -36,7 +36,6 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -172,13 +171,13 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             if (cu.getSourcePath().endsWith(Paths.get("settings.gradle")) &&
                 !cu.getStatements().isEmpty() &&
                 cu.getStatements().get(0) instanceof J.MethodInvocation &&
-                ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                "pluginManagement".equals(((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName())) {
                 return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
             } else {
                 int insertAtIdx = 0;
                 for (int i = 0; i < cu.getStatements().size(); i++) {
                     Statement existingStatement = cu.getStatements().get(i);
-                    if (existingStatement instanceof J.MethodInvocation && ((J.MethodInvocation) existingStatement).getSimpleName().equals("buildscript")) {
+                    if (existingStatement instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) existingStatement).getSimpleName())) {
                         insertAtIdx = i + 1;
                         break;
                     }
@@ -187,7 +186,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     Comment licenseHeader = getLicenseHeader(cu);
                     if (licenseHeader != null) {
                         cu = removeLicenseHeader(cu);
-                        statement = statement.withComments(Collections.singletonList(licenseHeader));
+                        statement = statement.withComments(singletonList(licenseHeader));
                     }
                     Space leadingSpace = Space.firstPrefix(cu.getStatements());
                     return cu.withStatements(ListUtils.insert(

@@ -57,7 +57,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -70,7 +70,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -97,7 +97,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -112,7 +112,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -141,7 +141,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -153,7 +153,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -179,7 +179,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-              
+
               class Other {
                   void method() {
                       Foo foo = new Foo();
@@ -203,7 +203,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           java(
             """
               import foo.Foo;
-              
+
               class Other {
                   void method(Foo foo) {
                       foo.bar("a");
@@ -212,7 +212,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
               """,
             """
               import foo.Foo;
-              
+
               class Other {
                   void method(Foo foo) {
                       /* this is a * terrible idea */

@@ -41,7 +41,7 @@ class AddPropertyTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -54,7 +54,7 @@ class AddPropertyTest implements RewriteTest {
                 <properties>
                   <key>value</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>

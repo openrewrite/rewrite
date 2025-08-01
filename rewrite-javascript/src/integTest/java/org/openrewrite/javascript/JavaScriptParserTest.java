@@ -114,7 +114,7 @@ class JavaScriptParserTest {
         @Language("tsx")
         String script = """
           import React from 'react';
-          
+
           const JSXConstructsExample = () => {
             // Props object for spread attribute demonstration
             const buttonProps = {
@@ -122,29 +122,29 @@ class JavaScriptParserTest {
               disabled: false,
               'data-testid': 'spread-button'
             };
-          
+
             const linkProps = {
               href: 'https://example.com',
               target: '_blank',
               rel: 'noopener noreferrer'
             };
-          
+
             return (
               <React.Fragment>
                 {/* Fragment - wrapping multiple elements without extra DOM node */}
-          
+
                 {/* Basic JSX Element with attributes */}
                 <div className="container" id="main-container" data-test="element-example">
                   <h1 title="Main heading">JSX Constructs Test</h1>
-          
+
                   {/* Element with spread attributes */}
                   <button {...buttonProps} onClick={() => alert('Spread attributes work!')}>
                     Button with Spread Props
                   </button>
-          
+
                   {/* Another spread attribute example */}
                   <a {...linkProps}>Link with Spread Props</a>
-          
+
                   {/* Namespace example (commonly used with SVG) */}
                   <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
                     <circle
@@ -156,7 +156,7 @@ class JavaScriptParserTest {
                       custom:attribute="namespace-example"
                     />
                   </svg>
-          
+
                   {/* Mixed attributes: regular, spread, and namespaced */}
                   <div
                     className="mixed-example"
@@ -166,8 +166,15 @@ class JavaScriptParserTest {
                   >
                     <p>This div uses regular attributes, spread attributes, and namespaced attributes</p>
                   </div>
+
+                  {/* JSX elements with generics */}
+                  <DataTable<User> data={[]} />
+                  <Component<string, number> prop="value" />
+                  <Form<FormData> onSubmit={() => {}}>
+                    <Input name="username" />
+                  </Form>
                 </div>
-          
+
                 {/* Short fragment syntax */}
                 <>
                   <p>This paragraph is in a short fragment syntax</p>
@@ -176,7 +183,7 @@ class JavaScriptParserTest {
               </React.Fragment>
             );
           };
-          
+
           export default JSXConstructsExample;
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.tsx"), script);

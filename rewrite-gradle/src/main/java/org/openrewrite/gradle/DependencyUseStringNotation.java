@@ -30,8 +30,13 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class DependencyUseStringNotation extends Recipe {
@@ -87,7 +92,7 @@ public class DependencyUseStringNotation extends Recipe {
                     if (lastArg instanceof J.Lambda) {
                         m = m.withArguments(Arrays.asList(stringNotation, lastArg));
                     } else {
-                        m = m.withArguments(Collections.singletonList(stringNotation));
+                        m = m.withArguments(singletonList(stringNotation));
                     }
                 } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                     G.MapEntry firstEntry = (G.MapEntry) m.getArguments().get(0);
@@ -115,7 +120,7 @@ public class DependencyUseStringNotation extends Recipe {
                     if (lastArg instanceof J.Lambda) {
                         m = m.withArguments(Arrays.asList(stringNotation, lastArg));
                     } else {
-                        m = m.withArguments(Collections.singletonList(stringNotation));
+                        m = m.withArguments(singletonList(stringNotation));
                     }
                 } else if (m.getArguments().get(0) instanceof J.Assignment) {
                     J.Assignment firstEntry = (J.Assignment) m.getArguments().get(0);
@@ -141,7 +146,7 @@ public class DependencyUseStringNotation extends Recipe {
                     if (lastArg instanceof J.Lambda) {
                         m = m.withArguments(Arrays.asList(stringNotation, lastArg));
                     } else {
-                        m = m.withArguments(Collections.singletonList(stringNotation));
+                        m = m.withArguments(singletonList(stringNotation));
                     }
                 }
 
@@ -160,7 +165,7 @@ public class DependencyUseStringNotation extends Recipe {
                     Dependency dependency = new Dependency(group, name, version, classifier, extension);
                     String stringNotation = dependency.toStringNotation();
 
-                    return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
+                    return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", emptyList(), JavaType.Primitive.String);
                 }
 
                 return null;

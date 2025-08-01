@@ -22,9 +22,9 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JsonPathMatcherTest {
@@ -954,7 +954,7 @@ class JsonPathMatcherTest {
                     types: "something"
                     pattern: "p2"
               """),
-          Collections.emptyList()
+          emptyList()
         );
     }
 

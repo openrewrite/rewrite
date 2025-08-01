@@ -141,7 +141,7 @@ class SimplifySingleElementAnnotationTest implements RewriteTest {
                 """
                   public @interface Quality {
                       Level value();
-                  
+
                       enum Level {
                           POOR, AVERAGE, GOOD, EXCELLENT
                       }

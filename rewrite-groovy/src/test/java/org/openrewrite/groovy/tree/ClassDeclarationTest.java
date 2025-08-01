@@ -148,7 +148,7 @@ class ClassDeclarationTest implements RewriteTest {
     void hasPackage() {
         rewriteRun(
           groovy(
-            """ 
+            """
               package org.openrewrite
 
               public class A{}
@@ -161,7 +161,7 @@ class ClassDeclarationTest implements RewriteTest {
     void hasPackageWithTrailingComma() {
         rewriteRun(
           groovy(
-            """ 
+            """
               package org.openrewrite;
 
               class A{}
@@ -306,7 +306,7 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               package a
-              
+
               class A {
                   A() {}
               }
@@ -417,7 +417,7 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               interface Something {}
-              
+
               class Test {
                   Something something = new Something() {}
                   static def test() {

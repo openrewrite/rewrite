@@ -62,7 +62,7 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -72,11 +72,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     %s platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -101,7 +101,7 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -111,11 +111,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     %s enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -134,7 +134,7 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -143,11 +143,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     testImplementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -169,11 +169,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
@@ -185,17 +185,17 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 facets {
                     smokeTest {
                         parentSourceSet = "test"
                     }
                 }
-                
+
                 dependencies {
                     smokeTestImplementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -217,7 +217,7 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -226,11 +226,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -253,7 +253,7 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
@@ -262,11 +262,11 @@ class AddPlatformDependencyTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
                 }
@@ -294,15 +294,15 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id 'jvm-test-suite'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                 }
-                
+
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {
@@ -316,15 +316,15 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id 'jvm-test-suite'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                 }
-                
+
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {
@@ -356,15 +356,15 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id 'jvm-test-suite'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                 }
-                
+
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {
@@ -378,15 +378,15 @@ class AddPlatformDependencyTest implements RewriteTest {
                     id "java-library"
                     id 'jvm-test-suite'
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation "org.apache.logging.log4j:log4j-core:2.22.1"
                 }
-                
+
                 testing {
                     suites {
                         integrationTest(JvmTestSuite) {

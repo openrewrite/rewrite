@@ -52,7 +52,6 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 
 import static java.util.Collections.*;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -173,8 +172,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                         gatherVariables(m);
                     } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                            ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                                    "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                         gatherVariables((J.MethodInvocation) depArgs.get(0));
                     }
 
@@ -614,12 +613,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
-            } else if ("ext".equals(method.getSimpleName()) && isSettingsGradle()) {
-                // rare case that gradle versions are set via settings.gradle ext block
+            } else if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
+                // rare case that gradle versions are set via settings.gradle ext block (only possible for Groovy DSL)
                 m = (J.MethodInvocation) new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
@@ -647,7 +646,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
-            } else if (m.getSimpleName().equals("ext")) {
+            } else if ("ext".equals(m.getSimpleName())) {
                 return m.withArguments(ListUtils.map(m.getArguments(), arg -> (Expression) new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
@@ -660,11 +659,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }.visit(arg, ctx)));
             }
             return m;
-        }
-
-        private boolean isSettingsGradle() {
-            String path = requireNonNull(getCursor().firstEnclosing(SourceFile.class)).getSourcePath().toString();
-            return path.endsWith("settings.gradle") || path.endsWith("settings.gradle.kts");
         }
 
         private J.MethodInvocation updateDependency(J.MethodInvocation method, ExecutionContext ctx) {
@@ -1239,7 +1233,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep) {
-        return withTransitives(dep, Collections.singleton(dep.getGav().asGroupArtifact()));
+        return withTransitives(dep, singleton(dep.getGav().asGroupArtifact()));
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep, Set<GroupArtifact> gas) {

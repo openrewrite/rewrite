@@ -45,6 +45,7 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -220,8 +221,8 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                                "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
 
@@ -292,7 +293,7 @@ public class ChangeDependency extends Recipe {
                                 String replacement = updated.toStringNotation();
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                m = m.withArguments(Collections.singletonList(newLiteral));
+                                m = m.withArguments(singletonList(newLiteral));
                             }
                         }
                     }
@@ -585,7 +586,7 @@ public class ChangeDependency extends Recipe {
                                 String replacement = updated.toStringNotation();
                                 J.Literal newLiteral = literal.withValue(replacement)
                                         .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                m = m.withArguments(Collections.singletonList(newLiteral));
+                                m = m.withArguments(singletonList(newLiteral));
                             }
                         }
                     }

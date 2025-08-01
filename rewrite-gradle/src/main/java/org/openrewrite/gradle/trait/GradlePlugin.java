@@ -210,7 +210,7 @@ public class GradlePlugin implements Trait<J> {
                         }
                     } else if (e instanceof J.Assignment) {
                         J.Assignment assignment = (J.Assignment) e;
-                        if (!(assignment.getVariable() instanceof J.Identifier && ((J.Identifier) assignment.getVariable()).getSimpleName().equals("plugin")) ||
+                        if (!(assignment.getVariable() instanceof J.Identifier && "plugin".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) ||
                                 !(assignment.getAssignment() instanceof J.Literal)) {
                             return null;
                         }
@@ -240,12 +240,12 @@ public class GradlePlugin implements Trait<J> {
 
         private boolean withinPlugins(Cursor cursor) {
             Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-            if (parent.isRoot() || !((J.MethodInvocation) parent.getValue()).getSimpleName().equals("plugins")) {
+            if (parent.isRoot() || !"plugins".equals(((J.MethodInvocation) parent.getValue()).getSimpleName())) {
                 return false;
             }
 
             parent = parent.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-            return parent.isRoot() || ((J.MethodInvocation) parent.getValue()).getSimpleName().equals("pluginManagement");
+            return parent.isRoot() || "pluginManagement".equals(((J.MethodInvocation) parent.getValue()).getSimpleName());
         }
 
         private boolean isProjectReceiver(Cursor cursor) {

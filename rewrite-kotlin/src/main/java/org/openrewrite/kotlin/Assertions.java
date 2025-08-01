@@ -38,8 +38,10 @@ import org.opentest4j.AssertionFailedError;
 
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
@@ -236,10 +238,10 @@ public final class Assertions {
                             return true;
                         }
                     })
-                    .collect(Collectors.toList());
+                    .collect(toList());
             if (!missingTypeResults.isEmpty()) {
                 throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
-                        .collect(Collectors.joining("\n\n")));
+                        .collect(joining("\n\n")));
             }
         }
     }
@@ -258,7 +260,7 @@ public final class Assertions {
                     if (!space.getComments().isEmpty()) {
                         return space;
                     }
-                    return space.withComments(Collections.singletonList(new TextComment(true, Integer.toString(id++), "", Markers.EMPTY)));
+                    return space.withComments(singletonList(new TextComment(true, Integer.toString(id++), "", Markers.EMPTY)));
                 }
 
                 @Override
@@ -307,7 +309,7 @@ public final class Assertions {
                         String path = getCursor()
                                 .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
                                 .map(t -> t.getClass().getSimpleName())
-                                .collect(Collectors.joining("->"));
+                                .collect(joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
                         String printedTree;
                         if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
@@ -501,7 +503,7 @@ public final class Assertions {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess &&
                    (ident == ((J.FieldAccess) value).getName() ||
-                       ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
+                       ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {

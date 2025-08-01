@@ -52,11 +52,11 @@ class TomlVisitorTest implements RewriteTest {
             """
               [versions]
               jackson = '2.14.2'
-              
+
               [libraries]
               jackson-annotations = { module = 'com.fasterxml.jackson.core:jackson-annotations', version.ref = 'jackson' }
               jackson-core = { module = 'com.fasterxml.jackson.core:jackson-core', version.ref = 'jackson' }
-              
+
               [bundles]
               jackson = ['jackson-annotations', 'jackson-core']
               """

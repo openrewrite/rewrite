@@ -79,7 +79,7 @@ class RenameVariableTest implements RewriteTest {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                if (classDecl.getSimpleName().equals("A")) {
+                if ("A".equals(classDecl.getSimpleName())) {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
@@ -122,7 +122,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String name;
-              
+
                   /**
                    * The length of <code>name</code> added to the length of {@link #name}.
                    *
@@ -136,7 +136,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String _name;
-              
+
                   /**
                    * The length of <code>name</code> added to the length of {@link #_name}.
                    *
@@ -223,11 +223,11 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+
               public class A<T> {
                   private String _val;
                   private String name;
-              
+
                   A(String name, String _val) {
                       this._val = _val;
                       this.name = name;
@@ -236,11 +236,11 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-              
+
               public class A<T> {
                   private String v;
                   private String name;
-              
+
                   A(String name, String v) {
                       this.v = v;
                       this.name = name;
@@ -821,7 +821,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-              
+
                   {
                       n++; // do not change.
                       int n;
@@ -830,7 +830,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n + 1 == 2) {}
                       n++;
                   }
-              
+
                   public int foo(int n) {
                       return n + this.n;
                   }
@@ -839,7 +839,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-              
+
                   {
                       n++; // do not change.
                       int n1;
@@ -848,7 +848,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n1 + 1 == 2) {}
                       n1++;
                   }
-              
+
                   public int foo(int n2) {
                       return n2 + this.n;
                   }
@@ -1043,7 +1043,7 @@ class RenameVariableTest implements RewriteTest {
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
                   if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
-                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Base")) {
+                    target instanceof J.ClassDeclaration && "Base".equals(((J.ClassDeclaration) target).getSimpleName())) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
@@ -1054,25 +1054,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-              
+
                   Base base() {
                       return hidden;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base hidden;
-              
+
                   Extended extended() {
                       return (Extended) hidden;
                   }
-              
+
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1092,25 +1092,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base changed;
-              
+
                   Base base() {
                       return changed;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) changed;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base hidden;
-              
+
                   Extended extended() {
                       return (Extended) hidden;
                   }
-              
+
                   public Extended test(Base hidden) {
                       this.hidden = super.changed;
                       this.hidden = hidden.changed;
@@ -1138,7 +1138,7 @@ class RenameVariableTest implements RewriteTest {
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J target = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
                   if ("hidden".equals(multiVariable.getVariables().getFirst().getSimpleName()) &&
-                    target instanceof J.ClassDeclaration && ((J.ClassDeclaration) target).getSimpleName().equals("Extended")) {
+                    target instanceof J.ClassDeclaration && "Extended".equals(((J.ClassDeclaration) target).getSimpleName())) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "changed"));
                   }
                   return super.visitVariableDeclarations(multiVariable, ctx);
@@ -1149,25 +1149,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-              
+
                   Base base() {
                       return hidden;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base hidden;
-              
+
                   Extended extended() {
                       return (Extended) hidden;
                   }
-              
+
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1187,25 +1187,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-              
+
                   Base base() {
                       return hidden;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base changed;
-              
+
                   Extended extended() {
                       return (Extended) changed;
                   }
-              
+
                   public Extended test(Base hidden) {
                       this.changed = super.hidden;
                       this.changed = hidden.hidden;
@@ -1244,25 +1244,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-              
+
                   Base base() {
                       return hidden;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base hidden;
-              
+
                   Extended extended() {
                       return (Extended) hidden;
                   }
-              
+
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1282,25 +1282,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-              
+
                   Base base() {
                       return hidden;
                   }
               }
-              
+
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-              
+
               class Extended extends Middle {
                   private Base hidden;
-              
+
                   Extended extended() {
                       return (Extended) hidden;
                   }
-              
+
                   public Extended test(Base changed) {
                       this.hidden = super.hidden;
                       this.hidden = changed.hidden;
@@ -1338,7 +1338,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-  
+
                   public void blocks() {
                       {
                           //only this one is in scope
@@ -1355,7 +1355,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-  
+
                   public void blocks() {
                       {
                           //only this one is in scope
@@ -1395,7 +1395,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-  
+
                   public void blocks() {
                       {
                           int n = 0;
@@ -1411,7 +1411,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n1;
-  
+
                   public void blocks() {
                       {
                           int n = 0;

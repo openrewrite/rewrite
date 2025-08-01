@@ -127,6 +127,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitJsxTag(element: JSX.Tag, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JSX.Tag>(element, p, async draft => {
             draft.openName = await this.visitLeftPadded(element.openName, p);
+            draft.typeArguments = element.typeArguments && await this.visitContainer(element.typeArguments, p);
             draft.afterName = await this.visitSpace(element.afterName, p);
             draft.attributes = await mapAsync(element.attributes, attr => this.visitRightPadded(attr, p));
             draft.selfClosing = element.selfClosing && await this.visitSpace(element.selfClosing, p);

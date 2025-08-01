@@ -107,7 +107,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (newAttributeValue == null || oldAttributeValue != null) {
                         return a;
                     }
-                    if (attributeName().equals("value")) {
+                    if ("value".equals(attributeName())) {
                         return JavaTemplate
                                 .apply("#{}", getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     }
@@ -174,7 +174,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
             private @Nullable Expression update(J.Literal literal, J.Annotation annotation, @Nullable String newAttributeValue) {
                 // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                if (attributeName().equals("value")) {
+                if ("value".equals(attributeName())) {
                     if (newAttributeValue == null) {
                         return null;
                     }
@@ -192,7 +192,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
             private @Nullable Expression update(J.FieldAccess fieldAccess, J.Annotation annotation, @Nullable String newAttributeValue) {
                 // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                if (attributeName().equals("value")) {
+                if ("value".equals(attributeName())) {
                     if (newAttributeValue == null) {
                         return null;
                     }
@@ -213,7 +213,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (newAttributeValue == null) {
                     return null;
                 }
-                if (attributeName != null && !newAttributeValue.equals("value")) {
+                if (attributeName != null && !"value".equals(attributeValue)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
                 }
                 return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
@@ -300,7 +300,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
-        return getMethods(annotation).size() == 1 && getMethods(annotation).get(0).getName().equals("value");
+        return getMethods(annotation).size() == 1 && "value".equals(getMethods(annotation).get(0).getName());
     }
 
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {

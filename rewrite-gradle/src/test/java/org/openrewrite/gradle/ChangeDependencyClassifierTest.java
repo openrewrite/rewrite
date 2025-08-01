@@ -42,11 +42,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
               }
@@ -55,11 +55,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
@@ -78,11 +78,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:javadoc'
                   api "org.openrewrite:rewrite-core:latest.release:javadoc"
@@ -92,11 +92,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classified'
                   api "org.openrewrite:rewrite-core:latest.release:classified"
@@ -116,11 +116,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'javadoc'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
@@ -130,11 +130,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified"
@@ -154,11 +154,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
@@ -169,11 +169,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
@@ -194,11 +194,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:javadoc'
                   api "org.openrewrite:rewrite-core:latest.release:javadoc"
@@ -210,11 +210,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classified'
                   api "org.openrewrite:rewrite-core:latest.release:classified"
@@ -236,11 +236,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:javadoc@jar'
                   api "org.openrewrite:rewrite-core:latest.release:javadoc@jar"
@@ -256,11 +256,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classified@jar'
                   api "org.openrewrite:rewrite-core:latest.release:classified@jar"
@@ -285,11 +285,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -298,11 +298,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
@@ -321,11 +321,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
@@ -335,11 +335,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
@@ -358,11 +358,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
@@ -371,11 +371,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
@@ -394,11 +394,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
@@ -408,11 +408,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
@@ -432,11 +432,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {
@@ -452,11 +452,11 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {

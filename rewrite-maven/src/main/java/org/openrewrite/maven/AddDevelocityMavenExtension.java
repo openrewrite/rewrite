@@ -46,8 +46,13 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.util.Collections.*;
 
 
 @Value
@@ -194,12 +199,12 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         // This recipe makes change for maven project only, or if the file `.mvn/gradle-enterprise.xml` already exists, do nothing
         if (!acc.isMavenProject() || acc.getMatchingGradleEnterpriseXmlFile() != null) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         VersionComparator versionComparator = Semver.validate("(,1.21)", null).getValue();
         if (versionComparator == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         String newVersion = version != null ? version : getLatestVersion(ctx);
@@ -381,7 +386,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 tag = super.visitTag(tag, found);
                 if (xPathMatcher.matches(getCursor())) {
                     Optional<String> maybeArtifactId = tag.getValue();
-                    if (maybeArtifactId.isPresent() && (maybeArtifactId.get().equals(GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID) || maybeArtifactId.get().equals(DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID))) {
+                    if (maybeArtifactId.isPresent() && (GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID.equals(maybeArtifactId.get()) || DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID.equals(maybeArtifactId.get()))) {
                         found.set(true);
                     }
                 }
@@ -418,11 +423,11 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     private String getLatestVersion(ExecutionContext ctx) {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles());
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles());
         VersionComparator versionComparator = new LatestRelease(null);
         GroupArtifact develocityExtension = new GroupArtifact("com.gradle", DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID);
         try {
-            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(develocityExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
+            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(develocityExtension, null, singletonList(MavenRepository.MAVEN_CENTRAL));
             return extensionMetadata.getVersioning()
                     .getVersions()
                     .stream()

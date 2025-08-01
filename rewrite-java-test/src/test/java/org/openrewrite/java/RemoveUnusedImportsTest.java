@@ -2044,7 +2044,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               public class A {
                   public final class B {}
                   public static class C {}
@@ -2054,14 +2054,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
               import a.*;
-              
+
               public class Foo {
                   A method(A.B ab, A.C ac) {}
               }
               """,
             """
               import a.A;
-              
+
               public class Foo {
                   A method(A.B ab, A.C ac) {}
               }
@@ -2090,7 +2090,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.HashMap;
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class Usages {
                   HashMap<String, String> hashMap;
                   Map<String, String> map;
@@ -2111,7 +2111,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
             """
               import java.util.Map;
               import java.util.Optional;
-                      
+
               public class WithoutMap {
                   Optional<String> optional;
                   Map.Entry<String, String> favoriteEntry;
@@ -2211,7 +2211,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
           java(
             """
             import java.util.Date;
-            
+
             class Test {
                 Date date1 = new Date();                    // unqualified usage
                 java.util.Date date2 = new java.util.Date();  // qualified usage

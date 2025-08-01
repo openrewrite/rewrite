@@ -317,11 +317,11 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               class Creature {}
-              
+
               def cat = new Creature()
               def copyCat = cat
               def lion = new Creature()
-              
+
               assert cat === copyCat
               assert cat !== lion
               """

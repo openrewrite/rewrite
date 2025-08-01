@@ -3548,13 +3548,14 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
+            typeArguments: node.openingElement.typeArguments && this.mapTypeArguments(this.suffix(node.openingElement.tagName), node.openingElement.typeArguments),
             afterName: attrs.length === 0 ?
-                this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
+                this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
             attributes:
                 this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
-                    this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
+                    this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
             children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
@@ -3571,6 +3572,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.tagName), this.visit(node.tagName)),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.suffix(node.tagName), node.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
@@ -4259,6 +4261,15 @@ export class JavaScriptParserVisitor {
 
     private findChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
         for (let i = 0; i < node.getChildCount(this.sourceFile); i++) {
+            if (node.getChildAt(i, this.sourceFile).kind === kind) {
+                return node.getChildAt(i, this.sourceFile);
+            }
+        }
+        return undefined;
+    }
+
+    private findLastChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
+        for (let i = node.getChildCount(this.sourceFile) - 1; i >= 0; i--) {
             if (node.getChildAt(i, this.sourceFile).kind === kind) {
                 return node.getChildAt(i, this.sourceFile);
             }

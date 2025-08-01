@@ -144,7 +144,7 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "${a} ${b}!"
-              
+
               val after = 0
               """
           )
@@ -159,7 +159,7 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "$a $b!"
-              
+
               val after = 0
               """
           )
@@ -190,7 +190,7 @@ class VariableDeclarationTest implements RewriteTest {
               }
               val a = Test ( )
               val b = " ${   a . value   }"
-              
+
               val after = 0
               """
           )
@@ -209,7 +209,7 @@ class VariableDeclarationTest implements RewriteTest {
                       val innerValue = 10
                   }
               }
-              
+
               val a = Test ( )
               val b = "${   a . testValue . innerValue   }"
               """
@@ -384,7 +384,7 @@ class VariableDeclarationTest implements RewriteTest {
             """
               val first : String = "1"
               val second : Int = 2
-              
+
               val l = listOf ( "foo" to first , "bar" to second )
               """
           )

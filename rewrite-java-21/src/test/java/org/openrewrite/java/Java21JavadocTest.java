@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,28 +15,32 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class RecipeMarkupDemonstrationTest implements RewriteTest {
+class Java21JavadocTest implements RewriteTest {
 
-    @ParameterizedTest
-    @ValueSource(strings = {"debug", "info", "warning", "error"})
-    void markup(String level) {
+    @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+    @Test
+    void snippet() {
         rewriteRun(
-          spec -> spec.recipe(new RecipeMarkupDemonstration(level)),
           java(
             """
               class Test {
+                  /**
+                   * This is a snippet:
+                   * {@snippet :
+                   *   int x = 1;
+                   *   int y = 2;
+                   *   System.out.println(x + y);
+                   * }
+                   */
+                  void method() {}
               }
-              """,
-            String.format("""
-              /*~~(This is a%s %s message.)~~>*/class Test {
-              }
-              """, "error".equals(level) || "info".equals(level) ? "n" : "", level)
+              """
           )
         );
     }
