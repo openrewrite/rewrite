@@ -21,14 +21,14 @@ import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
 
 import static java.lang.Boolean.TRUE;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
@@ -99,7 +99,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     return a;
                 }
 
-                String newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
+                String newAttributeValue;
+                if (attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1) {
+                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
+                    newAttributeValue = attributeValue;
+                } else {
+                    newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
+                }
                 List<Expression> currentArgs = a.getArguments();
 
                 // ADD the value when the annotation has no arguments, e.g. @Foo` to @Foo(name="new")
@@ -164,6 +170,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (oldAttributeValue != null) {
                         return as;
                     }
+                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
+                        return as;
+                    }
                     //noinspection ConstantConditions
                     return ((J.Annotation) JavaTemplate
                             .apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue))
@@ -195,6 +204,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if ("value".equals(attributeName())) {
                     if (newAttributeValue == null) {
                         return null;
+                    }
+                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(fieldAccess.toString())) {
+                        return fieldAccess;
                     }
                     if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
                         return fieldAccess;
@@ -234,6 +246,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         .getArguments().get(0);
             }
         });
+    }
+
+    private boolean isFullyQualifiedClass() {
+        return attributeValue != null && attributeValue.endsWith(".class") && StringUtils.countOccurrences(attributeValue, ".") > 1;
+    }
+
+    private static String getFullyQualifiedClass(String fqn) {
+        String withoutClassSuffix = fqn.substring(0, fqn.length() - 6);
+        return withoutClassSuffix.substring(withoutClassSuffix.lastIndexOf('.') + 1) + ".class";
     }
 
     private String attributeName() {
@@ -288,6 +309,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private List<String> getAttributeValues() {
         if (attributeValue == null) {
             return emptyList();
+        }
+        if (isFullyQualifiedClass()) {
+            return singletonList(getFullyQualifiedClass(attributeValue));
         }
         String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
         return Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});

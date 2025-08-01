@@ -113,8 +113,10 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               """,
             """
               import org.example.Foo;
+              
+              import java.math.BigDecimal;
 
-              @Foo(java.math.BigDecimal.class)
+              @Foo(BigDecimal.class)
               public class A {
               }
               """
