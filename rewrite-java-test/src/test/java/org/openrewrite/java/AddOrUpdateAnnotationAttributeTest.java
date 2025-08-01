@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -1384,7 +1385,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
-    void updateFieldAccessAttribute() {
+    void updateConstantWithValue() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "value", "hello", null, false, null)),
           java(
@@ -1422,6 +1423,54 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Const;
 
               @Foo(value = "hello")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("There is no way to determine right now to determine whether the `attributeValue` is meant as constant or as String value")
+    @Test
+    void updateConstantWithConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "value", "Const.A.B.BYE", null, false, null)),
+          java(
+            """
+              package org.example;
+
+              public class Const {
+                  public class A {
+                      public class B {
+                          public static final String HI = "hi";
+                          public static final String BYE = "bye";
+                      }
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.Const;
+
+              @Foo(value = Const.A.B.HI)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Const;
+
+              @Foo(value = Const.A.B.HI2)
               public class A {
               }
               """
@@ -1502,6 +1551,99 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   import org.example.Foo;
 
+                  @Foo("hello")
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchConstant() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hi", "Const.A.B.HI", false, null)),
+              java(
+                """
+                  package org.example;
+                  
+                  public class Const {
+                      public class A {
+                          public class B {
+                              public static final String HI = "hi";
+                          }
+                      }
+                  }
+                  """
+              ),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String value() default "";
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  import org.example.Const;
+    
+                  @Foo(Const.A.B.HI)
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  import org.example.Const;
+    
+                  @Foo("hi")
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        @ExpectedToFail("We can't support this right now, as there is no reference to the actual string literal of the constant")
+        void matchConstantLiteral() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", "hi", false, null)),
+              java(
+                """
+                  package org.example;
+                  
+                  public class Const {
+                      public class A {
+                          public class B {
+                              public static final String HI = "hi";
+                          }
+                      }
+                  }
+                  """
+              ),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String value() default "";
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  import org.example.Const;
+    
+                  @Foo(Const.A.B.HI)
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  import org.example.Const;
+    
                   @Foo("hello")
                   public class A {
                   }
