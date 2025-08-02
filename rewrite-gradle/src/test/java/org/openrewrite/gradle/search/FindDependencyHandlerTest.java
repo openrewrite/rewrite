@@ -20,14 +20,13 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.test.RewriteTest.fromRuntimeClasspath;
 
 class FindDependencyHandlerTest implements RewriteTest {
     @DocumentExample
     @Test
     void findDependenciesBlock() {
         rewriteRun(
-          spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
+          spec -> spec.recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.search.FindDependencyHandler"),
           buildGradle(
             """
               plugins {
