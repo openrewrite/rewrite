@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -6,6 +6,7 @@ plugins {
 }
 
 val kotlinVersion = "1.9.25"
+val junitVersion = "5.13.4"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -21,11 +22,11 @@ dependencies {
     implementation(kotlin("stdlib"))
 
     testImplementation("org.assertj:assertj-core:latest.release")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 
@@ -34,8 +35,6 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_1_8
-    }
+tasks.withType<KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
 }
