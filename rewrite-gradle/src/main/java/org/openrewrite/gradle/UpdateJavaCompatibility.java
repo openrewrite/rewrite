@@ -33,7 +33,6 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -252,7 +251,7 @@ public class UpdateJavaCompatibility extends Recipe {
             return new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    if (method.getSimpleName().equals("java")) {
+                    if ("java".equals(method.getSimpleName())) {
                         return new JavaIsoVisitor<ExecutionContext>() {
                             @Override
                             public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
@@ -307,7 +306,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
 
         DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
-        int currentMajor = getMajorVersion(a.getAssignment());
+        Integer currentMajor = getMajorVersion(a.getAssignment());
         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
             return a.withAssignment(changeJavaVersion(a.getAssignment(), actualStyle));
@@ -316,8 +315,8 @@ public class UpdateJavaCompatibility extends Recipe {
         return a;
     }
 
-    private boolean shouldUpdateVersion(int currentMajor) {
-        return currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade);
+    private boolean shouldUpdateVersion(@Nullable Integer currentMajor) {
+        return currentMajor != null && (currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade));
     }
 
     private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
@@ -336,17 +335,15 @@ public class UpdateJavaCompatibility extends Recipe {
             c.putMessageOnFirstEnclosing(enclosing, JAVA_TOOLCHAIN_FOUND, true);
         }
 
-        if (isMethodInvocation(m, "JavaLanguageVersion", "of")) {
+        if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
+
             List<Expression> args = m.getArguments();
 
-            if (args.size() == 1 && args.get(0) instanceof J.Literal) {
-                J.Literal versionArg = (J.Literal) args.get(0);
-                if (versionArg.getValue() instanceof Integer) {
-                    Integer versionNumber = (Integer) versionArg.getValue();
-                    if (shouldUpdateVersion(versionNumber)) {
-                        return m.withArguments(
-                                Collections.singletonList(versionArg.withValue(version)
-                                        .withValueSource(version.toString())));
+            if (args.size() == 1) {
+                if (args.get(0) instanceof J.Literal || ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                    Integer currentMajor = getMajorVersion(args.get(0));
+                    if (shouldUpdateVersion(currentMajor)) {
+                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, null)));
                     }
                     return m;
                 }
@@ -365,10 +362,9 @@ public class UpdateJavaCompatibility extends Recipe {
 
             if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
                 DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
-                int currentMajor = getMajorVersion(m.getArguments().get(0));
+                Integer currentMajor = getMajorVersion(m.getArguments().get(0));
                 if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                     DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
-                    //noinspection DataFlowIssue
                     return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeJavaVersion(arg, actualStyle)));
                 }
                 return m;
@@ -392,7 +388,7 @@ public class UpdateJavaCompatibility extends Recipe {
         }
     }
 
-    private int getMajorVersion(Expression expression) {
+    private @Nullable Integer getMajorVersion(Expression expression) {
         if (expression instanceof J.Literal) {
             J.Literal argument = (J.Literal) expression;
             JavaType.Primitive type = argument.getType();
@@ -414,7 +410,7 @@ public class UpdateJavaCompatibility extends Recipe {
             }
         }
 
-        return -1;
+        return null;
     }
 
     private @Nullable DeclarationStyle getCurrentStyle(Expression expression) {
@@ -462,7 +458,13 @@ public class UpdateJavaCompatibility extends Recipe {
 
         if (expression instanceof J.Literal) {
             J.Literal literal = (J.Literal) expression;
-            if (style == DeclarationStyle.String) {
+            if (style == null) {
+                if (literal.getType() == JavaType.Primitive.String) {
+                    return changeJavaVersion(literal, DeclarationStyle.String);
+                } else if (literal.getType() == JavaType.Primitive.Int || literal.getType() == JavaType.Primitive.Double) {
+                    return changeJavaVersion(literal, DeclarationStyle.Number);
+                }
+            } else if (style == DeclarationStyle.String) {
                 if (literal.getType() == JavaType.Primitive.String) {
                     expression = ChangeStringLiteral.withStringValue(literal, newJavaVersion);
                 } else {

@@ -27,8 +27,8 @@ import org.openrewrite.xml.table.XmlStyleReport;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
-import java.util.Collections;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator> {
@@ -92,7 +92,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
                 -1,
                 -1
         ));
-        return Collections.emptyList();
+        return emptyList();
     }
 
     @Override

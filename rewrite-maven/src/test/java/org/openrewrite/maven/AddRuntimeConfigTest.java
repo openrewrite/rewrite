@@ -40,8 +40,8 @@ class AddRuntimeConfigTest implements RewriteTest {
         """
     );
 
-    @Test
     @DocumentExample
+    @Test
     void createConfigFileWithRuntimeConfigIfFileDoesNotExist() {
         rewriteRun(
           spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", Separator.EQUALS)),
@@ -54,8 +54,8 @@ class AddRuntimeConfigTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4368")
+    @Test
     void fromYaml() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
@@ -93,8 +93,8 @@ class AddRuntimeConfigTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @EnumSource(Separator.class)
+    @ParameterizedTest
     void createConfigFileWithRuntimeConfigForAllSeparators(Separator separator) {
         rewriteRun(
           spec -> spec.recipe(new AddRuntimeConfig(MAVEN_CONFIG_FILENAME, "-T", "3", separator)),

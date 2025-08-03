@@ -77,7 +77,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
             spec -> spec.path(".mvn/extensions.xml")
           ),
           xml(
-            null,
+            doesNotExist(),
             """
               <gradleEnterprise>
                 <server>
@@ -95,7 +95,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
         rewriteRun(
           POM_XML_SOURCE_SPEC,
           xml(
-            null,
+            doesNotExist(),
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
@@ -109,7 +109,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
             spec -> spec.path(".mvn/extensions.xml")
           ),
           xml(
-            null,
+            doesNotExist(),
             """
               <gradleEnterprise>
                 <server>
@@ -149,7 +149,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
             })
           ),
           xml(
-            null,
+            doesNotExist(),
             """
               <develocity>
                 <server>
@@ -199,7 +199,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
           spec -> spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
           POM_XML_SOURCE_SPEC,
           xml(
-            null,
+            doesNotExist(),
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
@@ -213,7 +213,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
             spec -> spec.path(".mvn/extensions.xml")
           ),
           xml(
-            null,
+            doesNotExist(),
             """
               <gradleEnterprise>
                 <server>
@@ -240,7 +240,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
           spec -> spec.recipe(new AddDevelocityMavenExtension("1.21", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
           POM_XML_SOURCE_SPEC,
           xml(
-            null,
+            doesNotExist(),
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
@@ -254,7 +254,7 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
             spec -> spec.path(".mvn/extensions.xml")
           ),
           xml(
-            null,
+            doesNotExist(),
             """
               <develocity>
                 <server>

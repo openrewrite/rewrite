@@ -40,8 +40,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @Test
     @DocumentExample
+    @Test
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
@@ -292,7 +292,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         Recipe recipe = recipes.iterator().next();
         Optional<Contributor> maybeJon = recipe.getContributors()
           .stream()
-          .filter(c -> c.getName().equals("Jonathan Schneider"))
+          .filter(c -> "Jonathan Schneider".equals(c.getName()))
           .findFirst();
         assertThat(maybeJon).isPresent();
     }

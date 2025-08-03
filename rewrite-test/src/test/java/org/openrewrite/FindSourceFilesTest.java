@@ -22,7 +22,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.test.SourceSpecs.*;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class FindSourceFilesTest implements RewriteTest {
 
@@ -92,9 +93,9 @@ class FindSourceFilesTest implements RewriteTest {
         );
     }
 
+    @NullSource
     @ParameterizedTest
     @ValueSource(strings = {""})
-    @NullSource
     void blankMatchesEverything(String filePattern) {
         rewriteRun(
           spec -> spec.recipe(new FindSourceFiles(filePattern)),
@@ -151,8 +152,8 @@ class FindSourceFilesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3758")
+    @Test
     void eitherOr() {
         rewriteRun(
           spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),

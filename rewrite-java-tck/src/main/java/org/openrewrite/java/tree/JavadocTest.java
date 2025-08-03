@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
@@ -35,7 +36,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+
               /**
                *   {@link List#add(Object) } refers to import
                * @param Something that spans
@@ -44,13 +45,13 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**   the position of the first body element or tag is relative to the index beginning after the last contiguous whitespace following '**' */
                   Integer n;
-                            
+
                   /**
                    * {@link int}
                    */
                   class Inner {
                       Integer n;
-                      
+
                       /**
                        * {@link #n} refers to Inner
                        */
@@ -312,7 +313,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               package org.foo;
-                            
+
               /**
                * Type of an Opening Time.
                * <ul>
@@ -499,7 +500,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              /**   
+              /**
                  {@link int}
               */
               class Test {}
@@ -515,7 +516,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /**   
+                  /**
                      {@link int}
                   */
                   String s;
@@ -558,7 +559,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.Map;
-                            
+
               /**
                * {@link Map< String , Integer > }
                */
@@ -622,7 +623,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.nio.charset.StandardCharsets;
-                            
+
               /**
                *   {@link StandardCharsets#UTF_8 }
                *   {@linkplain StandardCharsets#UTF_8 }
@@ -725,7 +726,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.Map;
-                            
+
               /**
                * {@link Map<String, Map<String, Integer>>} multiple parameterized type
                */
@@ -743,7 +744,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+
               class Test {
                   /**
                    * @return - {@link List<String>} - description.
@@ -792,8 +793,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/968")
+    @SuppressWarnings("JavadocReference")
     @Test
     void missingBracket() {
         rewriteRun(
@@ -825,8 +826,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/967")
+    @SuppressWarnings("JavadocReference")
     @Test
     void multilineLink() {
         rewriteRun(
@@ -948,7 +949,7 @@ class JavadocTest implements RewriteTest {
                   /**
                    * @param <
                    *   T> t hi
-                   * @param 
+                   * @param
                    *   val
                    */
                   <T> boolean test(int val);
@@ -1090,7 +1091,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
@@ -1115,7 +1116,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 abstract class HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
@@ -1140,15 +1141,15 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface HtmlMarkupI {
                     Tag H1 = Tag.H1;
                 }
-                
+
                 abstract class HtmlMarkup2 implements HtmlMarkupI {
                     String H1 = "aa";
                 }
-                
+
                 abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
                 }
                 """
@@ -1235,15 +1236,15 @@ class JavadocTest implements RewriteTest {
           java(
             """
                 import javax.swing.text.html.HTML.Tag;
-                
+
                 interface SomeInterface {
                     int test();
                 }
-                
+
                 abstract class SomeParent2 implements SomeInterface {
                     abstract boolean test();
                 }
-                
+
                 abstract class SomeParent extends SomeParent2 implements SomeInterface {
                 }
                 """
@@ -1265,8 +1266,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/945")
+    @SuppressWarnings("JavadocReference")
     @Test
     void methodNotFound() {
         rewriteRun(
@@ -1284,8 +1285,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocReference")
     @Issue("https://github.com/openrewrite/rewrite/issues/944")
+    @SuppressWarnings("JavadocReference")
     @Test
     void typeNotFound() {
         rewriteRun(
@@ -1424,7 +1425,7 @@ class JavadocTest implements RewriteTest {
                    * The value of this constant is {@value}.
                    */
                   public static final String SCRIPT_START = "<script>";
-                            
+
                   /**
                    * {@value Test#SCRIPT_START}
                    */
@@ -1459,7 +1460,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              /**   
+              /**
                 *       Line 1
                 */
               class Test<T> {}
@@ -1468,8 +1469,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocBlankLines")
     @Issue("https://github.com/openrewrite/rewrite/issues/2139")
+    @SuppressWarnings("JavadocBlankLines")
     @Test
     void javaDocEndsOnSameLine() {
         rewriteRun(
@@ -1495,8 +1496,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * Text with trailing whitespace.    
-                   * 
+                   * Text with trailing whitespace.
+                   *
                    * @param arg desc
                    */
                   void method(String arg) {
@@ -1515,8 +1516,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * Text with trailing whitespace.    
-                   * More trailing whitespace    
+                   * Text with trailing whitespace.
+                   * More trailing whitespace
                    */
                   void method() {
                   }
@@ -1534,8 +1535,8 @@ class JavadocTest implements RewriteTest {
             """
               class Test {
                   /**
-                   * @param arg test text.    
-                   * More trailing whitespace    
+                   * @param arg test text.
+                   * More trailing whitespace
                    */
                   void method(String arg) {
                   }
@@ -1552,7 +1553,7 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /** 
+                  /**
                    * JavaDoc
                       1st new line.
                       2nd new line.
@@ -1575,8 +1576,8 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**
                   * JavaDocs treats whitespace differently when new lines exist
-                  
-                  
+
+
                   * with whitespace that is contained in pure text.
                   */
                   void method() {}
@@ -1595,8 +1596,8 @@ class JavadocTest implements RewriteTest {
               class Test {
                   /**
                    * New lines with whitespace followed by a param.
-                   
-                   
+
+
                    * @return void
                    */
                   void method() {
@@ -1614,9 +1615,9 @@ class JavadocTest implements RewriteTest {
           java(
             """
               class Test {
-                  /** 
+                  /**
                    * @param oboFile the file to be parsed
-                            
+
                    * @return the ontology represented as a BioJava ontology file
                    */
                   void test() {
@@ -1670,7 +1671,7 @@ class JavadocTest implements RewriteTest {
               interface Test {
                   /**
                    * Returns something.
-                   * 
+                   *
                    * @return true
                    */
                   boolean test();
@@ -1688,9 +1689,9 @@ class JavadocTest implements RewriteTest {
             """
               interface Test {
                   /**
-                   * Text followed by whitespace, and multiple new lines with/without whitespace.        
+                   * Text followed by whitespace, and multiple new lines with/without whitespace.
                    *
-                   * 
+                   *
                    */
                   void method();
               }
@@ -1706,17 +1707,17 @@ class JavadocTest implements RewriteTest {
           java(
             """
               import java.lang.Math;
-                            
+
               interface Test {
                   /**
                    * @see Math#pow(
-                   * 
-                   *    double   
-                   * 
                    *
-                   *    ,    
+                   *    double
+                   *
+                   *
+                   *    ,
                    * double
-                   * 
+                   *
                    * )
                    */
                   boolean test();
@@ -1792,8 +1793,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantThrows")
     @Issue("https://github.com/openrewrite/rewrite/issues/976")
+    @SuppressWarnings("RedundantThrows")
     @Test
     void multilineWithThrowsAndCRLF() {
         rewriteRun(
@@ -1843,8 +1844,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    @Test
     void arrayTypeLiterals() {
         rewriteRun(
           java("" +
@@ -1856,9 +1857,9 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
     @MinimumJava11
+    @Test
     void arrayTypeLiterals2() {
         rewriteRun(
           java("" +
@@ -1870,8 +1871,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void varargsMethod() {
         rewriteRun(
           java(
@@ -1895,8 +1896,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void varargsWithPrefix() {
         rewriteRun(
           // for some reason the compiler AST's type attribution is incomplete here
@@ -1922,8 +1923,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    @Test
     void arrayMethod() {
         rewriteRun(
           java(
@@ -2009,8 +2010,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
     void unicodeEscape() {
         rewriteRun(
           java(
@@ -2018,7 +2019,7 @@ class JavadocTest implements RewriteTest {
               interface Test {
               	/**
               	 * <p>Ř\\u00e9t\\u00FBrn:</p>
-              	 * 
+              	 *
               	 * {@code \\u0040Override
                  * public void method() {}
                  * }
@@ -2030,8 +2031,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5444")
+    @Test
     void whitespaceInGenericTypesInJavadocTags() {
         rewriteRun(
           java(
@@ -2053,15 +2054,15 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5411")
+    @Test
     void multilineHtmlCommentInJavadoc() {
         rewriteRun(
           java(
             """
-              /** 
+              /**
               * First line of comment
-              * <!-- comment 
+              * <!-- comment
               *   Second line of comment
               * -->
               * <!-- another comment -->
@@ -2114,19 +2115,19 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5196")
+    @Test
     void unclosedBraceOnLink() {
         rewriteRun(
           java(
             """
               class Test {
-                 /**   
+                 /**
                   * {@link int
                   * Some other text.
                   * See {@link java.lang.String}
                   * @param arg description
-                  */                  
+                  */
                   void method(String arg) {
                   }
               }
@@ -2135,8 +2136,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
     void badlyClosedXmlTags() {
         rewriteRun(
           java(
@@ -2151,8 +2152,8 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
+    @Test
     void spaceStarAfterStartOfJavaDoc() {
         rewriteRun(
           java(
@@ -2164,5 +2165,282 @@ class JavadocTest implements RewriteTest {
             """
           )
         );
+    }
+
+    // Snippet tests based on https://docs.oracle.com/en/java/javase/21/javadoc/snippets.html
+    @Nested
+    class Snippet {
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippet() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * This is a snippet:
+                       * {@snippet :
+                       *   int x = 1;
+                       *   int y = 2;
+                       *   System.out.println(x + y);
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithLanguageAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Properties snippet:
+                       * {@snippet lang=properties :
+                       *   server.port=8080
+                       *   server.host=localhost
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithIdAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with ID:
+                       * {@snippet id="example-1" :
+                       *   String greeting = "Hello, World!";
+                       *   System.out.println(greeting);
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetEmpty() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Empty snippet:
+                       * {@snippet :
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithMarkupComments() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with markup:
+                       * {@snippet :
+                       *   public static void main(String[] args) {
+                       *       System.out.println("Hello!");  // @highlight substring="Hello"
+                       *       var text = "placeholder";      // @replace substring="placeholder" replacement="..."
+                       *       List<String> list = null;      // @link substring="List" target="java.util.List"
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetMultipleAttributes() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * External snippet reference:
+                       * {@snippet class="com.example.HelloWorld" region="main"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithFileAttribute() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * File snippet:
+                       * {@snippet file="example.properties" region="database"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithIndentation() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Nested code:
+                       * {@snippet :
+                       *   class Inner {
+                       *       void method() {
+                       *           if (true) {
+                       *               System.out.println("nested");
+                       *           }
+                       *       }
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithSpecialCharacters() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Special characters:
+                       * {@snippet :
+                       *   String regex = "\\\\d+";  // Backslashes
+                       *   char quote = '"';         // Double quote
+                       *   String path = "C:\\\\temp"; // Windows path
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithBraces() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Balanced braces:
+                       * {@snippet :
+                       *   Map<String, List<Integer>> map = new HashMap<>() {{
+                       *       put("numbers", Arrays.asList(1, 2, 3));
+                       *   }};
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetNoColonAfterTag() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * External snippet without colon:
+                       * {@snippet class="Example"}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetWithWhitespaceBeforeColon() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Snippet with space before colon:
+                       * {@snippet   :
+                       *   // Code here
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5825")
+        @Test
+        void snippetMixedAttributesAndContent() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /**
+                       * Hybrid snippet:
+                       * {@snippet lang=java id="hybrid-example" :
+                       *   public void hybridMethod() {
+                       *       // This combines attributes and inline content
+                       *   }
+                       * }
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
     }
 }

@@ -32,7 +32,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -130,7 +133,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
-        Set<GradleProject> modules = new HashSet<>();
     }
 
     @Override
@@ -156,9 +158,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
-                    if (gradleProject != null) {
-                        acc.modules.add(gradleProject);
-                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -173,8 +172,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                         gatherVariables(m);
                     } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                            ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                                    "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                         gatherVariables((J.MethodInvocation) depArgs.get(0));
                     }
 
@@ -478,11 +477,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             private final UpdateGradle updateGradle = new UpdateGradle(acc);
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
-            private final UpdateDependencyLock updateLockFile = new UpdateDependencyLock(acc.modules);
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
-                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx) || updateLockFile.isAcceptable(sf, ctx);
+                return updateProperties.isAcceptable(sf, ctx) || updateGradle.isAcceptable(sf, ctx);
             }
 
             @Override
@@ -496,7 +494,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         t = updateGradle.visitNonNull(t, ctx);
                     }
                     Optional<GradleProject> projectMarker = t.getMarkers().findFirst(GradleProject.class);
-                    if ((tree != t || updateLockFile.isAcceptable(sf, ctx)) && projectMarker.isPresent()) {
+                    if (tree != t && projectMarker.isPresent()) {
                         GradleProject gradleProject = projectMarker.get();
                         Map<GroupArtifact, Set<String>> configurationsPerGa = acc.getConfigurationPerGAPerModule().getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
                         if (acc.getGaToNewVersion().isEmpty()) {
@@ -525,9 +523,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (projectMarker.get() != gradleProject) {
                             t = t.withMarkers(t.getMarkers().setByType(gradleProject));
                         }
-                    }
-                    if (updateLockFile.isAcceptable(sf, ctx)) {
-                        t = updateLockFile.visitNonNull(t, ctx);
                     }
                 }
                 return t;
@@ -618,8 +613,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
             } else if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
@@ -648,11 +643,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return a;
                         }
                         String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
-                        a = a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
-                        return a;
+                        return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
-            } else if (m.getSimpleName().equals("ext")) {
+            } else if ("ext".equals(m.getSimpleName())) {
                 return m.withArguments(ListUtils.map(m.getArguments(), arg -> (Expression) new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
@@ -1021,9 +1015,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
             boolean anyChanged = false;
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                // Find the old requested dependency that matches the one we're updating
+                org.openrewrite.maven.tree.Dependency oldRequested = null;
+                for (org.openrewrite.maven.tree.Dependency req : gdc.getRequested()) {
+                    if (Objects.equals(req.getGroupId(), gav.getGroupId()) && Objects.equals(req.getArtifactId(), gav.getArtifactId())) {
+                        oldRequested = req;
+                        break;
+                    }
+                }
+
                 GradleDependencyConfiguration newGdc = gdc
                         .withRequested(ListUtils.map(gdc.getRequested(), requested -> maybeUpdateDependency(requested, newRequested)))
-                        .withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> maybeUpdateResolvedDependency(gp, resolved, newDep, new HashSet<>())));
+                        .withDirectResolved(updateDirectResolved(gp, gdc.getDirectResolved(), oldRequested != null ? oldRequested : newRequested, newDep, mpd, ctx));
                 if (hasBomWithoutDependencies(newDep)) {
                     for (ResolvedManagedDependency resolvedDependency : resolvedPom.getDependencyManagement()) {
                         ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(null, resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion(), null);
@@ -1081,33 +1084,165 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
     }
 
-    private static ResolvedDependency maybeUpdateResolvedDependency(
+    private static List<ResolvedDependency> updateDirectResolved(
             GradleProject gp,
-            ResolvedDependency dep,
+            List<ResolvedDependency> directResolved,
+            org.openrewrite.maven.tree.Dependency oldRequestedDep,
             ResolvedDependency newDep,
-            Set<ResolvedDependency> traversalHistory) {
-        if (traversalHistory.contains(dep)) {
-            return dep;
-        }
-        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId()) && Objects.equals(dep.getVersion(), newDep.getVersion()) ||
-            wouldDowngrade(dep.getGav().asGroupArtifactVersion(), newDep.getGav().asGroupArtifactVersion())) {
-            return dep;
-        }
-        if (Objects.equals(dep.getGroupId(), newDep.getGroupId()) && Objects.equals(dep.getArtifactId(), newDep.getArtifactId())) {
-            if (isSpringPluginManaged(gp, newDep)) {
-                //Spring plugin overwrites versions that are not set in constraints or similar blocks so the transitive dependencies would remain the same except for the current lib.
-                return dep.withGav(newDep.getGav());
-            }
-            return newDep;
-        }
-        boolean added = traversalHistory.add(dep);
-        try {
-            return dep.withDependencies(ListUtils.map(dep.getDependencies(), d -> maybeUpdateResolvedDependency(gp, d, newDep, traversalHistory)));
-        } finally {
-            if (added) {
-                traversalHistory.remove(dep);
+            MavenPomDownloader mpd,
+            ExecutionContext ctx) {
+        // When we update a direct dependency, we need to:
+        // 1. Replace the matching direct dependency entirely (including its transitive deps)
+        // 2. For dependencies that were upgraded as transitives, re-resolve them to get their new dependencies
+        // 3. Remove any transitive dependencies that are no longer present
+
+        // First, find the old dependency in the direct resolved list
+        ResolvedDependency oldDep = null;
+        int oldDepIndex = -1;
+        for (int i = 0; i < directResolved.size(); i++) {
+            ResolvedDependency dep = directResolved.get(i);
+            if (Objects.equals(dep.getGroupId(), oldRequestedDep.getGroupId()) &&
+                Objects.equals(dep.getArtifactId(), oldRequestedDep.getArtifactId())) {
+                oldDep = dep;
+                oldDepIndex = i;
+                break;
             }
         }
+
+        if (oldDep == null) {
+            // Dependency not found in direct resolved, return as-is
+            return directResolved;
+        }
+
+        // Check if the old dependency already has the same version as the new one
+        if (Objects.equals(oldDep.getVersion(), newDep.getVersion())) {
+            // No version change, return as-is
+            return directResolved;
+        }
+
+        // Collect all transitive dependencies from both old and new versions
+        Set<GroupArtifact> oldTransitiveGAs = withTransitives(oldDep);
+        Set<GroupArtifact> newTransitiveGAs = withTransitives(newDep);
+
+
+        Map<GroupArtifact, String> newVersions = new HashMap<>();
+        collectVersions(newDep, newVersions);
+
+        List<ResolvedDependency> updated = new ArrayList<>();
+        boolean hasChanges = false;
+
+        for (int i = 0; i < directResolved.size(); i++) {
+            ResolvedDependency dep = directResolved.get(i);
+            GroupArtifact depGA = dep.getGav().asGroupArtifact();
+
+            if (i == oldDepIndex) {
+                // This is the dependency being updated
+                if (!wouldDowngrade(dep.getGav().asGroupArtifactVersion(), newDep.getGav().asGroupArtifactVersion())) {
+                    if (isSpringPluginManaged(gp, newDep)) {
+                        // Spring plugin overwrites versions that are not set in constraints or similar blocks
+                        // so the transitive dependencies would remain the same except for the current lib.
+                        ResolvedDependency updatedDep = dep.withGav(newDep.getGav());
+                        updated.add(updatedDep);
+                        hasChanges = true;
+                    } else {
+                        // Replace the entire dependency with new one, including its transitive dependencies
+                        updated.add(newDep);
+                        hasChanges = true;
+                    }
+                } else {
+                    // Would be a downgrade, keep the existing dependency
+                    updated.add(dep);
+                }
+            } else if (oldTransitiveGAs.contains(depGA) && !newTransitiveGAs.contains(depGA)) {
+                // This dependency was a transitive of the old version but is not in the new version
+                // Skip it (remove it from direct resolved)
+                hasChanges = true;
+                continue;
+            } else if (newVersions.containsKey(depGA) && !dep.getVersion().equals(newVersions.get(depGA))) {
+                // This dependency exists in both old and new trees but with different versions
+                // We need to re-resolve it to get the correct transitive dependencies for the new version
+                try {
+                    GroupArtifactVersion gav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), newVersions.get(depGA));
+                    Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
+                    ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
+
+                    Set<GroupArtifact> existingTransitiveGAs = new HashSet<>();
+                    for (ResolvedDependency existing : directResolved) {
+                        existingTransitiveGAs.add(existing.getGav().asGroupArtifact());
+                        collectTransitiveGAs(existing, existingTransitiveGAs);
+                    }
+
+                    List<ResolvedDependency> transitiveDependencies = filterTransitiveDependencies(
+                            resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx),
+                            existingTransitiveGAs,
+                            newTransitiveGAs
+                    );
+
+                    ResolvedDependency updatedDep = ResolvedDependency.builder()
+                            .gav(resolvedPom.getGav())
+                            .requested(dep.getRequested())
+                            .dependencies(transitiveDependencies)
+                            .build();
+                    updated.add(updatedDep);
+                    hasChanges = true;
+                } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
+                    // If we can't resolve the new version, keep the old one
+                    updated.add(dep);
+                }
+            } else {
+                // This is a different direct dependency, keep it as-is
+                updated.add(dep);
+            }
+        }
+
+        return hasChanges ? updated : directResolved;
+    }
+
+    private static void collectVersions(ResolvedDependency dep, Map<GroupArtifact, String> versions) {
+        versions.put(dep.getGav().asGroupArtifact(), dep.getVersion());
+        for (ResolvedDependency child : dep.getDependencies()) {
+            collectVersions(child, versions);
+        }
+    }
+
+    private static void collectTransitiveGAs(ResolvedDependency dep, Set<GroupArtifact> gas) {
+        for (ResolvedDependency child : dep.getDependencies()) {
+            gas.add(child.getGav().asGroupArtifact());
+            collectTransitiveGAs(child, gas);
+        }
+    }
+
+    private static List<ResolvedDependency> filterTransitiveDependencies(
+            List<ResolvedDependency> dependencies,
+            Set<GroupArtifact> existingGAs,
+            Set<GroupArtifact> newTransitiveGAs) {
+        List<ResolvedDependency> filtered = new ArrayList<>();
+        for (ResolvedDependency dep : dependencies) {
+            GroupArtifact ga = dep.getGav().asGroupArtifact();
+            // Include dependency if:
+            // 1. It was already in the existing dependency graph, OR
+            // 2. It's part of the new transitive dependencies from the main upgraded dependency
+            if (existingGAs.contains(ga) || newTransitiveGAs.contains(ga)) {
+                // Recursively filter its transitive dependencies too
+                List<ResolvedDependency> filteredTransitives = filterTransitiveDependencies(
+                        dep.getDependencies(), existingGAs, newTransitiveGAs);
+                filtered.add(dep.withDependencies(filteredTransitives));
+            }
+        }
+        return filtered;
+    }
+
+    private static Set<GroupArtifact> withTransitives(ResolvedDependency dep) {
+        return withTransitives(dep, singleton(dep.getGav().asGroupArtifact()));
+    }
+
+    private static Set<GroupArtifact> withTransitives(ResolvedDependency dep, Set<GroupArtifact> gas) {
+        Set<GroupArtifact> result = new HashSet<>(gas);
+        for (ResolvedDependency child : dep.getDependencies()) {
+            result.add(child.getGav().asGroupArtifact());
+            result.addAll(withTransitives(child, gas));
+        }
+        return result;
     }
 
     private static boolean wouldDowngrade(GroupArtifactVersion from, GroupArtifactVersion to) {

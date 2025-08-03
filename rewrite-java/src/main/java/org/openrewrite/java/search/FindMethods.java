@@ -30,7 +30,9 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Finds matching method invocations.
@@ -103,7 +105,7 @@ public class FindMethods extends Recipe {
                                 m.getName(),
                                 m.getParameterTypes().stream()
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
 
                         ));
                     }
@@ -126,7 +128,7 @@ public class FindMethods extends Recipe {
                                 method.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     m = SearchResult.found(m);
@@ -148,7 +150,7 @@ public class FindMethods extends Recipe {
                                 memberRef.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     m = m.withReference(SearchResult.found(m.getReference()));
@@ -170,7 +172,7 @@ public class FindMethods extends Recipe {
                                 newClass.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     n = SearchResult.found(n);
@@ -201,7 +203,7 @@ public class FindMethods extends Recipe {
                 .stream()
                 .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MemberReference || t instanceof J.NewClass)
                 .map(t -> (J) t)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     public static Set<J.MethodDeclaration> findDeclaration(J j, String methodPattern) {
@@ -230,6 +232,6 @@ public class FindMethods extends Recipe {
                 .stream()
                 .filter(J.MethodDeclaration.class::isInstance)
                 .map(J.MethodDeclaration.class::cast)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 }

@@ -24,12 +24,13 @@ import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+
+import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class HclTemplateParser {
@@ -65,7 +66,7 @@ public class HclTemplateParser {
         onBeforeParseTemplate.accept(stub);
         return (Expression) cache(stub, () -> {
             Hcl.ConfigFile cf = compileTemplate(stub);
-            return Collections.singletonList(((Hcl.Attribute) cf.getBody().get(0)).getValue());
+            return singletonList(((Hcl.Attribute) cf.getBody().get(0)).getValue());
         }).get(0);
     }
 

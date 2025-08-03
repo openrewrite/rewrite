@@ -29,10 +29,11 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -56,7 +57,7 @@ public class FindEmptyMethods extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S1186");
+        return singleton("RSPEC-S1186");
     }
 
     @Override
@@ -106,7 +107,7 @@ public class FindEmptyMethods extends Recipe {
                         .filter(o -> o instanceof J.MethodDeclaration)
                         .map(o -> (J.MethodDeclaration) o)
                         .filter(J.MethodDeclaration::isConstructor)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return constructors.size() == 1 &&
                        constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
                        constructors.get(0).getParameters().size() == 1 &&

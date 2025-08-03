@@ -44,7 +44,7 @@ class TomlParserTest implements RewriteTest {
               int3 = 0
               int4 = -17
               int5 = 1_000
-              
+
               # hexadecimal with prefix `0x`
               hex1 = 0xDEADBEEF
               hex2 = 0xdeadbeef
@@ -52,7 +52,7 @@ class TomlParserTest implements RewriteTest {
               # octal with prefix `0o`
               oct1 = 0o01234567
               oct2 = 0o755 # useful for Unix file permissions
-              
+
               # binary with prefix `0b`
               bin1 = 0b11010110
               """
@@ -69,22 +69,22 @@ class TomlParserTest implements RewriteTest {
               flt1 = +1.0
               flt2 = 3.1415
               flt3 = -0.01
-              
+
               # exponent
               flt4 = 5e+22
               flt5 = 1e06
               flt6 = -2E-2
-              
+
               # both
               flt7 = 6.626e-34
-              
+
               flt8 = 224_617.445_991_228
-              
+
               # infinity
               sf1 = inf  # positive infinity
               sf2 = +inf # positive infinity
               sf3 = -inf # negative infinity
-              
+
               # not a number
               sf4 = nan  # actual sNaN/qNaN encoding is implementation-specific
               sf5 = +nan # same as `nan`
@@ -165,7 +165,7 @@ class TomlParserTest implements RewriteTest {
               nested_arrays_of_ints = [ [ 1, 2 ], [3, 4, 5] ]
               nested_mixed_array = [ [ 1, 2 ], ["a", "b", "c"] ]
               string_array = [ "all", 'strings', ""\"are the same""\", '''type''' ]
-              
+
               # Mixed-type arrays are allowed
               numbers = [ 0.1, 0.2, 0.5, 1, 2, 5 ]
               contributors = [
@@ -175,7 +175,7 @@ class TomlParserTest implements RewriteTest {
               integers2 = [
                 1, 2, 3
               ]
-              
+
               integers3 = [
                 1,
                 2, # this is ok
@@ -193,11 +193,11 @@ class TomlParserTest implements RewriteTest {
               [table-1]
               key1 = "some string"
               key2 = 123
-              
+
               [table-2]
               key1 = "another string"
               key2 = 456
-              
+
               [dog."tater.man"]
               type.name = "pug"
               """,
@@ -219,13 +219,13 @@ class TomlParserTest implements RewriteTest {
               [[products]]
               name = "Hammer"
               sku = 738594937
-              
+
               [[products]]  # empty table within the array
-              
+
               [[products]]
               name = "Nail"
               sku = 284758393
-              
+
               color = "gray"
               """
           )

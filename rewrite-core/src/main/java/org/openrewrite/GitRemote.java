@@ -25,7 +25,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 @Value
 public class GitRemote {
@@ -155,7 +156,7 @@ public class GitRemote {
             }
 
             path = path.replaceFirst("^/", "");
-            boolean ssh = protocol.equals("ssh");
+            boolean ssh = "ssh".equals(protocol);
             switch (service) {
                 case Bitbucket:
                     if (!ssh) {
@@ -247,7 +248,7 @@ public class GitRemote {
 
             switch (match.service) {
                 case AzureDevOps:
-                    if (match.matchedUri.getHost().equalsIgnoreCase("ssh.dev.azure.com")) {
+                    if ("ssh.dev.azure.com".equalsIgnoreCase(match.matchedUri.getHost())) {
                         repositoryPath = repositoryPath.replaceFirst("(?i)v3/", "");
                     } else {
                         repositoryPath = repositoryPath.replaceFirst("(?i)/_git/", "/");
@@ -279,7 +280,7 @@ public class GitRemote {
                         String[] segments = normalizedUri.getPath().split("/");
                         String origin = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
                         if (segments.length > 2) {
-                            origin += Arrays.stream(segments, 0, segments.length - 2).collect(Collectors.joining("/"));
+                            origin += Arrays.stream(segments, 0, segments.length - 2).collect(joining("/"));
                         }
                         return new RemoteServerMatch(Service.Unknown, origin, URI.create(normalizedUri.getScheme() + "://" + origin));
                     });

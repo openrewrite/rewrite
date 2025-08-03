@@ -35,9 +35,9 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Provides methods for matching the given cursor location to a specific JsonPath expression.
@@ -211,7 +211,7 @@ public class JsonPathMatcher {
                 // Return a list if more than 1 property is specified.
                 return ctx.property().stream()
                         .map(this::visitProperty)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             } else if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
             } else if (ctx.indexes() != null) {
@@ -260,7 +260,7 @@ public class JsonPathMatcher {
             return results.stream()
                     .skip(start)
                     .limit(limit)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -342,7 +342,7 @@ public class JsonPathMatcher {
                             return visitProperty(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return getResultFromList(matches);
             } else if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
@@ -351,7 +351,7 @@ public class JsonPathMatcher {
                             return visitProperty(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 // Unwrap lists of results from visitProperty to match the position of the cursor.
                 List<Object> matches = new ArrayList<>();
@@ -380,7 +380,7 @@ public class JsonPathMatcher {
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 List<Object> matches = new ArrayList<>();
                 if (stop != null && stop == getExpressionContext(ctx)) {
@@ -408,7 +408,7 @@ public class JsonPathMatcher {
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             return null;
@@ -477,7 +477,7 @@ public class JsonPathMatcher {
                                 return visitUnaryExpression(ctx);
                             })
                             .filter(Objects::nonNull)
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
                     List<Object> matches = new ArrayList<>();
@@ -772,7 +772,7 @@ public class JsonPathMatcher {
                 return ((List<Object>) result).stream()
                         .map(this::getValue)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             } else if (result instanceof Json.Array) {
                 return ((Json.Array) result).getValues();
             } else if (result instanceof Json.Literal) {

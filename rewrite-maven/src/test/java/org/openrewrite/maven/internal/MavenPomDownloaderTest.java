@@ -77,7 +77,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       https://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
       https://repo1.maven.org/maven2, https://repo1.maven.org/maven2/
       http://repo1.maven.org/maven2/, https://repo1.maven.org/maven2/
-      
+
       https://central.sonatype.com/repository/maven-snapshots/, https://central.sonatype.com/repository/maven-snapshots/
       https://artifactory.moderne.ninja/artifactory/moderne-public/, https://artifactory.moderne.ninja/artifactory/moderne-public/
       https://repo.maven.apache.org/maven2/, https://repo.maven.apache.org/maven2/
@@ -305,8 +305,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertThat(oss.getUri()).isEqualTo("https://central.sonatype.com/repository/maven-snapshots/");
         }
 
-        @ParameterizedTest
         @Issue("https://github.com/openrewrite/rewrite/issues/3141")
+        @ParameterizedTest
         @ValueSource(strings = {"http://0.0.0.0", "https://0.0.0.0", "0.0.0.0:443"})
         void skipBlockedRepository(String url) {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
@@ -355,8 +355,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @Disabled
+        @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
                  MockWebServer releaseRepo = new MockWebServer()) {
@@ -425,11 +425,11 @@ class MavenPomDownloaderTest implements RewriteTest {
                   """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                    
+
                         <groupId>org.openrewrite.test</groupId>
                         <artifactId>foo</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                    
+
                         <repositories>
                           <repository>
                             <id>snapshot</id>
@@ -446,7 +446,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                             <url>http://%s:%d</url>
                           </repository>
                         </repositories>
-                    
+
                         <dependencies>
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>
@@ -1076,8 +1076,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3152")
+        @Test
         void useSnapshotTimestampVersion() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
@@ -1190,9 +1190,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("When username or password are environment properties that cannot be resolved, they should not be used")
         @Issue("https://github.com/openrewrite/rewrite/issues/3142")
+        @Test
         void doesNotUseAuthenticationIfCredentialsCannotBeResolved() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
@@ -1203,7 +1203,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                         MockResponse response = new MockResponse();
                         if (recordedRequest.getHeaders().get("Authorization") != null) {
                             response.setResponseCode(401);
-                        } else if (recordedRequest.getMethod() == null || !recordedRequest.getMethod().equalsIgnoreCase("HEAD")) {
+                        } else if (recordedRequest.getMethod() == null || !"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
                             response.setBody(
                               //language=xml
                               """
@@ -1231,9 +1231,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("Throw exception if there is no pom and no jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+        @Test
         void pomNotFoundWithNoJarShouldThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
@@ -1257,9 +1257,9 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Test
         @DisplayName("Don't throw exception if there is no pom and but there is a jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+        @Test
         void pomNotFoundWithJarFoundShouldNotThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
@@ -1288,6 +1288,52 @@ class MavenPomDownloaderTest implements RewriteTest {
                 assertThat(downloaded.getGav().getVersion()).isEqualTo("1");
             }
         }
+
+        @DisplayName("Clearly identify which pom failed to parse")
+        @Issue("https://github.com/openrewrite/rewrite/issues/5558")
+        @Test
+        void clearlyIdentifyWhichPomFailedToParse() throws Exception {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        assert recordedRequest.getPath() != null;
+                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom")) {
+                            // Deliberately malformed pom file, which Maven tolerates, but where jackson-databind fails
+                            return new MockResponse().setResponseCode(200).setBody(
+                              //language=xml
+                              """
+
+                                <?xml version="1.0" encoding="UTF-8"?>
+                                <project>
+                                    <modelVersion>4.0.0</modelVersion>
+
+                                    <groupId>com.mycompany.app</groupId>
+                                    <artifactId>my-app</artifactId>
+                                    <version>1</version>
+                                </project>
+                                """);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                var gav = new GroupArtifactVersion("fred", "fred", "1");
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class)
+                  .hasMessageContaining("Unable to download POM: fred:fred:1")
+                  .hasMessageContaining("Failed to parse pom")
+                  .hasMessageContaining("Illegal processing instruction target (\"xml\")");
+            }
+        }
     }
 
     @Test
@@ -1313,10 +1359,8 @@ class MavenPomDownloaderTest implements RewriteTest {
                   </project>
         """).toList().getFirst();
         MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(Collections.emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
         List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
         assertThat(deps).hasSize(35);
     }
-
-
 }

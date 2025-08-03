@@ -51,27 +51,23 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (!c.getLeadingAnnotations().isEmpty()) {
             c = concatenatePrefix(c, Space.firstPrefix(c.getLeadingAnnotations()));
-            c = c.withLeadingAnnotations(Space.formatFirstPrefix(c.getLeadingAnnotations(), Space.EMPTY));
-            return c;
+            return c.withLeadingAnnotations(Space.formatFirstPrefix(c.getLeadingAnnotations(), Space.EMPTY));
         }
 
         if (!c.getModifiers().isEmpty()) {
             c = concatenatePrefix(c, Space.firstPrefix(c.getModifiers()));
-            c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.EMPTY));
-            return c;
+            return c.withModifiers(Space.formatFirstPrefix(c.getModifiers(), Space.EMPTY));
         }
 
         if (!c.getPadding().getKind().getPrefix().isEmpty()) {
             c = concatenatePrefix(c, c.getPadding().getKind().getPrefix());
-            c = c.getPadding().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
-            return c;
+            return c.getPadding().withKind(c.getPadding().getKind().withPrefix(Space.EMPTY));
         }
 
         JContainer<J.TypeParameter> typeParameters = c.getPadding().getTypeParameters();
         if (typeParameters != null && !typeParameters.getElements().isEmpty()) {
             c = concatenatePrefix(c, typeParameters.getBefore());
-            c = c.getPadding().withTypeParameters(typeParameters.withBefore(Space.EMPTY));
-            return c;
+            return c.getPadding().withTypeParameters(typeParameters.withBefore(Space.EMPTY));
         }
 
         return c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
@@ -88,14 +84,12 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (!m.getLeadingAnnotations().isEmpty()) {
             m = concatenatePrefix(m, Space.firstPrefix(m.getLeadingAnnotations()));
-            m = m.withLeadingAnnotations(Space.formatFirstPrefix(m.getLeadingAnnotations(), Space.EMPTY));
-            return m;
+            return m.withLeadingAnnotations(Space.formatFirstPrefix(m.getLeadingAnnotations(), Space.EMPTY));
         }
 
         if (!m.getModifiers().isEmpty()) {
             m = concatenatePrefix(m, Space.firstPrefix(m.getModifiers()));
-            m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.EMPTY));
-            return m;
+            return m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), Space.EMPTY));
         }
 
         if (m.getAnnotations().getTypeParameters() != null) {
@@ -115,8 +109,7 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         m = concatenatePrefix(m, m.getName().getPrefix());
-        m = m.withName(m.getName().withPrefix(Space.EMPTY));
-        return m;
+        return m.withName(m.getName().withPrefix(Space.EMPTY));
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -126,14 +119,12 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (!v.getLeadingAnnotations().isEmpty()) {
             v = concatenatePrefix(v, Space.firstPrefix(v.getLeadingAnnotations()));
-            v = v.withLeadingAnnotations(Space.formatFirstPrefix(v.getLeadingAnnotations(), Space.EMPTY));
-            return v;
+            return v.withLeadingAnnotations(Space.formatFirstPrefix(v.getLeadingAnnotations(), Space.EMPTY));
         }
 
         if (!v.getModifiers().isEmpty()) {
             v = concatenatePrefix(v, Space.firstPrefix(v.getModifiers()));
-            v = v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.EMPTY));
-            return v;
+            return v.withModifiers(Space.formatFirstPrefix(v.getModifiers(), Space.EMPTY));
         }
 
         return v;

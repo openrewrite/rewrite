@@ -73,14 +73,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -102,14 +102,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -118,9 +118,9 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("DataFlowIssue")
     @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void changeTypeAttributionImplicitUsage() {
         rewriteRun(
@@ -128,7 +128,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import java.util.Collections
-                
+
               class Test {
                   int zero = Collections.emptyList().size()
               }

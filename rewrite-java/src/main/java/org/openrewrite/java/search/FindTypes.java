@@ -32,7 +32,8 @@ import org.openrewrite.trait.Trait;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -79,7 +80,7 @@ public class FindTypes extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
-                    Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
+                    Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(toSet());
                     return new ReferenceVisitor(matches).visit(tree, ctx);
                 }
                 return tree;
@@ -127,7 +128,7 @@ public class FindTypes extends Recipe {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
-                    fa.getName().getSimpleName().equals("class")) {
+                    "class".equals(fa.getName().getSimpleName())) {
                     ns.add(fieldAccess);
                 }
                 return fa;
@@ -197,7 +198,7 @@ public class FindTypes extends Recipe {
             J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                fa.getName().getSimpleName().equals("class")) {
+                "class".equals(fa.getName().getSimpleName())) {
                 return found(fa, ctx);
             }
             return fa;

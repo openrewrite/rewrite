@@ -24,10 +24,10 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.sort;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
@@ -47,8 +47,11 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
         if (matcher.matches(parent) &&
-            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> value.equals(m.getFind())).isPresent() &&
-            checkExistingSequenceValues(existingSeq, parent)) {
+                existingSeq.getMarkers()
+                        .findAll(AlreadyReplaced.class).stream()
+                        .map(AlreadyReplaced::getFind)
+                        .noneMatch(value::equals) &&
+                checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }
         return super.visitSequence(existingSeq, ctx);
@@ -63,10 +66,10 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                     .map(Yaml.Sequence.Entry::getBlock)
                     .map(block -> convertBlockToString(block, cursor))
                     .sorted()
-                    .collect(Collectors.toList());
+                    .collect(toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
                 List<String> sorted = new ArrayList<>(this.existingSequenceValues);
-                Collections.sort(sorted);
+                sort(sorted);
                 return values.equals(sorted);
             } else {
                 return values.equals(this.existingSequenceValues);
@@ -115,6 +118,6 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
         Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return newSequence.withMarkers(Markers.EMPTY.addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+        return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
     }
 }

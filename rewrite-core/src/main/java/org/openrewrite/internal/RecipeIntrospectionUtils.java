@@ -234,7 +234,7 @@ public class RecipeIntrospectionUtils {
 
     private static boolean isKotlin(Class<?> clazz) {
         for (Annotation a : clazz.getAnnotations()) {
-            if (a.annotationType().getName().equals("kotlin.Metadata")) {
+            if ("kotlin.Metadata".equals(a.annotationType().getName())) {
                 return true;
             }
         }

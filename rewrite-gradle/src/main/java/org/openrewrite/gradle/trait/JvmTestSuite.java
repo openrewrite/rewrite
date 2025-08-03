@@ -42,7 +42,12 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import static java.util.Collections.emptySet;
 
 @AllArgsConstructor
 public class JvmTestSuite implements Trait<Statement> {
@@ -248,21 +253,6 @@ public class JvmTestSuite implements Trait<Statement> {
             return new JvmTestSuite(cursor, getGradleProject(cursor), simpleName);
         }
 
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
-        }
-
         private boolean withinTestingBlock(Cursor cursor) {
             return withinBlock(cursor, "testing");
         }
@@ -274,7 +264,7 @@ public class JvmTestSuite implements Trait<Statement> {
         private Set<String> getSourceSets(Cursor cursor) {
             GradleProject gp = getGradleProject(cursor);
             if (gp == null) {
-                return Collections.emptySet();
+                return emptySet();
             }
 
             return sourceSets.computeIfAbsent(gp, key -> {
@@ -295,7 +285,7 @@ public class JvmTestSuite implements Trait<Statement> {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer ctx) {
                     J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                    if (m.getSimpleName().equals("dependencies")) {
+                    if ("dependencies".equals(m.getSimpleName())) {
                         return SearchResult.found(m);
                     }
                     return m;

@@ -24,8 +24,10 @@ import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
+import java.io.UncheckedIOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RawPomTest {
 
@@ -59,11 +61,11 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                   `<modelVersion>4.0.0</modelVersion>
-            
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-            
+
                   <repositories>
                     <repository>
                         <id>spring-milestones</id>
@@ -88,16 +90,16 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-            
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-            
+
                   <modules>
                     <module>my-module</module>
                     <module>my-other-module</module>
                   </modules>
-            
+
                   <subprojects>
                     <subproject>my-subproject</subproject>
                     <subproject>my-other-subproject</subproject>
@@ -123,7 +125,7 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                     <modelVersion>4.0.0</modelVersion>
-            
+
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
@@ -201,6 +203,26 @@ class RawPomTest {
         }
     }
 
+    @Test
+    void pomAtOriginOfDeserializationExceptionIsPartOfExceptionMessage() {
+        assertThatThrownBy(() -> RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        )).isInstanceOf(UncheckedIOException.class)
+          .hasMessageContaining("Failed to parse pom: Illegal processing instruction target (\"xml\")");
+    }
+
 
     @SuppressWarnings("ConstantConditions")
     @Test
@@ -209,18 +231,18 @@ class RawPomTest {
         String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-          
+
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
                       <version>2.4.0</version>
                   </parent>
-          
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-          
+
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -232,7 +254,7 @@ class RawPomTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-          
+
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -247,7 +269,7 @@ class RawPomTest {
                       </exclusions>
                     </dependency>
                   </dependencies>
-          
+
                   <build>
                       <plugins>
                           <plugin>
@@ -318,7 +340,7 @@ class RawPomTest {
                       <comments>A business-friendly OSS license</comments>
                     </license>
                   </licenses>
-          
+
                   <repositories>
                     <repository>
                       <releases>
@@ -337,7 +359,7 @@ class RawPomTest {
                       <layout>default</layout>
                     </repository>
                   </repositories>
-          
+
                   <profiles>
                       <profile>
                           <id>java9+</id>
@@ -420,7 +442,7 @@ class RawPomTest {
                                   </plugins>
                               </pluginManagement>
                           </build>
-          
+
                       </profile>
                   </profiles>
               </project>
@@ -438,7 +460,7 @@ class RawPomTest {
         assertThat(model.getPlugins()).hasSize(2);
 
         Plugin surefirePlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("maven-surefire-plugin"))
+          .filter(p -> "maven-surefire-plugin".equals(p.getArtifactId()))
           .findFirst()
           .orElseThrow();
 
@@ -452,14 +474,14 @@ class RawPomTest {
 
         assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello");
         Plugin jacocoPlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         var rewritePlugin = model.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
@@ -501,14 +523,14 @@ class RawPomTest {
 
         assertThat(rewriteProfile.getPlugins()).hasSize(2);
         jacocoPlugin = rewriteProfile.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         rewritePlugin = rewriteProfile.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
@@ -532,12 +554,12 @@ class RawPomTest {
         @Language("xml") String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-          
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-          
+
                   <build>
                       <plugins>
                           <plugin>

@@ -68,15 +68,15 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     }
 
     /**
-     * Returns a visitor which replaces all fully qualified references in the given subtree with simple names and adds 
+     * Returns a visitor which replaces all fully qualified references in the given subtree with simple names and adds
      * corresponding import statements.
      * <p>
      * For compatibility with other Java-based languages it is recommended to use this as a service via
      * {@link ImportService#shortenFullyQualifiedTypeReferencesIn(J)}, as that will dispatch to the correct
      * implementation for the language.
-     * 
+     *
      * @see ImportService#shortenFullyQualifiedTypeReferencesIn(J)
-     * @see JavaVisitor#service(Class) 
+     * @see JavaVisitor#service(Class)
      */
     public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
         return getVisitor(subtree);

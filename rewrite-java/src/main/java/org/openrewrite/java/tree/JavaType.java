@@ -119,7 +119,7 @@ public interface JavaType {
 
         public List<JavaType> getThrowableTypes() {
             if (throwableTypes == null) {
-                return Collections.emptyList();
+                return emptyList();
             }
             return Arrays.asList(throwableTypes);
         }
@@ -160,7 +160,7 @@ public interface JavaType {
 
         public List<JavaType> getBounds() {
             if (bounds == null) {
-                return Collections.emptyList();
+                return emptyList();
             }
             return Arrays.asList(bounds);
         }

@@ -75,8 +75,8 @@ class JavaSendReceiveTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
@@ -85,9 +85,9 @@ class JavaSendReceiveTest implements RewriteTest {
         }));
     }
 
+    @Disabled("Disabled until we've cleaned up the enum serialization")
     @DocumentExample
     @Test
-    @Disabled("Disabled until we've cleaned up the enum serialization")
     void sendReceiveIdempotence() {
         rewriteRun(
           java(

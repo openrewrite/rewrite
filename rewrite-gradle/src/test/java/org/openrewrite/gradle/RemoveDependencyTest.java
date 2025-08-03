@@ -47,11 +47,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
@@ -61,11 +61,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
@@ -77,13 +77,13 @@ class RemoveDependencyTest implements RewriteTest {
                 GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
                 assertThat(
                   compileClasspath.getRequested().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                    .filter(dep -> "org.springframework.boot".equals(dep.getGroupId()) && "spring-boot-starter-web".equals(dep.getArtifactId()))
                     .findAny())
                   .as("GradleProject requested dependencies should have been updated to remove `spring-boot-starter-web`")
                   .isNotPresent();
                 assertThat(
                   compileClasspath.getResolved().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                    .filter(dep -> "org.springframework.boot".equals(dep.getGroupId()) && "spring-boot-starter-web".equals(dep.getArtifactId()))
                     .findAny())
                   .as("GradleProject resolved dependencies should have been updated to remove `spring-boot-starter-web`")
                   .isNotPresent();
@@ -100,11 +100,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.springframework.boot:spring-boot-starter-web:2.7.0") {
                       exclude group: "junit"
@@ -116,11 +116,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
@@ -137,11 +137,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: "org.springframework.boot", name: "spring-boot-starter-web", version: "2.7.0"
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
@@ -151,11 +151,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
@@ -172,11 +172,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(group: "org.springframework.boot", name: "spring-boot-starter-web", version: "2.7.0") {
                       exclude group: "junit"
@@ -188,11 +188,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
@@ -319,11 +319,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
@@ -333,11 +333,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
               }
@@ -357,18 +357,18 @@ class RemoveDependencyTest implements RewriteTest {
                   id 'java'
                   id "org.openrewrite.rewrite" version "6.8.2"
               }
-              
+
               group = 'org.example'
               version = '1.0-SNAPSHOT'
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               rewrite {
                   activeRecipe("com.example.RemoveHibernateEntityManager")
               }
-              
+
               dependencies {
                   rewrite(platform("org.openrewrite.recipe:rewrite-recipe-bom:2.6.4"))
               }
@@ -387,18 +387,18 @@ class RemoveDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 group = 'org.example'
                 version = '1.0-SNAPSHOT'
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                     implementation 'org.hibernate:hibernate-entitymanager:5.6.15.Final'
                 }
-                
+
                 test {
                     useJUnitPlatform()
                 }
@@ -407,17 +407,17 @@ class RemoveDependencyTest implements RewriteTest {
                 plugins {
                     id 'java'
                 }
-                
+
                 group = 'org.example'
                 version = '1.0-SNAPSHOT'
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
+
                 dependencies {
                 }
-                
+
                 test {
                     useJUnitPlatform()
                 }
@@ -464,11 +464,11 @@ class RemoveDependencyTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {
@@ -485,11 +485,11 @@ class RemoveDependencyTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {
@@ -554,11 +554,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.springframework.boot:spring-boot-starter-web:2.7.0")
                   testImplementation("org.junit.vintage:junit-vintage-engine:5.6.2")
@@ -568,11 +568,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation("org.junit.vintage:junit-vintage-engine:5.6.2")
               }
@@ -589,11 +589,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(group = "org.springframework.boot", name = "spring-boot-starter-web", version = "2.7.0")
                   testImplementation(group = "org.junit.vintage", name = "junit-vintage-engine", version = "5.6.2")
@@ -603,11 +603,11 @@ class RemoveDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation(group = "org.junit.vintage", name = "junit-vintage-engine", version = "5.6.2")
               }
