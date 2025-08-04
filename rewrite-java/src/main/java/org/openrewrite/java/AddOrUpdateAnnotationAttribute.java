@@ -329,7 +329,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return getAttributeValues().stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
     }
 
-    @Deprecated // Use `SimplifySingleElementAnnotation`
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
         return getMethods(annotation).size() == 1 && "value".equals(getMethods(annotation).get(0).getName());
     }
