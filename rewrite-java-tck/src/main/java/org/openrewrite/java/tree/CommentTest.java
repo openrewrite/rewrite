@@ -95,4 +95,19 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5169")
+    @Test
+    void trailingEmptySingleLineBetweenModifierAndType() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                private//
+                int i = 436;
+              }
+              """
+          )
+        );
+    }
 }

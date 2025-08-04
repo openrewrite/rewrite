@@ -2158,10 +2158,37 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             char c = source.charAt(i);
             if (c == '/' && source.length() > i + 1) {
                 char next = source.charAt(i + 1);
-                if (next == '*') {
-                    inMultilineComment = true;
-                } else if (next == '/') {
-                    inComment = true;
+                if (next == '*' || next == '/') {
+                    // Process any accumulated word before entering comment
+                    if (!word.get().isEmpty()) {
+                        Modifier matching = null;
+                        for (Modifier modifier : modifiers.getFlags()) {
+                            if (modifier.name().toLowerCase().equals(word.get())) {
+                                matching = modifier;
+                                break;
+                            }
+                        }
+
+                        if (matching == null) {
+                            // Only reset cursor if we haven't found any modifiers yet
+                            if (sortedModifiers.isEmpty()) {
+                                this.cursor = afterLastModifierPosition;
+                            }
+                            break;
+                        } else {
+                            sortedModifiers.add(mapModifier(matching, currentAnnotations));
+                            afterFirstModifier = true;
+                            currentAnnotations = new ArrayList<>();
+                            word.set("");
+                            afterLastModifierPosition = cursor;
+                        }
+                    }
+                    
+                    if (next == '*') {
+                        inMultilineComment = true;
+                    } else {
+                        inComment = true;
+                    }
                 }
             }
 
@@ -2186,7 +2213,10 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         }
 
                         if (matching == null) {
-                            this.cursor = afterLastModifierPosition;
+                            // Only reset cursor if we haven't found any modifiers yet
+                            if (sortedModifiers.isEmpty()) {
+                                this.cursor = afterLastModifierPosition;
+                            }
                             break;
                         } else {
                             sortedModifiers.add(mapModifier(matching, currentAnnotations));
