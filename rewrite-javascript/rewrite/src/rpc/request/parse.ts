@@ -27,7 +27,7 @@ export class Parse {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjectGenerators: Map<string, (input: string) => any>): void {
+                  localObjects: Map<string, ((input: string) => any) | any>): void {
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
             let parser = Parsers.createParser("javascript", {
                 ctx: new ExecutionContext(),
@@ -42,7 +42,7 @@ export class Parse {
 
             for (let i = 0; i < request.inputs.length; i++) {
                 const id = randomId();
-                localObjectGenerators.set(id, async id => {
+                localObjects.set(id, async (id: string) => {
                     let sourceFile: SourceFile = (await generator.next()).value;
                     return produce(sourceFile, (draft) => {draft.id = id;});
                 });
