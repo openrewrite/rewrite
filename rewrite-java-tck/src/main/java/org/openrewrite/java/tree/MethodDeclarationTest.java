@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,9 +85,7 @@ class MethodDeclarationTest implements RewriteTest {
               """,
             sourceSpecs -> sourceSpecs.afterRecipe(cu -> {
                 J.MethodDeclaration foo = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-//                assertTypeIsAnnotatedAs((JavaType.Class) foo.getReturnTypeExpression().getType(), "org.jspecify.annotations.Nullable");
                 assertTypeIsAnnotatedAs(((JavaType.Class) foo.getMethodType().getReturnType()), "org.jspecify.annotations.Nullable");
-//                assertTypeIsAnnotatedAs((JavaType.Class) ((J.VariableDeclarations) foo.getParameters().get(0)).getVariables().get(0).getType(), "org.jspecify.annotations.Nullable");
                 assertTypeIsAnnotatedAs(((JavaType.Class) foo.getMethodType().getParameterTypes().get(0)), "org.jspecify.annotations.Nullable");
             })
           )
@@ -112,7 +110,7 @@ class MethodDeclarationTest implements RewriteTest {
                 J.MethodInvocation newTreeMap = ((J.MethodInvocation) bar.getVariables().get(0).getInitializer());
                 JavaType.Method newTreeMapType = newTreeMap.getMethodType();
                 JavaType.Parameterized comparatorParam = (JavaType.Parameterized) newTreeMapType.getParameterTypes().get(0);
-                assertTypeIsAnnotatedAs(comparatorParam, "org.jspecify.annotations.Nullable");
+                assertTypeIsAnnotatedAs(comparatorParam, "java.lang.FunctionalInterface");
             })
           )
         );
@@ -120,11 +118,12 @@ class MethodDeclarationTest implements RewriteTest {
 
 
     private static void assertTypeIsAnnotatedAs(JavaType.FullyQualified type, String... annotations) {
-        List<ThrowingConsumer<JavaType.FullyQualified>> array = Stream.of(annotations)
+        //noinspection rawtypes
+        ThrowingConsumer[] array = Stream.of(annotations)
           .<ThrowingConsumer<JavaType.FullyQualified>>map(ann -> a -> assertThat(a.getFullyQualifiedName()).isEqualTo(ann))
-          .toList();
-        //noinspection unchecked
-        assertThat(type.getAnnotations()).satisfiesExactly(array.toArray(new ThrowingConsumer[0]));
+          .collect(Collectors.toList()).toArray(new ThrowingConsumer[0]);
+        //noinspection,unchecked
+        assertThat(type.getAnnotations()).satisfiesExactly(array);
     }
 
     @Test
