@@ -129,7 +129,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         PendingResource<T> existing = threadLocal.get();
         if (existing != null) {
             // Return existing pending resource with no-op cleanup
-            return new Scope<T>(existing::getOrCreate, () -> {
+            return new Scope<>(existing::getOrCreate, () -> {
             });
         }
 
@@ -137,7 +137,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         PendingResource<T> pending = new PendingResource<>(factory);
         threadLocal.set(pending);
 
-        return new Scope<T>(
+        return new Scope<>(
                 pending::getOrCreate,
                 () -> {
                     T resource = pending.getIfCreated();
@@ -204,7 +204,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         PendingResource<T> pending = new PendingResource<>(factory);
         threadLocal.set(pending);
 
-        return new Scope<T>(
+        return new Scope<>(
                 pending::getOrCreate,
                 () -> {
                     T resource = pending.getIfCreated();
@@ -245,7 +245,7 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         PendingResource<T> pending = new PendingResource<>(() -> value);
         threadLocal.set(pending);
 
-        return new Scope<>(value, () -> {
+        return new Scope<>(() -> value, () -> {
             if (previousValue != null) {
                 threadLocal.set(previousValue);
             } else {
@@ -275,13 +275,6 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         Supplier<T> resourceSupplier;
         AutoCloseable cleanup;
 
-        // Constructor for eager resources (using)
-        Scope(T resource, AutoCloseable cleanup) {
-            this.resourceSupplier = () -> resource;
-            this.cleanup = cleanup;
-        }
-
-        // Constructor for lazy resources (requireOrCreate, create)
         Scope(Supplier<T> resourceSupplier, AutoCloseable cleanup) {
             this.resourceSupplier = resourceSupplier;
             this.cleanup = cleanup;
