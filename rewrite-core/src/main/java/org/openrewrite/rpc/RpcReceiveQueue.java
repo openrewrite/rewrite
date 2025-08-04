@@ -46,15 +46,13 @@ public class RpcReceiveQueue {
     private final Map<Integer, Object> refs;
     private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
-    private final Function<Integer, Object> getRef;
 
     public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull, Function<Integer, Object> getRef) {
+                           Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayDeque<>();
         this.logFile = logFile;
         this.pull = pull;
-        this.getRef = getRef;
     }
 
     public RpcObjectData take() {
@@ -135,11 +133,7 @@ public class RpcReceiveQueue {
                         //noinspection unchecked
                         return (T) refs.get(ref);
                     } else {
-                        // Ref was evicted from cache, fetch it
-                        Object refObject = getRef.apply(ref);
-                        refs.put(ref, refObject);
-                        //noinspection unchecked
-                        return (T) refObject;
+                        throw new IllegalStateException("Received a reference to an object that was not previously sent: " + ref);
                     }
                 } else {
                     // This is either a new object or a forward declaration with ref
