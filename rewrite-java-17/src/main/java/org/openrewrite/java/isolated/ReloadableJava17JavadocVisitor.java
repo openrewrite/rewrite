@@ -31,6 +31,7 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.tree.JCTree.JCWildcard;
 import com.sun.tools.javac.util.Context;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
@@ -1258,6 +1259,34 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             JContainer<Expression> typeArgs = JContainer.build(expressions)
                     .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
             return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
+        }
+
+        @Override
+        public J visitWildcard(WildcardTree node, Space fmt) {
+            cursor++; // skip '?'
+            
+            JCWildcard wildcard = (JCWildcard) node;
+            JLeftPadded<J.Wildcard.Bound> bound = null;
+            
+            if (wildcard.kind.kind != null) {
+                switch (wildcard.kind.kind) {
+                    case EXTENDS:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Extends).withBefore(whitespace());
+                        cursor += "extends".length();
+                        break;
+                    case SUPER:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Super).withBefore(whitespace());
+                        cursor += "super".length();
+                        break;
+                }
+            }
+            
+            NameTree boundedType = null;
+            if (wildcard.inner != null) {
+                boundedType = (NameTree) scan(wildcard.inner, whitespace());
+            }
+            
+            return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, boundedType);
         }
     }
 }
