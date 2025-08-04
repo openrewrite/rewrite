@@ -264,7 +264,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         String declaredVersion = null;
 
                         for (Expression e : m.getArguments()) {
-                            if (!(e instanceof G.MapEntry)) {
+                            if (!(e instanceof J.Assignment)) {
                                 continue;
                             }
                             J.Assignment assignment = (J.Assignment) e;
