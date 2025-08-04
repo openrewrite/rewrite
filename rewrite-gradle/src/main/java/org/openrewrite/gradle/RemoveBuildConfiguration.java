@@ -15,32 +15,40 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
-public class RemoveBuildCacheConfiguration extends Recipe {
+import static org.openrewrite.Preconditions.or;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+public class RemoveBuildConfiguration extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove build cache configuration for Develocity";
+        return "Remove build configuration method by name";
     }
 
     @Override
     public String getDescription() {
-        return "Remove the `buildCache` configuration from Gradle `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
+        return "Remove the Gradle build configuration methods from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
     }
+
+    @Option(displayName = "Method name",
+            description = "The name of the build configuration method to remove, e.g., `buildCache`.",
+            example = "buildCache")
+    String methodName;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsSettingsGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        if ("buildCache".equals(method.getSimpleName())) {
+                        if (methodName.equals(method.getSimpleName())) {
                             return null;
                         }
                         return super.visitMethodInvocation(method, ctx);
