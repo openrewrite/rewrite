@@ -196,13 +196,6 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public Hcl visitEmpty(Hcl.Empty empty, PrintOutputCapture<P> p) {
-        beforeSyntax(empty, Space.Location.EMPTY, p);
-        afterSyntax(empty, p);
-        return empty;
-    }
-
-    @Override
     public Hcl visitForIntro(Hcl.ForIntro forIntro, PrintOutputCapture<P> p) {
         beforeSyntax(forIntro, Space.Location.FOR_INTRO, p);
         visitContainer("for", forIntro.getPadding().getVariables(), HclContainer.Location.FOR_VARIABLES,
