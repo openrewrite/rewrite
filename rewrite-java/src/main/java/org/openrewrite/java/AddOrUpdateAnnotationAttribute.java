@@ -148,6 +148,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                 }
 
+                if (original != a){
+                    doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
+                }
                 return maybeAutoFormat(original, a, ctx);
             }
 
@@ -194,7 +197,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return literal;
                     }
                     return createAnnotationLiteral(annotation, newAttributeValue);
-                } else if (oldAttributeValue == null) {
+                } else if (oldAttributeValue == null && newAttributeValue != null) {
                     // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
                     // Make the attribute name explicit, before we add the new value below
                     return createAnnotationAssignment(annotation, "value", literal);
@@ -326,6 +329,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return getAttributeValues().stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
     }
 
+    @Deprecated // Use `SimplifySingleElementAnnotation`
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
         return getMethods(annotation).size() == 1 && "value".equals(getMethods(annotation).get(0).getName());
     }

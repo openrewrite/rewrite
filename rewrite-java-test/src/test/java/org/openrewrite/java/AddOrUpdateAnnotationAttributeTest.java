@@ -277,7 +277,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Foo;
               
-              @Foo(value = "newTest1")
+              @Foo("newTest1")
               public class A {
               }
               """
@@ -674,7 +674,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Foo;
 
-              @Foo(value = {"newTest"})
+              @Foo("newTest")
               public class A {
               }
               """
@@ -1424,7 +1424,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               import org.example.Const;
 
-              @Foo(value = "hello")
+              @Foo("hello")
               public class A {
               }
               """
@@ -1983,7 +1983,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   import org.example.Foo;
 
-                  @Foo(value = {"a", "b"})
+                  @Foo({"a", "b"})
                   public class A {
                   }
                   """
@@ -2016,7 +2016,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   import org.example.Foo;
 
-                  @Foo(value = {"a", "b"})
+                  @Foo({"a", "b"})
                   public class A {
                   }
                   """
@@ -2049,7 +2049,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   import org.example.Foo;
 
-                  @Foo(value = {"a", "b"})
+                  @Foo({"a", "b"})
                   public class A {
                   }
                   """
