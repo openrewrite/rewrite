@@ -29,7 +29,6 @@ import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.comp.Attr;
 import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.JCTree;
-import com.sun.tools.javac.tree.JCTree.JCWildcard;
 import com.sun.tools.javac.util.Context;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
@@ -1260,8 +1259,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         @Override
         public J visitWildcard(WildcardTree node, Space fmt) {
             cursor++; // skip '?'
-            
-            JCWildcard wildcard = (JCWildcard) node;
+
+            JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
             JLeftPadded<J.Wildcard.Bound> bound = null;
             
             if (wildcard.kind.kind != null) {
@@ -1276,12 +1275,12 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                         break;
                 }
             }
-            
+
             NameTree boundedType = null;
             if (wildcard.inner != null) {
                 boundedType = (NameTree) scan(wildcard.inner, whitespace());
             }
-            
+
             return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, boundedType);
         }
     }

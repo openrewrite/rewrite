@@ -1187,7 +1187,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         @Override
         public J visitWildcard(WildcardTree node, Space fmt) {
             cursor++; // skip '?'
-            
+
             JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
             JLeftPadded<J.Wildcard.Bound> bound = null;
             
@@ -1203,12 +1203,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         break;
                 }
             }
-            
+
             NameTree boundedType = null;
             if (wildcard.inner != null) {
                 boundedType = (NameTree) scan(wildcard.inner, whitespace());
             }
-            
+
             return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, boundedType);
         }
     }
