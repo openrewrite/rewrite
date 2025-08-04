@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -25,6 +27,8 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static java.util.Comparator.comparing;
@@ -1518,6 +1522,114 @@ class JavaTemplateTest implements RewriteTest {
 
                   abstract static class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
                   abstract static class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "#{}",
+      "#{any()}"
+    })
+    void canAlsoUseTemplateVariablesInPlacesThatDoNotAllowMethodInvocations(String templatePlaceholder) {
+        AnnotationMatcher allArgsConstructor = new AnnotationMatcher("@lombok.AllArgsConstructor");
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if (classDecl.getLeadingAnnotations().stream().noneMatch(allArgsConstructor::matches)) {
+                      return classDecl;
+                  }
+                  List<J.VariableDeclarations> fields = new ArrayList<>();
+                  int lastFieldIndex = 0;
+                  for (int i = 0; i < classDecl.getBody().getStatements().size(); i++) {
+                      Statement stmt = classDecl.getBody().getStatements().get(i);
+                      if (stmt instanceof J.VariableDeclarations) {
+                          J.VariableDeclarations varDecl = (J.VariableDeclarations) stmt;
+                          if (!varDecl.hasModifier(J.Modifier.Type.Static)) {
+                              lastFieldIndex = i;
+                              fields.add(varDecl.withModifiers(Collections.emptyList()));
+                          }
+                      }
+                  }
+
+                  if (fields.isEmpty()) {
+                      return classDecl;
+                  }
+
+                  StringBuilder template = new StringBuilder();
+                  template.append("public ").append(classDecl.getSimpleName()).append("(");
+                  template.append(String.join(", ", fields.stream().map(dec -> templatePlaceholder).toList()));
+                  template.append(") {\n");
+                  for (J.VariableDeclarations varDecl : fields) {
+                      template.append("    this.")
+                        .append(varDecl.getVariables().getFirst().getSimpleName())
+                        .append(" = ")
+                        .append(varDecl.getVariables().getFirst().getSimpleName())
+                        .append(";\n");
+                  }
+                  template.append("}");
+
+                  J.ClassDeclaration classDeclaration = JavaTemplate.builder(template.toString())
+                    .contextSensitive()
+                    .doAfterVariableSubstitution(System.out::println)
+                    .build()
+                    .apply(getCursor(), classDecl.getBody().getStatements().get(lastFieldIndex).getCoordinates().after(), fields.toArray());
+
+                  return super.visitClassDeclaration(classDeclaration, ctx);
+              }
+
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if (allArgsConstructor.matches(annotation)) {
+                      maybeRemoveImport("lombok.AllArgsConstructor");
+                      return null;
+                  }
+                  return annotation;
+              }
+          })).parser(JavaParser.fromJavaVersion().classpath("lombok")),
+          java(
+            """
+              import lombok.AllArgsConstructor;
+              
+              @AllArgsConstructor
+              class MyAllArgsConstructorClass {
+                  private String name;
+                  private int age;
+              }
+              """,
+            """
+              class MyAllArgsConstructorClass {
+                  private String name;
+                  private int age;
+              
+                  public MyAllArgsConstructorClass(String name, int age) {
+                      this.name = name;
+                      this.age = age;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import lombok.Data;
+              import lombok.Getter;
+              
+              @Data
+              @Getter
+              class MyDataClass {
+                  private String name;
+                  private int age;
+              }
+              """
+          ),
+          java(
+            """
+              class MyClassWithoutLombok {
+                  private String name;
+                  private int age;
               }
               """
           )
