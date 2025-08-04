@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
@@ -63,6 +64,21 @@ class HclEmptyTest implements RewriteTest {
                   # TODO: Add settings here
                 \
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5844")
+    @Test
+    void preserveInModule() {
+        rewriteRun(
+          hcl(
+            """
+              module "foo" {
+                  bar = {
+                  }
               }
               """
           )
