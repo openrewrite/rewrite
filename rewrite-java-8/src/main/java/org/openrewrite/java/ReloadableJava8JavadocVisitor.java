@@ -20,6 +20,7 @@ import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.WildcardTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -1180,6 +1181,33 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             JContainer<Expression> typeArgs = JContainer.build(expressions)
                     .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
             return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
+        }
+
+        @Override
+        public J visitWildcard(WildcardTree node, Space fmt) {
+            cursor++; // skip '?'
+
+            JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
+            JLeftPadded<J.Wildcard.Bound> bound = null;
+            if (wildcard.kind.kind != null) {
+                switch (wildcard.kind.kind) {
+                    case EXTENDS:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Extends).withBefore(whitespace());
+                        cursor += "extends".length();
+                        break;
+                    case SUPER:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Super).withBefore(whitespace());
+                        cursor += "super".length();
+                        break;
+                }
+            }
+
+            NameTree boundedType = null;
+            if (wildcard.inner != null) {
+                boundedType = (NameTree) scan(wildcard.inner, whitespace());
+            }
+
+            return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, boundedType);
         }
     }
 }
