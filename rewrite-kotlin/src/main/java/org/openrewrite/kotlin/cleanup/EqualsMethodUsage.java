@@ -28,10 +28,10 @@ import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.singleton;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -58,7 +58,7 @@ public class EqualsMethodUsage extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S6519");
+        return singleton("RSPEC-S6519");
     }
 
     @Override

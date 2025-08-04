@@ -60,7 +60,7 @@ class CompilationUnitTest implements RewriteTest {
               /* C0 */
               package a
               import java.util.List
-              
+
               class A /*C1*/
               // C2
               """,
@@ -94,7 +94,7 @@ class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin("""
             #!/usr/bin/env who
-            
+
             %s
             """.formatted(fileContent))
         );

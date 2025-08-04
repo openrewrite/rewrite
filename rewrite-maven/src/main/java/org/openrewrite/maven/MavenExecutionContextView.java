@@ -25,10 +25,11 @@ import org.openrewrite.maven.tree.*;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
@@ -260,14 +261,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                         settings.getActiveProfiles().getActiveProfiles().stream(),
                         Arrays.stream(activeProfiles))
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {
         if (settings.getServers() != null) {
             return settings.getServers().getServers().stream()
                     .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -276,14 +277,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         if (settings.getMirrors() != null) {
             return settings.getMirrors().getMirrors().stream()
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots(), settings.getServers()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
 
     private List<MavenRepository> mapRepositories(MavenSettings settings, List<String> activeProfiles) {
         Map<String, MavenRepository> repositories = this.getRepositories().stream()
-                .collect(Collectors.toMap(MavenRepository::getId, r -> r, (a, b) -> a));
+                .collect(toMap(MavenRepository::getId, r -> r, (a, b) -> a));
         return settings.getActiveRepositories(activeProfiles).stream()
                 .map(repo -> {
                     try {
@@ -321,6 +322,6 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     }
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 }

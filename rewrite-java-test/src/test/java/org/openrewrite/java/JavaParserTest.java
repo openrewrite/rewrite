@@ -208,7 +208,7 @@ class JavaParserTest implements RewriteTest {
               public class User implements InterfaceA, InterfaceB {
                 @Override
                 public void methodA() {}
-              
+
                 @Override
                public void methodB() {}
               }
@@ -334,7 +334,7 @@ class JavaParserTest implements RewriteTest {
               .extracting("text")
               .containsExactly(
                 """
-                  
+
                        * public Some getOther() { return other; }
                        *
                        \
@@ -348,7 +348,7 @@ class JavaParserTest implements RewriteTest {
                        \
                   """,
                 """
-                  
+
                        * public void setOther(Some value) { this.other =
                        * value; }
                        \

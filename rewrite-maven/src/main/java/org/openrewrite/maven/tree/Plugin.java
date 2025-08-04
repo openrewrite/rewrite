@@ -25,8 +25,10 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
@@ -123,7 +125,7 @@ public class Plugin {
 
     public <T> List<T> getConfigurationList(String path, Class<T> elementClass) {
         if (configuration == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         JsonNode current = configuration;
@@ -134,7 +136,7 @@ public class Plugin {
             }
         }
         if (current.isMissingNode()) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         if (current.isObject() && current.size() == 1) {
@@ -143,10 +145,10 @@ public class Plugin {
             current = current.iterator().next();
         }
         if (current.isValueNode()) {
-            return Collections.singletonList(MavenXmlMapper.readMapper().convertValue(current, new TypeReference<T>() {}));
+            return singletonList(MavenXmlMapper.readMapper().convertValue(current, new TypeReference<T>() {}));
         }
         if (!current.isArray()) {
-            return Collections.emptyList();
+            return emptyList();
         }
         return MavenXmlMapper.readMapper().convertValue(current, new TypeReference<List<T>>() {});
     }

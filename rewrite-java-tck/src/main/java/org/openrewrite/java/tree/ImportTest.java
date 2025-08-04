@@ -31,10 +31,10 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
-              
+
               import java.util.List;
               import java.util.*;
-              
+
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
@@ -58,10 +58,10 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
-              
+
               import java.util.List;
               import java.util.*;
-              
+
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
@@ -146,7 +146,7 @@ class ImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite.BadPackage;
-              
+
               public class Foo {
                   public static class Bar {
                   }
@@ -158,10 +158,10 @@ class ImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+
               import org.openrewrite.BadPackage.Foo;
               import org.openrewrite.BadPackage.Foo.Bar;
-              
+
               public class Bar {
                   private Foo foo;
               }

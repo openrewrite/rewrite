@@ -28,10 +28,11 @@ import org.openrewrite.kotlin.KotlinParser;
 
 import java.nio.file.Path;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
 public class GradleParser implements Parser {
@@ -94,13 +95,13 @@ public class GradleParser implements Parser {
                 .flatMap(source -> {
                     Path sourcePath = source.getPath();
                     if (sourcePath.endsWith("settings.gradle.kts")) {
-                        return kotlinSettingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                        return kotlinSettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
                     } else if (sourcePath.endsWith("settings.gradle")) {
-                        return groovySettingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                        return groovySettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
                     } else if (sourcePath.toString().endsWith(".gradle.kts")) {
-                        return kotlinBuildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                        return kotlinBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
                     }
-                    return groovyBuildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                    return groovyBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
                 });
     }
 

@@ -15,11 +15,43 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
+import java.util.List;
+
+import static java.util.Collections.emptyList;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class CoalesceProperties extends Recipe {
+
+    @Option(displayName = "Exclusions",
+            description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
+            example = "$..[org.springframework.security]")
+    List<String> exclusions;
+
+    @Option(displayName = "Apply to",
+            description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions that specify which keys the recipe should target only. " +
+                    "Only the properties matching these expressions will be unfolded.",
+            example = "$..[org.springframework.security]")
+    List<String> applyTo;
+
+    public CoalesceProperties() {
+        this(null, null);
+    }
+
+    @JsonCreator
+    public CoalesceProperties(@Nullable final List<String> exclusions, @Nullable final List<String> applyTo) {
+        this.exclusions = exclusions == null ? emptyList() : exclusions;
+        this.applyTo = applyTo == null ? emptyList() : applyTo;
+    }
 
     @Override
     public String getDisplayName() {
@@ -33,6 +65,6 @@ public class CoalesceProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new CoalescePropertiesVisitor<>();
+        return new CoalescePropertiesVisitor<>(exclusions, applyTo);
     }
 }

@@ -83,7 +83,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.method
-              
+
               class A
               """
           )
@@ -111,7 +111,7 @@ class ImportTest implements RewriteTest {
             """
               import kotlin.collections.List as L
               import kotlin.collections.Set as S
-              
+
               class T
               """
           )
@@ -137,7 +137,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import kotlin . collections . List ;
-              
+
               class T
               """
           )
@@ -152,7 +152,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import Foo as Bar
-              
+
               class Test
               """
           )

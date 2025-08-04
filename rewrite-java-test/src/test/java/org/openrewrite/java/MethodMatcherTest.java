@@ -201,7 +201,7 @@ class MethodMatcherTest implements RewriteTest {
             """
               package a;
               import java.util.function.Supplier;
-              
+
               class A {
                   Supplier<A> a = A::new;
               }
@@ -217,7 +217,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               class A {
                   void setInt(int value) {}
                   int getInt() {}
@@ -243,12 +243,12 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.abc;
-              
+
               class Parent {
                   public void method(String s) {
                   }
               }
-              
+
               class Test extends Parent {
                   @Override
                   public void method(String s) {
@@ -271,7 +271,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               class A {
                   void foo() {}
               }
@@ -315,7 +315,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-              
+
               class Foo {
                   void bar(int i, String s) {}
                   void other() {
@@ -430,7 +430,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-              
+
               class Foo {
                   void bar(String[] s) {}
                   void test() {

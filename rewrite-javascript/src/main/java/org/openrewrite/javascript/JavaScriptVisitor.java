@@ -1030,6 +1030,9 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         }
 
         t = t.getPadding().withOpenName(requireNonNull(visitLeftPadded(t.getPadding().getOpenName(), JLeftPadded.Location.LANGUAGE_EXTENSION, p)));
+        if (t.getTypeArguments() != null) {
+            t = t.withTypeArguments(visitContainer(t.getTypeArguments(), JContainer.Location.TYPE_PARAMETERS, p));
+        }
         t = t.withAfterName(visitSpace(t.getAfterName(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.getPadding().withAttributes(requireNonNull(ListUtils.map(t.getPadding().getAttributes(), attr -> visitRightPadded(attr, JRightPadded.Location.LANGUAGE_EXTENSION, p))));
 

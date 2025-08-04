@@ -16,7 +16,6 @@
 export * from "./generate";
 export * from "./get-object";
 export * from "./get-recipes";
-export * from "./get-ref";
 export * from "./parse";
 export * from "./prepare-recipe";
 export * from "./print";

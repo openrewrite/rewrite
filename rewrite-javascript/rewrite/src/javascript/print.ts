@@ -98,6 +98,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
         await this.visitLeftPaddedLocal("<", element.openName, p);
+        if (element.typeArguments) {
+            await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
+        }
         await this.visitSpace(element.afterName, p);
         await this.visitRightPaddedLocal(element.attributes, "", p);
 

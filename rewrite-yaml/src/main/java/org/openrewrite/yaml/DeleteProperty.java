@@ -26,9 +26,10 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
@@ -94,11 +95,11 @@ public class DeleteProperty extends Recipe {
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                         .filter(Yaml.Mapping.Entry.class::isInstance)
                         .map(Yaml.Mapping.Entry.class::cast)
-                        .collect(Collectors.toCollection(ArrayDeque::new));
+                        .collect(toCollection(ArrayDeque::new));
 
                 String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
                         .map(e2 -> e2.getKey().getValue())
-                        .collect(Collectors.joining("."));
+                        .collect(joining("."));
 
                 if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(prop, propertyKey) : prop.equals(propertyKey)) {
                     doAfterVisit(new DeletePropertyVisitor<>(entry));

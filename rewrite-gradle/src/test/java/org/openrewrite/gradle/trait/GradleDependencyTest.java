@@ -45,11 +45,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "com.google.guava:guava:28.2-jre"
               }
@@ -58,11 +58,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
               }
@@ -89,11 +89,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   %s "com.google.guava:guava:28.2-jre"
               }
@@ -102,11 +102,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
               }
@@ -136,11 +136,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   %s "com.google.guava:guava:28.2-jre"
               }
@@ -149,11 +149,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
               }
@@ -178,11 +178,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   %s "com.google.guava:guava:28.2-jre"
               }
@@ -191,11 +191,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/%s "com.google.guava:guava:28.2-jre"
               }
@@ -213,11 +213,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   def version = "28.2-jre"
                   implementation "com.google.guava:guava:${version}"
@@ -227,11 +227,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   def version = "28.2-jre"
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:${version}"
@@ -250,11 +250,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
               }
@@ -263,11 +263,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
               }
@@ -285,11 +285,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("com.google.guava:guava:28.2-jre"))
               }
@@ -298,11 +298,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(platform("com.google.guava:guava:28.2-jre"))
               }
@@ -320,11 +320,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
               }
@@ -333,11 +333,11 @@ class GradleDependencyTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
               }

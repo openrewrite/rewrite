@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -415,7 +414,7 @@ class AppendToSequenceTest implements RewriteTest {
                   fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
           yaml(
-                """
+            """
               name_squad: "squad1"
               azure_keyvault: "yupiyouh2"
               replicas_plan:

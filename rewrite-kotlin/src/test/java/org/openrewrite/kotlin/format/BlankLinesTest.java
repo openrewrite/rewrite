@@ -160,8 +160,8 @@ class BlankLinesTest implements RewriteTest {
                       private var field1: Int = 0
 
                       init {
-                  
-                  
+
+
                           field1 = 2
                       }
                   }
@@ -190,14 +190,14 @@ class BlankLinesTest implements RewriteTest {
 
                       init {
                           field1 = 2
-                  
-                  
+
+
                       }
-                  
+
                       enum class Test {
                           FIRST,
                           SECOND
-                  
+
                       }
                   }
                   """,
@@ -208,7 +208,7 @@ class BlankLinesTest implements RewriteTest {
                       init {
                           field1 = 2
                       }
-                  
+
                       enum class Test {
                           FIRST,
                           SECOND
@@ -228,12 +228,12 @@ class BlankLinesTest implements RewriteTest {
                   /*
                    * This is a sample file.
                    */
-                  
-                  
-                  
-                  
+
+
+
+
                   package com.intellij.samples
-                  
+
                   class Test {
                   }
                   """,
@@ -241,10 +241,10 @@ class BlankLinesTest implements RewriteTest {
                   /*
                    * This is a sample file.
                    */
-                  
-                  
+
+
                   package com.intellij.samples
-                  
+
                   class Test {
                   }
                   """
@@ -271,7 +271,7 @@ class BlankLinesTest implements RewriteTest {
                       """,
                     """
                       class Test {
-                      
+
                           private val field1: Int = 0
                       }
                       """
@@ -298,14 +298,14 @@ class BlankLinesTest implements RewriteTest {
                       """,
                     """
                       class OuterClass {
-                      
+
                           class InnerClass0 {
-                      
+
                               private val unused: Int = 0
                           }
-                      
+
                           class InnerClass1 {
-                      
+
                               private val unused: Int = 0
                           }
                       }
@@ -330,7 +330,7 @@ class BlankLinesTest implements RewriteTest {
                       """,
                     """
                       class OuterClass {
-                      
+
                           enum class InnerEnum0 {
                               FIRST,
                               SECOND
@@ -453,9 +453,9 @@ class BlankLinesTest implements RewriteTest {
                       annotation class Annotation
 
                       class Bar {
-                      
-                      
-                      
+
+
+
                           @Annotation
                           val a = 42
 
@@ -490,9 +490,9 @@ class BlankLinesTest implements RewriteTest {
           kotlin(
             """
               class A {
-              
+
                   private val id: Long = 0 // this comment will move to wrong place
-              
+
                   fun id(): Long {
                       return id;
                   }
@@ -575,17 +575,17 @@ class BlankLinesTest implements RewriteTest {
           blankLines(),
           kotlin(
             """
-              
-              
-              
+
+
+
               package com.intellij.samples
-              
+
               class Test {
               }
               """,
             """
               package com.intellij.samples
-              
+
               class Test {
               }
               """,
@@ -603,15 +603,15 @@ class BlankLinesTest implements RewriteTest {
             """
               package com.intellij.samples
               import java.util.Vector
-              
+
               class Test {
               }
               """,
             """
               package com.intellij.samples
-              
+
               import java.util.Vector
-              
+
               class Test {
               }
               """
@@ -626,15 +626,15 @@ class BlankLinesTest implements RewriteTest {
           blankLines(),
           kotlin(
             """
-              
+
               import java.util.Vector
-              
+
               class Test {
               }
               """,
             """
               import java.util.Vector
-              
+
               class Test {
               }
               """,
@@ -651,15 +651,15 @@ class BlankLinesTest implements RewriteTest {
             """
               package com.intellij.samples
               import java.util.Vector
-              
+
               class Test {
               }
               """,
             """
               package com.intellij.samples
-              
+
               import java.util.Vector
-              
+
               class Test {
               }
               """
@@ -679,7 +679,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               package com.intellij.samples
-              
+
               class Test {
               }
               """
@@ -699,7 +699,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               import java.util.Vector;
-              
+
               class Test {
               }
               """
@@ -714,10 +714,10 @@ class BlankLinesTest implements RewriteTest {
           kotlin(
             """
               import java.util.Vector
-              
+
               class Test {
               }
-              
+
               class Test2 {
                   class InnerClass0 {
                   }
@@ -727,14 +727,14 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               import java.util.Vector
-              
+
               class Test {
               }
-             
+
               class Test2 {
                   class InnerClass0 {
                   }
-              
+
                   class InnerClass1 {
                   }
               }
@@ -771,13 +771,13 @@ class BlankLinesTest implements RewriteTest {
                   FIRST,
                   SECOND
               }
-              
+
               class OuterClass {
                   enum class InnerEnum0 {
                       FIRST,
                       SECOND
                   }
-              
+
                   enum class InnerEnum1 {
                       FIRST,
                       SECOND
@@ -795,7 +795,7 @@ class BlankLinesTest implements RewriteTest {
           kotlin(
             """
               package com.intellij.samples
-              
+
               class Test {
               }
               """
@@ -864,7 +864,7 @@ class BlankLinesTest implements RewriteTest {
           kotlin(
             """
               val one = 1
-              
+
               class Test
               """
           )
@@ -907,12 +907,12 @@ class BlankLinesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               class T {
                   @Suppress val i = 1
                   @Suppress val j = 1
@@ -923,18 +923,18 @@ class BlankLinesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
 
                   @Suppress val i = 1
-              
+
                   @Suppress val j = 1
               }
-              
+
               class T {
-              
+
                   @Suppress val i = 1
-              
+
                   @Suppress val j = 1
               }
               """

@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -199,7 +200,7 @@ public abstract class Recipe implements Cloneable {
      * @return The tags.
      */
     public Set<String> getTags() {
-        return Collections.emptySet();
+        return emptySet();
     }
 
     /**

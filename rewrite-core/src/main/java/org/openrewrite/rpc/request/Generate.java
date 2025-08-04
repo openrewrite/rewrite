@@ -28,9 +28,9 @@ import org.openrewrite.table.SourcesFileResults;
 import java.util.Collection;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.ExecutionContext.CURRENT_RECIPE;
 
 @Value
@@ -71,7 +71,7 @@ public class Generate implements RpcRequest {
                 generated.forEach(g -> localObjects.put(g.getId().toString(), g));
                 return generated.stream()
                         .map(SourceFile::getId)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
             return emptyList();
         }

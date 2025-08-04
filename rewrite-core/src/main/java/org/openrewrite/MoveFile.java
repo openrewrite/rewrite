@@ -120,14 +120,14 @@ public class MoveFile extends Recipe {
                 String folderPrefix = folder;
                 if (!folderPrefix.endsWith("/**")) {
                     if (folderPrefix.endsWith("/")) {
-                        folderPrefix = folderPrefix + "**";
+                        folderPrefix += "**";
                     } else {
-                        folderPrefix = folderPrefix + "/**";
+                        folderPrefix += "/**";
                     }
                 }
 
                 Path currentFolder = sourcePath.getParent();
-                if (PathUtils.matchesGlob(sourcePath, folderPrefix) || folderPrefix.equals("/**")) {
+                if (PathUtils.matchesGlob(sourcePath, folderPrefix) || "/**".equals(folderPrefix)) {
                     String subFolders = currentFolder == null ? "" : separatorsToUnix(currentFolder.toString().substring(folder.length()));
                     if (subFolders.startsWith("/") || subFolders.startsWith("\\")) {
                         subFolders = subFolders.substring(1);
