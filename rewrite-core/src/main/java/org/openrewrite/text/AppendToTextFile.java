@@ -23,9 +23,10 @@ import org.openrewrite.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -121,8 +122,8 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         }
 
         return exists ?
-                Collections.emptyList() :
-                Collections.singletonList(PlainText.builder()
+                emptyList() :
+                singletonList(PlainText.builder()
                         .text(preamble + content)
                         .sourcePath(path)
                         .build());

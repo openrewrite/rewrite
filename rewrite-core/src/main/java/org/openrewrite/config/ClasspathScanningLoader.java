@@ -130,7 +130,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * non-declarative recipes they depend on that would be discovered by scanClasses
      */
     private void scanYaml(ClassGraph classGraph, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
-        try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
+        try (ScanResult scanResult = classGraph.scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->

@@ -31,11 +31,11 @@ class ChangePropertyValueTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+
                 <properties>
                   <guava.version>28.2-jre</guava.version>
                 </properties>
-                
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -44,11 +44,11 @@ class ChangePropertyValueTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+
                 <properties>
                   <guava.version>29.0-jre</guava.version>
                 </properties>
-                
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -68,7 +68,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -81,7 +81,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>value</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -103,7 +103,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>v</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -116,7 +116,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>value</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -139,7 +139,7 @@ class ChangePropertyValueTest implements RewriteTest {
                   <abc>value</abc>
                   <other>value</other>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -154,7 +154,7 @@ class ChangePropertyValueTest implements RewriteTest {
                   <key>value</key>
                   <other>value</other>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>

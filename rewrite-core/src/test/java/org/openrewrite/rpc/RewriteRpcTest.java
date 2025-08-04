@@ -17,9 +17,7 @@ package org.openrewrite.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
-import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -58,19 +56,21 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        client = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
+          .timeout(Duration.ofMinutes(10))
+          .build()
+          .batchSize(1);
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        server = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
+          .timeout(Duration.ofMinutes(10))
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        client.shutdown();
-        server.shutdown();
+        client.close();
+        server.close();
     }
 
     @DocumentExample
@@ -78,9 +78,9 @@ class RewriteRpcTest implements RewriteTest {
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @SneakyThrows
               @Override
-              public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
                   Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();
                   return requireNonNull(t);

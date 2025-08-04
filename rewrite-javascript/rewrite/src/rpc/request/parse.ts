@@ -16,27 +16,40 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
-import {Parser, ParserInput, Parsers, ParserType} from "../../parser";
+import {ParserInput, Parsers} from "../../parser";
+import {randomId} from "../../uuid";
+import {produce} from "immer";
+import {SourceFile} from "../../tree";
 
 export class Parse {
-    constructor(private readonly parser: ParserType,
-                private readonly inputs: ParserInput[],
+    constructor(private readonly inputs: ParserInput[],
                 private readonly relativeTo?: string) {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, any>): void {
+                  localObjects: Map<string, ((input: string) => any) | any>): void {
         connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
-            let parser: Parser | undefined = Parsers.createParser(request.parser, {ctx: new ExecutionContext(), relativeTo: request.relativeTo});
+            let parser = Parsers.createParser("javascript", {
+                ctx: new ExecutionContext(),
+                relativeTo: request.relativeTo
+            });
 
-            if (parser) {
-                const parsed = await parser.parse(...request.inputs);
-                return parsed.map(g => {
-                    localObjects.set(g.id.toString(), g);
-                    return g.id;
-                })
+            if (!parser) {
+                return [];
             }
-            return [];
+            const generator = parser.parse(...request.inputs);
+            const result: string[] = [];
+
+            for (let i = 0; i < request.inputs.length; i++) {
+                const id = randomId();
+                localObjects.set(id, async (id: string) => {
+                    let sourceFile: SourceFile = (await generator.next()).value;
+                    return produce(sourceFile, (draft) => {draft.id = id;});
+                });
+                result.push(id);
+            }
+
+            return result;
         });
     }
 }

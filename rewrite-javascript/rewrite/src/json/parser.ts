@@ -18,13 +18,13 @@ import {emptySpace, Json, space} from "./tree";
 
 export class JsonParser extends Parser {
 
-    async parse(...sourcePaths: ParserInput[]): Promise<SourceFile[]> {
-        return sourcePaths.map(sourcePath => {
-            return {
+    async *parse(...sourcePaths: ParserInput[]): AsyncGenerator<SourceFile> {
+        for (const sourcePath of sourcePaths) {
+            yield {
                 ...new ParseJsonReader(sourcePath).parse(),
                 sourcePath: this.relativePath(sourcePath)
             };
-        });
+        }
     }
 }
 
@@ -62,14 +62,14 @@ class ParseJsonReader extends ParserSourceReader {
                 values: parsed.map(p => {
                     const value = {
                         kind: Json.Kind.RightPadded,
-                        element: this.json(p),
+                        element: this.json(p) as Json.Value,
                         after: space(this.whitespace()),
                         markers: emptyMarkers
-                    };
+                    } satisfies Json.RightPadded<Json.Value> as Json.RightPadded<Json.Value>;
                     this.cursor++;
                     return value;
                 })
-            } as Json.Array;
+            } satisfies Json.Array as Json.Array;
         } else if (parsed !== null && typeof parsed === "object") {
             this.cursor++; // skip '{'
             return {
@@ -81,11 +81,11 @@ class ParseJsonReader extends ParserSourceReader {
                         element: this.member(parsed, key),
                         after: space(this.whitespace()),
                         markers: emptyMarkers
-                    } as Json.RightPadded<Json.Member>;
+                    } satisfies Json.RightPadded<Json.Member> as Json.RightPadded<Json.Member>;
                     this.cursor++;
                     return member;
                 })
-            } as Json.Object;
+            } satisfies Json.Object as Json.Object;
         } else if (typeof parsed === "string") {
             this.cursor += parsed.length + 2;
             return {
@@ -93,7 +93,7 @@ class ParseJsonReader extends ParserSourceReader {
                 ...base,
                 source: `"${parsed}"`,
                 value: parsed
-            } as Json.Literal;
+            } satisfies Json.Literal as Json.Literal;
         } else if (typeof parsed === "number") {
             this.cursor += parsed.toString().length;
             return {
@@ -101,7 +101,7 @@ class ParseJsonReader extends ParserSourceReader {
                 ...base,
                 source: parsed.toString(),
                 value: parsed,
-            } as Json.Literal;
+            } satisfies Json.Literal as Json.Literal;
         } else {
             throw new Error(`Unsupported JSON type: ${parsed}`);
         }
@@ -116,10 +116,10 @@ class ParseJsonReader extends ParserSourceReader {
             key: {
                 kind: Json.Kind.RightPadded,
                 markers: emptyMarkers,
-                element: this.json(key),
+                element: this.json(key) as Json.Key,
                 after: space(this.sourceBefore(":")),
-            },
-            value: this.json(parsed[key])
-        } as Json.Member;
+            } satisfies Json.RightPadded<Json.Key> as Json.RightPadded<Json.Key>,
+            value: this.json(parsed[key]) as Json.Value
+        } satisfies Json.Member as Json.Member;
     }
 }

@@ -279,6 +279,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Javadoc visitSnippet(Javadoc.Snippet snippet, PrintOutputCapture<P> p) {
+        beforeSyntax(snippet, p);
+        p.append("{@snippet");
+        visit(snippet.getAttributes(), p);
+        visit(snippet.getContent(), p);
+        visit(snippet.getEndBrace(), p);
+        afterSyntax(snippet, p);
+        return snippet;
+    }
+
+    @Override
     public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
         beforeSyntax(summary, p);
         p.append("{@summary");
@@ -397,9 +408,11 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
             beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
-            Expression containing = memberRef.getContaining();
-            if (containing != null) { // Invalid references will have a null containing
-                visit(containing, p);
+            JRightPadded<Expression> containing = memberRef.getPadding().getContaining();
+            // TO-BE-REMOVED(2025-09-01) For LSTs ingested before commit 117414b7 the entire `JRightPadded<Expression>` is `null`
+            //noinspection ConstantValue
+            if (containing != null && containing.getElement() != null) { // Invalid references will have a null containing
+                visit(containing.getElement(), p);
                 visitLeftPadded("#", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
             } else {
                 visitLeftPadded(null, memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);

@@ -37,8 +37,8 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
+    @Test
     void parenthesized() {
         rewriteRun(
           kotlin(
@@ -49,8 +49,8 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
+    @Test
     void nestedParenthesize() {
         rewriteRun(
           kotlin(

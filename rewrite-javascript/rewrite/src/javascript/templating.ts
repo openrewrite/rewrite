@@ -340,8 +340,8 @@ class TemplateEngine {
 
         // Parse the template string into an AST
         const parser = new JavaScriptParser();
-        const parseResults = await parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
+        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
+        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
 
         // Check if there are any statements
         if (!cu.statements || cu.statements.length === 0) {
@@ -663,9 +663,8 @@ class TemplateProcessor {
 
         // Parse template string to AST
         const parser = new JavaScriptParser();
-        const parseResults = await parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = parseResults[0] as JS.CompilationUnit;
-
+        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
+        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
         // Extract the relevant part of the AST
         return this.extractPatternFromAst(cu);
     }

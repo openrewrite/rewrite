@@ -55,7 +55,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -217,7 +216,7 @@ public class ReloadableJava11Parser implements JavaParser {
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
         List<ReloadableJava11ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
                 .map(input -> new ReloadableJava11ParserInputFileObject(input, ctx))
-                .collect(Collectors.toList());
+                .collect(toList());
         if (!annotationProcessors.isEmpty()) {
             compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
         }

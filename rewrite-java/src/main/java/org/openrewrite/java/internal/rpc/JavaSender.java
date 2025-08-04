@@ -15,9 +15,12 @@
  */
 package org.openrewrite.java.internal.rpc;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -297,7 +300,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, RpcSendQueue q) {
         q.getAndSend(intersectionType, i -> i.getPadding().getBounds(), bounds -> visitContainer(bounds, q));
-        q.getAndSend(intersectionType, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return intersectionType;
     }
 
@@ -638,5 +640,15 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
                     q.sendMarkers(c, Comment::getMarkers);
                 });
         q.getAndSend(space, Space::getWhitespace);
+    }
+
+    @Override
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
+        if (javaType instanceof RpcCodec) {
+            //noinspection unchecked
+            ((RpcCodec<@NonNull JavaType>) javaType).rpcSend(javaType, q);
+            return javaType;
+        }
+        return super.visitType(javaType, q);
     }
 }

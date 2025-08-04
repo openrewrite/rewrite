@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
 
@@ -26,12 +26,12 @@ import org.openrewrite.style.LineWrapSetting;
 public class WrappingAndBracesStyle implements JavaStyle {
 
     IfStatement ifStatement;
-    Annotations classAnnotations;
-    Annotations methodAnnotations;
-    Annotations fieldAnnotations;
-    Annotations parameterAnnotations;
-    Annotations localVariableAnnotations;
-    Annotations enumFieldAnnotations;
+    @Nullable Annotations classAnnotations;
+    @Nullable Annotations methodAnnotations;
+    @Nullable Annotations fieldAnnotations;
+    @Nullable Annotations parameterAnnotations;
+    @Nullable Annotations localVariableAnnotations;
+    @Nullable Annotations enumFieldAnnotations;
 
     public IfStatement getIfStatement() {
         //noinspection ConstantConditions

@@ -24,11 +24,11 @@ import org.openrewrite.properties.PropertiesParser;
 
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -112,9 +112,9 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
                             key + "=" + value)), null, ctx)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     @Override

@@ -19,7 +19,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.trait.Traits;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -62,14 +61,13 @@ public class DependencyUseMapNotation extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+            GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
             if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 return m;
             }
             m = forBasicString(m, this::mapEntry, J.Assignment::withPrefix, Function.identity());
-            m = forStringTemplate(m, K.StringTemplate.class, K.StringTemplate::getStrings, K.StringTemplate.Expression.class, K.StringTemplate.Expression::getTree, this::mapEntry, this::mapEntry, J.Assignment::withPrefix, Function.identity());
-            return m;
+            return forStringTemplate(m, K.StringTemplate.class, K.StringTemplate::getStrings, K.StringTemplate.Expression.class, K.StringTemplate.Expression::getTree, this::mapEntry, this::mapEntry, J.Assignment::withPrefix, Function.identity());
         }
 
         private J.Assignment mapEntry(String key, String value) {
@@ -94,14 +92,13 @@ public class DependencyUseMapNotation extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            GradleDependency.Matcher gradleDependencyMatcher = Traits.gradleDependency();
+            GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
             if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 return m;
             }
             m = forBasicString(m, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
-            m = forStringTemplate(m, G.GString.class, G.GString::getStrings, G.GString.Value.class, G.GString.Value::getTree, this::mapEntry, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
-            return m;
+            return forStringTemplate(m, G.GString.class, G.GString::getStrings, G.GString.Value.class, G.GString.Value::getTree, this::mapEntry, this::mapEntry, G.MapEntry::withPrefix, this::updateTypeForMapArgument);
         }
 
         private J.MethodInvocation updateTypeForMapArgument(J.MethodInvocation m) {

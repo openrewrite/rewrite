@@ -1140,59 +1140,59 @@ examples:
 - description: ''
   parameters:
   - 'null'
-  - https://oss.sonatype.org/content/repositories/snapshots
+  - https://central.sonatype.com/repository/maven-snapshots
   - 'null'
   sources:
   - before: |
       buildscript {
         repositories {
-          maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
 
       repositories {
-        maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-        maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-        maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+        maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+        maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+        maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
       }
     after: |
       buildscript {
         repositories {
-          /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
 
       repositories {
-        /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-        /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-        /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-        /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+        /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+        /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+        /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+        /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
       }
     path: build.gradle
     language: groovy
   - before: |
       pluginManagement {
         repositories {
-          maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
     after: |
       pluginManagement {
         repositories {
-          /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
     language: settingsGradle

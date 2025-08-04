@@ -39,11 +39,13 @@ import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -356,7 +358,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     }
                     // Add trailing linebreaks if they exist.
                     if (!lineBreaks.isEmpty()) {
-                        int pos = Collections.min(lineBreaks.keySet());
+                        int pos = min(lineBreaks.keySet());
                         if (lineBreaks.containsKey(pos)) {
                             body.add(lineBreaks.get(pos));
                             lineBreaks.remove(pos);
@@ -664,11 +666,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                         methodRefType
                 );
             } else {
+                if (qualifier == null) {
+                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+                }
                 return new J.MemberReference(
                         randomId(),
-                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
+                        qualifier.getPrefix(),
                         Markers.EMPTY,
-                        JRightPadded.build(qualifier == null ? null : qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -1148,12 +1153,12 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         @SuppressWarnings("SimplifyStreamApiCallChains")
         List<Integer> linebreakIndexes = lineBreaks.keySet().stream()
                 .filter(o -> o <= cursor)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         List<Javadoc> referenceLineBreaks = linebreakIndexes.stream()
                 .sorted()
                 .map(lineBreaks::get)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         for (Integer key : linebreakIndexes) {
             lineBreaks.remove(key);

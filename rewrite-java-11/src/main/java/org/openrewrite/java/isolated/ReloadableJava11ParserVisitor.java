@@ -51,12 +51,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
@@ -1266,6 +1266,13 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getAnnotations(),
                 new HashMap<>(node.getAnnotations().size()));
+        Tree underlying = node.getUnderlyingType();
+        if (underlying instanceof JCArrayTypeTree) {
+            Tree element = ((JCArrayTypeTree) underlying).getType();
+            if (element instanceof JCAnnotatedType) {
+                annotationPosTable.putAll(mapAnnotations(((JCAnnotatedType) element).getAnnotations(), new HashMap<>()));
+            }
+        }
         List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         if (!annotationPosTable.isEmpty()) {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {
@@ -2103,7 +2110,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         throw new RuntimeException(e);
                     }
                 })
-                .collect(Collectors.toMap(Field::getName, field -> {
+                .collect(toMap(Field::getName, field -> {
                     try {
                         return (Long) field.get(null);
                     } catch (IllegalAccessException e) {

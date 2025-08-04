@@ -30,7 +30,6 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
@@ -43,24 +42,21 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcReceiveQueue p) {
-        if (tree instanceof JS)
+        if (tree instanceof JS) {
             return super.visit(tree, p);
+        }
         return delegate.visit(tree, p);
     }
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
-        if (j instanceof JS.ExpressionStatement || j instanceof JS.StatementExpression) {
-            // for `ExpressionStatement` and `StatementExpression` the `prefix` and `markers` are derived properties
-            return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)));
-        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
-    public J visitCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
+    public J visitJsCompilationUnit(JS.CompilationUnit cu, RpcReceiveQueue q) {
         return cu.withSourcePath(q.<Path, String>receiveAndGet(cu.getSourcePath(), Paths::get))
                 .withCharset(q.<Charset, String>receiveAndGet(cu.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
@@ -123,6 +119,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitFunctionCall(JS.FunctionCall functionCall, RpcReceiveQueue q) {
+        return functionCall
+                .getPadding().withFunction(q.receive(functionCall.getPadding().getFunction(), s -> visitRightPadded(s, q)))
+                .getPadding().withTypeParameters(q.receive(functionCall.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
+                .getPadding().withArguments(q.receive(functionCall.getPadding().getArguments(), a -> visitContainer(a, q)))
+                .withMethodType(q.receive(functionCall.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+    }
+
+    @Override
     public J visitFunctionType(JS.FunctionType functionType, RpcReceiveQueue q) {
         return functionType
                 .withModifiers(q.receiveList(functionType.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
@@ -150,8 +155,9 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitImport(JS.Import anImport, RpcReceiveQueue q) {
+    public J visitImportDeclaration(JS.Import anImport, RpcReceiveQueue q) {
         return anImport
+                .withModifiers(q.receiveList(anImport.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
                 .withImportClause(q.receive(anImport.getImportClause(), el -> (JS.ImportClause) visitNonNull(el, q)))
                 .getPadding().withModuleSpecifier(q.receive(anImport.getPadding().getModuleSpecifier(), el -> visitLeftPadded(el, q)))
                 .withAttributes(q.receive(anImport.getAttributes(), el -> (JS.ImportAttributes) visitNonNull(el, q)))
@@ -204,7 +210,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitBinary(JS.Binary binary, RpcReceiveQueue q) {
+    public J visitBinaryExtensions(JS.Binary binary, RpcReceiveQueue q) {
         return binary
                 .withLeft(q.receive(binary.getLeft(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(binary.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.Binary.Type.class))))
@@ -246,13 +252,13 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, RpcReceiveQueue q) {
-        return objectBindingDeclarations
-                .withLeadingAnnotations(q.receiveList(objectBindingDeclarations.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
-                .withModifiers(q.receiveList(objectBindingDeclarations.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
-                .withTypeExpression(q.receive(objectBindingDeclarations.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
-                .getPadding().withBindings(q.receive(objectBindingDeclarations.getPadding().getBindings(), el -> visitContainer(el, q)))
-                .getPadding().withInitializer(q.receive(objectBindingDeclarations.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
+    public J visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, RpcReceiveQueue q) {
+        return objectBindingPattern
+                .withLeadingAnnotations(q.receiveList(objectBindingPattern.getLeadingAnnotations(), annot -> (J.Annotation) visitNonNull(annot, q)))
+                .withModifiers(q.receiveList(objectBindingPattern.getModifiers(), mod -> (J.Modifier) visitNonNull(mod, q)))
+                .withTypeExpression(q.receive(objectBindingPattern.getTypeExpression(), tree -> (TypeTree) visitNonNull(tree, q)))
+                .getPadding().withBindings(q.receive(objectBindingPattern.getPadding().getBindings(), el -> visitContainer(el, q)))
+                .getPadding().withInitializer(q.receive(objectBindingPattern.getPadding().getInitializer(), el -> visitLeftPadded(el, q)));
     }
 
     @Override
@@ -309,13 +315,6 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, RpcReceiveQueue q) {
-        return trailingTokenStatement
-                .getPadding().withExpression(q.receive(trailingTokenStatement.getPadding().getExpression(), el -> visitRightPadded(el, q)))
-                .withType(q.receive(trailingTokenStatement.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
     public J visitTuple(JS.Tuple tuple, RpcReceiveQueue q) {
         return tuple
                 .getPadding().withElements(q.receive(tuple.getPadding().getElements(), el -> visitContainer(el, q)))
@@ -346,7 +345,15 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
+    public J visitAs(JS.As as_, RpcReceiveQueue q) {
+        return as_
+                .getPadding().withLeft(q.receive(as_.getPadding().getLeft(), el -> visitRightPadded(el, q)))
+                .withRight(q.receive(as_.getRight(), expr -> (Expression) visitNonNull(expr, q)))
+                .withType(q.receive(as_.getType(), type -> visitType(type, q)));
+    }
+
+    @Override
+    public J visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, RpcReceiveQueue q) {
         return assignmentOperation
                 .withVariable(q.receive(assignmentOperation.getVariable(), expr -> (Expression) visitNonNull(expr, q)))
                 .getPadding().withOperator(q.receive(assignmentOperation.getPadding().getOperator(), el -> visitLeftPadded(el, q, toEnum(JS.AssignmentOperation.Type.class))))
@@ -437,6 +444,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J visitJsxTag(JSX.Tag tag, RpcReceiveQueue q) {
         return tag
                 .getPadding().withOpenName(q.receive(tag.getPadding().getOpenName(), name1 -> visitLeftPadded(name1, q)))
+                .withTypeArguments(q.receive(tag.getTypeArguments(), el -> visitContainer(el, q)))
                 .withAfterName(q.receive(tag.getAfterName(), space2 -> visitSpace(space2, q)))
                 .getPadding().withAttributes(q.receiveList(tag.getPadding().getAttributes(), attr -> visitRightPadded(attr, q)))
                 .withSelfClosing(q.receive(tag.getSelfClosing(), space1 -> visitSpace(space1, q)))
@@ -593,9 +601,8 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType,
-                              RpcReceiveQueue rpcReceiveQueue) {
-        return requireNonNull(super.visitType(javaType, rpcReceiveQueue));
+    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        return delegate.visitType(javaType, q);
     }
 
     private static class JavaScriptReceiverDelegate extends JavaReceiver {

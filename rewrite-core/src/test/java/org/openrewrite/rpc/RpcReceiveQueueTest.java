@@ -35,7 +35,8 @@ public class RpcReceiveQueueTest {
     @BeforeEach
     void setUp() {
         batches = new ArrayDeque<>();
-        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), new IdentityHashMap<Object, Integer>(), false);
+        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, false);
         rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst);
     }
 

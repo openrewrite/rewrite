@@ -28,7 +28,9 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.toList;
 
 public class PrintMavenAsDot extends Recipe {
     @Override
@@ -78,14 +80,14 @@ public class PrintMavenAsDot extends Recipe {
                     }
                 }
 
-                Set<ResolvedGroupArtifactVersion> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+                Set<ResolvedGroupArtifactVersion> seen = newSetFromMap(new IdentityHashMap<>());
                 for (Scope scope : Scope.values()) {
                     if (scope.ordinal() >= Scope.Compile.ordinal() && scope.ordinal() <= Scope.Test.ordinal()) {
                         dotEdges(
                                 dot, root, scope,
                                 mrr.getDependencies().get(scope).stream()
                                         .filter(dep -> dep.getDepth() == 0 && seen.add(dep.getGav()))
-                                        .collect(Collectors.toList()),
+                                        .collect(toList()),
                                 index
                         );
                     }

@@ -19,37 +19,64 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
+import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+import static java.util.Collections.unmodifiableList;
+import static java.util.Objects.requireNonNull;
 
 public class JavaScriptParser implements Parser {
 
-    private final JavaScriptRewriteRpc client;
+    private final JavaScriptRewriteRpc rewriteRpc;
 
-    private JavaScriptParser(JavaScriptRewriteRpc client) {
-        this.client = client;
+    private JavaScriptParser(JavaScriptRewriteRpc rewriteRpc) {
+        this.rewriteRpc = rewriteRpc;
     }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return client.parse("javascript", sources, relativeTo).stream();
+        // Registering `RewriteRpc` due to print-idempotence check
+        // Scope is closed using `Stream#onClose()`
+        ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
+        try {
+            JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
+            return rewriteRpc.parse(sources, relativeTo, this, ctx)
+                    .map(source -> {
+                        try {
+                            validator.visit(source, 0);
+                            return source;
+                        } catch (Exception e) {
+                            Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
+                                    .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
+                                    .findFirst();
+                            return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                        }
+                    })
+                    .onClose(scope::close);
+        } catch (Exception e) {
+            scope.close();
+            throw e;
+        }
     }
 
-    private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
             ".js", ".jsx", ".mjs", ".cjs",
             ".ts", ".tsx", ".mts", ".cts"
     ));
 
     // Exclude Yarn's Plug'n'Play loader files (https://yarnpkg.com/features/pnp)
-    private final static List<String> EXCLUSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
             ".pnp.cjs", ".pnp.loader.mjs"
     ));
 
@@ -79,46 +106,20 @@ public class JavaScriptParser implements Parser {
     }
 
     public static class Builder extends org.openrewrite.Parser.Builder {
-        private Path nodePath = Paths.get("node");
-        private @Nullable Path installationDir;
-        private int port;
+        private @Nullable JavaScriptRewriteRpc client;
 
         Builder() {
             super(JS.CompilationUnit.class);
         }
 
-        public Builder nodePath(Path path) {
-            this.nodePath = path;
-            return this;
-        }
-
-        public Builder installationDir(Path installationDir) {
-            this.installationDir = installationDir;
-            return this;
-        }
-
-        public Builder socket(int port) {
-            this.port = port;
+        public Builder rewriteRpc(JavaScriptRewriteRpc rewriteRpc) {
+            this.client = rewriteRpc;
             return this;
         }
 
         @Override
         public JavaScriptParser build() {
-            if (port != 0) {
-                return new JavaScriptParser(JavaScriptRewriteRpc.connect(
-                        Environment.builder().build(),
-                        port
-                ));
-            }
-
-            return new JavaScriptParser(JavaScriptRewriteRpc.start(
-                    Environment.builder().build(),
-                    nodePath.toString(),
-                    "--enable-source-maps",
-                    // Uncomment this to debug the server
-//                "--inspect-brk",
-                    installationDir.resolve("rpc/server.js").toString()
-            ));
+            return new JavaScriptParser(requireNonNull(client));
         }
 
         @Override

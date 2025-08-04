@@ -31,8 +31,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 @Value
@@ -72,7 +72,7 @@ public class FindMissingTypes extends Recipe {
                         String path = getCursor()
                                 .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
                                 .map(t -> t.getClass().getSimpleName())
-                                .collect(Collectors.joining("->"));
+                                .collect(joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
                         if (j != null) {
                             String printedTree;
@@ -305,7 +305,7 @@ public class FindMissingTypes extends Recipe {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess &&
                     (ident == ((J.FieldAccess) value).getName() ||
-                        ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
+                        ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {

@@ -58,7 +58,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-                            
+
                   public void method(Test t) {
                   }
               }
@@ -86,7 +86,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-                            
+
                   class A {
                   }
               }
@@ -113,7 +113,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-                            
+
                   public String s;
               }
               """

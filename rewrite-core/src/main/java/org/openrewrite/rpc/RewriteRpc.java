@@ -23,8 +23,12 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.PrintStream;
 import java.nio.file.Files;
@@ -36,27 +40,62 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
+/**
+ * Base class for RPC clients with thread-local context support.
+ */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc {
+public class RewriteRpc implements AutoCloseable {
+
+    public static Builder<?> from(JsonRpc jsonRpc, Environment marketplace) {
+        //noinspection rawtypes
+        return new Builder(marketplace) {
+            @Override
+            public RewriteRpc build() {
+                return new RewriteRpc(jsonRpc, marketplace, timeout);
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    public abstract static class Builder<T extends Builder<T>> {
+        protected final Environment marketplace;
+        protected Duration timeout = Duration.ofMinutes(1);
+
+        protected Builder(Environment marketplace) {
+            this.marketplace = marketplace;
+        }
+
+        public T timeout(Duration timeout) {
+            this.timeout = timeout;
+            return (T) this;
+        }
+
+        public abstract RewriteRpc build();
+    }
+
     private final JsonRpc jsonRpc;
 
-    private final AtomicInteger batchSize = new AtomicInteger(10);
-    private Duration timeout = Duration.ofMinutes(1);
+    private final AtomicInteger batchSize = new AtomicInteger(200);
+    private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream logFile;
+    private @Nullable PrintStream traceFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
      * between two processes.
      */
-    private final Map<String, Object> remoteObjects = new HashMap<>();
+    @VisibleForTesting
+    final Map<String, Object> remoteObjects = new HashMap<>();
 
     @VisibleForTesting
     final Map<String, Object> localObjects = new HashMap<>();
@@ -64,18 +103,23 @@ public class RewriteRpc {
     /* A reverse map of the objects back to their IDs */
     final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
-    private final Map<Integer, Object> remoteRefs = new HashMap<>();
+    @VisibleForTesting
+    final Map<Integer, Object> remoteRefs = new HashMap<>();
+
+    @VisibleForTesting
+    final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
-     * @param jsonRpc     The JSON-RPC connection to the remote peer.
      * @param marketplace The marketplace of recipes that this peer makes available.
      *                    Even if this peer is the host process, configuring this
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
+    protected RewriteRpc(JsonRpc jsonRpc, Environment marketplace, Duration timeout) {
+        this.timeout = timeout;
+
         this.jsonRpc = jsonRpc;
 
         Map<String, Recipe> preparedRecipes = new HashMap<>();
@@ -85,7 +129,7 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, traceSendPackets));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs, traceSendPackets));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -116,16 +160,13 @@ public class RewriteRpc {
     }
 
     public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.logFile = log;
+        this.traceFile = log;
         return this;
     }
 
-    public RewriteRpc timeout(Duration timeout) {
-        this.timeout = timeout;
-        return this;
-    }
 
-    public void shutdown() {
+    @Override
+    public void close() {
         jsonRpc.shutdown();
     }
 
@@ -165,7 +206,7 @@ public class RewriteRpc {
         if (!generated.isEmpty()) {
             return generated.stream()
                     .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -201,35 +242,98 @@ public class RewriteRpc {
 
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        // FIXME do this validation on the server side instead
+        for (OptionDescriptor option : r.getDescriptor().getOptions()) {
+            if (option.isRequired() && !options.containsKey(option.getName())) {
+                throw new IllegalArgumentException("Missing required option `" + option.getName() + "` for recipe `" + id + "`.");
+            }
+        }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
     }
 
-    public List<SourceFile> parse(String parser, Iterable<Parser.Input> inputs, @Nullable Path relativeTo) {
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
+        List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
+            inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(new InMemoryExecutionContext()).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
             } else {
                 mappedInputs.add(new Parse.PathInput(input.getPath()));
             }
         }
 
-        List<String> parsed = send("Parse", new Parse(parser, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-        if (!parsed.isEmpty()) {
-            return parsed.stream()
-                    .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+        if (inputList.isEmpty()) {
+            return Stream.of();
         }
-        return emptyList();
+
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable List<String> ids;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (ids == null) {
+                    // FIXME handle `TimeoutException` gracefully
+                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                    assert ids.size() == inputList.size();
+                }
+
+                // Process current item in batch
+                if (index >= inputList.size()) {
+                    return false;
+                }
+
+                Parser.Input input = inputList.get(index);
+                String id = ids.get(index);
+                index++;
+
+                SourceFile sourceFile = null;
+                parsingListener.startedParsing(input);
+                try {
+                    sourceFile = parser.requirePrintEqualsInput(getObject(id), input, relativeTo, ctx);
+                } catch (Exception e) {
+                    sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
+                } finally {
+                    if (sourceFile != null) {
+                        action.accept(sourceFile);
+                        parsingListener.parsed(input, sourceFile);
+                    }
+                }
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return inputList.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
     }
 
     public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE));
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
     }
 
-    public String print(Tree tree, Cursor parent) {
+    public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+    }
+
+    public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
+        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
     }
 
     @VisibleForTesting
@@ -243,16 +347,20 @@ public class RewriteRpc {
                         localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
-            }).collect(Collectors.toList());
+            }).collect(toList());
         }
         return cursorIds;
     }
 
     @VisibleForTesting
     public <T> T getObject(String id) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
-                new GetObject(id), GetObjectResponse.class));
-        Object remoteObject = q.receive(localObjects.get(id), null);
+        // Check if we have a cached version of this object
+        Object localObject = localObjects.get(id);
+        String lastKnownId = localObject != null ? id : null;
+
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
+                new GetObject(id, lastKnownId), GetObjectResponse.class));
+        Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }

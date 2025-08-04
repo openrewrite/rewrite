@@ -34,12 +34,17 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
@@ -117,7 +122,7 @@ public class Assertions {
                         }
                     })
                     .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
-                    .collect(Collectors.toList());
+                    .collect(toList());
             if (!missingTypeResults.isEmpty()) {
                 String missingTypes = missingTypeResults.stream()
                         .map(v -> v.getPath() + "\n" + v.getPrintedTree())
@@ -253,11 +258,11 @@ public class Assertions {
     }
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom) {
-        return addTypesToSourceSet(sourceSetName, extendsFrom, Collections.emptyList());
+        return addTypesToSourceSet(sourceSetName, extendsFrom, emptyList());
     }
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName) {
-        return addTypesToSourceSet(sourceSetName, Collections.emptyList(), Collections.emptyList());
+        return addTypesToSourceSet(sourceSetName, emptyList(), emptyList());
     }
 
     public static JavaVersion javaVersion(int version) {
@@ -273,6 +278,6 @@ public class Assertions {
 
     private static JavaSourceSet javaSourceSet(String sourceSet) {
         return javaSourceSets.computeIfAbsent(sourceSet, name ->
-                new JavaSourceSet(Tree.randomId(), name, Collections.emptyList(), Collections.emptyMap()));
+                new JavaSourceSet(Tree.randomId(), name, emptyList(), emptyMap()));
     }
 }

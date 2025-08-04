@@ -19,12 +19,13 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 
 public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
 
     @Override
-    public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit cu, P p) {
-        return (JS.CompilationUnit) super.visitCompilationUnit(cu, p);
+    public JS.CompilationUnit visitJsCompilationUnit(JS.CompilationUnit cu, P p) {
+        return (JS.CompilationUnit) super.visitJsCompilationUnit(cu, p);
     }
 
     @Override
@@ -43,8 +44,13 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignOp, P p) {
-        return (JS.AssignmentOperation) super.visitAssignmentOperation(assignOp, p);
+    public JS.As visitAs(JS.As as_, P p) {
+        return (JS.As) super.visitAs(as_, p);
+    }
+
+    @Override
+    public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignOp, P p) {
+        return (JS.AssignmentOperation) super.visitAssignmentOperationExtensions(assignOp, p);
     }
 
     @Override
@@ -103,18 +109,23 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        return (JS.FunctionCall) super.visitFunctionCall(functionCall, p);
+    }
+
+    @Override
     public JS.FunctionType visitFunctionType(JS.FunctionType functionType, P p) {
         return (JS.FunctionType) super.visitFunctionType(functionType, p);
     }
 
     @Override
-    public JS.Binary visitBinary(JS.Binary binary, P p) {
-        return (JS.Binary) super.visitBinary(binary, p);
+    public JS.Binary visitBinaryExtensions(JS.Binary binary, P p) {
+        return (JS.Binary) super.visitBinaryExtensions(binary, p);
     }
 
     @Override
-    public JS.Import visitImport(JS.Import anImport, P p) {
-        return (JS.Import) super.visitImport(anImport, p);
+    public JS.Import visitImportDeclaration(JS.Import anImport, P p) {
+        return (JS.Import) super.visitImportDeclaration(anImport, p);
     }
 
     @Override
@@ -218,8 +229,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.ObjectBindingDeclarations visitObjectBindingDeclarations(JS.ObjectBindingDeclarations objectBindingDeclarations, P p) {
-        return (JS.ObjectBindingDeclarations) super.visitObjectBindingDeclarations(objectBindingDeclarations, p);
+    public JS.ObjectBindingPattern visitObjectBindingPattern(JS.ObjectBindingPattern objectBindingPattern, P p) {
+        return (JS.ObjectBindingPattern) super.visitObjectBindingPattern(objectBindingPattern, p);
     }
 
     @Override
@@ -255,11 +266,6 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public JS.TemplateExpression.Span visitTemplateExpressionSpan(JS.TemplateExpression.Span value, P p) {
         return (JS.TemplateExpression.Span) super.visitTemplateExpressionSpan(value, p);
-    }
-
-    @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement statement, P p) {
-        return (JS.TrailingTokenStatement) super.visitTrailingTokenStatement(statement, p);
     }
 
     @Override
@@ -328,8 +334,8 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
-    public JS.Yield visitYield(JS.Yield yield, P p) {
-        return (JS.Yield) super.visitYield(yield, p);
+    public JS.Yield visitYield(J.Yield yield, P p) {
+        return (J.Yield) super.visitYield(yield, p);
     }
 
     // J overrides.
@@ -683,5 +689,30 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     @Override
     public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
         return (J.Unknown.Source) super.visitUnknownSource(source, p);
+    }
+
+    @Override
+    public JSX.Tag visitJsxTag(JSX.Tag tag, P p) {
+        return (JSX.Tag) super.visitJsxTag(tag, p);
+    }
+
+    @Override
+    public JSX.Attribute visitJsxAttribute(JSX.Attribute attribute, P p) {
+        return (JSX.Attribute) super.visitJsxAttribute(attribute, p);
+    }
+
+    @Override
+    public JSX.SpreadAttribute visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, P p) {
+        return (JSX.SpreadAttribute) super.visitJsxSpreadAttribute(spreadAttribute, p);
+    }
+
+    @Override
+    public JSX.EmbeddedExpression visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, P p) {
+        return (JSX.EmbeddedExpression) super.visitJsxEmbeddedExpression(embeddedExpression, p);
+    }
+
+    @Override
+    public JSX.NamespacedName visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
+        return (JSX.NamespacedName) super.visitJsxNamespacedName(namespacedName, p);
     }
 }

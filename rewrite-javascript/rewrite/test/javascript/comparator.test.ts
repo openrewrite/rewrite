@@ -15,7 +15,7 @@
  */
 import {JavaScriptComparatorVisitor} from '../../src/javascript/comparator';
 import {J} from '../../src/java';
-import {JS, JavaScriptParser} from '../../src/javascript';
+import {JavaScriptParser, JS} from '../../src/javascript';
 
 describe('JavaScriptComparatorVisitor', () => {
     const parser = new JavaScriptParser();
@@ -23,8 +23,8 @@ describe('JavaScriptComparatorVisitor', () => {
 
     // Helper function to parse code and get the AST
     async function parse(code: string): Promise<JS.CompilationUnit> {
-        const results = await parser.parse({text: code, sourcePath: 'test.ts'});
-        return results[0] as JS.CompilationUnit;
+        const parseGenerator = parser.parse({text: code, sourcePath: 'test.ts'});
+        return (await parseGenerator.next()).value as JS.CompilationUnit;
     }
 
     // Helper function to get the first statement from a compilation unit

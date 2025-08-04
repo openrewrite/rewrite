@@ -45,11 +45,11 @@ export class Visit {
             const after = await visitor.visit(before, p, await getCursor(request.cursor));
             if (!after) {
                 localObjects.delete(before.id.toString());
-            } else {
+            } else if (after !== before) {
                 localObjects.set(after.id.toString(), after);
             }
 
-            return {modified: before !== after}
+            return {modified: before !== after};
         });
     }
 

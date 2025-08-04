@@ -13,35 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker, Markers, MarkersKind} from "../markers";
-import {randomId} from "../uuid";
-import {WriteStream} from "fs";
+import {emptyMarkers, Marker, Markers, MarkersKind} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
-
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
-
-export interface Reference {
-    [REFERENCE_KEY]: true;
-}
-
-export function asRef<T extends {}>(obj: T | undefined): T & Reference | undefined {
-    if(obj === undefined) {
-        return undefined;
-    }
-    try {
-        // Spread would create a new object. This can be used multiple times on the
-        // same object without changing the reference.
-        Object.assign(obj, {[REFERENCE_KEY]: true});
-        return obj as T & Reference;
-    } catch (Error) {
-        return obj as T & Reference;
-    }
-}
-
-function isRef(obj?: any): obj is Reference {
-    return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
-}
+import {asRef, isRef, Reference, ReferenceMap} from "./reference";
+import {Writable} from "node:stream";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -108,14 +84,18 @@ export class RpcCodecs {
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
 
-    private refCount = 1
     private before?: any;
 
-    constructor(private readonly refs: WeakMap<Object, number>, private readonly trace: boolean) {
+    constructor(private readonly refs: ReferenceMap, private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
-        await this.send(after, before);
+        if (after.kind === MarkersKind.Markers) {
+            // FIXME check if we can solve this via RpcCodec
+            await this.sendMarkers(undefined!, _ => after);
+        } else {
+            await this.send(after, before);
+        }
 
         const result = this.q;
         result.push({state: RpcObjectState.END_OF_OBJECT});
@@ -224,16 +204,15 @@ export class RpcSendQueue {
     private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
         let ref: number | undefined;
         if (isRef(after)) {
-            if (this.refs.has(after)) {
+            ref = this.refs.get(after);
+            if (ref) {
                 this.put({
                     state: RpcObjectState.ADD,
-                    valueType: this.getValueType(after),
-                    ref: this.refs.get(after)
+                    ref
                 });
                 return;
             }
-            ref = this.refCount++;
-            this.refs.set(after, ref);
+            ref = this.refs.create(after);
         }
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
         this.put({
@@ -273,7 +252,7 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: WriteStream) {
+                private readonly logFile?: Writable) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -285,7 +264,7 @@ export class RpcReceiveQueue {
 
     receiveMarkers(markers?: Markers): Promise<Markers> {
         if (markers === undefined) {
-            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []} as Markers;
+            markers = emptyMarkers;
         }
         return this.receive(markers, async m => {
             return saveTrace(this.logFile, async () => {
@@ -312,20 +291,29 @@ export class RpcReceiveQueue {
                     return undefined as T;
                 case RpcObjectState.ADD:
                     ref = message.ref;
-                    if (ref !== undefined && this.refs.has(ref)) {
-                        return this.refs.get(ref);
+                    if (ref !== undefined && message.valueType === undefined && message.value === undefined) {
+                        // This is a pure reference to an existing object
+                        if (this.refs.has(ref)) {
+                            return this.refs.get(ref);
+                        } else {
+                            throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
+                        }
+                    } else {
+                        // This is either a new object or a forward declaration with ref
+                        before = message.valueType === undefined ?
+                            message.value :
+                            this.newObj(message.valueType);
                     }
-                    before = message.value ?? this.newObj(message.valueType!);
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
                     let after;
                     let codec;
                     if (onChange) {
-                        after = onChange(before!);
+                        after = await onChange(before!);
                     } else if ((codec = RpcCodecs.forInstance(before))) {
-                        after = codec.rpcReceive(before, this);
+                        after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
-                        after = message.value;
+                        after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
                     } else {
                         after = before;
                     }
@@ -365,6 +353,9 @@ export class RpcReceiveQueue {
                     // The next message should be a CHANGE with a list of positions
                     const d = await this.take();
                     const positions = d.value as number[];
+                    if (!positions) {
+                        throw new Error(`Expected positions array but got: ${JSON.stringify(d)}`);
+                    }
                     const after: T[] = new Array(positions.length);
                     for (let i = 0; i < positions.length; i++) {
                         const beforeIdx = positions[i];

@@ -27,7 +27,6 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 import java.util.Optional;
-import java.util.function.Supplier;
 
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
@@ -58,17 +57,20 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
         t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        TabsAndIndentsStyle tabsAndIndentsStyle = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
+        SpacesStyle spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+
         t = new SpacesVisitor<>(
-                Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
+                spacesStyle,
                 cu.getStyle(EmptyForInitializerPadStyle.class),
                 Style.from(EmptyForIteratorPadStyle.class, cu),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
+        t = new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
+        t = new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, cu))
@@ -79,8 +81,6 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         t = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-
-        return t;
+        return new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
     }
 }

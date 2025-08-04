@@ -25,7 +25,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.ParseToPrintInequalities;
 import org.openrewrite.tree.ParseError;
 
-import java.util.Collections;
+import static java.util.Collections.emptySet;
 
 public class FindParseToPrintInequality extends Recipe {
     transient ParseToPrintInequalities inequalities = new ParseToPrintInequalities(this);
@@ -58,7 +58,7 @@ public class FindParseToPrintInequality extends Recipe {
                                 null,
                                 parseError.getText(),
                                 parseError.getErroneous().printAll(),
-                                Collections.emptySet()
+                                emptySet()
                         )) {
                             inequalities.insertRow(ctx, new ParseToPrintInequalities.Row(
                                     parseError.getSourcePath().toString(),

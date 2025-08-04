@@ -24,9 +24,8 @@ describe('replace with context', () => {
     });
 
     async function parseExpression(source: string): Promise<J> {
-        const results = await parser.parse({text: source, sourcePath: 'test.ts'});
-        const cu = results[0] as JS.CompilationUnit;
-        const stmt = cu.statements[0].element as JS.ExpressionStatement;
+        const parseGenerator = parser.parse({text: source, sourcePath: 'test.ts'});
+        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;        const stmt = cu.statements[0].element as JS.ExpressionStatement;
         return stmt.expression;
     }
 

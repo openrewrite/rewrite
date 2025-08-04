@@ -100,6 +100,7 @@ export abstract class Recipe {
             options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
                 name: key,
                 value: (this as any)[key],
+                required: descriptor.required ?? true,
                 ...descriptor
             }))
         }
@@ -134,6 +135,7 @@ export interface RecipeDescriptor {
 export interface OptionDescriptor {
     readonly displayName: string
     readonly description: string
+    readonly required?: boolean
     readonly example?: string
     readonly valid?: string[]
 }

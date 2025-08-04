@@ -32,10 +32,10 @@ import javax.lang.model.type.TypeMirror;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -274,7 +274,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
+                        if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.
@@ -463,7 +463,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
                 for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
-                    if (targetClass.getSimpleName().equals("RecoveryErrorType")) {
+                    if ("RecoveryErrorType".equals(targetClass.getSimpleName())) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
                         Symbol originalSymbol = (Symbol) field.get(selectType);
@@ -590,7 +590,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
-                            .collect(Collectors.toList());
+                            .collect(toList());
                 } else {
                     try {
                         defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());

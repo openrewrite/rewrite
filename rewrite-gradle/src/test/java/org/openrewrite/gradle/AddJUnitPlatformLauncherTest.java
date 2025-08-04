@@ -58,7 +58,7 @@ class AddJUnitPlatformLauncherTest implements RewriteTest {
                 plugins {
                     id "java-library"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
