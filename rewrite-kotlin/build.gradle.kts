@@ -31,9 +31,3 @@ dependencies {
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
 }
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name == "compileTestKotlin") {
-        kotlinOptions.jvmTarget = "21"
-    }
-}
