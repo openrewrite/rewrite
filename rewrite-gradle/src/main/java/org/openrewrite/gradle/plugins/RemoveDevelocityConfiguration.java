@@ -16,7 +16,7 @@
 package org.openrewrite.gradle.plugins;
 
 import org.openrewrite.Recipe;
-import org.openrewrite.gradle.RemoveBuildConfiguration;
+import org.openrewrite.gradle.RemoveExtension;
 
 import java.util.Arrays;
 import java.util.List;
@@ -35,7 +35,7 @@ public class RemoveDevelocityConfiguration extends Recipe {
     @Override
     public List<Recipe> getRecipeList() {
         return Arrays.asList(
-                new RemoveBuildConfiguration("develocity"),
-                new RemoveBuildConfiguration("gradleEnterprise"));
+                new RemoveExtension("develocity"),
+                new RemoveExtension("gradleEnterprise"));
     }
 }

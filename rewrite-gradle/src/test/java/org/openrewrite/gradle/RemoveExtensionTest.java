@@ -21,11 +21,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-class RemoveBuildConfigurationTest implements RewriteTest {
+class RemoveExtensionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveBuildConfiguration("buildCache"));
+        spec.recipe(new RemoveExtension("buildCache"));
     }
 
     @Test

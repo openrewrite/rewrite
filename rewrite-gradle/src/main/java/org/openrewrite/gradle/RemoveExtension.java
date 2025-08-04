@@ -26,20 +26,20 @@ import static org.openrewrite.Preconditions.or;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class RemoveBuildConfiguration extends Recipe {
+public class RemoveExtension extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove build configuration method by name";
+        return "Remove build extension by name";
     }
 
     @Override
     public String getDescription() {
-        return "Remove the Gradle build configuration methods from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
+        return "Remove the Gradle build extension from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
     }
 
     @Option(displayName = "Method name",
-            description = "The name of the build configuration method to remove, e.g., `buildCache`.",
+            description = "The name of the build extension to remove, e.g., `buildCache`.",
             example = "buildCache")
     String methodName;
 
