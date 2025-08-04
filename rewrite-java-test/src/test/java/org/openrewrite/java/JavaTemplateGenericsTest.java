@@ -105,7 +105,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               class Test {
                   boolean test() {
                       return !List.of("1").iterator().hasNext();
@@ -114,7 +114,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """,
             """
               import java.util.List;
-              
+
               class Test {
                   boolean test() {
                       return /*~~>*/!List.of("1").iterator().hasNext();
@@ -144,7 +144,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               import com.google.common.collect.ImmutableSet;
               import org.assertj.core.api.AbstractAssert;
               import org.assertj.core.api.Assertions;
-              
+
               class Test {
                   void test() {
                       Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
@@ -155,7 +155,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               import com.google.common.collect.ImmutableSet;
               import org.assertj.core.api.AbstractAssert;
               import org.assertj.core.api.Assertions;
-              
+
               class Test {
                   void test() {
                       /*~~>*/Assertions.assertThat(ImmutableSet.of(1)).size().isLessThan(2).returnToIterable();
@@ -186,9 +186,9 @@ class JavaTemplateGenericsTest implements RewriteTest {
             """
               import com.google.common.collect.ImmutableSet;
               import com.google.common.collect.ImmutableSetMultimap;
-              
+
               import java.util.function.Predicate;
-              
+
               class Test {
                   void test() {
                       ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
@@ -198,9 +198,9 @@ class JavaTemplateGenericsTest implements RewriteTest {
             """
               import com.google.common.collect.ImmutableSet;
               import com.google.common.collect.ImmutableSetMultimap;
-              
+
               import java.util.function.Predicate;
-              
+
               class Test {
                   void test() {
                       /*~~>*/ImmutableSet.of(1).stream().filter(Predicate.not(ImmutableSetMultimap.of(2, 3)::containsKey)).collect(ImmutableSet.toImmutableSet());
@@ -228,7 +228,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   Stream<String> test() {
                       return Stream.of();
@@ -237,7 +237,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-              
+
               class Test {
                   Stream<String> test() {
                       return /*~~>*/Stream.of();
@@ -264,11 +264,11 @@ class JavaTemplateGenericsTest implements RewriteTest {
           java(
             """
               import com.google.common.collect.ImmutableMap;
-              
+
               import java.util.function.Function;
               import java.util.function.Predicate;
               import java.util.stream.Stream;
-              
+
               class Test {
                   Stream<Integer> test() {
                       return Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
@@ -277,11 +277,11 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """,
             """
               import com.google.common.collect.ImmutableMap;
-              
+
               import java.util.function.Function;
               import java.util.function.Predicate;
               import java.util.stream.Stream;
-              
+
               class Test {
                   Stream<Integer> test() {
                       return /*~~>*/Stream.of("foo").filter(ImmutableMap.of(1, 2)::containsKey).map(ImmutableMap.of(1, 2)::get);
@@ -322,7 +322,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(Object::toString);
@@ -334,7 +334,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(e -> e.toString());
@@ -379,7 +379,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(e -> e.toString());
@@ -391,7 +391,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(Object::toString);
@@ -436,7 +436,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.function.*;
-              
+
               class Foo {
                   List<Integer> test(List<Integer> list) {
                       Set<Integer> set = Set.of(1, 2, 3);
@@ -449,7 +449,7 @@ class JavaTemplateGenericsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.function.*;
-              
+
               class Foo {
                   List<Integer> test(List<Integer> list) {
                       Set<Integer> set = Set.of(1, 2, 3);

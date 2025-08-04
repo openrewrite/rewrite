@@ -46,7 +46,7 @@ class VariableNameUtilsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("name2")) {
+                  if ("name2".equals(identifier.getSimpleName())) {
                       return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
                   }
                   return identifier;
@@ -114,9 +114,9 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package bar;
-                            
+
               import foo.Super;
-                            
+
               class Test extends Super {
                   boolean classBlock;
               }
@@ -133,7 +133,7 @@ class VariableNameUtilsTest implements RewriteTest {
             """
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
-                            
+
               class Test {
                   boolean classBlock;
               }
@@ -191,7 +191,7 @@ class VariableNameUtilsTest implements RewriteTest {
 
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext p) {
-                  if (identifier.getSimpleName().equals("methodBlockA")) {
+                  if ("methodBlockA".equals(identifier.getSimpleName())) {
                       HashSet<String> variables = getCursor().getNearestMessage("variables", new HashSet<>());
                       variables.addAll(VariableNameUtils.findNamesInScope(getCursor().dropParentUntil(J.Block.class::isInstance)));
                       getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "variables", variables);
@@ -345,7 +345,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.util.function.Supplier;
-                            
+
               class Test {
                   void method() {
                       boolean methodBlockA;
@@ -372,7 +372,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class SuperSuper {
                   public int superSuperPublic;
                   protected int superSuperProtected;
@@ -384,7 +384,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class Super extends SuperSuper {
                   public int superPublic;
                   protected int superProtected;
@@ -396,7 +396,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               package foo.bar;
-                            
+
               class Test extends Super {
                   boolean classBlock;
               }
@@ -453,7 +453,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.io.*;
-                            
+
               class Test {
                   void method() {
                       File methodBlockA = new File("file.txt");
@@ -483,7 +483,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.io.*;
-                            
+
               class Test {
                   void method(short methodParam) {
                       boolean methodBlockA;
@@ -522,7 +522,7 @@ class VariableNameUtilsTest implements RewriteTest {
           java(
             """
               import java.util.function.Consumer;
-              
+
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -537,7 +537,7 @@ class VariableNameUtilsTest implements RewriteTest {
               """,
             """
               import java.util.function.Consumer;
-              
+
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -562,7 +562,7 @@ class VariableNameUtilsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("ex")) {
+                  if ("ex".equals(identifier.getSimpleName())) {
                       return identifier.withSimpleName(VariableNameUtils.generateVariableName("ignored", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
                   }
                   return identifier;

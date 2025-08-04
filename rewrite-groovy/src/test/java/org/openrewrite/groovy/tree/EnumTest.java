@@ -85,7 +85,7 @@ class EnumTest implements RewriteTest {
               enum Test {
                   @Deprecated(since = "now")
                   One,
-              
+
                   @Deprecated(since = "now")
                   Two;
               }
@@ -101,7 +101,7 @@ class EnumTest implements RewriteTest {
             """
               enum Test {
                   One, Two;
-              
+
                   void test() {}
               }
               """
@@ -120,12 +120,12 @@ class EnumTest implements RewriteTest {
                       @Deprecated
                       void foo() {}
                   },
-              
+
                   A2 {
                       @Deprecated
                       void foo() {}
                   };
-              
+
                   A() {}
                   A(int n) {}
               }
@@ -179,7 +179,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void noArguments() {
         rewriteRun(
@@ -193,7 +192,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithLiteralParameters() {
         rewriteRun(
@@ -203,7 +201,7 @@ class EnumTest implements RewriteTest {
                   ONE(1, "A"),
                   TWO(2, "B", ")"),
                   THREE(3, $/C/$, 1);
-              
+
                   A(int n, String s) {
                     this(n, s, "ignore")
                   }
@@ -214,7 +212,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void enumWithInvocationParameters() {
         rewriteRun(
@@ -223,11 +220,11 @@ class EnumTest implements RewriteTest {
               class X {
                 static X create() { new X() }
               }
-              
+
               enum A {
                   ONE(new X()),
                   TWO(X.create())
-              
+
                   A(X x) {}
               }
               """

@@ -41,7 +41,7 @@ class NoStaticImportTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-                              
+
               class Test {
                   void test() {
                       Object o = Collections.emptyList();
@@ -59,7 +59,7 @@ class NoStaticImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-                            
+
               import static org.openrewrite.java.TestNoStaticImport.method0;
 
               public class TestNoStaticImport {
@@ -128,7 +128,7 @@ class NoStaticImportTest implements RewriteTest {
                     default boolean isLast() {
                         return !hasNext();
                     }
-                    
+
                     boolean hasNext();
                 }
                 """
@@ -142,7 +142,7 @@ class NoStaticImportTest implements RewriteTest {
               java(
                     """
                 package org.example;
-                        
+
                 public abstract class AbstractClass {
                     public static boolean foo() {
                         return false;
@@ -258,7 +258,7 @@ class NoStaticImportTest implements RewriteTest {
                     public static void method0() {
                         InnerClass.method1();
                     }
-                            
+
                     public class InnerClass {
                         public static void method1() {
                         }
@@ -301,14 +301,14 @@ class NoStaticImportTest implements RewriteTest {
               java(
                     """
                 package org.openrewrite.java;
-                                
+
                 import static org.openrewrite.test.Test.Nested.foo;
-                                
+
                 public class Test {
                     public static void m() {
                         foo();
                     }
-                                
+
                     public static class Nested {
                         public static void foo() {
                         }
@@ -317,12 +317,12 @@ class NoStaticImportTest implements RewriteTest {
                 """,
                     """
                 package org.openrewrite.java;
-                                
+
                 public class Test {
                     public static void m() {
                         Nested.foo();
                     }
-                                
+
                     public static class Nested {
                         public static void foo() {
                         }

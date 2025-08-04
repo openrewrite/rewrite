@@ -35,10 +35,14 @@ import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -333,7 +337,7 @@ public interface Xml extends Tree {
                 charData = new CharData(randomId(), "", Markers.EMPTY,
                         false, value, "");
             }
-            return withContent(Collections.singletonList(charData));
+            return withContent(singletonList(charData));
         }
 
         @With
@@ -400,7 +404,7 @@ public interface Xml extends Tree {
                 return Optional.of(content.stream()
                         .map(c -> ((CharData) c).getText())
                         .map(StringEscapeUtils::unescapeXml)
-                        .collect(Collectors.joining()));
+                        .collect(joining()));
             }
             return Optional.empty();
         }
@@ -471,7 +475,7 @@ public interface Xml extends Tree {
         @Override
         public String toString() {
             return "<" + name + attributes.stream().map(a -> " " + a.getKey().getName() + "=\"" + a.getValueAsString() + "\"")
-                    .collect(Collectors.joining("")) + ">";
+                    .collect(joining("")) + ">";
         }
 
         @Value
@@ -871,7 +875,7 @@ public interface Xml extends Tree {
         @Override
         public String toString() {
             return "<%@ " + type + attributes.stream().map(a -> " " + a.getKey().getName() + "=\"" + a.getValueAsString() + "\"")
-                    .collect(Collectors.joining("")) + "%>";
+                    .collect(joining("")) + "%>";
         }
     }
 }

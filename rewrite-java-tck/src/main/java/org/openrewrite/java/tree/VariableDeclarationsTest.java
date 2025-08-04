@@ -36,7 +36,7 @@ class VariableDeclarationsTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.ArrayList;
-              
+
               class Test {
                   void test() {
                       ArrayList<String> categories = new ArrayList<>();

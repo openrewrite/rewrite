@@ -433,6 +433,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
         q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getTypeArguments, el -> visitContainer(el, q));
         q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 

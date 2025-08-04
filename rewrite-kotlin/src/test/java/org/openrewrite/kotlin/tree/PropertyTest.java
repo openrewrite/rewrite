@@ -64,7 +64,7 @@ class PropertyTest implements RewriteTest {
                       private   set
                   var bar: Long
                       @Suppress  get /*C1*/
-              
+
                   init {
                       foo = 1
                       bar = 2
@@ -96,7 +96,7 @@ class PropertyTest implements RewriteTest {
           kotlin(
             """
               val <T : Any> Collection<T>.nullable: Collection<T?>
-                  /*c1*/ get() = this ;   
+                  /*c1*/ get() = this ;
               """
           )
         );

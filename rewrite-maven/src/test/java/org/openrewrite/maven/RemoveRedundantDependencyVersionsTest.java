@@ -24,8 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Collections;
-
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -956,7 +955,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     void except() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
-                  Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
+                  singletonList("org.junit.jupiter:junit-jupiter-api"))),
           pomXml(
             """
               <project>

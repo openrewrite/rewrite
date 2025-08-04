@@ -26,10 +26,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -117,7 +117,7 @@ class AssertionsTest implements RewriteTest {
 
         @Override
         public List<Recipe> getRecipeList() {
-            return Collections.singletonList(new NonMavenRecipe());
+            return singletonList(new NonMavenRecipe());
         }
 
         @Override

@@ -65,7 +65,7 @@ class ClassExpressionTest implements RewriteTest {
           groovy(
             """
               package foo
-              
+
               interface MyEntity {
               }
               class Foo {
@@ -84,7 +84,7 @@ class ClassExpressionTest implements RewriteTest {
           groovy(
             """
               package foo
-              
+
               interface MyEntity {
               }
               class Foo {

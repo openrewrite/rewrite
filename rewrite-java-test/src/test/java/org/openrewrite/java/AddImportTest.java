@@ -33,10 +33,10 @@ import org.openrewrite.test.SourceSpecs;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -593,11 +593,11 @@ class AddImportTest implements RewriteTest {
               java(
                 """
                   package a;
-                  
+
                   import c.C0;
                   import c.c.C1;
                   import c.c.c.C2;
-                  
+
                   class A {}
                   """,
                 String.format("""
@@ -607,7 +607,7 @@ class AddImportTest implements RewriteTest {
 
                     class A {}
                     """,
-                  expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
+                  expectedImports.stream().map(i -> "import " + i + ";").collect(joining("\n"))
                 )
               )
             );
@@ -916,7 +916,7 @@ class AddImportTest implements RewriteTest {
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    if (method.getName().getSimpleName().equals("emptyList")) {
+                    if ("emptyList".equals(method.getName().getSimpleName())) {
                         return method.withSelect(null);
                     }
                     return method;
@@ -1317,7 +1317,7 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """.replace("\n", "\r\n"),
-            """        
+            """
               import java.util.List;
               import java.util.Set;
 
@@ -1608,7 +1608,7 @@ class AddImportTest implements RewriteTest {
     void importWithNestedClass() {
         @Language("java") final String auxSource = """
           package com.example;
-          
+
           public interface A {
               enum DataType {
                   TYPE_1,
@@ -1688,20 +1688,20 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package sample;
-              
+
               import com.ex.app.config.OldA;
               import com.ex.app.task.OldB;
               import com.ex.app.task.OldC;
               import com.ex.app.task.OldD;
               import com.ex.app.task.OldE;
-              
+
               public class A {
                   private final OldA a;
                   private final OldB b;
                   private final OldC c;
                   private final OldD d;
                   private final OldE e;
-              
+
                   public A(OldA a, OldB b, OldC c, OldD d, OldE e) {
                       this.a = a;
                       this.b = b;
@@ -1713,20 +1713,20 @@ class AddImportTest implements RewriteTest {
               """,
             """
           package sample;
-          
+
           import com.ex.app.config.NewA;
           import com.ex.app.task.NewB;
           import com.ex.app.task.NewC;
           import com.ex.app.task.NewD;
           import com.ex.app.task.NewE;
-          
+
           public class A {
               private final NewA a;
               private final NewB b;
               private final NewC c;
               private final NewD d;
               private final NewE e;
-          
+
               public A(NewA a, NewB b, NewC c, NewD d, NewE e) {
                   this.a = a;
                   this.b = b;

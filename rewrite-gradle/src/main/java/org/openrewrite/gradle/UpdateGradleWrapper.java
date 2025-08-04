@@ -42,6 +42,7 @@ import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
@@ -286,15 +287,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public Collection<SourceFile> generate(GradleWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         if (!acc.gradleProject) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         if (!(acc.addGradleWrapperJar || acc.addGradleWrapperProperties || acc.addGradleBatchScript || acc.addGradleShellScript)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<SourceFile> gradleWrapperFiles = new ArrayList<>();

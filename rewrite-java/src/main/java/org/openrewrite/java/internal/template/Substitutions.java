@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
 
 @RequiredArgsConstructor
@@ -46,7 +47,7 @@ public class Substitutions {
     private final PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
             "#{", "}", null);
     @Getter
-    private final Set<JavaType.GenericTypeVariable> typeVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<JavaType.GenericTypeVariable> typeVariables = newSetFromMap(new IdentityHashMap<>());
 
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
@@ -156,7 +157,7 @@ public class Substitutions {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
-            if (!genericType.getName().equals("?")) {
+            if (!"?".equals(genericType.getName())) {
                 return genericType.getName();
             } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
@@ -207,7 +208,7 @@ public class Substitutions {
         if (type == null) {
             return;
         }
-        Set<JavaType> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<JavaType> visited = newSetFromMap(new IdentityHashMap<>());
         new JavaTypeVisitor<Integer>() {
             @Override
             public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
@@ -230,7 +231,7 @@ public class Substitutions {
                 if (!visited.add(generic)) {
                     return generic;
                 }
-                if (!generic.getName().equals("?")) {
+                if (!"?".equals(generic.getName())) {
                     typeVariables.add(generic);
                 }
                 return super.visitGenericTypeVariable(generic, p);

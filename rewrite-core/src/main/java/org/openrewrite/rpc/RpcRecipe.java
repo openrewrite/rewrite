@@ -26,7 +26,9 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 
 @RequiredArgsConstructor
@@ -138,8 +140,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
             recipeList = descriptor.getRecipeList().stream()
                     .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
                             .filter(opt -> opt.getValue() != null)
-                            .collect(Collectors.toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
-                    .collect(Collectors.toList());
+                            .collect(toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
+                    .collect(toList());
         }
         return recipeList;
     }

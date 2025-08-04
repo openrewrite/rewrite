@@ -22,8 +22,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
-
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
@@ -200,7 +199,7 @@ class FindPluginsTest implements RewriteTest {
               .name("name")
               .version("version")
               .path("path")
-              .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+              .plugins(singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
               .build()
             )
           )

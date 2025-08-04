@@ -26,10 +26,11 @@ import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
@@ -57,7 +58,7 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S1128");
+        return singleton("RSPEC-S1128");
     }
 
     @Override
@@ -222,10 +223,10 @@ public class RemoveUnusedImports extends Recipe {
                     Set<String> topLevelTypeNames = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .filter(fq -> fq.getOwningClass() == null)
                             .map(JavaType.FullyQualified::getFullyQualifiedName)
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
-                            .collect(Collectors.toSet());
+                            .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
                     if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;

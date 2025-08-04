@@ -24,7 +24,8 @@ import org.openrewrite.maven.MavenSettings;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
@@ -80,7 +81,7 @@ public class MavenRepositoryMirror {
                 externalOnly = true;
                 mirrorOfWithoutExternal = mirrorOf.substring(colonIndex + 1);
             }
-            mirrorsOf = Arrays.stream(mirrorOfWithoutExternal.split(",")).collect(Collectors.toList());
+            mirrorsOf = Arrays.stream(mirrorOfWithoutExternal.split(",")).collect(toList());
             excludedRepos = new HashSet<>();
             includedRepos = new HashSet<>();
             for (String mirror : mirrorsOf) {

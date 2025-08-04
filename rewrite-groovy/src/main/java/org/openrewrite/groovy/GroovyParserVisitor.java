@@ -61,12 +61,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isWhitespace;
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.internal.Delimiter.*;
@@ -452,9 +452,74 @@ public class GroovyParserVisitor {
 
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
 
-            // TODO initializer (enum constructor invocation)
+            J.NewClass initializer = null;
+            if (sourceStartsWith("(")) {
+                Space prefixNewClass = whitespace();
+                skip("(");
 
-            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, null);
+                // The Groovy AST does not list the enum constructor arguments anywhere, thus first get the arguments as string
+                int start = cursor;
+                int argCount = 0;
+                int depth = 0;
+                whitespace();
+                while (!(source.charAt(cursor) == ')' && depth == 0)) {
+                    Delimiter delimiter = getDelimiter(null, cursor);
+                    if (delimiter != null) {
+                        cursor += delimiter.open.length();
+                        sourceBefore(delimiter.close);
+                    } else {
+                        name();
+                    }
+                    whitespace();
+                    skip(",");
+                    whitespace();
+                    if (source.charAt(cursor) == '(') {
+                        depth++;
+                        skip("(");
+                    } else if (depth > 0 && source.charAt(cursor) == ')') {
+                        depth--;
+                        skip(")");
+                    }
+                    argCount++;
+                }
+                String argsAsString = source.substring(start, cursor);
+                skip(")");
+
+                // ... then grab the constructor arguments ...
+                StringBuilder constructorDeclarationArgs = new StringBuilder();
+                ConstructorNode ctor = null;
+                for (ConstructorNode node : field.getDeclaringClass().getDeclaredConstructors()) {
+                    if ((node.getParameters().length - 2) == argCount) {
+                        ctor = node;
+                        break;
+                    }
+                }
+                if (ctor != null) {
+                    for (int i = 2; i < ctor.getParameters().length; i++) {
+                        Parameter param = ctor.getParameters()[i];
+                        if (i != 2) {
+                            constructorDeclarationArgs.append(", ");
+                        }
+                        constructorDeclarationArgs.append(param.getType().getName()).append(" ").append(param.getName());
+                    }
+                }
+
+                // ... and use the information in a small class to get the constructor invocation arguments anyway
+                G.CompilationUnit cu = (G.CompilationUnit) GroovyParser.builder().build()
+                        .parse("class A {\n" +
+                               "  A(" + constructorDeclarationArgs + ") {}\n" +
+                               "  def use() {\n" +
+                               "    new A(" + argsAsString + ")\n" +
+                               "  }\n" +
+                               "}")
+                        .findFirst().get();
+                JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
+                        .getPadding().getArguments();
+
+                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, args, null, typeMapping.methodType(ctor));
+            }
+
+            return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);
         }
 
         private void visitVariableField(FieldNode field) {
@@ -2813,7 +2878,7 @@ public class GroovyParserVisitor {
      * Grabs a {@link Delimiter} from source if cursor is right in front of a delimiter.
      * Whitespace characters are NOT excluded, the cursor will not be moved.
      */
-    private @Nullable Delimiter getDelimiter(ASTNode node, int cursor) {
+    private @Nullable Delimiter getDelimiter(@Nullable ASTNode node, int cursor) {
         boolean isPatternOperator = source.startsWith("~", cursor);
         int c = cursor;
         if (isPatternOperator) {
@@ -2843,7 +2908,10 @@ public class GroovyParserVisitor {
         return null;
     }
 
-    private boolean validateIsDelimiter(ASTNode node, int c) {
+    private boolean validateIsDelimiter(@Nullable ASTNode node, int c) {
+        if (node == null) {
+            return false;
+        }
         FindBinaryOperationVisitor visitor = new FindBinaryOperationVisitor(source.substring(c, c + 1), c, sourceLineNumberOffsets);
         node.visit(visitor);
         return !visitor.isFound();
@@ -3104,7 +3172,7 @@ public class GroovyParserVisitor {
         matcher.appendTail(sb);
         String multiLineRemoved = sb.toString();
         return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
-                .collect(Collectors.joining("\n"));
+                .collect(joining("\n"));
     }
 
     private DeclarationExpression transformBackToDeclarationExpression(ConstantExpression expression) {

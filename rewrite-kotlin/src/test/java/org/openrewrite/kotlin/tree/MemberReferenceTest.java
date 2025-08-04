@@ -103,10 +103,10 @@ class MemberReferenceTest implements RewriteTest {
           kotlin(
             """
               import java.util.function.Supplier/*c*/
-              
+
               val s1: Supplier<List<String>> = Supplier(::emptyList)
               val s2: Supplier<List<String>> = Supplier { emptyList() }
-              
+
               val s3 = Supplier<List<String>>(::emptyList)
               val s4 = Supplier<List<String>> { emptyList() }
               """

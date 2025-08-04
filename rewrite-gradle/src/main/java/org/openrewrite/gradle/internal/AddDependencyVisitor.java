@@ -47,11 +47,12 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
 
@@ -233,7 +234,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             List<ResolvedDependency> transitiveDependencies;
             if (gav.getVersion() == null) {
                 resolvedGav = null;
-                transitiveDependencies = Collections.emptyList();
+                transitiveDependencies = emptyList();
             } else {
                 MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                 Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
@@ -247,7 +248,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
             Set<GradleDependencyConfiguration> configurationsToAdd = Stream.concat(
                             Stream.of(configuration),
                             gp.configurationsExtendingFrom(configuration, true).stream())
-                    .collect(Collectors.toSet());
+                    .collect(toSet());
 
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                 if (!configurationsToAdd.contains(gdc)) {
@@ -334,7 +335,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependencies;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(Collections.singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                    dependencies = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
                             .findFirst()
                             .map(K.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
@@ -346,7 +347,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
                 }
-                return Collections.singletonList(dependencies);
+                return singletonList(dependencies);
             } finally {
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
             }
@@ -361,7 +362,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 J.MethodInvocation dependency;
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
                 if (isKotlinDsl) {
-                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(Collections.singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+                    dependency = (J.MethodInvocation) ((J.Block) GRADLE_PARSER.parseInputs(singletonList(new GradleParser.Input(Paths.get("build.gradle.kts"), () -> new ByteArrayInputStream(template.getBytes(StandardCharsets.UTF_8)))), null, ctx)
                             .findFirst()
                             .map(K.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
@@ -373,7 +374,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
                 }
-                return Collections.singletonList(dependency.withPrefix(Space.format("\n")));
+                return singletonList(dependency.withPrefix(Space.format("\n")));
             } finally {
                 ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
             }
@@ -413,7 +414,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     private String escapeIfNecessary(String configurationName) {
         // default is a gradle configuration created by the base plugin and a groovy keyword if
         // it is used it needs to be escaped
-        return configurationName.equals("default") ? "'" + configurationName + "'" : configurationName;
+        return "default".equals(configurationName) ? "'" + configurationName + "'" : configurationName;
     }
 
     private DependencyStyle autodetectDependencyStyle(J.@Nullable Block block) {

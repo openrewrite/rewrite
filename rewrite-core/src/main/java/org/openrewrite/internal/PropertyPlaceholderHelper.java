@@ -135,13 +135,13 @@ public class PropertyPlaceholderHelper {
             if (substringMatch(buf, index, placeholderSuffix)) {
                 if (withinNestedPlaceholder > 0) {
                     withinNestedPlaceholder--;
-                    index = index + placeholderSuffix.length();
+                    index += placeholderSuffix.length();
                 } else {
                     return index;
                 }
             } else if (substringMatch(buf, index, simplePrefix)) {
                 withinNestedPlaceholder++;
-                index = index + simplePrefix.length();
+                index += simplePrefix.length();
             } else {
                 index++;
             }

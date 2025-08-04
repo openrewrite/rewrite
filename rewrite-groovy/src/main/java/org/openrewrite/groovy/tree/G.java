@@ -38,7 +38,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 public interface G extends J {
     @SuppressWarnings("unchecked")
@@ -184,7 +185,7 @@ public interface G extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.Import.class::isInstance)
                     .map(J.Import.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -199,7 +200,7 @@ public interface G extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -271,13 +272,13 @@ public interface G extends J {
                 return t.statements.stream()
                         .filter(s -> s.getElement() instanceof J.ClassDeclaration)
                         .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             public G.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 int insertionIdx = 0;
                 for (JRightPadded<Statement> statement : statements) {
                     if (!(statement.getElement() instanceof J.Import)) {
@@ -289,7 +290,7 @@ public interface G extends J {
                 //noinspection unchecked
                 statements.addAll(insertionIdx, classes.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(Collectors.toList()));
+                        .collect(toList()));
 
                 List<JRightPadded<ClassDeclaration>> originalClasses = t.getPadding().getClasses();
                 if (originalClasses.size() != classes.size()) {
@@ -313,18 +314,18 @@ public interface G extends J {
                 return t.statements.stream()
                         .filter(s -> s.getElement() instanceof J.Import)
                         .map(s -> (JRightPadded<J.Import>) (Object) s)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.Import))
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 //noinspection unchecked
                 statements.addAll(0, imports.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(Collectors.toList()));
+                        .collect(toList()));
 
                 List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
                 if (originalImports.size() != imports.size()) {

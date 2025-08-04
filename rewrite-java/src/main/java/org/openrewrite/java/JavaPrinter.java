@@ -485,7 +485,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitCase(Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
         J elem = case_.getCaseLabels().get(0);
-        if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
+        if (!(elem instanceof Identifier) || !"default".equals(((Identifier) elem).getSimpleName())) {
             p.append("case");
         }
         visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);

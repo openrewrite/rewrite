@@ -39,9 +39,10 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import static java.util.Collections.singletonList;
 
 /**
  * When changing a plugin id that uses the `apply` syntax or versionless plugins syntax, the version is will not be changed.
@@ -188,7 +189,7 @@ public class ChangePlugin extends Recipe {
                                 }
 
                                 m = m.withSelect(select.withArguments(ListUtils.mapFirst(select.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newPluginId))))
-                                        .withArguments(Collections.singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
+                                        .withArguments(singletonList(ChangeStringLiteral.withStringValue(versionLiteral, resolvedVersion)));
                             } catch (MavenDownloadingException e) {
                                 return e.warn(m);
                             }
