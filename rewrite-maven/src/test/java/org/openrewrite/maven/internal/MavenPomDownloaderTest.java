@@ -132,7 +132,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   <repositories>
                       <repository>
                           <id>local-provided</id>
-                          <url>https://oss.sonatype.org/content/repositories/releases</url>
+                          <url>https://repo1.maven.org/maven2/</url>
                       </repository>
                   </repositories>
               </project>

@@ -827,6 +827,11 @@ public class MavenPomDownloader {
 
         // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
+            // Skip decommissioned sonatype repositories, as these are no longer functional and will slow down the dependency resolution by 60 seconds
+            // See also: https://central.sonatype.org/news/20240109_issues_sonatype_org_deprecation/ and https://central.sonatype.org/pages/ossrh-eol/
+            if (repo.getUri().contains("sonatype.org")) {
+                continue;
+            }
             repositoriesById.put(repo.getId(), repo);
         }
 
