@@ -88,10 +88,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     it instanceof SourceFile).getValue() instanceof Javadoc.Parameter) {
                 return ident;
             }
-            
-            // Skip if this identifier is part of a class literal (e.g., FooBarBaz.class)
-            if (isClassLiteralReference(getCursor())) return ident;
-            
+
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
@@ -132,14 +129,13 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitIdentifier(ident, p);
         }
 
-        // Returns true if the identifier is part of a class literal (e.g., FooBarBaz.class)
-        private boolean isClassLiteralReference(Cursor cursor) {
-            Cursor parent = cursor.getParentTreeCursor();
-            if (parent.getValue() instanceof J.FieldAccess) {
-                J.FieldAccess parentValue = parent.getValue();
-                return "class".equals(parentValue.getName().getSimpleName());
+        @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.getType() instanceof JavaType.Parameterized &&
+                    ((JavaType.Parameterized) fieldAccess.getType()).getType() instanceof JavaType.Class) {
+                return fieldAccess; // Avoid renaming `Foo` in `Foo.class`
             }
-            return false;
+            return super.visitFieldAccess(fieldAccess, p);
         }
 
         @Override
