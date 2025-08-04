@@ -2292,7 +2292,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                             break;
                         }
                     }
-                    
                     if (next == '*') {
                         inMultilineComment = true;
                     } else {

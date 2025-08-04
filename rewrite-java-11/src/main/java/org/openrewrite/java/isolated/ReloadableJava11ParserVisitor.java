@@ -2187,7 +2187,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                             afterLastModifierPosition = cursor;
                         }
                     }
-                    
                     if (next == '*') {
                         inMultilineComment = true;
                     } else {
