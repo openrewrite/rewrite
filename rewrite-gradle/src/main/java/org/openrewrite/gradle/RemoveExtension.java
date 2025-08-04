@@ -35,7 +35,7 @@ public class RemoveExtension extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove the Gradle build extension from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
+        return "Remove a Gradle build extension from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
     }
 
     @Option(displayName = "Method name",
