@@ -1189,7 +1189,6 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
             JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
             JLeftPadded<J.Wildcard.Bound> bound = null;
-            
             if (wildcard.kind.kind != null) {
                 switch (wildcard.kind.kind) {
                     case EXTENDS:
