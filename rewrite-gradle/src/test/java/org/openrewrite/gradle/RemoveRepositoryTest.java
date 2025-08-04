@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class RemoveRepositoryTest implements RewriteTest {
 
@@ -37,6 +38,24 @@ class RemoveRepositoryTest implements RewriteTest {
             """
               repositories {
                  \s
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeJcenterKotlin() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRepository("jcenter")),
+          buildGradleKts(
+            """
+              repositories {
+                  jcenter()
+              }
+              """,
+            """
+              repositories {
               }
               """
           )

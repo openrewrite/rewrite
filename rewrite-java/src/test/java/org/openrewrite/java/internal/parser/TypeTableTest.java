@@ -78,8 +78,8 @@ class TypeTableTest implements RewriteTest {
             AtomicLong jarsSize = new AtomicLong();
             AtomicLong jarCount = new AtomicLong();
             Files.walkFileTree(m2Repo, new SimpleFileVisitor<>() {
-                @SneakyThrows
                 @Override
+                @SneakyThrows
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (file.toString().endsWith(".jar")) {
                         jarsSize.addAndGet(writeJar(file, writer));
@@ -125,9 +125,9 @@ class TypeTableTest implements RewriteTest {
               import org.junit.jupiter.api.Assertions;
               import org.junit.jupiter.api.BeforeEach;
               import org.junit.jupiter.api.Test;
-              
+
               class Test {
-              
+
                   @BeforeEach
                   void before() {
                   }

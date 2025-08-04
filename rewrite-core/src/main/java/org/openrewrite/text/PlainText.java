@@ -43,10 +43,12 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<PlainText> {
 
     @Builder.Default
     @With
+    @EqualsAndHashCode.Include
     UUID id = Tree.randomId();
 
     @With
@@ -177,18 +179,18 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
 
     @Override
     public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
-        return t.withId(UUID.fromString(q.receiveAndGet(t.getId(), UUID::toString)))
+        return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
                 .withMarkers(q.receiveMarkers(t.getMarkers()))
-                .withSourcePath(Paths.get(q.receiveAndGet(t.getSourcePath(), Path::toString)))
-                .withCharset(Charset.forName(q.receiveAndGet(t.getCharset(), Charset::name)))
+                .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
+                .withCharsetName(q.receiveAndGet(t.getCharsetName(), String::toString))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
                 .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
-                .withText(q.receiveAndGet(t.getText(), String::toString))
+                .withText(q.receive(t.getText()))
                 .withSnippets(q.receiveList(t.getSnippets(), s -> s
-                        .withId(UUID.fromString(q.receiveAndGet(s.getId(), UUID::toString)))
+                        .withId(q.receiveAndGet(s.getId(), UUID::fromString))
                         .withMarkers(q.receiveMarkers(s.getMarkers()))
-                        .withText(q.receiveAndGet(s.getText(), String::toString))));
+                        .withText(q.receive(s.getText()))));
     }
 
     @Value

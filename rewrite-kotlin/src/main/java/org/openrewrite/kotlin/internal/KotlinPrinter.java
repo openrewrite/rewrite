@@ -207,7 +207,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         if (!destructuringDeclaration.getInitializer().getVariables().isEmpty() &&
-                destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
+            destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
             visitSpace(Objects.requireNonNull(destructuringDeclaration.getInitializer().getVariables().get(0).getPadding()
                     .getInitializer()).getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
             p.append("=");
@@ -359,7 +359,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
         }
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> rpvs =  vd.getPadding().getVariables();
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> rpvs = vd.getPadding().getVariables();
         if (!rpvs.isEmpty()) {
             JRightPadded<J.VariableDeclarations.NamedVariable> rpv = vd.getPadding().getVariables().get(0);
             J.VariableDeclarations.NamedVariable nv = rpv.getElement();
@@ -439,7 +439,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(":");
         }
 
-        delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]",  p);
+        delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]", p);
         return multiAnnotationType;
     }
 
@@ -671,8 +671,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
                 for (Statement statement : classDecl.getBody().getStatements()) {
                     if (statement instanceof J.MethodDeclaration &&
-                            statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
-                            !statement.getMarkers().findFirst(Implicit.class).isPresent()) {
+                        statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
+                        !statement.getMarkers().findFirst(Implicit.class).isPresent()) {
                         J.MethodDeclaration method = (J.MethodDeclaration) statement;
                         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
                         visit(method.getLeadingAnnotations(), p);
@@ -852,15 +852,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return lambda;
         }
 
-        private void visitLambdaParameters(J.Lambda.Parameters parameters, PrintOutputCapture<P> p) {
+        @Override
+        public J visitLambdaParameters(J.Lambda.Parameters parameters, PrintOutputCapture<P> p) {
             visitMarkers(parameters.getMarkers(), p);
             if (parameters.isParenthesized()) {
                 visitSpace(parameters.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
                 p.append('(');
-                visitRightPadded(parameters.getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+                visitRightPadded(parameters.getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
                 p.append(')');
             } else {
-                List<JRightPadded<J>> params = parameters.getPadding().getParams();
+                List<JRightPadded<J>> params = parameters.getPadding().getParameters();
                 for (int i = 0; i < params.size(); i++) {
                     JRightPadded<J> param = params.get(i);
                     if (param.getElement() instanceof J.Lambda.Parameters) {
@@ -876,6 +877,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     }
                 }
             }
+            return parameters;
         }
 
         @Override
@@ -978,7 +980,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("?");
                 }
 
-                if (!method.getName().getSimpleName().equals("<empty>") &&
+                if (!"<empty>".equals(method.getName().getSimpleName()) &&
                     !method.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
                     p.append(".");
                 }
@@ -1178,7 +1180,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("val");
                 }
 
-                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && m.getKeyword().equals("typealias")) {
+                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && "typealias".equals(m.getKeyword())) {
                     isTypeAlias = true;
                 }
             }

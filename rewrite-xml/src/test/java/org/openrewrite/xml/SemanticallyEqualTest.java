@@ -160,6 +160,6 @@ class SemanticallyEqualTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> semanticallyEqual(boolean isEqual) {
         return spec -> spec.beforeRecipe(sources ->
-          assertThat(SemanticallyEqual.areEqual((Xml) sources.get(0), (Xml) sources.get(1))).isEqualTo(isEqual));
+          assertThat(SemanticallyEqual.areEqual((Xml) sources.getFirst(), (Xml) sources.get(1))).isEqualTo(isEqual));
     }
 }

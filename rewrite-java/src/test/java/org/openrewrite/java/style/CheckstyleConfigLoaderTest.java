@@ -330,4 +330,98 @@ class CheckstyleConfigLoaderTest {
         UnnecessaryParenthesesStyle unnecessaryParenthesesStyle = (UnnecessaryParenthesesStyle) checkstyle.getStyles().iterator().next();
         assertThat(unnecessaryParenthesesStyle.getStringLiteral()).isTrue();
     }
+
+    @Test
+    void customImportOrderStyle() throws CheckstyleException {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="CustomImportOrder">
+                        <property name="specialImportsRegExp" value="^org\\."/>
+                        <property name="thirdPartyPackageRegExp" value="^com\\."/>
+                        <property name="standardPackageRegExp" value="^(java\\.|javax\\.)"/>
+                        <property name="customImportOrderRules"
+                       value="STANDARD_JAVA_PACKAGE###THIRD_PARTY_PACKAGE###SPECIAL_IMPORTS###STATIC"/>
+                </module>
+            </module>
+        """, emptyMap());
+
+        assertThat(checkstyle.getStyles()).hasSize(1);
+        assertThat(checkstyle.getStyles()).allMatch(s -> s instanceof CustomImportOrderStyle);
+
+        CustomImportOrderStyle customImportOrderStyle = (CustomImportOrderStyle) checkstyle.getStyles().iterator().next();
+        assertThat(customImportOrderStyle.getSpecialImportsRegExp()).isEqualTo("^org\\.");
+        assertThat(customImportOrderStyle.getThirdPartyPackageRegExp()).isEqualTo("^com\\.");
+        assertThat(customImportOrderStyle.getStandardPackageRegExp()).isEqualTo("^(java\\.|javax\\.)");
+        assertThat(customImportOrderStyle.getSeparateLineBetweenGroups()).isFalse();
+        assertThat(customImportOrderStyle.getSortImportsInGroupAlphabetically()).isFalse();
+        assertThat(customImportOrderStyle.getImportOrder()).containsExactly(
+          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STANDARD_JAVA_PACKAGE, null),
+          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.THIRD_PARTY_PACKAGE, null),
+          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.SPECIAL_IMPORTS, null),
+          new CustomImportOrderStyle.GroupWithDepth(CustomImportOrderStyle.CustomImportOrderGroup.STATIC, null));
+    }
+
+    @Test
+    void unusedImportsWithJavadocProcessing() throws CheckstyleException {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="UnusedImports">
+                        <property name="processJavadoc" value="true"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        assertThat(checkstyle.getStyles()).hasSize(1).allSatisfy(style -> {
+            assertThat(style).isInstanceOf(UnusedImportsStyle.class);
+            assertThat(((UnusedImportsStyle) style).isProcessJavadoc()).isTrue();
+        });
+    }
+
+    @Test
+    void unusedImportsWithoutExpliciteJavadocProcessing() throws CheckstyleException {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="UnusedImports">
+                        <property name="processJavadoc" value="false"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        assertThat(checkstyle.getStyles()).hasSize(1).allSatisfy(style -> {
+            assertThat(style).isInstanceOf(UnusedImportsStyle.class);
+            assertThat(((UnusedImportsStyle) style).isProcessJavadoc()).isFalse();
+        });
+    }
+
+    @Test
+    void unusedImportsWithoutJavadocProcessing() throws CheckstyleException {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="UnusedImports"/>
+                </module>
+            </module>
+        """, emptyMap());
+
+        assertThat(checkstyle.getStyles()).hasSize(1).allSatisfy(style -> {
+            assertThat(style).isInstanceOf(UnusedImportsStyle.class);
+            assertThat(((UnusedImportsStyle) style).isProcessJavadoc()).isFalse();
+        });
+    }
 }

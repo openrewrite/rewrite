@@ -67,7 +67,7 @@ class SemanticallyEqualTest {
         assertEqual(
           """
             import static java.lang.String.valueOf;
-            
+
             class T {
                 Object o1 = String.valueOf("1");
                 Object o2 = String.valueOf("1");
@@ -76,7 +76,7 @@ class SemanticallyEqualTest {
             """,
           """
             import static java.lang.String.valueOf;
-            
+
             class T {
                 Object o1 = String.valueOf("1");
                 Object o2 = "1".valueOf("1");
@@ -430,8 +430,8 @@ class SemanticallyEqualTest {
               ).findFirst()
               .map(J.CompilationUnit.class::cast)
               .get();
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-            J.Assignment a = (J.Assignment) m.getBody().getStatements().get(0);
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
             assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
             assertFalse(SemanticallyEqual.areEqual(((J.FieldAccess) a.getVariable()).getName(), a.getAssignment()));
         }
@@ -450,8 +450,8 @@ class SemanticallyEqualTest {
               ).findFirst()
               .map(J.CompilationUnit.class::cast)
               .get();
-            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
-            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().get(0)).getExpression();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().getFirst()).getExpression();
             assertFalse(SemanticallyEqual.areEqual(b.getLeft(), b.getRight()));
         }
     }
@@ -470,7 +470,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsEqual(@Language(value = "java") String source) {
+    private void assertExpressionsEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 
@@ -490,7 +490,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsNotEqual(@Language(value = "java") String source) {
+    private void assertExpressionsNotEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 

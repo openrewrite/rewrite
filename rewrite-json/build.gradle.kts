@@ -25,5 +25,5 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("io.moderne:jsonrpc:latest.release")
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 }

@@ -5,11 +5,6 @@ plugins {
     id("jvm-test-suite")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
@@ -26,10 +21,17 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.antlr:antlr4-runtime:4.13.2")
     "javaTck"(project(":rewrite-java-tck"))
 }
 
-tasks.withType<JavaCompile> {
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
@@ -48,16 +50,13 @@ tasks.withType<JavaCompile> {
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/ReloadableJava21JavadocVisitor**",
         "**/ReloadableJava21Parser**",
         "**/ReloadableJava21ParserVisitor**",
         "**/ReloadableJava21TypeMapping**",
-        "**/ReloadableJava21TypeSignatureBuilder**",
-        "**/Javac**",
-        "**/JavacTreeMaker**",
-        "**/Permit**"
+        "**/ReloadableJava21TypeSignatureBuilder**"
     )
 }
 

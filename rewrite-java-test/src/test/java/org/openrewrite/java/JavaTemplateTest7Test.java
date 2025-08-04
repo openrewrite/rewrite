@@ -29,11 +29,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class JavaTemplateTest7Test implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "CachedNumberConstructorCall",
       "Convert2MethodRef"
       , "removal"})
+    @Test
     void lambdaIsVariableInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -42,7 +42,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -109,8 +109,8 @@ class JavaTemplateTest7Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/1821")
+    @SuppressWarnings("UnusedAssignment")
     @Test
     void assignmentNotPartOfVariableDeclaration() {
         rewriteRun(
@@ -179,7 +179,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               """,
             """
               import java.nio.charset.StandardCharsets;
-              
+
               public class Test {
                   byte[] test() {
                       String s = "hello";

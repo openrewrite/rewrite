@@ -90,12 +90,10 @@ public class PropertyPlaceholderHelper {
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
                 }
-                if (!visitedPlaceholders.add(originalPlaceholder)) {
-                    throw new IllegalArgumentException(
-                            "Circular placeholder reference '" + originalPlaceholder + "' in property definitions");
+                if (visitedPlaceholders.add(originalPlaceholder)) {
+                    placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 }
                 // Recursive invocation, parsing placeholders contained in the placeholder key.
-                placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 // Now obtain the value for the fully resolved key...
                 String propVal = placeholderResolver.apply(placeholder);
                 if (propVal == null && valueSeparator != null) {
@@ -121,7 +119,7 @@ public class PropertyPlaceholderHelper {
                 }
 
                 // Proceed with unprocessed value.
-                startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
+                startIndex = result.indexOf(placeholderPrefix, endIndex);
                 visitedPlaceholders.remove(originalPlaceholder);
             } else {
                 startIndex = -1;
@@ -137,13 +135,13 @@ public class PropertyPlaceholderHelper {
             if (substringMatch(buf, index, placeholderSuffix)) {
                 if (withinNestedPlaceholder > 0) {
                     withinNestedPlaceholder--;
-                    index = index + placeholderSuffix.length();
+                    index += placeholderSuffix.length();
                 } else {
                     return index;
                 }
             } else if (substringMatch(buf, index, simplePrefix)) {
                 withinNestedPlaceholder++;
-                index = index + simplePrefix.length();
+                index += simplePrefix.length();
             } else {
                 index++;
             }

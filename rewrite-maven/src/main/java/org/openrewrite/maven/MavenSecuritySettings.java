@@ -201,7 +201,8 @@ public class MavenSecuritySettings {
             System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
-                 InvalidKeyException | InvalidAlgorithmParameterException | IllegalArgumentException e) {
+                 InvalidKeyException | InvalidAlgorithmParameterException | NegativeArraySizeException |
+                 ArrayIndexOutOfBoundsException | IllegalArgumentException e) {
             return null;
         }
     }

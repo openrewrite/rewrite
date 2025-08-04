@@ -38,21 +38,21 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
           groovy(
             """
               package foo
-              
+
               /* comment */
               import java.util.List
-              
+
               class Test {
                   List<String> l = new java.util.ArrayList<>()
               }
               """,
             """
               package foo
-              
+
               /* comment */
               import java.util.ArrayList
               import java.util.List
-              
+
               class Test {
                   List<String> l = new ArrayList<>()
               }
@@ -61,8 +61,8 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3736")
+    @Test
     void keepHeader() {
         rewriteRun(
           groovy(
@@ -71,7 +71,7 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
                * header comment will be removed from this groovy script, but not from similar java file
                */
               import java.util.regex.Pattern
-              
+
               def pattern = Pattern.compile("pattern")
               def list = new java.util.ArrayList<String>(1)
               """,
@@ -81,7 +81,7 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
                */
               import java.util.ArrayList
               import java.util.regex.Pattern
-              
+
               def pattern = Pattern.compile("pattern")
               def list = new ArrayList<String>(1)
               """

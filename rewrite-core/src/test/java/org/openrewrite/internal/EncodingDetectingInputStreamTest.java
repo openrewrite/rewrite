@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
@@ -78,7 +77,7 @@ class EncodingDetectingInputStreamTest {
 
     @Test
     void isUtf8() throws IOException {
-        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        List<String> accents = List.of("Café", "Lýðræðisríki");
         for (String accent : accents) {
             try (EncodingDetectingInputStream is = read(accent, UTF_8)) {
                 assertThat(is.getCharset()).isEqualTo(UTF_8);
@@ -88,7 +87,7 @@ class EncodingDetectingInputStreamTest {
 
     @Test
     void isWindows1252() throws IOException {
-        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        List<String> accents = List.of("Café", "Lýðræðisríki");
         for (String accent : accents) {
             try (EncodingDetectingInputStream is = read(accent, WINDOWS_1252)) {
                 assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);

@@ -296,9 +296,41 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               float a = 0.1
-              def b = 0.1f
-              double c = 1.0d
-              long d = 1L
+              def b = 0.10f
+              def c = -0.10f
+              double d = 1.0d
+              double e = -1.0d
+              long f = +1L
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2752")
+    @Test
+    void numericLiteralsWithUnderscores() {
+        rewriteRun(
+          groovy(
+            """
+              def l1 = 10_000L
+              def l2 = 10_000l
+              def i = 10_000
+              def d1 = 10_000d
+              def d2 = 10_000D
+              def f1 = 10_000f
+              def f2 = -10_000.0F
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericLiteralWithSpacing() {
+        rewriteRun(
+          groovy(
+            """
+              def a = -           0.10
+              def b = +           0.10
               """
           )
         );
@@ -314,8 +346,8 @@ class LiteralTest implements RewriteTest {
                 // Groovy AST represents 1.8 as a BigDecimal
                 // Java AST would represent it as Double
                 // Our AST could reasonably make either choice
-                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().get(0))
-                  .getVariables().get(0).getInitializer());
+                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().getFirst())
+                  .getVariables().getFirst().getInitializer());
                 if (initializer.getType() == JavaType.Primitive.Double) {
                     assertThat(initializer.getValue()).isEqualTo(1.8);
                 } else if (TypeUtils.isOfClassType(initializer.getType(), "java.math.BigDecimal")) {
@@ -411,8 +443,8 @@ class LiteralTest implements RewriteTest {
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5232")
+    @Test
     void stringWithMultipleBackslashes() {
         rewriteRun(
           groovy(

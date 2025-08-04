@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import java.util.Collections;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
@@ -29,11 +28,13 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptySet;
+
 public class KotlinTemplate extends JavaTemplate {
     private KotlinTemplate(boolean contextSensitive, KotlinParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         super(
                 code,
-                Collections.emptySet(),
+                emptySet(),
                 onAfterVariableSubstitution,
                 new KotlinTemplateParser(
                         contextSensitive,

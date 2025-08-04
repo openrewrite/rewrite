@@ -515,8 +515,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactId() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(
@@ -531,8 +531,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(
@@ -1328,8 +1328,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1717")
+    @Test
     void changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1411,8 +1411,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1751")
+    @Test
     void allowNewVersionToBeExpressedAsSemverSelector() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1558,8 +1558,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4779")
+    @Test
     void changePluginDependencyGroupIdAndArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -1577,7 +1577,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-            
+
                 <build>
                     <plugins>
                         <plugin>
@@ -1602,7 +1602,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-            
+
                 <build>
                     <plugins>
                         <plugin>
@@ -1621,6 +1621,58 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 </build>
             </project>
             """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyGroupIdAndArtifactIdWithVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <activation.api>1.2.0</activation.api>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>${activation.api}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <activation.api>1.2.2</activation.api>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>${activation.api}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }

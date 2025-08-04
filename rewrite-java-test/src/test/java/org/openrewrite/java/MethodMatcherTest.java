@@ -62,8 +62,8 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(JavaType.Unknown.getInstance()));
     }
 
-    @Test
     @SuppressWarnings("rawtypes")
+    @Test
     void matchesSuperclassTypeOfInterfaces() {
         rewriteRun(
           java(
@@ -201,7 +201,7 @@ class MethodMatcherTest implements RewriteTest {
             """
               package a;
               import java.util.function.Supplier;
-              
+
               class A {
                   Supplier<A> a = A::new;
               }
@@ -217,7 +217,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               class A {
                   void setInt(int value) {}
                   int getInt() {}
@@ -235,20 +235,20 @@ class MethodMatcherTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("RedundantMethodOverride")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     void strictMatchMethodOverride() {
         rewriteRun(
           java(
             """
               package com.abc;
-              
+
               class Parent {
                   public void method(String s) {
                   }
               }
-              
+
               class Test extends Parent {
                   @Override
                   public void method(String s) {
@@ -271,7 +271,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-              
+
               class A {
                   void foo() {}
               }
@@ -296,8 +296,8 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/492")
-    @Test
     @SuppressWarnings("SpellCheckingInspection")
+    @Test
     void matchesWildcardedMethodNameStartingWithJavaKeyword() {
         assertTrue(nameRegex("A assert*()").matcher("assertThat").matches());
     }
@@ -315,7 +315,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-              
+
               class Foo {
                   void bar(int i, String s) {}
                   void other() {
@@ -419,9 +419,9 @@ class MethodMatcherTest implements RewriteTest {
           .findFirst()
           .map(J.CompilationUnit.class::cast)
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-        var classDecl = cu.getClasses().get(0);
-        J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().get(0);
-        return (J.MethodInvocation) testMethod.getBody().getStatements().get(0);
+        var classDecl = cu.getClasses().getFirst();
+        J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().getFirst();
+        return (J.MethodInvocation) testMethod.getBody().getStatements().getFirst();
     }
 
     @Test
@@ -430,7 +430,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-              
+
               class Foo {
                   void bar(String[] s) {}
                   void test() {

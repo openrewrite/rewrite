@@ -24,7 +24,6 @@ import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -146,7 +145,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.LinkedList;
               import java.util.List;
-              
+
               public class A {
                  private List<?> list;
                  private static List<String> list1 = new ArrayList<>();
@@ -159,7 +158,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.LinkedList;
               import java.util.List;
-              
+
               public class A {
                  /*~~>*/private List<?> list;
                  /*~~>*/private static List<String> list1 = new ArrayList<>();

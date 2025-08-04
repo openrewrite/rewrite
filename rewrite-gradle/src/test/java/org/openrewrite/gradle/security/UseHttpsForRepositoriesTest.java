@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 @SuppressWarnings("HttpUrlsUsage")
 class UseHttpsForRepositoriesTest implements RewriteTest {
@@ -99,6 +100,34 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                       url "https://repo.spring.example.com/libs-release-local/$subRepo"
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDSLSupport() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              repositories {
+                   maven { url = uri("http://repo.spring.example.com/libs-release-local") }
+                   maven { url = uri("http://repo.spring.example.com/libs-release-local") }
+                   maven {
+                       val subRepo = if (properties["snapshot"] as Boolean? == true) "snapshot" else "release"
+                       url = uri("http://repo.spring.example.com/libs-release-local/$subRepo")
+                   }
+               }
+              """,
+            """
+              repositories {
+                   maven { url = uri("https://repo.spring.example.com/libs-release-local") }
+                   maven { url = uri("https://repo.spring.example.com/libs-release-local") }
+                   maven {
+                       val subRepo = if (properties["snapshot"] as Boolean? == true) "snapshot" else "release"
+                       url = uri("https://repo.spring.example.com/libs-release-local/$subRepo")
+                   }
+               }
               """
           )
         );

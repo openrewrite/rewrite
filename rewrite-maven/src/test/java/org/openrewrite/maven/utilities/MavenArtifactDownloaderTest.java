@@ -71,16 +71,63 @@ class MavenArtifactDownloaderTest {
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();
 
-    List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-    for (ResolvedDependency runtimeDependency : runtimeDependencies) {
-      assertNotNull(
-          downloader.downloadArtifact(runtimeDependency),
-          String.format(
-              "%s:%s:%s:%s failed to download",
-              runtimeDependency.getGroupId(),
-              runtimeDependency.getArtifactId(),
-              runtimeDependency.getVersion(),
-              runtimeDependency.getType()));
+        List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
+        for (ResolvedDependency runtimeDependency : runtimeDependencies) {
+            if (!("bom".equals(runtimeDependency.getType()))) {
+                assertNotNull(
+                  downloader.downloadArtifact(runtimeDependency),
+                  String.format(
+                    "%s:%s:%s:%s failed to download",
+                    runtimeDependency.getGroupId(),
+                    runtimeDependency.getArtifactId(),
+                    runtimeDependency.getVersion(),
+                    runtimeDependency.getType()));
+            }
+        }
     }
-  }
+
+    @Test
+    void downloadDependenciesWithClassifier(@TempDir Path tempDir) {
+        ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+        MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
+        MavenArtifactDownloader downloader = new MavenArtifactDownloader(
+          artifactCache, null, t -> ctx.getOnError().accept(t));
+
+        MavenParser mavenParser = MavenParser.builder().build();
+        SourceFile parsed = mavenParser.parse(ctx,
+          //language=xml
+          """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>maven-downloader-test</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>net.sf.json-lib</groupId>
+                        <artifactId>json-lib</artifactId>
+                        <version>2.4</version>
+                        <classifier>jdk15</classifier>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+        ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
+
+        MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        assertThat(mavenModel.getDependencies()).isNotEmpty();
+
+        List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
+        for (ResolvedDependency runtimeDependency : runtimeDependencies) {
+            if (!("bom".equals(runtimeDependency.getType()))) {
+                assertNotNull(
+                  downloader.downloadArtifact(runtimeDependency),
+                  String.format(
+                    "%s:%s:%s:%s failed to download",
+                    runtimeDependency.getGroupId(),
+                    runtimeDependency.getArtifactId(),
+                    runtimeDependency.getVersion(),
+                    runtimeDependency.getType()));
+            }
+        }
+    }
 }

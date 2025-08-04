@@ -159,7 +159,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleSettings gradleSettings = maybeGradleSettings.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, null, gradleSettings), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -175,7 +175,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     } catch (MavenDownloadingException e) {
                         return e.warn(cu);
                     }
-                } else if (!gradleSixOrLater && cu.getSourcePath().toString().equals("build.gradle")) {
+                } else if (!gradleSixOrLater && "build.gradle".equals(cu.getSourcePath().toString())) {
                     // Older than 6.0 goes in root build.gradle only, not in build.gradle of subprojects
                     Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
                     if (!maybeGradleProject.isPresent()) {
@@ -184,7 +184,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleProject gradleProject = maybeGradleProject.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, gradleProject, null), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -236,7 +236,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
-                if (method.getSimpleName().equals("gradleEnterprise") || method.getSimpleName().equals("develocity")) {
+                if ("gradleEnterprise".equals(method.getSimpleName()) || "develocity".equals(method.getSimpleName())) {
                     atomicBoolean.set(true);
                 }
                 return super.visitMethodInvocation(method, atomicBoolean);

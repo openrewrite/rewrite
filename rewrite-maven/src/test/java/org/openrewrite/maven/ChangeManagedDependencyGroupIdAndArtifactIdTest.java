@@ -76,8 +76,8 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
+    @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
         assertThatExceptionOfType(AssertionError.class)
           .isThrownBy(() -> rewriteRun(
@@ -329,14 +329,14 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <version.property>1.2.0</version.property>
+                      <version.property>1.2.2</version.property>
                   </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.2</version>
+                              <version>${version.property}</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>

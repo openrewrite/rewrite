@@ -33,9 +33,9 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
@@ -51,6 +51,11 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
+    private final String bindType;
+
+    public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
+        this(imports, contextSensitive, "Object");
+    }
 
     public String template(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -94,7 +99,7 @@ public class BlockStatementTemplateGenerator {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
                 if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
-                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    ("__P__".equals(classDecl.getSimpleName()) || "__M__".equals(classDecl.getSimpleName()))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -204,25 +209,27 @@ public class BlockStatementTemplateGenerator {
     @SuppressWarnings("DataFlowIssue")
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
-                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
-        if (j instanceof J.Lambda) {
+                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
+        if (j instanceof J.Lambda && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
-        } else if (j instanceof J.MemberReference) {
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append("Object o = ");
+                before.append(bindType).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append("Object o = ");
+            before.append(bindType).append(" o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
@@ -591,12 +598,12 @@ public class BlockStatementTemplateGenerator {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 if (condition != null) {
-                    boolean thenNeverCompletesNormally = PatternVariables.neverCompletesNormally(iff.getThenPart());
-                    boolean elseNeverCompletesNormally = iff.getElsePart() != null && PatternVariables.neverCompletesNormally(iff.getElsePart().getBody());
-                    if (thenNeverCompletesNormally || elseNeverCompletesNormally) {
+                    boolean thenAlwaysCompletesAbnormally = PatternVariables.alwaysCompletesAbnormally(iff.getThenPart());
+                    boolean elseAlwaysCompletesAbnormally = iff.getElsePart() != null && PatternVariables.alwaysCompletesAbnormally(iff.getElsePart().getBody());
+                    if (thenAlwaysCompletesAbnormally || elseAlwaysCompletesAbnormally) {
                         StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
-                        ifStatement.append(thenNeverCompletesNormally ? " throw new RuntimeException(); }" : " }");
-                        ifStatement.append(elseNeverCompletesNormally ? " else { throw new RuntimeException(); }" : " else { }");
+                        ifStatement.append(thenAlwaysCompletesAbnormally ? " throw new RuntimeException(); }" : " }");
+                        ifStatement.append(elseAlwaysCompletesAbnormally ? " else { throw new RuntimeException(); }" : " else { }");
                         before.insert(0, ifStatement);
                     }
                 }

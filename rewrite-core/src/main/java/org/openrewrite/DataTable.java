@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -45,7 +46,7 @@ public class DataTable<Row> {
      * @param displayName The display name of this data table.
      * @param description The description of this data table.
      */
-    public DataTable(Recipe recipe,
+    public DataTable(@Nullable Recipe recipe,
                      @NlsRewrite.DisplayName @Language("markdown") String displayName,
                      @NlsRewrite.Description @Language("markdown") String description) {
         this.displayName = displayName;

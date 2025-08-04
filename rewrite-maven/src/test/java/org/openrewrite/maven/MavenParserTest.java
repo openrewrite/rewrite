@@ -28,6 +28,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
@@ -61,7 +63,7 @@ class MavenParserTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>junit</groupId>
@@ -111,7 +113,7 @@ class MavenParserTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>foo</groupId>
@@ -125,8 +127,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2603")
+    @Test
     void repositoryWithPropertyPlaceholder() {
         rewriteRun(
           pomXml(
@@ -234,7 +236,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                
+
                   <dependencies>
                     <dependency>
                       <groupId>junit</groupId>
@@ -271,7 +273,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -300,7 +302,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -330,7 +332,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.6");
               })
             )
@@ -360,7 +362,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).get(0);
+                  var dependency = results.findDependencies("junit", "junit", Scope.Compile).getFirst();
                   assertThat(dependency.getVersion()).isEqualTo("4.9");
               })
             )
@@ -503,7 +505,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                .findDependencies("com.google.guava", "guava", null).get(0).getVersion())
+                .findDependencies("com.google.guava", "guava", null).getFirst().getVersion())
                 .isEqualTo("14.0")
             )
           )
@@ -605,10 +607,10 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom()
-                  .getRepositories().get(0).getId())
+                  .getRepositories().getFirst().getId())
                   .isEqualTo("coolId");
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom()
-                  .getRepositories().get(0).getUri())
+                  .getRepositories().getFirst().getUri())
                   .isEqualTo("https://repository.apache.org/content/repositories/snapshots");
             })
           )
@@ -623,7 +625,7 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -633,7 +635,7 @@ class MavenParserTest implements RewriteTest {
                           <name>Trygve Laugst&oslash;l</name>
                       </developer>
                   </developers>
-              
+
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -646,10 +648,10 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Test).get(0).getLicenses().get(0).getType())
+                  .get(Scope.Test).getFirst().getLicenses().getFirst().getType())
                   .isEqualTo(License.Type.Eclipse);
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Test).get(0).getType())
+                  .get(Scope.Test).getFirst().getType())
                   .isEqualTo("jar");
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPackaging())
                   .isEqualTo("pom");
@@ -689,11 +691,11 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>single-project</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+
                   <dependencies>
                       <dependency>
                           <groupId>com.google.guava</groupId>
@@ -701,7 +703,7 @@ class MavenParserTest implements RewriteTest {
                           <version>29.0-jre</version>
                       </dependency>
                   </dependencies>
-              
+
                   <repositories>
                       <repository>
                           <id>jcenter</id>
@@ -723,15 +725,15 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>single-project</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+
                   <properties>
                       <dependency.scope>compile</dependency.scope>
                   </properties>
-              
+
                   <dependencies>
                       <dependency>
                           <groupId>com.google.guava</groupId>
@@ -783,11 +785,11 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-              
+
                   <parent>
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
@@ -807,11 +809,11 @@ class MavenParserTest implements RewriteTest {
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-              
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-              
+
                   <dependencies>
                       <dependency>
                           <groupId>com.mycompany.app</groupId>
@@ -1010,11 +1012,11 @@ class MavenParserTest implements RewriteTest {
                             resp.setBody("""
                               <project>
                                 <modelVersion>4.0.0</modelVersion>
-                              
+
                                 <groupId>com.foo</groupId>
                                 <artifactId>bar</artifactId>
                                 <version>1.0.0</version>
-                              
+
                               </project>
                               """
                             );
@@ -1086,8 +1088,8 @@ class MavenParserTest implements RewriteTest {
 
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
-              .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                               deps.get(0).getArtifactId().equals("bar"));
+              .matches(deps -> "com.foo".equals(deps.getFirst().getGroupId()) &&
+                "bar".equals(deps.getFirst().getArtifactId()));
             mockRepo.shutdown();
         }
     }
@@ -1120,7 +1122,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Compile).get(0).getVersion())
+                  .get(Scope.Compile).getFirst().getVersion())
                   .isEqualTo("0.1.0-SNAPSHOT")
               )
             ),
@@ -1244,7 +1246,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
-                  .get(Scope.Compile).get(0).getVersion())
+                  .get(Scope.Compile).getFirst().getVersion())
                   .isEqualTo("0.1.0-SNAPSHOT")
               )
             )
@@ -1254,17 +1256,17 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                
+
                         <artifactId>b</artifactId>
                         <groupId>org.openrewrite.maven</groupId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-                
+
                         <properties>
                             <maven.compiler.source>1.8</maven.compiler.source>
                             <maven.compiler.target>1.8</maven.compiler.target>
                         </properties>
-                
+
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1285,12 +1287,12 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                
+
                         <artifactId>c</artifactId>
                         <groupId>org.openrewrite.maven</groupId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-                
+
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1309,11 +1311,11 @@ class MavenParserTest implements RewriteTest {
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
-                
+
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>d</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <properties>
                             <maven.compiler.source>1.8</maven.compiler.source>
                             <maven.compiler.target>1.8</maven.compiler.target>
@@ -1325,8 +1327,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("LanguageMismatch")
     @Nested
+    @SuppressWarnings("LanguageMismatch")
     class Profiles {
 
         //language=xml
@@ -1389,9 +1391,9 @@ class MavenParserTest implements RewriteTest {
           """;
 
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should be active " +
-                     "unless there is another active profile _from the same POM file_")
+          "unless there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
@@ -1421,9 +1423,9 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-                     " if there is another active profile _from the same POM file_")
+          " if there is another active profile _from the same POM file_")
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @Test
         void activeByDefaultWithPomLocalActiveProfile() {
             rewriteRun(
@@ -1506,21 +1508,21 @@ class MavenParserTest implements RewriteTest {
                       </profiles>
                   </project>
                   """,
-                    spec -> spec.afterRecipe(pomXml -> {
-                                Map<String, List<ResolvedDependency>> deps =
-                                        pomXml.getMarkers()
-                                                .findFirst(MavenResolutionResult.class)
-                                                .orElseThrow()
-                                                .getDependencies()
-                                                .get(Scope.Compile)
-                                                .stream()
-                                                .collect(groupingBy(ResolvedDependency::getArtifactId));
+                spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
 
-                                assertThat(deps)
-                                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
-                                                .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
-                            }
-                    )
+                      assertThat(deps)
+                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                  }
+                )
               )
             );
         }
@@ -1574,15 +1576,15 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                .getPom().getRequested().getProfiles().get(0).getActivation())
+                .getPom().getRequested().getProfiles().getFirst().getActivation())
                 .isNull()
             )
           )
         );
     }
 
-    @SuppressWarnings("CheckTagEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
+    @SuppressWarnings("CheckTagEmptyBody")
     @Test
     void parseEmptyValueActivationTag() {
         rewriteRun(
@@ -1605,7 +1607,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 ProfileActivation activation = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                  .getPom().getRequested().getProfiles().get(0).getActivation();
+                  .getPom().getRequested().getProfiles().getFirst().getActivation();
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isNull();
                 assertThat(activation.getJdk()).isNull();
@@ -1641,7 +1643,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml -> {
                 ProfileActivation activation = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                  .getPom().getRequested().getProfiles().get(0).getActivation();
+                  .getPom().getRequested().getProfiles().getFirst().getActivation();
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isTrue();
             })
@@ -1698,8 +1700,8 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
-                  .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                                   deps.get(0).getVersion().equals("29.0-jre"))
+                  .matches(deps -> "guava".equals(deps.getFirst().getArtifactId()) &&
+                    "29.0-jre".equals(deps.getFirst().getVersion()))
               )
             )
           )
@@ -1733,7 +1735,7 @@ class MavenParserTest implements RewriteTest {
                         <artifactId>a-parent</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
                         <packaging>pom</packaging>
-                
+
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1756,9 +1758,9 @@ class MavenParserTest implements RewriteTest {
                               <version>0.1.0-SNAPSHOT</version>
                               <relativePath />
                           </parent>
-                  
+
                           <artifactId>a</artifactId>
-                  
+
                           <dependencies>
                               <dependency>
                                   <groupId>org.openrewrite.maven</groupId>
@@ -1772,10 +1774,10 @@ class MavenParserTest implements RewriteTest {
                     var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                       .getDependencies().get(Scope.Compile);
                     assertThat(compileDependencies).hasSize(2);
-                    assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("b") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
-                    assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("d") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                    assertThat(compileDependencies).anyMatch(it -> "b".equals(it.getArtifactId()) &&
+                      "0.1.0-SNAPSHOT".equals(it.getVersion()));
+                    assertThat(compileDependencies).anyMatch(it -> "d".equals(it.getArtifactId()) &&
+                      "0.1.0-SNAPSHOT".equals(it.getVersion()));
                 })
               ),
               mavenProject("b-parent",
@@ -1817,9 +1819,9 @@ class MavenParserTest implements RewriteTest {
                                   <version>0.1.0-SNAPSHOT</version>
                                   <relativePath />
                               </parent>
-                      
+
                               <artifactId>b</artifactId>
-                      
+
                               <dependencies>
                                   <dependency>
                                       <groupId>org.openrewrite.maven</groupId>
@@ -1859,7 +1861,7 @@ class MavenParserTest implements RewriteTest {
                         <artifactId>a</artifactId>
                         <version>1.0.0</version>
                         <packaging>jar</packaging>
-                
+
                         <dependencyManagement>
                             <dependencies>
                                 <dependency>
@@ -1869,7 +1871,7 @@ class MavenParserTest implements RewriteTest {
                                 </dependency>
                             </dependencies>
                         </dependencyManagement>
-                
+
                         <dependencies>
                             <dependency>
                                 <groupId>junit</groupId>
@@ -1915,9 +1917,9 @@ class MavenParserTest implements RewriteTest {
               spec -> spec.afterRecipe(pomXml -> {
                   var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getDependencies().get(Scope.Compile);
-                  assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("junit") &&
-                                                                 it.getVersion().equals("4.11"));
-                  assertThat(compileDependencies).noneMatch(it -> it.getArtifactId().equals("hamcrest-core"));
+                  assertThat(compileDependencies).anyMatch(it -> "junit".equals(it.getArtifactId()) &&
+                    "4.11".equals(it.getVersion()));
+                  assertThat(compileDependencies).noneMatch(it -> "hamcrest-core".equals(it.getArtifactId()));
               })
             )
           )
@@ -1933,7 +1935,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-              
+
                   <profiles>
                       <profile>
                           <id>old-jdk</id>
@@ -2105,15 +2107,13 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
@@ -2125,38 +2125,34 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionWithParent() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+
                 <modules>
                   <module>sample-rest</module>
                 </modules>
-              
+
               </project>
               """,
-                spec -> spec.path("pom.xml")),
+            spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample</artifactId>
@@ -2165,53 +2161,49 @@ class MavenParserTest implements RewriteTest {
                 </parent>
               </project>
               """,
-                spec -> spec.path("rest/pom.xml"))
+            spec -> spec.path("rest/pom.xml"))
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+
                 <modules>
                   <module>sample-parent</module>
                   <module>sample-app</module>
                   <module>sample-rest</module>
                   <module>sample-web</module>
                 </modules>
-              
+
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
               </project>
               """,
-                spec -> spec.path("pom.xml")),
+            spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-parent</artifactId>
                 <groupId>net.sample</groupId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
-              
+
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -2228,30 +2220,28 @@ class MavenParserTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-                spec -> spec.path("parent/pom.xml")),
+            spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
@@ -2259,17 +2249,15 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-                spec -> spec.path("app/pom.xml")),
+            spec -> spec.path("app/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2278,17 +2266,15 @@ class MavenParserTest implements RewriteTest {
                 </parent>
               </project>
               """,
-                spec -> spec.path("rest/pom.xml")),
+            spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2297,54 +2283,50 @@ class MavenParserTest implements RewriteTest {
                 </parent>
               </project>
               """,
-                spec -> spec.path("web/pom.xml"))
+            spec -> spec.path("web/pom.xml"))
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
+    @Test
     void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>net.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+
                 <modules>
                   <module>sample-parent</module>
                   <module>sample-app</module>
                   <module>sample-rest</module>
                   <module>sample-web</module>
                 </modules>
-              
+
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
               </project>
               """,
-                spec -> spec.path("pom.xml")),
+            spec -> spec.path("pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-parent</artifactId>
                 <groupId>net.sample</groupId>
                 <version>${revision}</version>
                 <packaging>pom</packaging>
-              
+
                 <properties>
                   <revision>0.0.0-SNAPSHOT</revision>
                 </properties>
-              
+
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
@@ -2361,35 +2343,33 @@ class MavenParserTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-                spec -> spec.path("parent/pom.xml")),
+            spec -> spec.path("parent/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
                   </dependency>
-              
+
                   <dependency>
                     <groupId>junit</groupId>
                     <artifactId>junit</artifactId>
@@ -2398,33 +2378,31 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-                """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+            """
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-app</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
                   <version>${revision}</version>
                   <relativePath>../parent/pom.xml</relativePath>
                 </parent>
-              
+
                 <dependencies>
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-rest</artifactId>
                   </dependency>
-              
+
                   <dependency>
                     <groupId>net.sample</groupId>
                     <artifactId>sample-web</artifactId>
                   </dependency>
-              
+
                   <dependency>
                     <groupId>junit</groupId>
                     <artifactId>junit</artifactId>
@@ -2433,17 +2411,15 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-                spec -> spec.path("app/pom.xml")),
+            spec -> spec.path("app/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-rest</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2452,17 +2428,15 @@ class MavenParserTest implements RewriteTest {
                 </parent>
               </project>
               """,
-                spec -> spec.path("rest/pom.xml")),
+            spec -> spec.path("rest/pom.xml")),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-              
+              <project>
+
                 <modelVersion>4.0.0</modelVersion>
                 <artifactId>sample-web</artifactId>
                 <packaging>jar</packaging>
-              
+
                 <parent>
                   <groupId>net.sample</groupId>
                   <artifactId>sample-parent</artifactId>
@@ -2471,29 +2445,28 @@ class MavenParserTest implements RewriteTest {
                 </parent>
               </project>
               """,
-                spec -> spec.path("web/pom.xml"))
+            spec -> spec.path("web/pom.xml"))
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2373")
+    @Test
     void multipleCiFriendlyVersionPlaceholders() {
         rewriteRun(
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>bogus.example</groupId>
                 <artifactId>parent</artifactId>
                 <version>${revision}${changelist}</version>
                 <packaging>pom</packaging>
-              
+
                 <modules>
                   <module>sub</module>
                 </modules>
-              
+
                 <properties>
                   <revision>99999.0</revision>
                   <changelist>-SNAPSHOT</changelist>
@@ -2503,20 +2476,19 @@ class MavenParserTest implements RewriteTest {
           ),
           pomXml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <parent>
                   <groupId>bogus.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>${revision}${changelist}</version>
                 </parent>
-              
+
                 <artifactId>sub</artifactId>
               </project>
               """,
-                spec -> spec.path("sub/pom.xml"))
+            spec -> spec.path("sub/pom.xml"))
         );
     }
 
@@ -2525,8 +2497,7 @@ class MavenParserTest implements RewriteTest {
         rewriteRun(
           mavenProject("a",
             pomXml("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample.optional</groupId>
                 <artifactId>a</artifactId>
@@ -2536,8 +2507,7 @@ class MavenParserTest implements RewriteTest {
             )),
           mavenProject("b",
             pomXml("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.sample.optional</groupId>
                 <artifactId>b</artifactId>
@@ -2561,8 +2531,7 @@ class MavenParserTest implements RewriteTest {
           ),
           mavenProject("c",
             pomXml("""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample.optional</groupId>
                   <artifactId>c</artifactId>
@@ -2578,9 +2547,9 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                 .getDependencies().get(Scope.Compile))
-                .noneMatch(dep -> dep.getGav().getArtifactId().equals("a"))
-                .anyMatch(dep -> dep.getGav().getArtifactId().equals("b"))
-                .anyMatch(dep -> dep.getGav().getArtifactId().equals("junit")))
+                .noneMatch(dep -> "a".equals(dep.getGav().getArtifactId()))
+                .anyMatch(dep -> "b".equals(dep.getGav().getArtifactId()))
+                .anyMatch(dep -> "junit".equals(dep.getGav().getArtifactId())))
             ))
         );
     }
@@ -2593,7 +2562,7 @@ class MavenParserTest implements RewriteTest {
             <groupId>com.mycompany.app</groupId>
             <artifactId>my-app</artifactId>
             <version>1</version>
-          
+
             <dependencies>
               <dependency>
                 <groupId>junit</groupId>
@@ -2620,7 +2589,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+
                   <build>
                       <plugins>
                           <plugin>
@@ -2635,7 +2604,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
-                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst();
                   assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
                   assertThat(plugin.getConfiguration()).isNotNull();
               }
@@ -2653,7 +2622,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+
                   <build>
                       <plugins>
                           <plugin>
@@ -2665,7 +2634,7 @@ class MavenParserTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(pomXml -> {
-                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0);
+                  Plugin plugin = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst();
                   assertThat(plugin.getArtifactId()).isEqualTo("maven-compiler-plugin");
                   assertThat(plugin.getConfiguration()).isNull();
               }
@@ -2692,7 +2661,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
-                  .get(0).getArtifactId())
+                  .getFirst().getArtifactId())
                   .isEqualTo("maven-compiler-plugin")
               )
             )
@@ -2704,9 +2673,9 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <packaging>pom</packaging>
-                
+
                         <build>
                           <plugins>
                               <plugin>
@@ -2734,7 +2703,7 @@ class MavenParserTest implements RewriteTest {
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>a</artifactId>
                   <version>0.1.0-SNAPSHOT</version>
-              
+
                   <build>
                     <pluginManagement>
                       <plugins>
@@ -2752,7 +2721,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(pomXml ->
               assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
-                .get(0).getArtifactId())
+                .getFirst().getArtifactId())
                 .isEqualTo("maven-compiler-plugin")
             )
           )
@@ -2777,7 +2746,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml ->
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
-                  .get(0).getArtifactId())
+                  .getFirst().getArtifactId())
                   .isEqualTo("maven-compiler-plugin")
               )
             )
@@ -2789,9 +2758,9 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <packaging>pom</packaging>
-                
+
                         <build>
                         <pluginManagement>
                             <plugins>
@@ -2841,9 +2810,9 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <packaging>pom</packaging>
-                
+
                         <build>
                           <plugins>
                               <plugin>
@@ -2873,9 +2842,9 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <packaging>pom</packaging>
-                
+
                         <build>
                           <plugins>
                               <plugin>
@@ -2903,7 +2872,7 @@ class MavenParserTest implements RewriteTest {
                           <relativePath />
                       </parent>
                       <artifactId>a</artifactId>
-                
+
                       <build>
                           <plugins>
                               <plugin>
@@ -2918,10 +2887,10 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(2)
-                  .anyMatch(elem -> elem.asText().equals("11"))
-                  .anyMatch(elem -> elem.asText().equals("17"))
+                  .anyMatch(elem -> "11".equals(elem.asText()))
+                  .anyMatch(elem -> "17".equals(elem.asText()))
               )
             )
           )
@@ -2938,9 +2907,9 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
+
                         <packaging>pom</packaging>
-                
+
                         <build>
                           <plugins>
                             <plugin>
@@ -2970,7 +2939,7 @@ class MavenParserTest implements RewriteTest {
                           <relativePath />
                       </parent>
                       <artifactId>a</artifactId>
-                
+
                       <build>
                           <plugins>
                             <plugin>
@@ -2988,7 +2957,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3057,7 +3026,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3129,7 +3098,7 @@ class MavenParserTest implements RewriteTest {
                   </project>
                 """,
               spec -> spec.afterRecipe(pomXml ->
-                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().get(0).getConfiguration())
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins().getFirst().getConfiguration())
                   .hasSize(1)
                   .isEqualTo(JsonNodeFactory.instance.objectNode()
                     .set("resources", JsonNodeFactory.instance.objectNode()
@@ -3293,8 +3262,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4093")
+    @Test
     void circularImportDependency() {
         rewriteRun(
           mavenProject("root",
@@ -3321,7 +3290,7 @@ class MavenParserTest implements RewriteTest {
                 """,
               spec -> spec.afterRecipe(pomXml -> {
                   MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
                   assertThat(gav.getGroupId()).isEqualTo("junit");
                   assertThat(gav.getArtifactId()).isEqualTo("junit");
                   assertThat(gav.getVersion()).isEqualTo("4.13.2");
@@ -3351,7 +3320,7 @@ class MavenParserTest implements RewriteTest {
                   """,
                 spec -> spec.afterRecipe(pomXml -> {
                     MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().getFirst().getGav();
                     assertThat(gav.getGroupId()).isEqualTo("junit");
                     assertThat(gav.getArtifactId()).isEqualTo("junit");
                     assertThat(gav.getVersion()).isEqualTo("4.13.2");
@@ -3373,11 +3342,11 @@ class MavenParserTest implements RewriteTest {
                     <artifactId>example-root</artifactId>
                     <packaging>pom</packaging>
                     <version>1.0.0</version>
-                
+
                     <properties>
                         <project.version>1.0.1</project.version>
                     </properties>
-                
+
                     <modules>
                         <module>example-child</module>
                     </modules>
@@ -3411,8 +3380,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4319")
+    @Test
     void multiModulePropertyVersionShouldAddModules() {
         rewriteRun(
           mavenProject("root",
@@ -3502,7 +3471,7 @@ class MavenParserTest implements RewriteTest {
                       assertThat(res.getDependencies().get(Scope.Compile)).isEmpty();
                       assertThat(res.getDependencies().get(Scope.Runtime)).isEmpty();
                       assertThat(res.getDependencies().get(Scope.Provided)).isEmpty();
-                      assertThat(res.getDependencies().get(Scope.Test)).isNotEmpty().anyMatch(dep -> dep.getGroupId().equals("com.google.guava") && dep.getArtifactId().equals("guava"));
+                      assertThat(res.getDependencies().get(Scope.Test)).isNotEmpty().anyMatch(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()));
                   }
                 )
               )
@@ -3859,10 +3828,10 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-                spec -> spec.afterRecipe(pom -> {
-                    MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
-                })
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
+            })
           ));
     }
 
@@ -3872,66 +3841,66 @@ class MavenParserTest implements RewriteTest {
           pomXml(
             //language=xml
             """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-            
-              <groupId>org.openrewrite</groupId>
-              <artifactId>sam-parent</artifactId>
-              <version>1.0.0</version>
-              <packaging>pom</packaging>
-            
-              <dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openrewrite</groupId>
-                        <artifactId>rewrite-core</artifactId>
-                        <version>8.0.0</version>
-                    </dependency>
-                </dependencies>
-              </dependencyManagement>
-            </project>
-            """
-          ),
-          mavenProject("sam-bom",
-            pomXml(
-              //language=xml
-              """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-              
+
                 <groupId>org.openrewrite</groupId>
-                <artifactId>sam-bom</artifactId>
+                <artifactId>sam-parent</artifactId>
                 <version>1.0.0</version>
                 <packaging>pom</packaging>
-              
+
                 <dependencyManagement>
                   <dependencies>
                       <dependency>
                           <groupId>org.openrewrite</groupId>
                           <artifactId>rewrite-core</artifactId>
-                          <version>7.0.0</version>
+                          <version>8.0.0</version>
                       </dependency>
                   </dependencies>
                 </dependencyManagement>
               </project>
-              """)),
+              """
+          ),
+          mavenProject("sam-bom",
+            pomXml(
+              //language=xml
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>sam-bom</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+
+                  <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite</groupId>
+                            <artifactId>rewrite-core</artifactId>
+                            <version>7.0.0</version>
+                        </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """)),
           mavenProject("sam",
             pomXml(
               //language=xml
               """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-                
+
                   <groupId>org.openrewrite</groupId>
                   <artifactId>sam</artifactId>
                   <version>1.0.0</version>
-                
+
                   <parent>
                       <groupId>org.openrewrite</groupId>
                       <artifactId>sam-parent</artifactId>
                       <version>1.0.0</version>
                   </parent>
-                
+
                   <dependencyManagement>
                     <dependencies>
                         <dependency>
@@ -3943,7 +3912,7 @@ class MavenParserTest implements RewriteTest {
                         </dependency>
                     </dependencies>
                   </dependencyManagement>
-                
+
                   <dependencies>
                     <dependency>
                         <groupId>org.openrewrite</groupId>
@@ -3959,14 +3928,14 @@ class MavenParserTest implements RewriteTest {
                     .as("The parent says 8.0.0, the bom says 7.0.0, Maven says the parent is nearer.")
                     .isEqualTo("8.0.0");
               })))
-          );
+        );
     }
 
     @Test
     void jaxbRuntime() {
         rewriteRun(
           pomXml(
-                """
+            """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany</groupId>
@@ -3982,22 +3951,579 @@ class MavenParserTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-                spec -> spec.afterRecipe(pom -> {
-                            MavenResolutionResult mrr = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                            assertThat(mrr.getDependencies().get(Scope.Runtime))
-                                    .map(ResolvedDependency::getGav)
-                                    .map(ResolvedGroupArtifactVersion::asGroupArtifactVersion)
-                                    .as("At one point this test failed with no version number found for jakarta.xml.bind-api because ResolvedPom was not considering classifiers as significant for dependency management")
-                                    .containsExactlyInAnyOrder(
-                                            new GroupArtifactVersion("org.glassfish.jaxb", "jaxb-runtime", "2.3.9"),
-                                            new GroupArtifactVersion("jakarta.xml.bind", "jakarta.xml.bind-api", "2.3.3"),
-                                            new GroupArtifactVersion("org.glassfish.jaxb", "txw2", "2.3.9"),
-                                            new GroupArtifactVersion("com.sun.istack", "istack-commons-runtime", "3.0.12"),
-                                            new GroupArtifactVersion("com.sun.activation", "jakarta.activation", "1.2.2")
-                                    );
-                        }
-                )
+            spec -> spec.afterRecipe(pom -> {
+                  MavenResolutionResult mrr = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(mrr.getDependencies().get(Scope.Runtime))
+                    .map(ResolvedDependency::getGav)
+                    .map(ResolvedGroupArtifactVersion::asGroupArtifactVersion)
+                    .as("At one point this test failed with no version number found for jakarta.xml.bind-api because ResolvedPom was not considering classifiers as significant for dependency management")
+                    .containsExactlyInAnyOrder(
+                      new GroupArtifactVersion("org.glassfish.jaxb", "jaxb-runtime", "2.3.9"),
+                      new GroupArtifactVersion("jakarta.xml.bind", "jakarta.xml.bind-api", "2.3.3"),
+                      new GroupArtifactVersion("org.glassfish.jaxb", "txw2", "2.3.9"),
+                      new GroupArtifactVersion("com.sun.istack", "istack-commons-runtime", "3.0.12"),
+                      new GroupArtifactVersion("com.sun.activation", "jakarta.activation", "1.2.2")
+                    );
+              }
+            )
           )
         );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"latest", "release"})
+    void latestOrReleaseVersionInDependencyManagement(String version) {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                     <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-dependencies</artifactId>
+                      <version>%s</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(version)
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void weirdImpalaPom() {
+        // Maven says:
+        // The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+        // But does not fail the build as it does not actually have any transitive dependencies
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <groupId>test</groupId>
+                  <artifactId>impala-test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                  <packaging>jar</packaging>
+
+                  <name>Impala test</name>
+                  <description>The POM for Impala:ImpalaJDBC42:jar:2.6.26.1031 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details</description>
+
+                  <dependencies>
+                      <dependency>
+                          <groupId>Impala</groupId>
+                          <artifactId>ImpalaJDBC42</artifactId>
+                          <version>2.6.26.1031</version>
+                      </dependency>
+                  </dependencies>
+
+                  <repositories>
+                      <repository>
+                          <id>cloudera</id>
+                          <name>cloudera</name>
+                          <url>https://repository.cloudera.com/repository/cloudera-repos/</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Nested
+    class DependencyManagement {
+        // https://repo1.maven.org/maven2/org/apache/maven/plugins/maven-site-plugin/3.9.1/
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void simple() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                          </dependency>
+                        </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(pom -> {
+                        MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
+                        assertThat(resolvedDependencies).satisfiesOnlyOnce(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.apache.maven.plugins");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("maven-site-plugin");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.9.1");
+                        });
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void withType() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </project>
+                      """,
+                    spec -> spec.afterRecipe(pom -> {
+                        MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                        List<ResolvedDependency> resolvedDependencies = resolution.getDependencies().get(Scope.Compile);
+                        assertThat(resolvedDependencies).satisfiesOnlyOnce(dep -> {
+                            assertThat(dep.getGav().getGroupId()).isEqualTo("org.apache.maven.plugins");
+                            assertThat(dep.getGav().getArtifactId()).isEqualTo("maven-site-plugin");
+                            assertThat(dep.getGav().getVersion()).isEqualTo("3.9.1");
+                        });
+                    })
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void twoDependencyManagementEntries() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                          </dependency>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                          </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void twoDependencyManagementEntries_dependencyWithType() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                          </dependency>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void twoDependencyManagementEntries_twoDependencies() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                          </dependency>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <version>3.9.1</version>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                          </dependency>
+                          <dependency>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-site-plugin</artifactId>
+                            <classifier>source-release</classifier>
+                            <type>zip</type>
+                          </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/5402")
+        @Test
+        void allDependencyManagementEntryVariants_allDependencyVariants() {
+            rewriteRun(
+              mavenProject(
+                "my-bom",
+                pomXml(
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-bom</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                         <dependencies>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>jar</type>
+                                 <scope>compile</scope>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>pom</type>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>sources</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <classifier>javadoc</classifier>
+                             </dependency>
+                             <dependency>
+                                 <groupId>io.flux-capacitor</groupId>
+                                 <artifactId>common</artifactId>
+                                 <version>0.1148.0</version>
+                                 <type>test-jar</type>
+                                 <scope>test</scope>
+                             </dependency>
+                         </dependencies>
+                      </dependencyManagement>
+                    </project>
+                    """
+                ),
+                mavenProject(
+                  "my-app",
+                  pomXml(
+                    """
+                      <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencyManagement>
+                          <dependencies>
+                            <dependency>
+                              <groupId>com.mycompany.app</groupId>
+                              <artifactId>my-bom</artifactId>
+                              <version>1</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                            </dependency>
+                          </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>jar</type>
+                             <scope>compile</scope>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>pom</type>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>sources</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <classifier>javadoc</classifier>
+                           </dependency>
+                           <dependency>
+                             <groupId>io.flux-capacitor</groupId>
+                             <artifactId>common</artifactId>
+                             <type>test-jar</type>
+                             <scope>test</scope>
+                           </dependency>
+                        </dependencies>
+                      </project>
+                      """
+                  )
+                )
+              )
+            );
+        }
+
     }
 }

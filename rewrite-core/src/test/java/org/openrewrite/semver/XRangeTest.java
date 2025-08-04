@@ -17,6 +17,8 @@ package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class XRangeTest {
@@ -109,5 +111,23 @@ class XRangeTest {
     @Test
     void matchCustomMetadata() {
         assertThat(new XRange("3", "2", "*", "", ".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+        // -beta is a recognized pre-release pattern, which isn't allowed.
+        assertThat(XRange.build("3.5.x", "-beta").getValue().isValid(null, "3.5.1-beta")).isFalse();
+    }
+
+    @Test
+    void compareRCVersion() {
+        XRange xRange = XRange.build("3.5.x", null).getValue();
+        assertThat(xRange).isNotNull();
+        assertThat(xRange.upgrade("3.5.0-RC1", List.of("3.5.0", "3.5.1-RC1")).orElse(null)).isEqualTo("3.5.0");
+    }
+
+    @Test
+    void shouldNotSwitchToSnapshot() {
+        XRange xRange = XRange.build("3.6.x", null).getValue();
+        assertThat(xRange).isNotNull();
+        assertThat(xRange.isValid(null, "3.6.1-SNAPSHOT")).isFalse();
+        assertThat(xRange.isValid(null, "3.6.0")).isTrue();
+        assertThat(xRange.upgrade("3.4.0", List.of("3.6.0", "3.6.1-SNAPSHOT")).orElse(null)).isEqualTo("3.6.0");
     }
 }

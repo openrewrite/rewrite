@@ -149,14 +149,14 @@ class JavaTemplateTest5Test implements RewriteTest {
                   return method;
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(2)).getBody()
-                .getStatements().get(0);
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(2)).getBody()
+                .getStatements().getFirst();
               JavaType.Method type = m.getMethodType();
-              assertThat(type.getParameterTypes().get(0)).isEqualTo(JavaType.Primitive.Int);
+              assertThat(type.getParameterTypes().getFirst()).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1)).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(2)).matches(jt ->
-                TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
+                "java.lang.String".equals(TypeUtils.asFullyQualified(jt).getFullyQualifiedName()));
           }),
           java(
             """
@@ -184,9 +184,9 @@ class JavaTemplateTest5Test implements RewriteTest {
     Recipe replaceAnnotationRecipe = toRecipe(() -> new JavaIsoVisitor<>() {
         @Override
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            if (annotation.getSimpleName().equals("SuppressWarnings")) {
+            if ("SuppressWarnings".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
-            } else if (annotation.getSimpleName().equals("A1")) {
+            } else if ("A1".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
             return super.visitAnnotation(annotation, ctx);
@@ -336,7 +336,7 @@ class JavaTemplateTest5Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
+                  if (classDecl.getLeadingAnnotations().isEmpty() && !"Test".equals(classDecl.getSimpleName())) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
                   }
                   return super.visitClassDeclaration(classDecl, ctx);
@@ -390,10 +390,8 @@ class JavaTemplateTest5Test implements RewriteTest {
               class Test {
                   void test() {
                       // the m
-                      @SuppressWarnings("other")
-                      int m;
-                      @SuppressWarnings("other")
-                      final int n;
+                      @SuppressWarnings("other") int m;
+                      @SuppressWarnings("other") final int n;
                   }
               }
               """
@@ -436,18 +434,12 @@ class JavaTemplateTest5Test implements RewriteTest {
                   @Deprecated
                   private final int m, a;
                   void test() {
-                      @SuppressWarnings("ALL")
-                      @Deprecated /* hello */
+                      @SuppressWarnings("ALL") @Deprecated /* hello */
                       Boolean z;
                       // comment n
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      int n;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
-                      final Boolean b;
-                      @SuppressWarnings("ALL")
-                      @Deprecated
+                      @SuppressWarnings("ALL") @Deprecated int n;
+                      @SuppressWarnings("ALL") @Deprecated final Boolean b;
+                      @SuppressWarnings("ALL") @Deprecated
                       // comment x, y
                       private Boolean x, y;
                   }

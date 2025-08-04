@@ -98,7 +98,6 @@ public class RawPom {
     @Nullable
     String packaging;
 
-    @Nullable
     Dependencies dependencies;
 
     @Nullable
@@ -128,6 +127,29 @@ public class RawPom {
     @Nullable
     SubProjects subprojects;
 
+    public RawPom(@Nullable String pomVersion, @Nullable Parent parent, @Nullable String groupId, String artifactId, @Nullable String version, @Nullable String currentVersion, @Nullable String name, @Nullable String description, @Nullable Prerequisites prerequisites, @Nullable String packaging, @Nullable Dependencies dependencies, @Nullable DependencyManagement dependencyManagement, @Nullable Map<String, String> properties, @Nullable Build build, @Nullable RawRepositories repositories, @Nullable RawPluginRepositories pluginRepositories, @Nullable Licenses licenses, @Nullable Profiles profiles, @Nullable Modules modules, @Nullable SubProjects subprojects) {
+        this.pomVersion = pomVersion;
+        this.parent = parent;
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.currentVersion = currentVersion;
+        this.name = name;
+        this.description = description;
+        this.prerequisites = prerequisites;
+        this.packaging = packaging;
+        this.dependencies = dependencies == null ? new Dependencies() : dependencies;
+        this.dependencyManagement = dependencyManagement;
+        this.properties = properties;
+        this.build = build;
+        this.repositories = repositories;
+        this.pluginRepositories = pluginRepositories;
+        this.licenses = licenses;
+        this.profiles = profiles;
+        this.modules = modules;
+        this.subprojects = subprojects;
+    }
+
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
             RawPom pom = MavenXmlMapper.readMapper().readValue(inputStream, RawPom.class);
@@ -136,7 +158,7 @@ public class RawPom {
             }
             return pom;
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse pom", e);
+            throw new UncheckedIOException("Failed to parse pom: " + e.getMessage(), e);
         }
     }
 
@@ -185,7 +207,7 @@ public class RawPom {
         private final List<Dependency> dependencies;
 
         public Dependencies() {
-            this.dependencies = emptyList();
+            this.dependencies = new ArrayList<>();
         }
 
         public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
@@ -620,5 +642,4 @@ public class RawPom {
         }
         return emptyList();
     }
-
 }

@@ -39,15 +39,15 @@ class YamlParserTest implements RewriteTest {
         List<SourceFile> yamlSources = YamlParser.builder().build().parse("a: b\n").toList();
         assertThat(yamlSources).singleElement().isInstanceOf(Yaml.Documents.class);
 
-        Yaml.Documents documents = (Yaml.Documents) yamlSources.get(0);
-        Yaml.Document document = documents.getDocuments().get(0);
+        Yaml.Documents documents = (Yaml.Documents) yamlSources.getFirst();
+        Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
 
         // Assert that the title is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+        Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo("b");
     }
@@ -66,8 +66,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    @Test
     void listsAndListsOfLists() {
         rewriteRun(
           yaml(
@@ -105,8 +105,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ValueSource(strings = {
       "b",
       " 🛠",
@@ -122,11 +122,11 @@ class YamlParserTest implements RewriteTest {
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
 
         Yaml.Documents documents = (Yaml.Documents) sourceFile;
-        Yaml.Document document = documents.getDocuments().get(0);
+        Yaml.Document document = documents.getDocuments().getFirst();
 
         // Assert that end is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+        Yaml.Mapping.Entry entry = mapping.getEntries().getFirst();
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getValue()).isEqualTo(input.trim());
     }
@@ -311,12 +311,12 @@ class YamlParserTest implements RewriteTest {
           """;
 
         // when
-        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().get(0);
+        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
 
         // test
-        Yaml.Document document = parsed.getDocuments().get(0);
+        Yaml.Document document = parsed.getDocuments().getFirst();
         Yaml.Mapping topMapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry person = topMapping.getEntries().get(0);
+        Yaml.Mapping.Entry person = topMapping.getEntries().getFirst();
         assertEquals("person", person.getKey().getValue());
         Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
         assertEquals("map", withinPerson.getTag().getName());
@@ -406,6 +406,61 @@ class YamlParserTest implements RewriteTest {
             - #🦍COMMENT: 🎱unicode
             - action: Escape
             """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorScalar() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name This string will appear as the value.
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorMap() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor_name
+                anchor_key: 1
+                another_anchor_key: 2
+              other_anchor: *anchor_name
+              """
+          )
+        );
+    }
+
+    @Test
+    void withAnchorSequence() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+                - item1
+                - item2
+              other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    @Test
+    void withAnchorSequenceOnRootLevel() {
+        rewriteRun(
+          yaml(
+            """
+              anchored_content: &anchor
+              - item1
+              - item2
+              other_anchor: *anchor
+              """
           )
         );
     }

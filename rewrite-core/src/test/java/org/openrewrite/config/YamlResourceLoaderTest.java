@@ -40,8 +40,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @Test
     @DocumentExample
+    @Test
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
@@ -119,7 +119,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
 
                 assertThat(e.getParameters()).hasSize(2);
-                assertThat(e.getParameters().get(0)).isEqualTo("arg0");
+                assertThat(e.getParameters().getFirst()).isEqualTo("arg0");
                 assertThat(e.getParameters().get(1)).isEqualTo("1");
 
                 assertThat(e.getSources()).hasSize(1);
@@ -199,7 +199,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
         assertThat(descriptor.getDataTables()).isNotEmpty();
         assertThat(descriptor.getMaintainers()).hasSize(2);
-        Maintainer sam = descriptor.getMaintainers().get(0);
+        Maintainer sam = descriptor.getMaintainers().getFirst();
         assertThat(sam.getMaintainer()).isEqualTo("Sam");
         assertThat(sam.getLogo()).isNotNull();
         assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
@@ -242,7 +242,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         Recipe recipe = recipes.iterator().next();
         List<Contributor> contributors = recipe.getContributors();
         assertThat(contributors).hasSize(2);
-        Contributor jon = contributors.get(0);
+        Contributor jon = contributors.getFirst();
         assertThat(jon.getName()).isEqualTo("Jonathan Schneider");
         assertThat(jon.getEmail()).isEqualTo("jon@moderne.io");
         assertThat(jon.getLineCount()).isEqualTo(5);
@@ -292,7 +292,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         Recipe recipe = recipes.iterator().next();
         Optional<Contributor> maybeJon = recipe.getContributors()
           .stream()
-          .filter(c -> c.getName().equals("Jonathan Schneider"))
+          .filter(c -> "Jonathan Schneider".equals(c.getName()))
           .findFirst();
         assertThat(maybeJon).isPresent();
     }

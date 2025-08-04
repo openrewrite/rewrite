@@ -16,11 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.Value;
-import org.antlr.v4.runtime.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
 import org.openrewrite.java.internal.template.TemplateParameter;
@@ -31,6 +29,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static org.openrewrite.Tree.randomId;
 
 class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
@@ -57,7 +57,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             return matchTemplate(templateTree, input);
         } catch (RuntimeException e) {
             // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
-            return new TemplateMatchResult(false, Collections.emptyList());
+            return new TemplateMatchResult(false, emptyList());
         }
     }
 
@@ -92,7 +92,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             typedPatternByName.put(name, s);
                         }
 
-                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), type, name)));
+                        Markers markers = Markers.build(singleton(new TemplateParameter(randomId(), type, name)));
                         parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
                     }
                 } else {
@@ -124,7 +124,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {
         if (templateTree == cursor.getValue()) {
             // When `JavaTemplate#apply()` returns the input itself, it could not be matched
-            return new TemplateMatchResult(false, Collections.emptyList());
+            return new TemplateMatchResult(false, emptyList());
         }
 
         JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
@@ -136,7 +136,6 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     @SuppressWarnings("ConstantConditions")
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
         final Map<J, String> matchedParameters = new LinkedHashMap<>();
-        final Types types = new Types(true);
 
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
@@ -158,8 +157,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     }
                 }
 
-                if (TypeUtils.isObject(marker.getType()) ||
-                    isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                if (isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
                     registerMatch(j, marker.getName());
                     return true;
                 }
@@ -198,13 +196,13 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         @Override
-        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
-            return target == source || isAssignableTo(target, source);
+        protected boolean isOfType(JavaType target, JavaType source) {
+            return TypeUtils.isAssignableTo(target, source, TypeUtils.ComparisonContext.INFER);
         }
 
         @Override
-        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
-            return types.isAssignableTo(target, source);
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from, TypeUtils.ComparisonContext.INFER);
         }
     }
 }

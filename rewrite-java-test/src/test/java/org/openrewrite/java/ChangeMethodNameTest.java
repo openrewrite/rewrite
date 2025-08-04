@@ -76,8 +76,8 @@ class ChangeMethodNameTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Issue("https://github.com/openrewrite/rewrite/issues/605")
+    @SuppressWarnings({"ConstantConditions", "RedundantOperationOnEmptyContainer"})
     @Test
     void changeMethodNameForOverriddenMethod() {
         rewriteRun(
@@ -113,12 +113,12 @@ class ChangeMethodNameTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 List<Statement> statements = testMethodDecl.getBody().getStatements();
-                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.get(0);
+                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.getFirst();
                 assertThat(barInvocation.getName().getSimpleName()).isEqualTo("bar");
                 assertThat(barInvocation.getMethodType().getName()).isEqualTo("bar");
-                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().get(0);
+                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().getFirst();
                 JavaType.Method barRefType = barReference.getMethodType();
                 assertThat(barRefType.getName()).isEqualTo("bar");
             })
@@ -158,9 +158,9 @@ class ChangeMethodNameTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void changeMethodNameForOverriddenMethodMatchOverridesFalse() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodName("com.abc.Parent method(String)", "changed", false, null)),
@@ -435,17 +435,17 @@ class ChangeMethodNameTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J visit(Tree tree, ExecutionContext executionContext) {
-                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, executionContext);
+              public J visit(Tree tree, ExecutionContext ctx) {
+                  return (J) new ChangeMethodName("com.abc.B static1(String)", newMethodName, null, null).getVisitor().visitNonNull(tree, ctx);
               }
           })),
           java(b, SourceSpec::skip),
           java(
             """
               package com.abc;
-              
+
               import java.util.ArrayList;
-              
+
               class A {
                  public void test() {
                      com.abc.B.static1("boo");
@@ -468,9 +468,9 @@ class ChangeMethodNameTest implements RewriteTest {
         Validated<Object> reservedKeyword = new ChangeMethodName("a.Clazz method(..)", "this", null, null).validate();
         assertThat(reservedKeyword.isValid()).isFalse();
         assertThat(reservedKeyword.failures()).singleElement()
-          .matches(f -> f.getProperty().equals("newMethodName"))
-          .matches(f -> f.getInvalidValue().equals("this"))
-          .matches(f -> f.getMessage().equals("should not be a Java Reserved Keyword."));
+          .matches(f -> "newMethodName".equals(f.getProperty()))
+          .matches(f -> "this".equals(f.getInvalidValue()))
+          .matches(f -> "should not be a Java Reserved Keyword.".equals(f.getMessage()));
     }
 
     @Test
@@ -478,9 +478,9 @@ class ChangeMethodNameTest implements RewriteTest {
         Validated<Object> reservedLiteral = new ChangeMethodName("a.Clazz method(..)", "null", null, null).validate();
         assertThat(reservedLiteral.isValid()).isFalse();
         assertThat(reservedLiteral.failures()).singleElement()
-          .matches(f -> f.getProperty().equals("newMethodName"))
-          .matches(f -> f.getInvalidValue().equals("null"))
-          .matches(f -> f.getMessage().equals("should not be a Java Reserved Literal."));
+          .matches(f -> "newMethodName".equals(f.getProperty()))
+          .matches(f -> "null".equals(f.getInvalidValue()))
+          .matches(f -> "should not be a Java Reserved Literal.".equals(f.getMessage()));
     }
 
     @Test
@@ -488,8 +488,8 @@ class ChangeMethodNameTest implements RewriteTest {
         Validated<Object> invalidPattern = new ChangeMethodName("a.Clazz method(..)", "123", null, null).validate();
         assertThat(invalidPattern.isValid()).isFalse();
         assertThat(invalidPattern.failures()).singleElement()
-          .matches(f -> f.getProperty().equals("newMethodName"))
-          .matches(f -> f.getInvalidValue().equals("123"))
-          .matches(f -> f.getMessage().equals("should be a valid Java method name."));
+          .matches(f -> "newMethodName".equals(f.getProperty()))
+          .matches(f -> "123".equals(f.getInvalidValue()))
+          .matches(f -> "should be a valid Java method name.".equals(f.getMessage()));
     }
 }

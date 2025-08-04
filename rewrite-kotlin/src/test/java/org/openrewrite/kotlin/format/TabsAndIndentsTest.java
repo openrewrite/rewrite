@@ -60,10 +60,10 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test { init {
                   if (true == false)
                   doTheThing();
-                            
+
                   doTheOtherThing();
                   somethingElseEntirely();
-                            
+
                   foo();
               }
                   fun doTheThing() {}
@@ -76,10 +76,10 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test { init {
                   if (true == false)
                       doTheThing();
-                            
+
                   doTheOtherThing();
                   somethingElseEntirely();
-                            
+
                   foo();
               }
                   fun doTheThing() {}
@@ -143,8 +143,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void multilineCommentStartPositionIsIndented() {
         rewriteRun(
@@ -261,7 +261,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
             import java.util.*;
-            
+
             class Foo {
             	fun f(
             			var1: String,
@@ -599,8 +599,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    @Test
     void methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent() {
         rewriteRun(
           kotlin(
@@ -681,8 +681,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    @Test
     void lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent() {
         rewriteRun(
           kotlin(
@@ -720,7 +720,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   fun method(s: String) {
                       a({
                           f -> s.toLowerCase()
-                          })
+                      })
                   }
               }
               """
@@ -1093,7 +1093,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               annotation class Anno
-                            
+
               class Test {
                   @Suppress(
                       "unchecked"
@@ -1112,7 +1112,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               annotation class Anno
-                            
+
               @Suppress("A")
               @Anno
                  class A {
@@ -1124,7 +1124,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               annotation class Anno
-                            
+
               @Suppress("A")
               @Anno
               class A {
@@ -1659,13 +1659,13 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.io.File
-                            
+
               class Test {
                   fun method(m: Int, f: File, f2: File) {
                       method(m, File(
                                   "test"
-                              ), 
-                          File("test", 
+                              ),
+                          File("test",
                               "test"
                           ))
                   }
@@ -1698,18 +1698,18 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.util.function.Function
-                            
+
               abstract class Test {
                   abstract fun a(f: Function<Test, Test>): Test
                   abstract fun b(f: Function<Test, Test>): Test
                   abstract fun c(f: Function<Test, Test>): Test
-                            
+
                   fun method(f: Function<Test, Test>): Test {
                       return a(f)
                           .b {
                               t ->
-                                  c(f)
-                              }
+                              c(f)
+                          }
                   }
               }
               """
@@ -1723,12 +1723,12 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.util.function.Function
-                            
+
               abstract class Test {
                   abstract fun a(f: Function<Test, Test>): Test
                   abstract fun b(f: Function<Test, Test>): Test
                   abstract fun c(f: Function<Test, Test>): Test
-                            
+
                   fun method(f: Function<Test, Test>): Test {
                       return a(f)
                           .b {t ->
@@ -1748,12 +1748,12 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.util.stream.Stream
-                            
+
               class Test {
                   var b: Boolean = false
                   fun method(): Stream<Test> {
                       if (b && method()
-                          .anyMatch { t -> b || 
+                          .anyMatch { t -> b ||
                                   b
                           }) {
                           // do nothing
@@ -1775,7 +1775,7 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {
                   constructor(t: Test)
                   constructor()
-                            
+
                   fun method(t: Test) {
                       method(
                           Test(
@@ -2178,8 +2178,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/323")
+    @Test
     void resetIndentationAfterClosingParameterListParenthesis() {
         rewriteRun(
           kotlin(
@@ -2232,7 +2232,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import kotlin.reflect.full.memberProperties
-              
+
               inline fun <reified T : Any> T.destruct(): Map<String, Any?> {
                   return T::class.memberProperties.map {
                       it.name to it.get(this)
@@ -2370,16 +2370,16 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               import java.io.Closeable
-              
+
               data class PrinterInput(
                   val buildDuration: Long,
                   val taskDurations: Collection<Pair<String, Long>>,
                   val maxWidth: Int,
                   val showBars: Boolean,
               )
-              
+
               interface Printer : Closeable {
-              
+
                   fun print(input: PrinterInput) {
                       // find the maxes needed for formatting
                       val (maxLabelLen, maxDuration, maxFormattedDurationLen) = input.taskDurations.fold(
@@ -2401,7 +2401,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
             """
               fun format(vararg params: String) { }
-              
+
               fun test(vararg params: String) {
                   format(
                       "a",
@@ -2414,8 +2414,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/546")
+    @Test
     void annotationIndentation() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new KotlinIsoVisitor<>() {
@@ -2428,7 +2428,7 @@ class TabsAndIndentsTest implements RewriteTest {
           kotlin(
                 """
             package org.sample
-            
+
             @SafeVarargs
             @SuppressWarnings
             class Foo

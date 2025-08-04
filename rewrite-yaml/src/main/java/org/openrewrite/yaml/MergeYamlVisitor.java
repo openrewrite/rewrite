@@ -17,12 +17,12 @@ package org.openrewrite.yaml;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.yaml.MergeYaml.InsertMode;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -36,8 +36,8 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.*;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
  * Visitor class to merge two yaml files.
@@ -203,19 +203,19 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
                 }
             } else {
-               Cursor c = getCursor().dropParentUntil(it -> {
-                   if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
-                       return true;
-                   }
+                Cursor c = getCursor().dropParentUntil(it -> {
+                    if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
+                        return true;
+                    }
 
-                   if (it instanceof Yaml.Mapping) {
-                       List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
-                       // At least two entries and when current elem is the last entry should not be current entry
-                       return entries.size() > 1 && !entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue());
-                   }
+                    if (it instanceof Yaml.Mapping) {
+                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
+                        // At least two entries and when current elem is the last entry should not be current entry
+                        return entries.size() > 1 && !entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue());
+                    }
 
-                   return false;
-               });
+                    return false;
+                });
 
                 String comment = null;
                 if (c.getValue() instanceof Yaml.Document) {
@@ -255,7 +255,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
-                ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
+                    ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
                 mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(
                         linebreak() + substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
             }
@@ -334,7 +334,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      */
     private <T> ListConcat<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
         if (insertMode == null || insertMode == Last || insertProperty == null || t.isEmpty()) {
-            return new ListConcat<>(ListUtils.concatAll(ls, t), -1,-1);
+            return new ListConcat<>(ListUtils.concatAll(ls, t), -1, -1);
         }
 
         List<T> mutatedEntries = new ArrayList<>();
@@ -381,7 +381,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
         String[] lines = LINE_BREAK.split(entry.getPrefix(), -1);
-        int keyIndent  = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+        int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
         int indent = minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
     }

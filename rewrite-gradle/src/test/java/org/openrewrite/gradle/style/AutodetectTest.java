@@ -38,7 +38,7 @@ class AutodetectTest implements RewriteTest {
               repositories {
                 gradlePluginPortal() // so that external plugins can be resolved in dependencies section
               }
-              
+
               dependencies {
                 implementation 'io.freefair.gradle:lombok-plugin:8.4'
                 implementation 'com.github.spotbugs.snom:spotbugs-gradle-plugin:5.0.13'

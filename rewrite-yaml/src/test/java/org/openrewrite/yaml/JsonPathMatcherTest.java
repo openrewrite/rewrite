@@ -22,9 +22,9 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JsonPathMatcherTest {
@@ -763,6 +763,148 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void matchesListInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'release')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: another
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 3
+                - name: command 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListsInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListItemInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')][1].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesInNestedPropertyByFilterCondition() {
+        assertMatched(
+          "$..[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+              """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3401")
     @Test
     void multipleBinaryExpressions() {
@@ -812,7 +954,7 @@ class JsonPathMatcherTest {
                     types: "something"
                     pattern: "p2"
               """),
-          Collections.emptyList()
+          emptyList()
         );
     }
 

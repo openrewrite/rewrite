@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
-import static org.openrewrite.groovy.tree.G.Unary.Type.Spread;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -170,6 +169,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case Spaceship:
                 keyword = "<=>";
                 break;
+            case ElvisAssignment:
+                keyword = "?=";
+                break;
+            case Power:
+                keyword = "**";
+                break;
+            case PowerAssignment:
+                keyword = "**=";
+                break;
+            case IdentityEquals:
+                keyword = "===";
+                break;
+            case IdentityNotEquals:
+                keyword = "!==";
+                break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
@@ -299,13 +313,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 p.append(",");
             });
             visit(multiVariable.getTypeExpression(), p);
-            // For backwards compatibility.
-            for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-                visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-                p.append('[');
-                visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-                p.append(']');
-            }
             if (multiVariable.getVarargs() != null) {
                 visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
                 p.append("...");
@@ -337,7 +344,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.append("->");
             }
-            if (lambda.getBody() instanceof J.Block) {
+            if (lambda.getBody() instanceof J.Block && !ls.isJavaStyle()) {
                 J.Block block = (J.Block) lambda.getBody();
                 visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
                 visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
@@ -393,15 +400,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
             }
-            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-            if (typeParameters != null) {
-                visit(typeParameters.getAnnotations(), p);
-                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-                visitMarkers(typeParameters.getMarkers(), p);
-                p.append('<');
-                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-                p.append('>');
-            }
+            visit(method.getAnnotations().getTypeParameters(), p);
             method.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");

@@ -98,6 +98,7 @@ public class MavenArtifactDownloader {
                           dependency.getVersion() + '/' +
                           dependency.getArtifactId() + '-' +
                           (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                          (dependency.getClassifier() == null ? "" : "-" + dependency.getClassifier()) +
                           ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 

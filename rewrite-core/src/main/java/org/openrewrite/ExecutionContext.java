@@ -23,12 +23,10 @@ import org.openrewrite.rpc.request.Visit;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -46,13 +44,13 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
-                () -> Collections.newSetFromMap(new IdentityHashMap<>()));
+                () -> newSetFromMap(new IdentityHashMap<>()));
         return this;
     }
 
     @Incubating(since = "7.20.0")
     default Set<TreeObserver.Subscription> getObservers() {
-        return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
+        return getMessage("org.openrewrite.internal.treeObservers", emptySet());
     }
 
     Map<String, @Nullable Object> getMessages();
@@ -126,60 +124,12 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
      * {@link Visit.Handler} implementation.
      */
     @Override
-    default void rpcSend(ExecutionContext after, RpcSendQueue q) {
-        // The after state will change if any messages have changed by a call to clone
-        q.getAndSend(after, ctx -> {
-            Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
-                    emptyMap() : ctx.getMessages());
-            // The remote side will manage its own recipe and cycle state.
-            messages.remove(CURRENT_CYCLE);
-            messages.remove(CURRENT_RECIPE);
-            messages.remove(DATA_TABLES);
-            return messages;
-        });
-
-        Map<DataTable<?>, List<?>> dt = after.getMessage(DATA_TABLES);
-        q.getAndSendList(after, sendWholeList(dt == null ? null : dt.keySet()), DataTable::getName, null);
-        if (dt != null) {
-            for (List<?> rowSet : dt.values()) {
-                q.getAndSendList(after, sendWholeList(rowSet),
-                        row -> Integer.toString(System.identityHashCode(row)),
-                        null);
-            }
-
-        }
+    default void rpcSend(ExecutionContext ctx, RpcSendQueue q) {
+        // TODO send enough information for the remote to know which DataTableStore to use
     }
 
     @Override
-    default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
-        Map<String, Object> messages = q.receive(before.getMessages());
-        for (Map.Entry<String, Object> e : messages.entrySet()) {
-            before.putMessage(e.getKey(), e.getValue());
-        }
-
-        List<DataTable<?>> dataTables = q.receiveList(emptyList(), null);
-        //noinspection ConstantValue
-        if (dataTables != null) {
-            for (DataTable<?> dataTable : dataTables) {
-                List<?> rows = q.receiveList(emptyList(), null);
-                before.computeMessage(ExecutionContext.DATA_TABLES, rows, ConcurrentHashMap::new, (extract, allDataTables) -> {
-                    //noinspection unchecked
-                    List<Object> dataTablesOfType = (List<Object>) allDataTables.computeIfAbsent(dataTable, c -> new ArrayList<>());
-                    dataTablesOfType.addAll(rows);
-                    return allDataTables;
-                });
-            }
-        }
-        return before;
-    }
-
-    static <T> Function<ExecutionContext, @Nullable List<T>> sendWholeList(@Nullable Collection<T> list) {
-        AtomicBoolean retrievedAfter = new AtomicBoolean(false);
-        return ctx -> {
-            if (!retrievedAfter.getAndSet(true)) {
-                return list == null ? null : new ArrayList<>(list);
-            }
-            return null;
-        };
+    default ExecutionContext rpcReceive(ExecutionContext ctx, RpcReceiveQueue q) {
+        return ctx;
     }
 }

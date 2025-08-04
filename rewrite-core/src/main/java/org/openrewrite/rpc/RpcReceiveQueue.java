@@ -15,13 +15,14 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.io.PrintStream;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -29,14 +30,31 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
-    private final List<RpcObjectData> batch;
-    private final Map<Integer, Object> refs;
-    private final Supplier<List<RpcObjectData>> pull;
+    private static final ObjenesisStd objenesis = new ObjenesisStd();
+    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .build((String key) -> {
+                try {
+                    Class<?> clazz = Class.forName(key);
+                    return objenesis.newInstance(clazz);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            });
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
+    private final Deque<RpcObjectData> batch;
+    private final Map<Integer, Object> refs;
+    private final @Nullable PrintStream logFile;
+    private final Supplier<List<RpcObjectData>> pull;
+    private final Function<Integer, Object> getRef;
+
+    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
+                           Supplier<List<RpcObjectData>> pull, Function<Integer, Object> getRef) {
         this.refs = refs;
-        this.batch = new ArrayList<>();
+        this.batch = new ArrayDeque<>();
+        this.logFile = logFile;
         this.pull = pull;
+        this.getRef = getRef;
     }
 
     public RpcObjectData take() {
@@ -44,29 +62,31 @@ public class RpcReceiveQueue {
             List<RpcObjectData> data = pull.get();
             batch.addAll(data);
         }
-        return batch.remove(0);
+        return batch.remove();
     }
 
     /**
-     * Receive a value from the queue and apply a function to it, usually to
-     * convert it to a string or fetch some nested object off of it.
+     * Receive a value from the queue and apply a function to it to convert it to the required
+     * type.
      *
-     * @param before The value to apply the function to, which may be null.
-     * @param apply  A function that is called only when before is non-null.
-     * @param <T>    A before value ahead of the function call.
-     * @param <U>    The return type of the function. This will match the type that is
-     *               being received from the remote.
-     * @return The received value. To set the correct before state when the received state
-     * is NO_CHANGE or CHANGE, the function is applied to the before parameter, unless before
-     * is null in which case the before state is assumed to be null.
+     * @param before  The value to apply the function to, which may be null.
+     * @param mapping Function to apply in case of ADD or CHANGE to convert the received value to
+     *                the desired type. Only applied when the value from the queue is not null.
+     * @param <T>     The property value type of the before and returned value.
+     * @param <U>     The type of the value as encoded by the data item read from the queue.
+     * @return The received and converted value. When the received state is NO_CHANGE then the
+     * before value will be returned.
      */
-    public <T, U> U receiveAndGet(@Nullable T before, Function<T, U> apply) {
-        return receive(before == null ? null : apply.apply(before), null);
+    @SuppressWarnings({"DataFlowIssue", "unchecked"})
+    public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
+        T after = receive(before, null);
+        return after != null && after != before ? mapping.apply((U) after) : after;
     }
 
     public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m.withMarkers(
-                receiveList(m.getMarkers(), null)));
+        return receive(markers, m -> m
+                .withId(receiveAndGet(m.getId(), UUID::fromString))
+                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -92,8 +112,15 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
+
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withTrace(null));
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + Trace.traceReceiver());
+            logFile.flush();
+        }
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -102,16 +129,40 @@ public class RpcReceiveQueue {
                 return null;
             case ADD:
                 ref = message.getRef();
-                if (refs.containsKey(ref)) {
-                    //noinspection unchecked
-                    return (T) refs.get(ref);
+                if (ref != null && message.getValueType() == null && message.getValue() == null) {
+                    // This is a pure reference to an existing object
+                    if (refs.containsKey(ref)) {
+                        //noinspection unchecked
+                        return (T) refs.get(ref);
+                    } else {
+                        // Ref was evicted from cache, fetch it
+                        Object refObject = getRef.apply(ref);
+                        refs.put(ref, refObject);
+                        //noinspection unchecked
+                        return (T) refObject;
+                    }
+                } else {
+                    // This is either a new object or a forward declaration with ref
+                    before = message.getValueType() == null ?
+                            message.getValue() :
+                            newObj(message.getValueType());
                 }
-                before = onChange == null || message.getValueType() == null ?
-                        message.getValue() :
-                        newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
-                T after = onChange == null ? message.getValue() : onChange.apply(before);
+                T after;
+
+                // TODO handle enums here
+
+                if (onChange != null) {
+                    after = onChange.apply(before);
+                } else if (before instanceof RpcCodec) {
+                    //noinspection unchecked
+                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if (message.getValueType() == null) {
+                    after = message.getValue();
+                } else {
+                    after = before;
+                }
                 if (ref != null) {
                     refs.put(ref, after);
                 }
@@ -121,14 +172,12 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
+    public <T> @Nullable List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
-                //noinspection DataFlowIssue
                 return before;
             case DELETE:
-                //noinspection DataFlowIssue
                 return null;
             case ADD:
                 before = new ArrayList<>();
@@ -136,7 +185,7 @@ public class RpcReceiveQueue {
             case CHANGE:
                 msg = take(); // the next message should be a CHANGE with a list of positions
                 assert msg.getState() == RpcObjectData.State.CHANGE;
-                List<Integer> positions = msg.getValue();
+                List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
                     after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
@@ -147,13 +196,18 @@ public class RpcReceiveQueue {
         }
     }
 
-    private static <T> T newObj(String type) {
-        try {
-            Class<?> clazz = Class.forName(type);
-            //noinspection unchecked
-            return (T) new ObjenesisStd().newInstance(clazz);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+    private <T> T newObj(String type) {
+        //noinspection unchecked
+        return (T) requireNonNull(instanceCache.get(type));
+    }
+
+    /**
+     * @param enumType The enumeration that we are creating or updating
+     * @param <T>      The enum type.
+     * @return An enum mapping function that can be used when receiving a string to convert
+     * it to an enum value.
+     */
+    public static <T extends Enum<T>> Function<Object, T> toEnum(Class<T> enumType) {
+        return value -> Enum.valueOf(enumType, (String) value);
     }
 }

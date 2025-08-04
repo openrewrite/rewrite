@@ -929,7 +929,15 @@ public class SemanticallyEqual {
                     return memberRef;
                 }
 
-                visit(memberRef.getContaining(), compareTo.getContaining());
+                // if the method reference is on an instance, compare it
+                if (memberRef.getContaining() instanceof J.Identifier && ((J.Identifier) memberRef.getContaining()).getFieldType() != null ||
+                        compareTo.getContaining() instanceof J.Identifier && ((J.Identifier) compareTo.getContaining()).getFieldType() != null) {
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                } else if (memberRef.getContaining() instanceof J.FieldAccess && ((J.FieldAccess) memberRef.getContaining()).getName().getFieldType() != null ||
+                        compareTo.getContaining() instanceof J.FieldAccess && ((J.FieldAccess) compareTo.getContaining()).getName().getFieldType() != null) {
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                }
+
                 visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
@@ -1526,12 +1534,12 @@ public class SemanticallyEqual {
             return firstTypeName;
         }
 
-        protected boolean isOfType(@Nullable JavaType target, @Nullable JavaType source) {
+        protected boolean isOfType(JavaType target, JavaType source) {
             return TypeUtils.isOfType(target, source);
         }
 
-        protected boolean isAssignableTo(@Nullable JavaType target, @Nullable JavaType source) {
-            return TypeUtils.isAssignableTo(target, source);
+        protected boolean isAssignableTo(JavaType to, JavaType from) {
+            return TypeUtils.isAssignableTo(to, from);
         }
     }
 }

@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java.internal.template;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,6 +22,11 @@ import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.Map;
+import java.util.Set;
+
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singleton;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TypeParameterTest {
@@ -44,7 +45,7 @@ class TypeParameterTest {
     })
     void primitive(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isSameAs(JavaType.Primitive.fromKeyword(name));
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -56,7 +57,7 @@ class TypeParameterTest {
     })
     void javaLang(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo("java.lang." + name);
     }
@@ -77,7 +78,7 @@ class TypeParameterTest {
     })
     void arrays(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Array.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -88,7 +89,7 @@ class TypeParameterTest {
     })
     void qualified(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -105,7 +106,7 @@ class TypeParameterTest {
     })
     void parameterized(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -120,7 +121,7 @@ class TypeParameterTest {
     })
     void parameterizedWithModifierShouldNeverHideParametrizedType(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         JavaType.Parameterized pType = (JavaType.Parameterized) type;
         assertThat(pType.withFullyQualifiedName("test")).isInstanceOf(JavaType.Parameterized.class);
         assertThat(pType.withFullyQualifiedName("test")).isNotSameAs(pType);
@@ -133,7 +134,7 @@ class TypeParameterTest {
     })
     void unbounded(String name) {
         TemplateParameterParser parser = TypeParameter.parser(name);
-        JavaType type = TypeParameter.toJavaType(parser.type(), Collections.emptyMap());
+        JavaType type = TypeParameter.toJavaType(parser.type(), emptyMap());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
@@ -160,10 +161,10 @@ class TypeParameterTest {
         assertThat(b.getBounds()).hasSize(1).first().isSameAs(c);
         assertThat(c.getBounds()).hasSize(2);
 
-        assertThat(TypeUtils.toString(c.getBounds().get(0))).isEqualTo("java.lang.Comparable<? super B>");
+        assertThat(TypeUtils.toString(c.getBounds().getFirst())).isEqualTo("java.lang.Comparable<? super B>");
         assertThat(TypeUtils.toString(c.getBounds().get(1))).isEqualTo("java.io.Serializable");
 
-        JavaType cBound = ((JavaType.Parameterized) c.getBounds().get(0)).getTypeParameters().get(0);
+        JavaType cBound = ((JavaType.Parameterized) c.getBounds().getFirst()).getTypeParameters().getFirst();
         assertThat(cBound).isInstanceOfSatisfying(JavaType.GenericTypeVariable.class, type -> {
             assertThat(type.getName()).isEqualTo("?");
             assertThat(type.getVariance()).isEqualTo(JavaType.GenericTypeVariable.Variance.CONTRAVARIANT);
@@ -178,7 +179,7 @@ class TypeParameterTest {
       "T extends java.util.function.Supplier<? extends T>"
     })
     void parseRecursiveGenericType(String name) {
-        Set<String> genericTypes = Collections.singleton(name);
+        Set<String> genericTypes = singleton(name);
         Map<String, JavaType.GenericTypeVariable> result = TypeParameter.parseGenericTypes(genericTypes);
         assertThat(result)
           .containsOnlyKeys("T")
@@ -191,13 +192,13 @@ class TypeParameterTest {
           });
 
         JavaType.GenericTypeVariable type = result.get("T");
-        JavaType.Parameterized parameterizedType = ((JavaType.Parameterized) type.getBounds().get(0));
+        JavaType.Parameterized parameterizedType = ((JavaType.Parameterized) type.getBounds().getFirst());
         assertThat(TypeUtils.toString(parameterizedType)).isSubstringOf(name);
         if (name.contains("?")) {
-            JavaType.GenericTypeVariable wildcard = (JavaType.GenericTypeVariable) parameterizedType.getTypeParameters().get(0);
-            assertThat(wildcard.getBounds().get(0)).isSameAs(type);
+            JavaType.GenericTypeVariable wildcard = (JavaType.GenericTypeVariable) parameterizedType.getTypeParameters().getFirst();
+            assertThat(wildcard.getBounds().getFirst()).isSameAs(type);
         } else {
-            assertThat(parameterizedType.getTypeParameters().get(0)).isSameAs(type);
+            assertThat(parameterizedType.getTypeParameters().getFirst()).isSameAs(type);
         }
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -32,11 +33,11 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
@@ -115,21 +116,28 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
-
-            if (onlyIfReferenced && !hasReference(cu)) {
+            Optional<JavaType> typeReference = findTypeReference(cu);
+            if (onlyIfReferenced && !typeReference.isPresent()) {
                 return cu;
             }
 
-            if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
-                String ending = i.getQualid().getSimpleName();
-                if (member == null) {
-                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
-                            (ending.equals(typeName) || "*".equals(ending));
-                }
-                return i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
-                        (ending.equals(member) || "*".equals(ending));
-            })) {
+            ImportStatus importStatus = checkImportsForType(cu.getImports());
+
+            if (importStatus == ImportStatus.EXPLICITLY_IMPORTED) {
                 return cu;
+            }
+
+            if (!"Record".equals(typeName) && importStatus == ImportStatus.IMPLICITLY_IMPORTED) {
+                return cu;
+            }
+
+            if (importStatus == ImportStatus.IMPORT_AMBIGUITY && typeReference.isPresent()) {
+                if (typeReference.get() instanceof JavaType.FullyQualified) {
+                    return new FullyQualifyTypeReference<P>((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
+                }
+                if (typeReference.get() instanceof JavaType.Method || typeReference.get() instanceof JavaType.Variable) {
+                    return new FullyQualifyMemberReference<P>(typeReference.get()).visit(cu, p);
+                }
             }
 
             J.Import importToAdd = new J.Import(randomId(),
@@ -161,9 +169,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
                     .map(JavaSourceSet::getClasspath)
-                    .orElse(Collections.emptyList());
+                    .orElse(emptyList());
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
+
+            if (member != null && typeReference.isPresent()) {
+                cu = (JavaSourceFile) new ShortenFullyQualifiedMemberReferences(typeReference.get()).visit(cu, p);
+            } else if (member == null && typeReference.isPresent()) {
+                cu = (JavaSourceFile) new ShortenFullyQualifiedTypeReferences((JavaType.FullyQualified) typeReference.get()).visit(cu, p);
+            }
 
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
             newImports = checkCRLF(cu, newImports);
@@ -181,6 +195,41 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
+    private ImportStatus checkImportsForType(List<J.Import> imports) {
+        for (J.Import imp : imports) {
+            String ending = imp.getQualid().getSimpleName();
+            if (imp.isStatic() ^ member != null) {
+                continue;
+            }
+            if (imp.isStatic()) {
+                if (imp.getTypeName().equals(fullyQualifiedName)) {
+                    if (ending.equals(member)) {
+                        return ImportStatus.EXPLICITLY_IMPORTED;
+                    } else if ("*".equals(ending)) {
+                        return ImportStatus.IMPLICITLY_IMPORTED;
+                    }
+                }
+                if (!"*".equals(ending) && ending.equals(member)) {
+                    return ImportStatus.IMPORT_AMBIGUITY;
+                }
+            } else {
+                String impTypeName = imp.getTypeName().replace('$', '.');
+                if (fullyQualifiedName.equals(impTypeName)) {
+                    return ImportStatus.EXPLICITLY_IMPORTED;
+                } else if ("*".equals(ending)) {
+                    String prefix = impTypeName.substring(0, impTypeName.length() - 1);
+                    if (fullyQualifiedName.startsWith(prefix) && !fullyQualifiedName.substring(prefix.length()).contains(".")) {
+                        return ImportStatus.IMPLICITLY_IMPORTED;
+                    }
+                }
+                if (!"*".equals(ending) && ending.equals(typeName)) {
+                    return ImportStatus.IMPORT_AMBIGUITY;
+                }
+            }
+        }
+        return ImportStatus.NOT_IMPORTED;
+    }
+
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
         GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
                 .orElse(autodetectGeneralFormatStyle(cu));
@@ -193,12 +242,15 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         return newImports;
     }
 
-    private boolean isTypeReference(NameTree t) {
-        boolean isTypRef = true;
-        if (t instanceof J.FieldAccess) {
-            isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName);
+    private Optional<JavaType> getTypeReference(NameTree t) {
+        if (!(t instanceof J.FieldAccess)) {
+           return Optional.ofNullable(t.getType());
+
         }
-        return isTypRef;
+        if (isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName)) {
+            return Optional.ofNullable(((J.FieldAccess) t).getTarget().getType());
+        }
+        return Optional.empty();
     }
 
     /**
@@ -212,16 +264,18 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
      * @return true if the import is referenced by the class either explicitly or through a method reference.
      */
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
-    private boolean hasReference(JavaSourceFile compilationUnit) {
+    private Optional<JavaType> findTypeReference(JavaSourceFile compilationUnit) {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
-                if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) &&
-                        isTypeReference(t)) {
-                    return true;
+                if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) {
+                    Optional<JavaType> mayBeTypeReference = getTypeReference(t);
+                    if (mayBeTypeReference.isPresent()) {
+                        return mayBeTypeReference;
+                    }
                 }
             }
-            return false;
+            return Optional.empty();
         }
 
         // For static method imports, we are either looking for a specific method or a wildcard.
@@ -230,18 +284,23 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
                 if (mi.getSelect() == null &&
                         ("*".equals(member) || mi.getName().getSimpleName().equals(member))) {
-                    return true;
+                    return Optional.ofNullable(mi.getMethodType());
                 }
             }
         }
 
         // Check whether there is static-style access of the field in question
-        AtomicReference<Boolean> hasStaticFieldAccess = new AtomicReference<>(false);
-        new FindStaticFieldAccess().visit(compilationUnit, hasStaticFieldAccess);
-        return hasStaticFieldAccess.get();
+        return Optional.ofNullable(new FindStaticFieldAccess().reduce(compilationUnit, new AtomicReference<>()).get());
     }
 
-    private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
+    private enum ImportStatus {
+        NOT_IMPORTED,
+        IMPLICITLY_IMPORTED,
+        EXPLICITLY_IMPORTED,
+        IMPORT_AMBIGUITY,
+    }
+
+    private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<JavaType>> {
         private boolean checkIsOfClassType(@Nullable JavaType type, String fullyQualifiedName) {
             if (isOfClassType(type, fullyQualifiedName)) {
                 return true;
@@ -250,25 +309,113 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         }
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<JavaType> fieldAccess) {
             // If the type isn't used there's no need to proceed further
             for (JavaType.Variable varType : cu.getTypesInUse().getVariables()) {
-                if (checkIsOfClassType(varType.getType(), fullyQualifiedName)) {
-                    return super.visitCompilationUnit(cu, found);
+                if (checkIsOfClassType(varType.getOwner(), fullyQualifiedName)) {
+                    return super.visitCompilationUnit(cu, fieldAccess);
                 }
             }
             return cu;
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
+        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<JavaType> fieldAccess) {
             assert getCursor().getParent() != null;
-            if (identifier.getSimpleName().equals(member) &&
-                    checkIsOfClassType(identifier.getType(), fullyQualifiedName) &&
+            if (identifier.getSimpleName().equals(member) && identifier.getFieldType() != null &&
+                    checkIsOfClassType(identifier.getFieldType().getOwner(), fullyQualifiedName) &&
                     !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
-                found.set(true);
+                assert identifier.getType() != null;
+                fieldAccess.set(identifier.getFieldType());
             }
             return identifier;
+        }
+    }
+
+    @AllArgsConstructor
+    private class ShortenFullyQualifiedTypeReferences extends ShortenFullyQualifiedReference {
+        private final JavaType.FullyQualified typeToShorten;
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.isFullyQualifiedClassReference(typeToShorten.getFullyQualifiedName())) {
+                return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+
+        @Override
+        public J visitIdentifier(J.Identifier identifier, P p) {
+            if (isFullyQualifiedClassReference(identifier, typeToShorten.getFullyQualifiedName())) {
+                return identifier.withSimpleName(typeToShorten.getClassName());
+            }
+            return super.visitIdentifier(identifier, p);
+        }
+    }
+
+    @AllArgsConstructor
+    private class ShortenFullyQualifiedMemberReferences extends ShortenFullyQualifiedReference {
+        private final JavaType memberToShorten;
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation methodInvocation, P p) {
+            J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, p);
+            if (!(memberToShorten instanceof JavaType.Method)) {
+                return mi;
+            }
+            JavaType.Method m = (JavaType.Method) memberToShorten;
+            JavaType.FullyQualified targetType = m.getDeclaringType();
+
+            if (isFullyQualifiedClassReference(mi.getSelect(), targetType.getFullyQualifiedName()) && mi.getSimpleName().equals(m.getName())) {
+                return methodInvocation.withSelect(null);
+            }
+            return mi;
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (!(memberToShorten instanceof JavaType.Variable)) {
+                return super.visitFieldAccess(fieldAccess, p);
+            }
+            JavaType.Variable var = (JavaType.Variable) memberToShorten;
+            JavaType.FullyQualified targetType = (JavaType.FullyQualified) var.getOwner();
+            if (targetType != null) {
+                if (fieldAccess.getTarget() instanceof J.FieldAccess) {
+                    J.FieldAccess target = (J.FieldAccess) fieldAccess.getTarget();
+                    if (target.isFullyQualifiedClassReference(targetType.getFullyQualifiedName())) {
+                        return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                    }
+                }
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+    }
+
+    private abstract class ShortenFullyQualifiedReference extends JavaVisitor<P> {
+        @Override
+        public J visitImport(J.Import _import, P p) {
+            return _import;
+        }
+
+        @Override
+        protected JavadocVisitor<P> getJavadocVisitor() {
+            return new JavadocVisitor<P>(new JavaVisitor<>()) {
+                @Override
+                public Javadoc visitReference(Javadoc.Reference reference, P p) {
+                    return reference;
+                }
+            };
+        }
+
+        protected boolean isFullyQualifiedClassReference(@Nullable Expression expr, String className) {
+            if (expr instanceof J.FieldAccess) {
+                return ((J.FieldAccess) expr).isFullyQualifiedClassReference(className);
+            }
+            if (expr instanceof J.Identifier) {
+                J.Identifier id = (J.Identifier) expr;
+                return id.getFieldType() == null && id.getSimpleName().equals(className);
+            }
+            return false;
         }
     }
 }

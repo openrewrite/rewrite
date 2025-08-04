@@ -45,7 +45,7 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ConstantConditions")
-public class KotlinTypeMappingTest {
+class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
     private static final K.CompilationUnit cu;
     private static final K.ClassDeclaration goatClassDeclaration;
@@ -91,7 +91,7 @@ public class KotlinTypeMappingTest {
     }
 
     public JavaType firstMethodParameter(String methodName) {
-        return methodType(methodName).getParameterTypes().get(0);
+        return methodType(methodName).getParameterTypes().getFirst();
     }
 
     @Test
@@ -102,7 +102,7 @@ public class KotlinTypeMappingTest {
     @Test
     void fieldType() {
         K.Property property = getProperty("field");
-        J.VariableDeclarations.NamedVariable variable = property.getVariableDeclarations().getVariables().get(0);
+        J.VariableDeclarations.NamedVariable variable = property.getVariableDeclarations().getVariables().getFirst();
         J.Identifier id = variable.getName();
         assertThat(variable.getType()).isEqualTo(id.getType());
         assertThat(id.getFieldType()).isInstanceOf(JavaType.Variable.class);
@@ -150,13 +150,13 @@ public class KotlinTypeMappingTest {
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
 
-        J.VariableDeclarations.NamedVariable nv = ((J.VariableDeclarations) md.getParameters().get(0)).getVariables().get(0);
+        J.VariableDeclarations.NamedVariable nv = ((J.VariableDeclarations) md.getParameters().getFirst()).getVariables().getFirst();
         assertThat(nv.getVariableType()).isEqualTo(nv.getName().getFieldType());
         assertThat(nv.getType().toString()).isEqualTo("org.openrewrite.kotlin.C");
         assertThat(nv.getVariableType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}{name=arg,type=org.openrewrite.kotlin.C}");
 
-        J.VariableDeclarations.NamedVariable inMethod = ((J.VariableDeclarations) md.getBody().getStatements().get(0)).getVariables().get(0);
+        J.VariableDeclarations.NamedVariable inMethod = ((J.VariableDeclarations) md.getBody().getStatements().getFirst()).getVariables().getFirst();
         assertThat(inMethod.getVariableType()).isEqualTo(inMethod.getName().getFieldType());
         assertThat(inMethod.getType().toString()).isEqualTo("kotlin.Int");
         assertThat(inMethod.getVariableType().toString())
@@ -192,14 +192,14 @@ public class KotlinTypeMappingTest {
     void parameterized() {
         JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
-        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
+        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
 
         J.MethodDeclaration md = goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
           .filter(it -> (it instanceof J.MethodDeclaration) && "parameterized".equals(((J.MethodDeclaration) it).getSimpleName()))
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
-        J.VariableDeclarations vd = (J.VariableDeclarations) md.getParameters().get(0);
+        J.VariableDeclarations vd = (J.VariableDeclarations) md.getParameters().getFirst();
         assertThat(vd.getTypeExpression().getType().toString())
           .isEqualTo("org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>");
         assertThat(((J.ParameterizedType) vd.getTypeExpression()).getClazz().getType().toString())
@@ -214,35 +214,35 @@ public class KotlinTypeMappingTest {
 
     @Test
     void generic() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
     void genericContravariant() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).
           isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
     void genericMultipleBounds() {
         List<JavaType> typeParameters = goatType.getTypeParameters();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.get(typeParameters.size() - 1);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
         assertThat(generic.getName()).isEqualTo("S");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(1)).getFullyQualifiedName()).
           isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
     void genericUnbounded() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("U");
         assertThat(generic.getVariance()).isEqualTo(INVARIANT);
         assertThat(generic.getBounds()).isEmpty();
@@ -251,13 +251,13 @@ public class KotlinTypeMappingTest {
     @Test
     void genericRecursive() {
         JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
-        JavaType typeParam = param.getTypeParameters().get(0);
+        JavaType typeParam = param.getTypeParameters().getFirst();
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParam;
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
-        assertThat(TypeUtils.asParameterized(generic.getBounds().get(0))).isNotNull();
+        assertThat(TypeUtils.asParameterized(generic.getBounds().getFirst())).isNotNull();
 
-        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().get(0)).getTypeParameters().get(0);
+        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().getFirst()).getTypeParameters().getFirst();
         assertThat(elemType.getName()).isEqualTo("U");
         assertThat(elemType.getVariance()).isEqualTo(COVARIANT);
         assertThat(elemType.getBounds()).hasSize(1);
@@ -272,7 +272,7 @@ public class KotlinTypeMappingTest {
     @Test
     void inheritedJavaTypeGoat() {
         JavaType.Parameterized clazz = (JavaType.Parameterized) firstMethodParameter("inheritedKotlinTypeGoat");
-        assertThat(clazz.getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
+        assertThat(clazz.getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
         assertThat(clazz.getTypeParameters().get(1).toString()).isEqualTo("Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}");
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>");
     }
@@ -280,7 +280,7 @@ public class KotlinTypeMappingTest {
     @Test
     void genericIntersectionType() {
         JavaType.GenericTypeVariable clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
-        assertThat(clazz.getBounds().get(0).toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$TypeA");
+        assertThat(clazz.getBounds().getFirst().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$TypeA");
         assertThat(clazz.getBounds().get(1).toString()).isEqualTo("org.openrewrite.kotlin.PT<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.C}>");
         assertThat(clazz.getBounds().get(2).toString()).isEqualTo("org.openrewrite.kotlin.C");
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}");
@@ -318,11 +318,11 @@ public class KotlinTypeMappingTest {
     void ignoreSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType;
         assertThat(goat.getAnnotations()).hasSize(1);
-        assertThat(goat.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(goat.getAnnotations().getFirst().getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
 
         JavaType.Method clazzMethod = methodType("clazz");
         assertThat(clazzMethod.getAnnotations()).hasSize(1);
-        assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(clazzMethod.getAnnotations().getFirst().getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
     }
 
     @Test
@@ -343,7 +343,7 @@ public class KotlinTypeMappingTest {
         JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
         assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
         assertThat(c.getSupertype()).isNull();
-        assertThat(c.getMethods()).hasSize(12);
+        assertThat(c.getMethods()).hasSize(13);
 
         // Assert generic type parameters have the correct type bounds.
         JavaType.Method method = c.getMethods().stream().filter(it -> "getClass".equals(it.getName())).findFirst().orElse(null);
@@ -352,15 +352,15 @@ public class KotlinTypeMappingTest {
 
         JavaType.Parameterized returnType = (JavaType.Parameterized) method.getReturnType();
         // Assert the type of the parameterized type contains the type parameter from the source.
-        assertThat(returnType.getType().getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
+        assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
     }
 
-    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     @Nested
+    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     class ParsingTest implements RewriteTest {
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
+        @Test
         void coneTypeProjection() {
             rewriteRun(
               kotlin(
@@ -405,7 +405,7 @@ public class KotlinTypeMappingTest {
                             @Override
                             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
                                 if ("Foo".equals(classDecl.getSimpleName())) {
-                                    assertThat(classDecl.getImplements().get(0).getType().toString()).isEqualTo("java.lang.invoke.TypeDescriptor$OfField<Foo<kotlin.Any>>");
+                                    assertThat(classDecl.getImplements().getFirst().getType().toString()).isEqualTo("java.lang.invoke.TypeDescriptor$OfField<Foo<kotlin.Any>>");
                                     found.set(true);
                                 }
                                 return super.visitClassDeclaration(classDecl, found);
@@ -578,13 +578,13 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           "n++~kotlin.Int",
           "--n~kotlin.Int",
           "n += a~kotlin.Int",
           "n = a + b~kotlin.Int"
         }, delimiter = '~')
+        @ParameterizedTest
         void operatorOverload(String p1, String p2) {
             rewriteRun(
               kotlin(
@@ -629,7 +629,6 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           // Method type on overload with no named arguments.
           "foo(\"\", 1, true)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
@@ -640,6 +639,7 @@ public class KotlinTypeMappingTest {
           // Method type with trailing lambda
           "foo(b = 1, noDefault = true) {}~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
         }, delimiter = '~')
+        @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
             rewriteRun(
               kotlin(
@@ -769,8 +769,8 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("UnusedReceiverParameter")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @SuppressWarnings("UnusedReceiverParameter")
         @Test
         void parameterizedReceiver() {
             rewriteRun(
@@ -865,8 +865,8 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/374")
+        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Test
         void privateToThisModifier() {
             rewriteRun(
@@ -1177,8 +1177,8 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("HasPlatformType")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/483")
+        @SuppressWarnings("HasPlatformType")
         @Test
         void isStaticFlag() {
             //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
@@ -1236,8 +1236,8 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Test
         void memberReference() {
             //noinspection RemoveRedundantBackticks
@@ -1266,12 +1266,12 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
-        @ParameterizedTest
         @CsvSource(value = {
           "fun foo(l: MutableList<String>) { @Suppress l += \"x\" }~kotlin.Suppress",
           "val releaseDates: List< @Suppress String > = emptyList()~kotlin.Suppress"
         }, delimiter = '~')
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @ParameterizedTest
         void annotationOnKotlinConeType(String input, String type) {
             //noinspection RemoveRedundantBackticks
             rewriteRun(
@@ -1468,7 +1468,7 @@ public class KotlinTypeMappingTest {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
                                 if ("AutoCloseable".equals(identifier.getSimpleName()) && identifier.getType() != null) {
-                                    assertThat(((JavaType.Class) identifier.getType()).getMethods().get(0).toString())
+                                    assertThat(((JavaType.Class) identifier.getType()).getMethods().getFirst().toString())
                                             .isEqualTo("java.lang.AutoCloseable{name=close,return=void,parameters=[]}");
                                     found.set(true);
                                 }
@@ -1779,8 +1779,8 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")
+        @Test
         void callWithDefaultedGenericParameters() {
             rewriteRun(
               kotlin(

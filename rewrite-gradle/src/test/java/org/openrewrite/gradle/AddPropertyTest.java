@@ -74,7 +74,7 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           buildGradle("plugins { id 'java' }"),
           properties(
-            null,
+            doesNotExist(),
             //language=properties
             """
               org.gradle.caching=true
@@ -106,6 +106,40 @@ class AddPropertyTest implements RewriteTest {
           dir("project2",
             properties(
               "",
+              spec -> spec.path("gradle.properties")
+            )
+          )
+        );
+    }
+
+    @Test
+    void addOnlyToSpecifiedFilePatternWithDotSlashPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("org.gradle.caching", "true", true, "./gradle.properties")),
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            //language=properties
+            """
+            aaa=true
+            zzz=true
+            """,
+            //language=properties
+            """
+              aaa=true
+              org.gradle.caching=true
+              zzz=true
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          dir("project1",
+            properties(
+              "project1.prop=true",
+              spec -> spec.path("gradle.properties")
+            )
+          ),
+          dir("project2",
+            properties(
+              "project2.prop=true",
               spec -> spec.path("gradle.properties")
             )
           )

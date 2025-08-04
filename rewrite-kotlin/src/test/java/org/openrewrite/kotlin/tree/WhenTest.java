@@ -267,7 +267,7 @@ class WhenTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                K.When when = (K.When)((J.MethodDeclaration)(cu.getStatements().get(0))).getBody().getStatements().get(1);
+                K.When when = (K.When)((J.MethodDeclaration)(cu.getStatements().getFirst())).getBody().getStatements().get(1);
                 boolean allBranchesHasLiteralBody = when.getBranches().getStatements().stream().map(K.WhenBranch.class::cast).allMatch(
                   branch -> branch.getBody() instanceof J.Literal ||
                             branch.getBody() instanceof J.Parentheses<?> && ((J.Parentheses<?>) branch.getBody()).getTree() instanceof J.Literal
@@ -295,8 +295,8 @@ class WhenTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/240")
+    @Test
     void subjectVariable() {
         rewriteRun(
           kotlin(
@@ -310,7 +310,7 @@ class WhenTest implements RewriteTest {
                   assertThat(cu.getStatements()).satisfiesExactly(
                       stmt -> {
                           J.VariableDeclarations x = (J.VariableDeclarations) stmt;
-                          K.When initializer = (K.When) x.getVariables().get(0).getInitializer();
+                          K.When initializer = (K.When) x.getVariables().getFirst().getInitializer();
                           assertThat(initializer.getSelector().getTree()).isInstanceOf(J.VariableDeclarations.class);
                       }
                   );

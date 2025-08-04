@@ -66,7 +66,7 @@ public class ChangeExtraProperty extends Recipe {
                         return as;
                     }
                     J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
-                    if(m == null || !m.getSimpleName().equals("ext")) {
+                    if(m == null || !"ext".equals(m.getSimpleName())) {
                         return as;
                     }
                     as = updateAssignment(as);
@@ -75,8 +75,8 @@ public class ChangeExtraProperty extends Recipe {
                     if(!Objects.equals(key, var.getSimpleName())) {
                         return as;
                     }
-                    if((var.getTarget() instanceof J.Identifier && ((J.Identifier) var.getTarget()).getSimpleName().equals("ext")) ||
-                       (var.getTarget() instanceof J.FieldAccess && ((J.FieldAccess) var.getTarget()).getSimpleName().equals("ext")) ) {
+                    if((var.getTarget() instanceof J.Identifier && "ext".equals(((J.Identifier) var.getTarget()).getSimpleName())) ||
+                       (var.getTarget() instanceof J.FieldAccess && "ext".equals(((J.FieldAccess) var.getTarget()).getSimpleName())) ) {
                         as = updateAssignment(as);
                     }
                 }

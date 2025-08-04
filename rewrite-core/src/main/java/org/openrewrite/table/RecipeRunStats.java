@@ -35,12 +35,19 @@ import static java.util.Objects.requireNonNull;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     private final MeterRegistry registry = new SimpleMeterRegistry();
+    private final Set<Path> sourceFileVisited = new HashSet<>();
     private final Set<Path> sourceFileChanged = new HashSet<>();
 
     public RecipeRunStats(Recipe recipe) {
         super(recipe,
                 "Recipe performance",
                 "Statistics used in analyzing the performance of recipes.");
+    }
+
+    public void recordSourceVisited(@Nullable SourceFile source) {
+        if (source != null) {
+            sourceFileVisited.add(source.getSourcePath());
+        }
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
@@ -73,13 +80,13 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
             Timer scanner = registry.find("rewrite.recipe.scan").tag("name", recipeName).timer();
             Row row = new Row(
                     recipeName,
-                    Long.valueOf(editor.count()).intValue(),
+                    sourceFileVisited.size(),
                     sourceFileChanged.size(),
                     scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].percentile(),
+                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
                     scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
                     (long) editor.totalTime(TimeUnit.NANOSECONDS),
-                    editor.takeSnapshot().percentileValues()[0].percentile(),
+                    editor.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
                     (long) editor.max(TimeUnit.NANOSECONDS)
             );
             addRowToDataTable(ctx, row);
@@ -94,7 +101,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                         Long.valueOf(scanner.count()).intValue(),
                         sourceFileChanged.size(),
                         (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                        scanner.takeSnapshot().percentileValues()[0].percentile(),
+                        scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
                         (long) scanner.max(TimeUnit.NANOSECONDS),
                         0L,
                         0.0,
@@ -130,28 +137,28 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The number of source files which were changed in the recipe run. Includes files created, deleted, and edited.")
         Integer sourceFilesChanged;
 
-        @Column(displayName = "Cumulative scanning time",
+        @Column(displayName = "Cumulative scanning time (ns)",
                 description = "The total time spent across the scanning phase of this recipe.")
-        Long scanTotalTime;
+        Long scanTotalTimeNs;
 
-        @Column(displayName = "99th percentile scanning time",
+        @Column(displayName = "99th percentile scanning time (ns)",
                 description = "99 out of 100 scans completed in this amount of time.")
-        Double scanP99;
+        Double scanP99Ns;
 
-        @Column(displayName = "Max scanning time",
+        @Column(displayName = "Max scanning time (ns)",
                 description = "The max time scanning any one source file.")
-        Long scanMax;
+        Long scanMaxNs;
 
-        @Column(displayName = "Cumulative edit time",
+        @Column(displayName = "Cumulative edit time (ns)",
                 description = "The total time spent across the editing phase of this recipe.")
-        Long editTotalTime;
+        Long editTotalTimeNs;
 
-        @Column(displayName = "99th percentile edit time",
+        @Column(displayName = "99th percentile edit time (ns)",
                 description = "99 out of 100 edits completed in this amount of time.")
-        Double editP99;
+        Double editP99Ns;
 
-        @Column(displayName = "Max edit time",
+        @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
-        Long editMax;
+        Long editMaxNs;
     }
 }

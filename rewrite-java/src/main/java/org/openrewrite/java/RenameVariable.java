@@ -90,7 +90,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             }
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
-                if (ident.getFieldType() != null && TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
+                if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
+                        TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
                     parent.putMessage("renamed", true);
                     return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
                 } else if (parent.getValue() instanceof J.FieldAccess &&

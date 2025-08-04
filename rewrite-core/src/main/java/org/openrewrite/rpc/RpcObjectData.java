@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +24,7 @@ import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import lombok.Value;
+import lombok.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -32,6 +34,8 @@ import java.util.Map;
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
  */
 @Value
+@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
+@RequiredArgsConstructor
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -73,18 +77,15 @@ public class RpcObjectData {
     @Nullable
     Integer ref;
 
-    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref) {
-        this.state = state;
-        this.valueType = valueType;
-        this.value = value;
-        this.ref = ref;
-    }
+    /**
+     * The stack trace of the thread that created this object. This is
+     * useful in debugging asymmetries between senders/receivers.
+     */
+    @With
+    @Nullable
+    String trace;
 
-    public boolean hasValue() {
-        return value != null;
-    }
-
-    public <V> V getValue() {
+    public <V> @Nullable V getValue() {
         if (value instanceof Map && valueType != null) {
             try {
                 Class<?> valueClass = Class.forName(valueType);
@@ -94,6 +95,8 @@ public class RpcObjectData {
                 // we are converting to is annotated with @JsonTypeInfo.
                 //noinspection unchecked
                 ((Map<String, Object>) value).put("@c", valueType);
+                //noinspection unchecked
+                ((Map<String, Object>) value).put("@ref", 1);
 
                 //noinspection unchecked
                 return (V) mapper.convertValue(value, valueClass);
@@ -101,10 +104,11 @@ public class RpcObjectData {
                 throw new RuntimeException(e);
             }
         }
-        //noinspection DataFlowIssue,unchecked
+        // noinspection unchecked
         return (V) value;
     }
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     public enum State {
         NO_CHANGE,
         ADD,

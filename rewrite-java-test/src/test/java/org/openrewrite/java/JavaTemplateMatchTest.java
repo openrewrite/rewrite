@@ -64,8 +64,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-templating/pull/91")
+    @Test
     void shouldMatchAbstractStringAssertIsEqualToEmptyString() {
         rewriteRun(
           spec -> spec
@@ -204,8 +204,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstQualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -271,8 +271,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstUnqualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -340,8 +340,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"ObviousNullCheck"})
+    @Test
     void matchAgainstStaticallyImportedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -409,8 +409,8 @@ class JavaTemplateMatchTest implements RewriteTest {
           ));
     }
 
-    @Test
     @SuppressWarnings({"UnnecessaryCallToStringValueOf", "RedundantCast"})
+    @Test
     void matchCompatibleTypes() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -457,8 +457,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("DataFlowIssue")
+    @Test
     void matchMethodInvocationParameter() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -538,8 +538,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("ConstantValue")
+    @Test
     void matchExpressionInThrow() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -798,8 +798,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("RedundantCast")
+    @Test
     void matchSpecialPrimitives() {
         rewriteRun(
           spec -> spec
@@ -841,8 +841,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessaryBoxing")
+    @Test
     void matchBoxedTypes() {
         rewriteRun(
           spec -> {
@@ -1006,14 +1006,14 @@ class JavaTemplateMatchTest implements RewriteTest {
           spec -> spec
             .expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                JavaTemplate template = JavaTemplate.builder("java.util.Optional.ofNullable(#{any(java.lang.String)}).orElseGet(#{any(java.lang.Object)}::toString)").build();
+                JavaTemplate template = JavaTemplate.builder("java.util.function.Predicate.not(#{any(java.util.Set)}::contains)").build();
 
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                     JavaTemplate.Matcher matcher = template.matcher(getCursor());
                     if (matcher.find()) {
                         JavaTemplateSemanticallyEqual.TemplateMatchResult result = matcher.getMatchResult();
-                        assertThat(result.getMatchedParameters()).hasSize(2);
+                        assertThat(result.getMatchedParameters()).hasSize(1);
                         return SearchResult.found(template.apply(getCursor(), method.getCoordinates().replace(), result.getMatchedParameters().toArray()));
                     }
                     return super.visitMethodInvocation(method, executionContext);
@@ -1022,22 +1022,92 @@ class JavaTemplateMatchTest implements RewriteTest {
           //language=java
           java(
             """
-              import java.util.Optional;
-              
+              import java.util.function.Predicate;
+              import java.util.Set;
+
               class Foo {
-                  @SuppressWarnings("all")
-                  void test() {
-                      Optional.ofNullable("foo").orElseGet("bar"::toString);
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return Predicate.not(set::contains);
                   }
               }
               """,
             """
-              import java.util.Optional;
-              
+              import java.util.function.Predicate;
+              import java.util.Set;
+
               class Foo {
-                  @SuppressWarnings("all")
+                  Predicate<Object> test() {
+                      Set<String> set = Set.of("1", "2");
+                      return /*~~>*/java.util.function.Predicate.not(set::contains);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchMemberReferenceAndLambda() {
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate refTemplate = JavaTemplate.builder("String::valueOf")
+                  .bindType("java.util.function.Function<Object, String>")
+                  .build();
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("(e)->e.toString()")
+                  .bindType("java.util.function.Function<Object, String>")
+                  .build();
+
+                @Override
+                public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                    var matcher = refTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitMemberReference(memberRef, executionContext);
+                    }
+                }
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
+                    var matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+
+              class Foo {
                   void test() {
-                      /*~~>*/java.util.Optional.ofNullable("foo").orElseGet("bar"::toString);
+                      test(String::valueOf);
+                      test(e -> e.toString());
+                      test(x -> x.toString());
+                  }
+
+                  void test(Function<Object, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+
+              class Foo {
+                  void test() {
+                      test((e) -> e.toString());
+                      test(String::valueOf);
+                      test(String::valueOf);
+                  }
+
+                  void test(Function<Object, String> fn) {
                   }
               }
               """

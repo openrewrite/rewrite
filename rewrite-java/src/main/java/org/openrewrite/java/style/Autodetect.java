@@ -21,6 +21,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -28,14 +29,19 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.*;
+import static org.openrewrite.internal.StringUtils.hasLineBreak;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
@@ -93,16 +99,19 @@ public class Autodetect extends NamedStyles {
             return indentStatistics.getTabsAndIndentsStyle();
         }
 
-        public ImportLayoutStyle getImportLayoutStyle(){
+        public ImportLayoutStyle getImportLayoutStyle() {
             return findImportLayout.aggregate().getImportLayoutStyle();
         }
-        public SpacesStyle getSpacesStyle(){
+
+        public SpacesStyle getSpacesStyle() {
             return spacesStatistics.getSpacesStyle();
         }
-        public WrappingAndBracesStyle getWrappingAndBracesStyle(){
+
+        public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             return wrappingAndBracesStatistics.getWrappingAndBracesStyle();
         }
-        public GeneralFormatStyle getFormatStyle(){
+
+        public GeneralFormatStyle getFormatStyle() {
             return generalFormatStatistics.getFormatStyle();
         }
     }
@@ -172,7 +181,7 @@ public class Autodetect extends NamedStyles {
                                         (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
                                         charsToOccurrence.getValue()));
                     })
-                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
+                    .collect(toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
 
             return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
                     .map(Map.Entry::getKey)
@@ -288,7 +297,7 @@ public class Autodetect extends NamedStyles {
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
                                 spaceCountToFrequency.getValue().intValue())))
-                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+                .collect(groupingBy(Map.Entry::getKey, summingInt(Map.Entry::getValue)));
 
         return tabSizeToFrequencyMap.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
@@ -385,7 +394,7 @@ public class Autodetect extends NamedStyles {
                     // Some statement types, like method invocations, are also expressions
                     // If an expression appears in a context where statements are expected, its indent is not a continuation
                     Set<Expression> statementExpressions = getCursor()
-                            .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
+                            .getMessage("STATEMENT_EXPRESSION", newSetFromMap(
                                     new IdentityHashMap<>(block.getStatements().size())));
                     statementExpressions.add((Expression) s);
                     getCursor().putMessage("STATEMENT_EXPRESSION", statementExpressions);
@@ -981,7 +990,7 @@ public class Autodetect extends NamedStyles {
             for (J.Import anImport : cu.getImports()) {
                 importedPackages.add(anImport.getPackageName() + ".");
 
-                if (anImport.getQualid().getSimpleName().equals("*")) {
+                if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
                         int count = 0;
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
@@ -1018,7 +1027,7 @@ public class Autodetect extends NamedStyles {
 
             importsBySourceFile.add(cu.getImports().stream()
                     .map(it -> new ImportAttributes(it.isStatic(), it.getPackageName(), it.getPrefix().getWhitespace()))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
 
             return cu;
         }
@@ -1268,13 +1277,64 @@ public class Autodetect extends NamedStyles {
 
     private static class WrappingAndBracesStatistics {
         int elseOnNewLine = 0;
+        int classAnnotationsWrapped = 0;
+        int methodAnnotationsWrapped = 0;
+        int fieldAnnotationsWrapped = 0;
+        int parameterAnnotationsWrapped = 0;
+        int localVariableAnnotationsWrapped = 0;
+        int enumFieldAnnotationsWrapped = 0;
 
         public WrappingAndBracesStyle getWrappingAndBracesStyle() {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
+            if (classAnnotationsWrapped != 0 && wrappingAndBracesStyle.getClassAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withClassAnnotations(
+                        wrappingAndBracesStyle.getClassAnnotations()
+                                .withWrap(determineWrapping(classAnnotationsWrapped, wrappingAndBracesStyle.getClassAnnotations().getWrap()))
+                );
+            }
+            if (methodAnnotationsWrapped != 0 && wrappingAndBracesStyle.getMethodAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withMethodAnnotations(
+                        wrappingAndBracesStyle.getMethodAnnotations()
+                                .withWrap(determineWrapping(methodAnnotationsWrapped, wrappingAndBracesStyle.getMethodAnnotations().getWrap()))
+                );
+            }
+            if (fieldAnnotationsWrapped != 0 && wrappingAndBracesStyle.getFieldAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withFieldAnnotations(
+                        wrappingAndBracesStyle.getFieldAnnotations()
+                                .withWrap(determineWrapping(fieldAnnotationsWrapped, wrappingAndBracesStyle.getFieldAnnotations().getWrap()))
+                );
+            }
+            if (parameterAnnotationsWrapped != 0 && wrappingAndBracesStyle.getParameterAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withParameterAnnotations(
+                        wrappingAndBracesStyle.getParameterAnnotations()
+                                .withWrap(determineWrapping(parameterAnnotationsWrapped, wrappingAndBracesStyle.getParameterAnnotations().getWrap()))
+                );
+            }
+            if (localVariableAnnotationsWrapped != 0 && wrappingAndBracesStyle.getLocalVariableAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withLocalVariableAnnotations(
+                        wrappingAndBracesStyle.getLocalVariableAnnotations()
+                                .withWrap(determineWrapping(localVariableAnnotationsWrapped, wrappingAndBracesStyle.getLocalVariableAnnotations().getWrap()))
+                );
+            }
+            if (enumFieldAnnotationsWrapped != 0 && wrappingAndBracesStyle.getEnumFieldAnnotations() != null) {
+                wrappingAndBracesStyle = wrappingAndBracesStyle.withEnumFieldAnnotations(
+                        wrappingAndBracesStyle.getEnumFieldAnnotations()
+                                .withWrap(determineWrapping(enumFieldAnnotationsWrapped, wrappingAndBracesStyle.getEnumFieldAnnotations().getWrap()))
+                );
+            }
             return wrappingAndBracesStyle
                     .withIfStatement(new WrappingAndBracesStyle.IfStatement(
                             elseOnNewLine > 0)
                     );
+        }
+
+        private LineWrapSetting determineWrapping(int wrapsFound, LineWrapSetting defaultSetting) {
+            if (wrapsFound > 0) {
+                return WrapAlways;
+            } else if (wrapsFound < 0) {
+                return DoNotWrap;
+            }
+            return defaultSetting;
         }
     }
 
@@ -1285,8 +1345,105 @@ public class Autodetect extends NamedStyles {
             return super.visitElse(else_, stats);
         }
 
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
+            for (int i = 0; i < classDecl.getLeadingAnnotations().size(); i++) {
+                J.Annotation ann = classDecl.getLeadingAnnotations().get(i);
+                wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(ann.getPrefix());
+            }
+            if (!classDecl.getLeadingAnnotations().isEmpty()) {
+                if (!classDecl.getModifiers().isEmpty()) {
+                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getModifiers().get(0).getPrefix());
+                } else {
+                    wrappingAndBracesStatistics.classAnnotationsWrapped += hasNewLine(classDecl.getPadding().getKind().getPrefix());
+                }
+            }
+            return super.visitClassDeclaration(classDecl, wrappingAndBracesStatistics);
+        }
+
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
+            for (int i = 0; i < method.getLeadingAnnotations().size(); i++) {
+                J.Annotation ann = method.getLeadingAnnotations().get(i);
+                wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(ann.getPrefix());
+            }
+            if (!method.getLeadingAnnotations().isEmpty()) {
+                if (!method.getModifiers().isEmpty()) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getModifiers().get(0).getPrefix());
+                } else if (method.getTypeParameters() != null) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getTypeParameters().get(0).getPrefix());
+                } else if (method.getReturnTypeExpression() != null) {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getReturnTypeExpression().getPrefix());
+                } else {
+                    wrappingAndBracesStatistics.methodAnnotationsWrapped += hasNewLine(method.getName().getPrefix());
+                }
+            }
+            return super.visitMethodDeclaration(method, wrappingAndBracesStatistics);
+        }
+
+        @Override
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
+            Cursor possiblyBlock = getCursor().dropParentUntil(J.class::isInstance);
+            AnnotationType annotationType = null;
+            if (possiblyBlock.getValue() instanceof J.Block) {
+                if (possiblyBlock.getParent() != null && possiblyBlock.getParent().getValue() instanceof J.ClassDeclaration) {
+                    annotationType = AnnotationType.field;
+                    for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
+                        J.Annotation ann = multiVariable.getLeadingAnnotations().get(i);
+                        wrappingAndBracesStatistics.fieldAnnotationsWrapped += hasNewLine(ann.getPrefix());
+                    }
+                } else {
+                    annotationType = AnnotationType.local;
+                    for (int i = 0; i < multiVariable.getLeadingAnnotations().size(); i++) {
+                        J.Annotation ann = multiVariable.getLeadingAnnotations().get(i);
+                        wrappingAndBracesStatistics.localVariableAnnotationsWrapped += hasNewLine(ann.getPrefix());
+                    }
+                }
+            } else if (getCursor().getParent(3) != null && (getCursor().getParent(3).getValue() instanceof J.ClassDeclaration || getCursor().getParent(3).getValue() instanceof J.MethodDeclaration)) {
+                annotationType = AnnotationType.param;
+                multiVariable.getLeadingAnnotations().forEach(ann -> wrappingAndBracesStatistics.parameterAnnotationsWrapped += hasNewLine(ann.getPrefix()));
+            }
+            if (!multiVariable.getLeadingAnnotations().isEmpty() && annotationType != null) {
+                if (!multiVariable.getModifiers().isEmpty()) {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getModifiers().get(0).getPrefix()));
+                } else if (multiVariable.getTypeExpression() != null) {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getTypeExpression().getPrefix()));
+                } else {
+                    appendWrapping(wrappingAndBracesStatistics, annotationType, hasNewLine(multiVariable.getVariables().get(0).getPrefix()));
+                }
+            }
+            return super.visitVariableDeclarations(multiVariable, wrappingAndBracesStatistics);
+        }
+
+        private enum AnnotationType {
+            field, local, param
+        }
+
+        private void appendWrapping(WrappingAndBracesStatistics wrappingAndBracesStatistics, AnnotationType annotationType, int value) {
+            switch (annotationType) {
+                case field:
+                    wrappingAndBracesStatistics.fieldAnnotationsWrapped += value;
+                    break;
+                case local:
+                    wrappingAndBracesStatistics.localVariableAnnotationsWrapped += value;
+                    break;
+                case param:
+                    wrappingAndBracesStatistics.parameterAnnotationsWrapped += value;
+                    break;
+            }
+        }
+
+        @Override
+        public J.EnumValue visitEnumValue(J.EnumValue _enum, WrappingAndBracesStatistics wrappingAndBracesStatistics) {
+            _enum.getAnnotations().forEach(ann -> wrappingAndBracesStatistics.enumFieldAnnotationsWrapped += hasNewLine(ann.getPrefix()));
+            if (!_enum.getAnnotations().isEmpty()) {
+                wrappingAndBracesStatistics.enumFieldAnnotationsWrapped += hasNewLine(_enum.getName().getPrefix());
+            }
+            return super.visitEnumValue(_enum, wrappingAndBracesStatistics);
+        }
+
         private int hasNewLine(Space space) {
-            return space.getWhitespace().contains("\n") ? 1 : -1;
+            return hasLineBreak(space.getWhitespace()) ? 1 : -1;
         }
     }
 }

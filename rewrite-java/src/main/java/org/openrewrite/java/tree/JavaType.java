@@ -26,6 +26,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.Function;
@@ -116,7 +119,7 @@ public interface JavaType {
 
         public List<JavaType> getThrowableTypes() {
             if (throwableTypes == null) {
-                return Collections.emptyList();
+                return emptyList();
             }
             return Arrays.asList(throwableTypes);
         }
@@ -157,7 +160,7 @@ public interface JavaType {
 
         public List<JavaType> getBounds() {
             if (bounds == null) {
-                return Collections.emptyList();
+                return emptyList();
             }
             return Arrays.asList(bounds);
         }
@@ -1085,7 +1088,7 @@ public interface JavaType {
         }
     }
 
-    enum Primitive implements JavaType {
+    enum Primitive implements JavaType, RpcCodec<Primitive> {
         Boolean,
         Byte,
         Char,
@@ -1222,6 +1225,17 @@ public interface JavaType {
 
         public boolean isNumeric() {
             return this == Double || this == Int || this == Float || this == Long || this == Short;
+        }
+
+        @Override
+        public void rpcSend(Primitive after, RpcSendQueue q) {
+            q.getAndSend(after, Primitive::getKeyword);
+        }
+
+        @Override
+        public Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
+            String keyword = q.receiveAndGet(null, java.lang.String::toString);
+            return fromKeyword(keyword);
         }
     }
 
@@ -1392,6 +1406,11 @@ public interface JavaType {
 
             Stack<FullyQualified> interfaces = new Stack<>();
             interfaces.addAll(declaringType.getInterfaces());
+            FullyQualified supertype = declaringType.getSupertype();
+            while (supertype != null) {
+                interfaces.add(supertype);
+                supertype = supertype.getSupertype();
+            }
 
             while (!interfaces.isEmpty()) {
                 FullyQualified declaring = interfaces.pop();

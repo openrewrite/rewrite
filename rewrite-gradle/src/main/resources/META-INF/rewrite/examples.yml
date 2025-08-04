@@ -394,6 +394,39 @@ examples:
       }
     path: build.gradle
     language: groovy
+- description: ''
+  sources:
+  - before: |
+      plugins {
+          `java-library`
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      val version = "latest.release"
+
+      dependencies {
+          api(group = "org.openrewrite", name = "rewrite-core", version = "latest.release")
+          implementation(group = "org.openrewrite", name = "rewrite-core", version = version, classifier = "sources")
+      }
+    after: |
+      plugins {
+          `java-library`
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      val version = "latest.release"
+
+      dependencies {
+          api("org.openrewrite:rewrite-core:latest.release")
+          implementation("org.openrewrite:rewrite-core:$version:sources")
+      }
+    language: buildGradleKts
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.EnableDevelocityBuildCache
@@ -493,7 +526,6 @@ recipeName: org.openrewrite.gradle.RemoveRedundantDependencyVersions
 examples:
 - description: ''
   parameters:
-  - 'null'
   - 'null'
   - 'null'
   - 'null'
@@ -946,16 +978,15 @@ examples:
   sources:
   - before: |
       plugins {
-          id 'org.openrewrite.rewrite' version '5.40.0'
-          id 'com.github.johnrengelman.shadow' version '6.1.0'
+          id("org.openrewrite.rewrite") version("5.40.0")
+          id("com.github.johnrengelman.shadow") version("6.1.0")
       }
     after: |
       plugins {
-          id 'org.openrewrite.rewrite' version '5.40.6'
-          id 'com.github.johnrengelman.shadow' version '6.1.0'
+          id("org.openrewrite.rewrite") version("5.40.6")
+          id("com.github.johnrengelman.shadow") version("6.1.0")
       }
-    path: build.gradle
-    language: groovy
+    language: buildGradleKts
 - description: Upgrading a settings plugin
   parameters:
   - com.gradle.enterprise
@@ -1109,61 +1140,124 @@ examples:
 - description: ''
   parameters:
   - 'null'
-  - https://oss.sonatype.org/content/repositories/snapshots
+  - https://central.sonatype.com/repository/maven-snapshots
   - 'null'
   sources:
   - before: |
       buildscript {
         repositories {
-          maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
 
       repositories {
-        maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-        maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-        maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-        maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+        maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+        maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+        maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+        maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
       }
     after: |
       buildscript {
         repositories {
-          /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
 
       repositories {
-        /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-        /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-        /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-        /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+        /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+        /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+        /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+        /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
       }
     path: build.gradle
     language: groovy
   - before: |
       pluginManagement {
         repositories {
-          maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
     after: |
       pluginManagement {
         repositories {
-          /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-          /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-          /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+          /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+          /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+          /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
         }
       }
+    language: settingsGradle
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.search.ModuleHasDependency
+examples:
+- description: ''
+  parameters:
+  - org.openrewrite.recipe
+  - rewrite-spring
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+      }
+      repositories {
+          mavenCentral()
+      }
+      dependencies {
+          implementation 'org.openrewrite.recipe:rewrite-spring:6.7.0'
+      }
+    after: |
+      /*~~(Module has dependency: org.openrewrite.recipe:rewrite-spring)~~>*/plugins {
+          id 'java'
+      }
+      repositories {
+          mavenCentral()
+      }
+      dependencies {
+          implementation 'org.openrewrite.recipe:rewrite-spring:6.7.0'
+      }
+    path: build.gradle
+    language: groovy
+  - before: |
+      plugins {
+        id 'java'
+      }
+      repositories {
+        mavenCentral()
+      }
+      dependencies {
+          implementation 'org.openrewrite:rewrite-gradle:8.52.0'
+      }
+    path: build.gradle
+    language: groovy
+  - before: |
+      class A {}
+    after: |
+      /*~~(Module has dependency: org.openrewrite.recipe:rewrite-spring)~~>*/class A {}
+    language: java
+  - before: |
+      class B {}
+    language: java
+  - before: multi-project-build
+    language: mavenProject
+  - before: other-project
+    language: mavenProject
+  - before: project-applies-openrewrite-plugin
+    language: mavenProject
+  - before: |
+      include 'project-applies-openrewrite-plugin'
+      include 'other-project'
     language: settingsGradle
 ---
 type: specs.openrewrite.org/v1beta/example

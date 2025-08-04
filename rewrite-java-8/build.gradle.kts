@@ -12,6 +12,7 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 val javaTck = configurations.create("javaTck") {
     isTransitive = false
 }
+
 dependencies {
     compileOnly(files(tools))
     compileOnly("org.slf4j:slf4j-api:1.7.+")

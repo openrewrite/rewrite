@@ -60,7 +60,7 @@ class MappingTest implements RewriteTest {
               name : org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
-                assertThat(((Yaml.Mapping) (y.getDocuments().get(0).getBlock())).getEntries().stream()
+                assertThat(((Yaml.Mapping) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
                   .map(Scalar::getValue)).containsExactly("type", "name");
             })
@@ -77,11 +77,11 @@ class MappingTest implements RewriteTest {
                       name: org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
-                Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().get(0).getBlock();
+                Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
                 assertThat(mapping.getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
                   .map(Scalar::getValue)).containsExactly("type");
-                assertThat(mapping.getEntries().get(0).getValue()).isInstanceOf(Yaml.Mapping.class);
+                assertThat(mapping.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Mapping.class);
             })
           )
         );
@@ -141,7 +141,7 @@ class MappingTest implements RewriteTest {
               baz: foo
               """,
             spec -> spec.afterRecipe(documents -> {
-                var doc = documents.getDocuments().get(0);
+                var doc = documents.getDocuments().getFirst();
                 Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
                 assertThat(mapping.getEntries().size()).isEqualTo(2);
 
@@ -177,7 +177,7 @@ class MappingTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(2);
-                var doc = docs.getDocuments().get(0);
+                var doc = docs.getDocuments().getFirst();
                 assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre\n");
                 assertThat(doc.getEnd().getPrefix()).isEqualTo("\n# doc-1-end\n");
                 var doc2 = docs.getDocuments().get(1);
@@ -196,7 +196,7 @@ class MappingTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(1);
-                var doc = docs.getDocuments().get(0);
+                var doc = docs.getDocuments().getFirst();
                 assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre");
             })
           )

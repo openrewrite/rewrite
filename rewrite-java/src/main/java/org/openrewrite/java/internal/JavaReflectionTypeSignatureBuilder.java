@@ -38,6 +38,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
                 return arraySignature(clazz);
             } else if (clazz.isPrimitive()) {
                 return primitiveSignature(clazz);
+            } else if (clazz.getTypeParameters().length == 0) {
+                return classSignature(clazz);
             }
 
             StringBuilder s = new StringBuilder(classSignature(clazz));

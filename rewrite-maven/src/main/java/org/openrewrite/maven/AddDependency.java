@@ -279,6 +279,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {
-        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && !acc.scopeByProject.isEmpty();
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive) && (onlyIfUsing == null || !acc.scopeByProject.isEmpty());
     }
 }

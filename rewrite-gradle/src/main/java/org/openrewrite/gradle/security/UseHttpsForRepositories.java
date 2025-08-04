@@ -19,13 +19,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
 import java.util.Set;
@@ -33,7 +33,6 @@ import java.util.Set;
 import static java.util.Collections.singleton;
 
 public class UseHttpsForRepositories extends Recipe {
-    private static final MethodMatcher REPO_URL = new MethodMatcher("MavenArtifactRepositorySpec url(..)");
 
     @Override
     public String getDisplayName() {
@@ -57,7 +56,7 @@ public class UseHttpsForRepositories extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(REPO_URL), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             private J.Literal fixupLiteralIfNeeded(J.Literal arg) {
                 String url = (String) arg.getValue();
                 //noinspection HttpUrlsUsage
@@ -69,19 +68,28 @@ public class UseHttpsForRepositories extends Recipe {
             }
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (REPO_URL.matches(method)) {
-                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        if (arg instanceof J.Literal) {
-                            return fixupLiteralIfNeeded((J.Literal) arg);
-                        } else if (arg instanceof G.GString) {
-                            G.GString garg = (G.GString) arg;
-                            return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
-                                    lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
-                        }
-                        return arg;
-                    }));
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if ("url".equals(m.getSimpleName()) || "uri".equals(m.getSimpleName())) {
+                    try {
+                        getCursor()
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && "maven".equals(((J.MethodInvocation) e).getSimpleName()))
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) e).getSimpleName()));
+                        m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                            if (arg instanceof J.Literal) {
+                                return fixupLiteralIfNeeded((J.Literal) arg);
+                            } else if (arg instanceof G.GString) {
+                                G.GString garg = (G.GString) arg;
+                                return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
+                                        lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
+                            } else if (arg instanceof K.StringTemplate) {
+                                K.StringTemplate karg = (K.StringTemplate) arg;
+                                return karg.withStrings(ListUtils.mapFirst(karg.getStrings(),
+                                        lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
+                            }
+                            return arg;
+                        }));
+                    } catch (Exception ignored) {}
                 }
                 return m;
             }

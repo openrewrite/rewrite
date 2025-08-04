@@ -116,6 +116,27 @@ examples:
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.AddTagAttribute
+examples:
+  - description: Add an attribute to a tag if it doesn't already exist
+    parameters:
+      - bean
+      - scope
+      - singleton
+    sources:
+      - before: |
+          <beans>
+              <bean id="myBean"/>
+              <bean id="anotherBean" scope="prototype"/>
+          </beans>
+        after: |
+          <beans>
+              <bean id="myBean" scope="singleton"/>
+              <bean id="anotherBean" scope="prototype"/>
+          </beans>
+        language: xml
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.xml.ChangeTagName
 examples:
 - description: ''
@@ -292,6 +313,28 @@ examples:
       <dependency/>
         </dependencies>
       </project>
+    language: xml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.xml.search.DoesNotUseNamespaceUri
+examples:
+- description: ''
+  parameters:
+  - http://example.com/dummy
+  sources:
+  - after: |
+      <!--~~>--><beans xmlns="http://www.springframework.org/schema/beans"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="
+              http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
+              http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+          <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
+              <jaxws:conduitSelector>
+                  <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
+              </jaxws:conduitSelector>
+          </jaxws:client>
+      </beans>
     language: xml
 ---
 type: specs.openrewrite.org/v1beta/example

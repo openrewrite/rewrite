@@ -51,7 +51,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
               newTree instanceof J.Ternary ||
               newTree instanceof J.Assignment ||
               newTree instanceof J.InstanceOf ||
-              newTree instanceof J.TypeCast)) {
+              newTree instanceof J.TypeCast ||
+              newTree instanceof J.SwitchExpression)) {
             return newTree;
         }
 
@@ -157,8 +158,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
     private boolean needsParentheses(Expression expr, Object parent) {
         return parent instanceof J.Unary ||
-               (parent instanceof J.MethodInvocation &&
-                expr.isScope(((J.MethodInvocation) parent).getSelect()));
+               (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+                (expr instanceof J.SwitchExpression);
     }
 
     private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
@@ -324,6 +325,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         return a;
+    }
+
+    @Override
+    public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
+        return parenthesize((Expression) super.visitSwitchExpression(switch_, p));
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {

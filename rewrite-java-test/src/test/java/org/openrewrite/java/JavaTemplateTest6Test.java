@@ -61,10 +61,8 @@ class JavaTemplateTest6Test implements RewriteTest {
             """
               class Test {
                   void test() {
-                      @SuppressWarnings("ALL")
-                      final int m;
-                      @SuppressWarnings("ALL")
-                      int n;
+                      @SuppressWarnings("ALL") final int m;
+                      @SuppressWarnings("ALL") int n;
                   }
               }
               """
@@ -121,7 +119,7 @@ class JavaTemplateTest6Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
-                  if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
+                  if (classDecl.getLeadingAnnotations().isEmpty() && !"Test".equals(classDecl.getSimpleName())) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")",
                         getCursor(), classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
                   }
@@ -152,7 +150,7 @@ class JavaTemplateTest6Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                  if (annotation.getSimpleName().equals("SuppressWarnings")) {
+                  if ("SuppressWarnings".equals(annotation.getSimpleName())) {
                       return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
                   }
                   return annotation;
@@ -252,8 +250,8 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
               assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream()
                 .map(JavaType.FullyQualified.class::cast)
                 .map(JavaType.FullyQualified::getFullyQualifiedName))
@@ -291,20 +289,20 @@ class JavaTemplateTest6Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(type).isNotNull();
               var paramTypes = type.getParameterTypes();
-              assertThat(paramTypes.get(0))
+              assertThat(paramTypes.getFirst())
                 .as("The method declaration's type's genericSignature first argument should have type 'java.util.List'")
                 .matches(tType -> tType instanceof JavaType.FullyQualified &&
-                                  TypeUtils.asFullyQualified(tType).getFullyQualifiedName().equals("java.util.List"));
+                                  "java.util.List".equals(TypeUtils.asFullyQualified(tType).getFullyQualifiedName()));
 
               assertThat(paramTypes.get(1))
                 .as("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches(uType ->
                   uType instanceof JavaType.GenericTypeVariable &&
-                  TypeUtils.asGeneric(uType).getName().equals("U") &&
+                  "U".equals(TypeUtils.asGeneric(uType).getName()) &&
                   TypeUtils.asGeneric(uType).getBounds().isEmpty());
           }),
           java(
@@ -361,7 +359,7 @@ class JavaTemplateTest6Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var statement = method.getBody().getStatements().get(0);
+                  var statement = method.getBody().getStatements().getFirst();
                   if (statement instanceof J.Unary) {
                       return JavaTemplate.builder("n = 1;")
                         .contextSensitive()
@@ -423,12 +421,12 @@ class JavaTemplateTest6Test implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "UnnecessaryBoxing",
       "CachedNumberConstructorCall",
       "ResultOfMethodCallIgnored"
       , "Convert2MethodRef"})
+    @Test
     void replaceNamedVariableInitializerMethodInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -437,7 +435,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
                       return JavaTemplate.apply("new Integer(#{any()})",
-                        getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                        getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
                   }
                   return super.visitMethodInvocation(method, p);
               }

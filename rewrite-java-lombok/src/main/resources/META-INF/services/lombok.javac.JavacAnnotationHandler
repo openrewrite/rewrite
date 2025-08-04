@@ -29,4 +29,5 @@ org.openrewrite.java.lombok.NonNullNoOpHandler
 org.openrewrite.java.lombok.RequiredArgsConstructorHandler
 org.openrewrite.java.lombok.SetterHandler
 org.openrewrite.java.lombok.SneakyThrowsNoOpHandler
+org.openrewrite.java.lombok.SuperBuilderHandler
 org.openrewrite.java.lombok.SynchronizedNoOpHandler

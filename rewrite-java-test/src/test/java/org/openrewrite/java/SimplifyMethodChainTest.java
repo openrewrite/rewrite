@@ -19,29 +19,29 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
+import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
 class SimplifyMethodChainTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void simplify() {
         rewriteRun(
           spec -> spec.recipe(new SimplifyMethodChain(
-            Arrays.asList("A b()", "B c()"), "c2", false)),
+            List.of("A b()", "B c()"), "c2", false)),
           java(
             """
               class A {
                   static B b() { return new B(); }
                   static C c2() { return new C(); }
               }
-                            
+
               class B {
                   C c() { return new C(); }
               }
-                            
+
               class C {
               }
               """

@@ -15,7 +15,7 @@ dependencies {
     if (System.getProperty("idea.active") != null ||
             System.getProperty("idea.sync.active") != null) {
         // so we can run tests in the IDE with the IntelliJ IDEA runner
-        runtimeOnly(project(":rewrite-java-17"))
+        runtimeOnly(project(":rewrite-java-21"))
     }
 }
 
@@ -37,12 +37,12 @@ infoBroker {
     )
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
 }
 
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }
 

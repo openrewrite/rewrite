@@ -25,12 +25,12 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.max;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -130,7 +130,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         validated = validated.and(required("newGroupId", newGroupId).or(required("newArtifactId", newArtifactId)));
-        validated = validated.and(test(
+        return validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -140,7 +140,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override
@@ -239,16 +238,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         .anyMatch(rd -> (version == null) || version.equals(rd.getVersion()));
             }
 
-            private Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, String newValue, ExecutionContext ctx) {
-                Optional<Xml.Tag> childTag = tag.getChild(childTagName);
-                if (childTag.isPresent() && !newValue.equals(childTag.get().getValue().orElse(null))) {
-                    tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, ctx);
-                }
-                return tag;
-            }
-
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
-
                 MavenResolutionResult result = getResolutionResult();
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
@@ -274,7 +264,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     }
 
                 }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
+                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
         };
     }

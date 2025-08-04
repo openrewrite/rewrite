@@ -196,7 +196,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                             metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     // TODO This is hacky, but the class structure of LatestRelease is suboptimal, see https://github.com/openrewrite/rewrite/pull/5029
                     // Fix it when we have a chance to refactor the code.
-                    if (versionComparator.getClass().getSimpleName().equals("LatestRelease") && mavenMetadata.getVersioning().getRelease() != null) {
+                    if ("LatestRelease".equals(versionComparator.getClass().getSimpleName()) && mavenMetadata.getVersioning().getRelease() != null) {
                         return mavenMetadata.getVersioning().getRelease();
                     }
                     LatestRelease latest = new LatestRelease(versionPattern);

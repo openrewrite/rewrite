@@ -215,6 +215,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        return (J.Lambda.Parameters) super.visitLambdaParameters(parameters, p);
+    }
+
+    @Override
     public J.Literal visitLiteral(J.Literal literal, P p) {
         return (J.Literal) super.visitLiteral(literal, p);
     }
@@ -281,6 +286,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.ParenthesizedTypeTree visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        return (J.ParenthesizedTypeTree) super.visitParenthesizedTypeTree(parTree, p);
+    }
+
+    @Override
     public J.Primitive visitPrimitive(J.Primitive primitive, P p) {
         return (J.Primitive) super.visitPrimitive(primitive, p);
     }
@@ -333,6 +343,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
         return (J.TypeParameter) super.visitTypeParameter(typeParam, p);
+    }
+
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        return (J.TypeParameters) super.visitTypeParameters(typeParameters, p);
     }
 
     @Override

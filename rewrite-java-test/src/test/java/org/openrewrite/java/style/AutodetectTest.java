@@ -24,6 +24,8 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
+import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 
 @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})
 class AutodetectTest implements RewriteTest {
@@ -56,8 +58,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3552")
+    @Test
     void continuationIndentFromParameters() {
         var cus = jp().parse(
           """
@@ -77,8 +79,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3550")
+    @Test
     void alignParametersWhenMultiple() {
         var cus = jp().parse(
           """
@@ -133,18 +135,18 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package org.springframework.cloud.netflix.eureka;
-                        
+
             import static org.springframework.cloud.netflix.eureka.EurekaConstants.DEFAULT_PREFIX;
-                        
+
             @SuppressWarnings("ALL")
             @ConfigurationProperties(EurekaClientConfigBean.PREFIX)
             public class EurekaClientConfigBean implements EurekaClientConfig, Ordered {
             	private static final int MINUTES = 60;
-                        
+
             	public void setOrder(int order) {
             		this.order = order;
             	}
-                        
+
             	@Override
             	public boolean equals(Object o) {
             		EurekaClientConfigBean that = (EurekaClientConfigBean) o;
@@ -171,26 +173,26 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.netflix.kayenta.orca.controllers;
-                        
+
             @SuppressWarnings("ALL")
             @RestController
             public class AdminController {
               private final ApplicationEventPublisher publisher;
-                        
+
               @Autowired
               public AdminController(ApplicationEventPublisher publisher) {
                 this.publisher = publisher;
               }
-                        
+
               @RequestMapping(
                   method = RequestMethod.POST)
               void setInstanceEnabled(@RequestBody Map<String, Boolean> enabledWrapper) {
                 Boolean enabled = enabledWrapper.get("enabled");
-                        
+
                 if (enabled == null) {
                   throw new ValidationException("The field 'enabled' must be set.", null);
                 }
-                        
+
                 setInstanceEnabled(enabled);
               }
             }
@@ -215,16 +217,16 @@ class AutodetectTest implements RewriteTest {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                     J.Identifier i = super.visitIdentifier(ident, ctx);
-                        
+
                     if (TypeUtils.isOfClassType(i.getType(), oldPackageName)
                             && i.getSimpleName().equals(oldPackageType.getClassName())) {
                         i = i.withName((newPackageType).getClassName())
                                 .withType(newPackageType);
                     }
-                        
+
                     return i;
                 }
-                        
+
             }
             """
         );
@@ -362,7 +364,7 @@ class AutodetectTest implements RewriteTest {
 
             import java.util.ArrayList;
             import java.util.List;
-                        
+
             public class HelloWorld {
                 public static void main(String[] args) {
                     System.out.print("Hello");
@@ -414,17 +416,17 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             import com.fasterxml.jackson.annotation.JsonCreator;
-            
+
             import org.openrewrite.internal.StringUtils;
             import org.openrewrite.internal.ListUtils;
             import org.openrewrite.internal.lang.Nullable;
-            
+
             import java.util.*;
             import java.util.stream.Collectors;
-            
+
             import static java.util.Collections.*;
             import static java.util.function.Function.identity;
-            
+
             public class Test {
             }
             """
@@ -435,25 +437,25 @@ class AutodetectTest implements RewriteTest {
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+        assertThat(importLayout.getLayout().getFirst()).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
+          .matches(b -> "org\\.openrewrite\\.internal\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(4))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> "javax\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(5))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> "java\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
@@ -467,24 +469,24 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.example;
-                        
+
             import static com.example.Assertions.java;
-                        
+
             import static java.util.Collections.singletonList;
             import static org.assertj.core.api.Assertions.assertThat;
             import static org.junit.jupiter.api.Assertions.assertEquals;
-                        
+
             import java.util.List;
             """,
           """
             package com.example;
-                        
+
             import static com.example.Assertions.java;
-                        
+
             import static java.util.Collections.singletonList;
             import static org.assertj.core.api.Assertions.assertThat;
             import static org.junit.jupiter.api.Assertions.assertEquals;
-                        
+
             import java.util.List;
             """
         );
@@ -493,10 +495,10 @@ class AutodetectTest implements RewriteTest {
         cus.forEach(detector::sample);
         var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
 
-        assertThat(importLayout.getLayout().get(0))
+        assertThat(importLayout.getLayout().getFirst())
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
+          .matches(b -> "com\\.example\\..+".equals(((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString()));
 
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
@@ -516,7 +518,7 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             import java.util.*;
-            
+
             public class Test {
                 List<Integer> l;
                 Set<Integer> s;
@@ -544,7 +546,7 @@ class AutodetectTest implements RewriteTest {
             import java.util.HashSet;
             import java.util.List;
             import java.util.Set;
-            
+
             import javax.persistence.Entity;
             import javax.persistence.FetchType;
             import javax.persistence.JoinColumn;
@@ -552,7 +554,7 @@ class AutodetectTest implements RewriteTest {
             import javax.persistence.ManyToMany;
             import javax.persistence.Table;
             import javax.xml.bind.annotation.XmlElement;
-            
+
             public class Test {
                 List<Integer> l;
                 Set<Integer> s;
@@ -752,8 +754,8 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    @Test
     void detectAfterCommaShouldIgnoreFirstElement() {
         var cus = jp().parse(
           """
@@ -776,18 +778,18 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    @Test
     void detectAfterCommaBasedOnLambdas() {
         var cus = jp().parse(
           """
             import java.util.function.BiConsumer;
-            
+
             class T {
                 static {
                     int[] i0 = new int[]{1,2};
                     int[] i1 = new int[]{2,3};
-            
+
                     BiConsumer<?, ?> c0 = (a, b) -> {};
                     BiConsumer<?, ?> c1 = (a, b) -> {};
                     BiConsumer<?, ?> c2 = (a, b) -> {};
@@ -935,7 +937,7 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.test;
-            
+
             public class Foo {
                private static final int underIndented;
                      int overIndented;
@@ -972,7 +974,7 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             import java.util.stream.Stream;
-                        
+
             class Continuations {
                 public void cont() {
                     Stream.of("foo",
@@ -1014,8 +1016,8 @@ class AutodetectTest implements RewriteTest {
 
     @Nested
     class ContinuationIndentForAnnotations {
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3568")
+        @Test
         void ignoreSpaceBetweenAnnotations() {
             var cus = jp().parse(
               """
@@ -1048,7 +1050,7 @@ class AutodetectTest implements RewriteTest {
                 @interface Foos{
                     Foo[] value();
                 }
-                
+
                 class Test {
                     @Foos(
                        @Foo)
@@ -1076,7 +1078,7 @@ class AutodetectTest implements RewriteTest {
                 @interface Foos{
                     Foo[] value();
                 }
-                
+
                 class Test {
                     @Foos(
                        {@Foo})
@@ -1096,8 +1098,8 @@ class AutodetectTest implements RewriteTest {
               .isEqualTo(3);
         }
 
-        @Test
         @ExpectedToFail("existing visitor does not super-visit newArray trees")
+        @Test
         void includeAnnotationArgArrayElements() {
             var cus = jp().parse(
               """
@@ -1105,7 +1107,7 @@ class AutodetectTest implements RewriteTest {
                 @interface Foos{
                     Foo[] value();
                 }
-                
+
                 class Test {
                     @Foos({
                        @Foo})
@@ -1125,4 +1127,379 @@ class AutodetectTest implements RewriteTest {
               .isEqualTo(3);
         }
     }
+
+    @Nested
+    class AnnotationWrapping {
+        @Test
+        void classLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                @Foo
+                @Foo
+                class Test {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getClassAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void methodLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    @Foo
+                    @Foo
+                    void method() {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getMethodAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void fieldLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    @Foo
+                    @Foo
+                    private int field;
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getFieldAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void paramLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    void method(@Foo @Foo int param) {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void localVariableLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    void method() {
+                        @Foo @Foo int localVar;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getLocalVariableAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void enumFieldLevelAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                enum MyEnum {
+                    @Foo @Foo VALUE
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getEnumFieldAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void recordFieldAnnotations() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                record someRecord(@Foo @Foo String name) {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void classLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                @Foo @Foo class Test {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getClassAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void methodLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    @Foo @Foo void method() {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getMethodAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void fieldLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    @Foo @Foo private int field;
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getFieldAnnotations().getWrap()).isEqualTo(DoNotWrap);
+        }
+
+        @Test
+        void paramLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    void method(
+                      @Foo
+                      @Foo
+                      int param) {
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void localVariableLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                class Test {
+                    void method() {
+                        @Foo
+                        @Foo
+                        int localVar;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getLocalVariableAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void enumFieldLevelOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                enum MyEnum {
+                    @Foo
+                    @Foo
+                    VALUE
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getEnumFieldAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+        @Test
+        void recordFieldOpposingDefault() {
+            var cus = jp().parse(
+              """
+                import java.lang.annotation.Repeatable;
+
+                @Repeatable(Foo.Foos.class)
+                @interface Foo {
+                    @interface Foos {
+                        Foo[] value();
+                    }
+                }
+
+                record someRecord(
+                  @Foo
+                  @Foo
+                  String name) {
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var wrapsAndBraces = detector.build().getStyle(WrappingAndBracesStyle.class);
+            assertThat(wrapsAndBraces.getParameterAnnotations().getWrap()).isEqualTo(WrapAlways);
+        }
+
+    }
+
 }

@@ -121,7 +121,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
                 var it = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody())
-                  .getStatements().get(0)).getExpression();
+                  .getStatements().getFirst()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(it.getSelect().getType()).getFullyQualifiedName()).isEqualTo("java.lang.String");
                 assertThat(it.getMethodType().getName()).isEqualTo("substring");
                 assertThat(it.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
@@ -147,7 +147,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
                 var it = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody())
-                  .getStatements().get(0)).getExpression();
+                  .getStatements().getFirst()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(it.getSelect().getType()).getFullyQualifiedName()).isEqualTo("java.lang.Integer");
                 assertThat(it.getMethodType().getName()).isEqualTo("byteValue");
                 assertThat(it.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.Integer");
@@ -172,7 +172,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
                 var m = (J.MethodInvocation) cu.getStatements().get(1);
                 assertThat(m.getArguments()).hasSize(3);
                 assertThat(m.getArguments().get(2)).isInstanceOf(J.Lambda.class);
-                var foo = (J.Identifier) ((G.ExpressionStatement) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody()).getStatements().get(0))
+                var foo = (J.Identifier) ((G.ExpressionStatement) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(2)).getBody()).getStatements().getFirst())
                   .getExpression()).getExpression();
                 assertThat(TypeUtils.asFullyQualified(foo.getType()).getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
@@ -195,8 +195,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 var m = (J.MethodInvocation) cu.getStatements().get(1);
                 assertThat(m.getArguments()).hasSize(1);
-                assertThat(m.getArguments().get(0)).isInstanceOf(J.Lambda.class);
-                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                assertThat(m.getArguments().getFirst()).isInstanceOf(J.Lambda.class);
+                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().getFirst()).getBody()).getStatements().getFirst()).getExpression();
                 assertThat(substring.getMethodType().getName()).isEqualTo("substring");
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
@@ -204,15 +204,15 @@ class GroovyTypeAttributionTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
     @ExpectedToFail
+    @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
     @Test
     void infersDelegateViaSimilarGradleApi() {
         rewriteRun(
           groovy(
                 """
               package org.gradle.api
-              
+
               interface Action<T> {
                   void execute(T t);
               }
@@ -230,8 +230,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
                   .findFirst()
                   .get();
                 assertThat(m.getArguments()).hasSize(1);
-                assertThat(m.getArguments().get(0)).isInstanceOf(J.Lambda.class);
-                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                assertThat(m.getArguments().getFirst()).isInstanceOf(J.Lambda.class);
+                var substring = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) m.getArguments().getFirst()).getBody()).getStatements().getFirst()).getExpression();
                 assertThat(substring.getMethodType().getName()).isEqualTo("substring");
                 assertThat(substring.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("java.lang.String");
             })
@@ -241,8 +241,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
 
     private Consumer<SourceSpec<G.CompilationUnit>> isAttributed(boolean attributed) {
         return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
-            @SuppressWarnings("ConstantConditions")
             @Override
+            @SuppressWarnings("ConstantConditions")
             public J visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
                 assertThat(TypeUtils.asFullyQualified(variable.getVariableType().getType())
                   .getFullyQualifiedName())

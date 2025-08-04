@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveTrailingSemicolon extends Recipe {
@@ -65,7 +64,7 @@ public class RemoveTrailingSemicolon extends Recipe {
 
             @Override
             @SuppressWarnings("DataFlowIssue")
-            public <M extends Marker> M visitMarker(Marker marker, ExecutionContext ctx) {
+            public <M extends Marker> @Nullable M visitMarker(Marker marker, ExecutionContext ctx) {
                 return semiColonRemovable.remove(marker) ? null : super.visitMarker(marker, ctx);
             }
         };

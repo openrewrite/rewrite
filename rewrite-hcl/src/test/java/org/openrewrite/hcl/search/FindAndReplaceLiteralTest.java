@@ -17,14 +17,15 @@ package org.openrewrite.hcl.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class FindAndReplaceLiteralTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void defaultNonRegexReplace() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null)),
@@ -268,6 +269,22 @@ class FindAndReplaceLiteralTest implements RewriteTest {
                   cluster_name = "cluster-4"
                 }
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5579")
+    @Test
+    void handleNullLiteral() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new FindAndReplaceLiteral("foo", "bar", null, null)
+          ),
+          //language=hcl
+          hcl(
+            """
+              myVar = null
               """
           )
         );

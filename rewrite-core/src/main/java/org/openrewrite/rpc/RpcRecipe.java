@@ -16,7 +16,6 @@
 package org.openrewrite.rpc;
 
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
@@ -27,7 +26,9 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 
 @RequiredArgsConstructor
@@ -99,9 +100,14 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         }
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                rpc.scan((SourceFile) tree, scanVisitor, ctx);
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof RpcCodec;
+            }
+
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
+                rpc.scan((SourceFile) tree, scanVisitor, ctx);
                 return tree;
             }
         };
@@ -116,10 +122,14 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                Tree t = rpc.visit((SourceFile) tree, editVisitor, ctx);
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof RpcCodec;
+            }
+
+            @Override
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                return t;
+                return rpc.visit((SourceFile) tree, editVisitor, ctx);
             }
         };
     }
@@ -130,8 +140,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
             recipeList = descriptor.getRecipeList().stream()
                     .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
                             .filter(opt -> opt.getValue() != null)
-                            .collect(Collectors.toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
-                    .collect(Collectors.toList());
+                            .collect(toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
+                    .collect(toList());
         }
         return recipeList;
     }

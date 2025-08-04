@@ -29,7 +29,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -56,7 +57,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private boolean substituted;
 
             @Override
-            public J visitAnnotation(J.Annotation annotation, Integer integer) {
+            public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
                     isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
@@ -72,7 +73,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
-                return super.visitAnnotation(annotation, integer);
+                return super.visitAnnotation(annotation, p);
             }
 
             @Override
@@ -164,8 +165,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
-                            c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
-                            return c;
+                            return c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
                         }
                         case IMPLEMENTS: {
                             List<TypeTree> implementings = unsubstitute(templateParser.parseImplements(getCursor(), substitutedTemplate));
@@ -368,9 +368,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
 
                             //noinspection ConstantConditions
-                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
+                            return m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
                                     .withMethodType(type).withName(method.getName().withType(type));
-                            return m;
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
@@ -388,6 +387,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                if (getCursor().firstEnclosing(Javadoc.DocComment.class) != null) {
+                    // We don't have support for changing method references in Javadoc comments (yet), so it's safer not to attempt any changes
+                    return method;
+                }
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && isScope(method)) {
                     J.MethodInvocation m;
                     if (loc == METHOD_INVOCATION_ARGUMENTS) {

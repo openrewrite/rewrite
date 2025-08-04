@@ -22,9 +22,9 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.Space;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JsonPathMatcherTest {
@@ -558,6 +558,41 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void bracketOperatorByIndexesMultipleDigits() {
+        assertMatched(
+          "$.list[10]",
+          List.of(
+            //language=json5
+            """
+                  {
+                    "list": [
+                      {"item1": "index0"},
+                      {"item2": "index1"},
+                      {"item3": "index2"},
+                      {"item4": "index3"},
+                      {"item5": "index4"},
+                      {"item6": "index5"},
+                      {"item7": "index6"},
+                      {"item8": "index7"},
+                      {"item9": "index8"},
+                      {"item10": "index9"},
+                      {"item11": "index10"},
+                      {"item12": "index11"},
+                      {"item13": "index12"},
+                      {"item3": "index13"}
+                    ]
+                  }
+              """
+          ),
+        //language=json5
+          List.of(
+            """
+                  {"item11": "index10"}
+              """)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1419")
     @Test
     void doesNotMatchWrongValue() {
@@ -820,7 +855,7 @@ class JsonPathMatcherTest {
                 }
               }
               """),
-          Collections.emptyList()
+          emptyList()
         );
     }
 

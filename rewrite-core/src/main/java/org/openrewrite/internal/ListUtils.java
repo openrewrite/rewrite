@@ -179,7 +179,7 @@ public final class ListUtils {
     /**
      * For backwards compatibility; prefer {@link #mapFirst(List, Function)}.
      */
-    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<@Nullable T> mapFirst) {
+    public static <T> @Nullable List<T> mapFirst(@Nullable List<T> ls, UnaryOperator<T> mapFirst) {
         return mapFirst(ls, (Function<T, T>) mapFirst);
     }
 
@@ -218,6 +218,7 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
@@ -256,6 +257,7 @@ public final class ListUtils {
             while (newLs.remove(null)) ;
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
@@ -338,6 +340,7 @@ public final class ListUtils {
             }
         }
 
+        //noinspection NullableProblems
         return newLs;
     }
 
@@ -350,7 +353,7 @@ public final class ListUtils {
      * @return A new list with expanded or modified elements, or the original list if unchanged.
      */
     @Contract("null, _ -> null; !null, _ -> !null")
-    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    public static <T> @Nullable List<T> flatMap(@Nullable List<T> ls, Function<T, @Nullable Object> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 

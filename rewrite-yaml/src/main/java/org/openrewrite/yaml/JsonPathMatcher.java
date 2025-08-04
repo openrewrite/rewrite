@@ -314,7 +314,7 @@ public class JsonPathMatcher {
             List<Object> indexes = new ArrayList<>();
             for (TerminalNode terminalNode : ctx.PositiveNumber()) {
                 for (int i = 0; i < results.size(); i++) {
-                    if (terminalNode.getText().contains(String.valueOf(i))) {
+                    if (terminalNode.getText().equals(String.valueOf(i))) {
                         indexes.add(results.get(i));
                     }
                 }
@@ -453,7 +453,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+        public @Nullable Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();
@@ -673,6 +673,28 @@ public class JsonPathMatcher {
                     if (!matches.isEmpty() && originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
                         return originalScope;
                     }
+
+                    // The filterExpression matched a result inside a List.
+                    List<Object> matchedResults = new ArrayList<>();
+                    if (!matches.isEmpty()) {
+                        if (originalScope instanceof List) {
+                            for (Object originalScopeObject : ((List<Object>) originalScope)) {
+                                if (filterMatched(originalScopeObject, matches)) {
+                                    matchedResults.add(originalScopeObject);
+                                }
+                            }
+                        } else if (originalScope instanceof Yaml.Mapping) {
+                            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) originalScope).getEntries()) {
+                                if (filterMatched(entry, matches)) {
+                                    matchedResults.add(entry);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!matchedResults.isEmpty()) {
+                        return getResultFromList(matchedResults);
+                    }
                     return matches;
                 } else {
                     if (originalScope instanceof Yaml.Mapping.Entry) {
@@ -813,6 +835,32 @@ public class JsonPathMatcher {
                 return literal.substring(1, literal.length() - 1);
             }
             return "null".equals(literal) ? null : literal;
+        }
+
+        private static boolean filterMatched(Object scope, List<Object> matches) {
+            return matches.stream().anyMatch(match -> filterMatched(scope, match));
+        }
+
+        private static boolean filterMatched(Object scope, Object match) {
+            if (!(scope instanceof Yaml && match instanceof Yaml)) {
+                return false;
+            }
+            Yaml matchedYaml = (Yaml) match;
+            Yaml scopedYaml = (Yaml) scope;
+            if (matchedYaml.getId().equals(scopedYaml.getId())) {
+                return true;
+            }
+            if (scope instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
+                return filterMatched(entry.getValue(), match);
+            } else if (scope instanceof Yaml.Mapping) {
+                Yaml.Mapping mapping = (Yaml.Mapping) scope;
+                return mapping.getEntries().stream().anyMatch(entry -> filterMatched(entry, match));
+            } else if (scope instanceof Yaml.Sequence) {
+                Yaml.Sequence sequence = (Yaml.Sequence) scope;
+                return sequence.getEntries().stream().anyMatch(entry -> filterMatched(entry, match));
+            }
+            return false;
         }
     }
 }

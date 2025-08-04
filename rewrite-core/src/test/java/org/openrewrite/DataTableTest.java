@@ -61,7 +61,7 @@ class DataTableTest implements RewriteTest {
         new WordTable(recipe);
 
         assertThat(recipe.getDataTableDescriptors()).hasSize(4);
-        assertThat(recipe.getDataTableDescriptors().get(0).getColumns()).hasSize(2);
+        assertThat(recipe.getDataTableDescriptors().getFirst().getColumns()).hasSize(2);
     }
 
     @JsonIgnoreType

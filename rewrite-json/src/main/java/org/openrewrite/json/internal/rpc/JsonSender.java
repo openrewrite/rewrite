@@ -40,13 +40,14 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     @Override
     public Json visitDocument(Json.Document document, RpcSendQueue q) {
-        q.getAndSend(document, (Json.Document d) -> d.getSourcePath().toString());
-        q.getAndSend(document, (Json.Document d) -> d.getCharset().name());
+        q.getAndSend(document, d -> d.getSourcePath().toString());
+        q.getAndSend(document, d -> d.getCharset().name());
         q.getAndSend(document, Json.Document::isCharsetBomMarked);
         q.getAndSend(document, Json.Document::getChecksum);
         q.getAndSend(document, Json.Document::getFileAttributes);
         q.getAndSend(document, Json.Document::getValue, j -> visit(j, q));
-        q.getAndSend(document, d -> asRef(d.getEof()));
+        q.getAndSend(document, d -> asRef(d.getEof()), space ->
+                visitSpace(Reference.getValueNonNull(space), q));
         return document;
     }
 
@@ -105,6 +106,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     @Override
     public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcSendQueue q) {
+        assert right != null;
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
         q.getAndSend(right, j -> asRef(j.getAfter()),
                 space -> visitSpace(Reference.getValueNonNull(space), q));

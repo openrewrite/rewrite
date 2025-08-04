@@ -35,22 +35,20 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
-        j = j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString)));
+        j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
-        return j;
+        return j.withMarkers(q.receiveMarkers(j.getMarkers()));
     }
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        String sourcePath = q.receiveAndGet(document.getSourcePath(), Path::toString);
-        return document.withSourcePath(Paths.get(sourcePath))
-                .withCharset(Charset.forName(q.receiveAndGet(document.getCharset(), Charset::name)))
+        return document.withSourcePath(q.<Path, String>receiveAndGet(document.getSourcePath(), Paths::get))
+                .withCharset(q.<Charset, String>receiveAndGet(document.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))
                 .withValue(q.receive(document.getValue(), j -> (JsonValue) visitNonNull(j, q)))
-                .withEof(q.receive(document.getEof()));
+                .withEof(q.receive(document.getEof(), space -> visitSpace(space, q)));
     }
 
     @Override

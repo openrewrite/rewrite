@@ -26,12 +26,12 @@ import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.max;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
@@ -40,11 +40,6 @@ import static org.openrewrite.internal.StringUtils.isBlank;
 public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    // there are several implicitly defined version properties that we should never attempt to update
-    private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
-            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
-    ));
 
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
@@ -106,7 +101,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        validated = validated.and(test(
+        return validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -116,7 +111,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override
@@ -146,24 +140,17 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isManagedDependencyTag(oldGroupId, oldArtifactId)) {
-                    Optional<Xml.Tag> groupIdTag = t.getChild("groupId");
-                    boolean changed = false;
-                    if (groupIdTag.isPresent() && !newGroupId.equals(groupIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(groupIdTag.get(), newGroupId));
-                        changed = true;
+                    if (t.getChild("groupId").isPresent()) {
+                        t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
-                    Optional<Xml.Tag> artifactIdTag = t.getChild("artifactId");
-                    if (artifactIdTag.isPresent() && !newArtifactId.equals(artifactIdTag.get().getValue().orElse(null))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(artifactIdTag.get(), newArtifactId));
-                        changed = true;
+                    if (t.getChild("artifactId").isPresent()) {
+                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
                     }
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
-
                             if (versionTag.isPresent()) {
                                 String resolvedArtifactId = newArtifactId;
                                 if (resolvedArtifactId.contains("${")) {
@@ -172,16 +159,15 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                     resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
                                 }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
+                                t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                             }
-                            changed = true;
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);
                         }
                     }
-                    if (changed) {
+                    if (t != tag) {
                         maybeUpdateModel();
-                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
+                        doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
                         if (isNewDependencyPresent) {
                             doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                             maybeUpdateModel();
@@ -230,7 +216,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
 
                 }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
+                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
         };
     }

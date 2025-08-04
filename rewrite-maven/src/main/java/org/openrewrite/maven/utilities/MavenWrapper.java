@@ -25,7 +25,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.semver.LatestRelease;
@@ -36,10 +38,10 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -95,7 +97,7 @@ public class MavenWrapper {
                 .findAny()
                 .orElse(DistributionType.Bin);
 
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(emptyMap(), ctx, null, null);
 
         VersionComparator wrapperVersionComparator = StringUtils.isBlank(wrapperVersion) ?
                 new LatestRelease(null) :
@@ -112,7 +114,7 @@ public class MavenWrapper {
                         .snapshots(true)
                         .build();
 
-        List<MavenRepository> repositories = Collections.singletonList(repository);
+        List<MavenRepository> repositories = singletonList(repository);
         try {
             GroupArtifact wrapperDistributionGroupArtifact = new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper-distribution");
             MavenMetadata wrapperMetadata = pomDownloader.downloadMetadata(wrapperDistributionGroupArtifact, null, repositories);

@@ -64,8 +64,8 @@ class SwitchTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(1);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().getFirst()).getCases().getStatements()).hasSize(1);
             })
           )
         );
@@ -105,8 +105,8 @@ class SwitchTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(3);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().getFirst()).getCases().getStatements()).hasSize(3);
             })
           )
         );

@@ -58,7 +58,7 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               #!/usr/bin/env groovy
-              
+
               def a = 'hello'
               """
           )
@@ -112,10 +112,10 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               def p = Paths.get("abc")
-              
+
               import java.io.File
               def f = new File(p.toFile(), "def")
-              
+
               import java.io.InputStream
               f.withInputStream { InputStream io ->
                 io.read()

@@ -221,7 +221,7 @@ class AddPropertyTest implements RewriteTest {
               management.metrics.enable.process.files=true
               """,
             spec -> spec.afterRecipe(after -> {
-                Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
+                Properties.Entry entry = (Properties.Entry) after.getContent().getFirst();
                 assertThat(entry.getValue().getText()).isEqualTo("true");
                 assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
             })

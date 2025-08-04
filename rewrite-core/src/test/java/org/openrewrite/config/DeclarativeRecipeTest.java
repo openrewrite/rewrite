@@ -29,7 +29,6 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -129,7 +128,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         Validated<Object> validation = dr.validate();
         assertThat(validation.isValid()).isFalse();
         assertThat(validation.failures().size()).isEqualTo(2);
-        assertThat(validation.failures().get(0).getProperty()).isEqualTo("initialization");
+        assertThat(validation.failures().getFirst().getProperty()).isEqualTo("initialization");
     }
 
     @Test
@@ -335,8 +334,8 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void exposesUnderlyingDataTables() {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
-          "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
-        dr.addUninitialized(new Find("sam", null, null, null, null, null, null));
+          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of(), Map.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
@@ -372,14 +371,14 @@ class DeclarativeRecipeTest implements RewriteTest {
           )
         );
         rewriteRun(
-          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(3),
+          spec -> spec.recipe(root).cycles(10).cycles(3).expectedCyclesThatMakeChanges(2),
           text("1", "1+1+1")
         );
         assertThat(cycleCount).hasValue(3);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class MaxCycles extends Recipe {
         int maxCycles;
         List<Recipe> recipeList;
@@ -400,8 +399,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class RepeatedFindAndReplace extends Recipe {
         String find;
         String replace;

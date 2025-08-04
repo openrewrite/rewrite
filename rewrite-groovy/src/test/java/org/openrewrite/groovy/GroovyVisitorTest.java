@@ -54,7 +54,7 @@ class GroovyVisitorTest implements RewriteTest {
           )
         );
     }
-  
+
     @Test
     void newArrayWithSize() {
         rewriteRun(groovy(
@@ -133,7 +133,7 @@ class GroovyVisitorTest implements RewriteTest {
             """
         ));
     }
-  
+
     @Test
     void spreadOperator() {
         rewriteRun(groovy(

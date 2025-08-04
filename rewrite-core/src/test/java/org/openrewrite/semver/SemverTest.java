@@ -78,5 +78,6 @@ class SemverTest {
         assertThat(Semver.max("INVALID-2023.1.0.1", "1.0.2")).isEqualTo("1.0.2");
         assertThat(Semver.max("INVALID-2023.1.0.3", "1.0.2")).isEqualTo("1.0.2");
         assertThat(Semver.max("1.0.2", "INVALID-2023.1.0.3")).isEqualTo("1.0.2");
+        assertThat(Semver.max("123456-fix-something-SNAPSHOT", "123456-fix-something-SNAPSHOT")).isEqualTo("123456-fix-something-SNAPSHOT");
     }
 }

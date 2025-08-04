@@ -48,7 +48,7 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("file.kt").afterRecipe(cu ->
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue())
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue())
           )
         );
     }

@@ -58,7 +58,7 @@ public class DeleteKey extends Recipe {
             @Override
             public  Yaml.Sequence.@Nullable Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
-                    //noinspection ConstantConditions
+                    removeUnused(getCursor().getParent());
                     return null;
                 }
                 return super.visitSequenceEntry(entry, ctx);

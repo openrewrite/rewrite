@@ -409,20 +409,30 @@ recipeName: org.openrewrite.yaml.UnfoldProperties
 examples:
 - description: ''
   parameters:
+  - List.of("$..[logging.level][?(@property.match(/.*/))]", "$..[enable.process.files]")
   - 'null'
   sources:
   - before: |
+      spring.application.name: my-app
+      logging.level:
+        root: INFO
+        org.springframework.web: DEBUG
       management:
         metrics.enable.process.files: true
         endpoint.health:
           show-components: always
           show-details: always
     after: |
+      spring:
+        application:
+          name: my-app
+      logging:
+        level:
+          root: INFO
+          org.springframework.web: DEBUG
       management:
         metrics:
-          enable:
-            process:
-              files: true
+          enable.process.files: true
         endpoint:
           health:
             show-components: always
