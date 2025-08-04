@@ -31,11 +31,11 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -348,7 +348,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                     randomId(),
                                     prefix(element),
                                     Markers.EMPTY,
-                                    Collections.singletonList(ident),
+                                    singletonList(ident),
                                     beforeElementTag));
                 }
                 externalSubsets = new Xml.DocTypeDecl.ExternalSubsets(randomId(), subsetPrefix, Markers.EMPTY, elements);

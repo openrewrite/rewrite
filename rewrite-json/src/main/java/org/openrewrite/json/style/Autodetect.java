@@ -30,11 +30,11 @@ import org.openrewrite.style.Style;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
@@ -251,7 +251,7 @@ public class Autodetect extends NamedStyles {
                             return takeWhile.get();
                         })
                         .mapToObj(c -> c == ' ')
-                        .collect(Collectors.groupingBy(identity(), counting()));
+                        .collect(groupingBy(identity(), counting()));
 
                 if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
                     frequencies.linesWithSpaceIndents++;

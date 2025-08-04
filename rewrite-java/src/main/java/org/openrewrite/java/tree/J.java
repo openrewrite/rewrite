@@ -896,7 +896,7 @@ public interface J extends Tree, RpcCodec<J> {
                     Space.EMPTY,
                     Markers.EMPTY,
                     JRightPadded.build(false),
-                    Collections.emptyList(),
+                    emptyList(),
                     Space.EMPTY
             );
         }
@@ -3728,9 +3728,9 @@ public interface J extends Tree, RpcCodec<J> {
 
         @Override
         public List<J.Identifier> getNames() {
-            return Collections.singletonList(
+            return singletonList(
                     // TODO this creates an artificial identifier. Revise this decision.
-                    new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(),
+                    new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, emptyList(),
                             String.valueOf(value), JavaType.Primitive.String, null)
             );
         }

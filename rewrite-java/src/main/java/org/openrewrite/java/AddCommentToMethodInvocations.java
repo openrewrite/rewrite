@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
@@ -27,8 +26,6 @@ import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -53,14 +50,6 @@ public class AddCommentToMethodInvocations extends Recipe {
             example = "java.util.List add*(..)")
     String methodPattern;
 
-    @Option(displayName = "Multiline",
-            description = "Comments use by default single line // but they can use multiline /* */.",
-            required = false)
-    @Nullable
-    Boolean isMultiline;
-
-    private static final Pattern NEWLINE = Pattern.compile("\\R");
-
     @Override
     public Validated<Object> validate() {
         return super.validate().and(MethodMatcher.validate(methodPattern));
@@ -73,16 +62,15 @@ public class AddCommentToMethodInvocations extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
                 if (methodMatcher.matches(m)) {
-                    String methodPrefixWhitespace = m.getPrefix().getWhitespace();
-
-                    boolean createMultiline = Boolean.TRUE.equals(isMultiline);
-                    Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(createMultiline ? methodPrefixWhitespace : " ") : comment;
-
+                    String prefixWhitespace = m.getPrefix().getWhitespace();
+                    String newCommentText = comment.trim()
+                            /* First Line * Second Line */
+                            .replaceAll("\\R", " * ")
+                            // Prevent closing the comment early
+                            .replace("*/", "*");
                     if (doesNotHaveComment(newCommentText, m.getComments())) {
-                        TextComment textComment = new TextComment(createMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
+                        TextComment textComment = new TextComment(true, " " + newCommentText + " ", prefixWhitespace, Markers.EMPTY);
                         return m.withComments(ListUtils.concat(m.getComments(), textComment));
                     }
                 }
@@ -92,7 +80,7 @@ public class AddCommentToMethodInvocations extends Recipe {
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                            lookFor.equals(((TextComment) c).getText())) {
+                            lookFor.trim().equals(((TextComment) c).getText().trim())) {
                         return false;
                     }
                 }

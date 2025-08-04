@@ -62,7 +62,7 @@ class LombokTest implements RewriteTest {
             """
               import lombok.Cleanup;
               import java.io.*;
-              
+
               public class CleanupExample {
                 public static void main(String[] args) throws IOException {
                   @Cleanup InputStream in = new FileInputStream(args[0]);
@@ -91,7 +91,7 @@ class LombokTest implements RewriteTest {
               import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
               import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
               import lombok.Setter;
-              
+
               class Profiles {
                   @Setter
                   @JacksonXmlProperty(localName = "profile")
@@ -109,11 +109,11 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.Getter;
-              
+
               @Getter
               class A {
                   int n;
-              
+
                   void test() {
                       System.out.println(getN());
                   }
@@ -131,13 +131,13 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.Builder;
-                  
+
                   @Builder
                   class A {
                       boolean b;
                       int n;
                       String s;
-                  
+
                       void test() {
                           A a = A.builder().n(1).b(true).s("foo").build();
                       }
@@ -153,13 +153,13 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.Builder;
-                  
+
                   @Builder
                   class A {
                       @Builder.Default boolean b = false;
                       @Builder.Default int n = 0;
                       @Builder.Default String s = "Hello, Anshuman!";
-                  
+
                       void test() {
                           A x = A.builder().n(1).b(true).s("foo").build();
                           A y = A.builder().n(1).b(true).build();
@@ -177,13 +177,13 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.Builder;
-                  
+
                   @Builder
                   class A {
                       @Builder.Default private final boolean b = false;
                       @Builder.Default public final int n = 0;
                       @Builder.Default protected final String s = "Hello, Anshuman!";
-                  
+
                       void test() {
                           A x = A.builder().n(1).b(true).s("foo").build();
                           A y = A.builder().n(1).b(true).build();
@@ -227,7 +227,7 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.experimental.SuperBuilder;
-                  
+
                   @SuperBuilder
                   public class Parent {
                       String lastName;
@@ -237,7 +237,7 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.experimental.SuperBuilder;
-                  
+
                   @SuperBuilder
                   public class Child extends Parent {
                       String firstName;
@@ -265,17 +265,17 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.experimental.SuperBuilder;
-                  
+
                   @SuperBuilder
                   class Parent {
                       String lastName;
                   }
-                  
+
                   @SuperBuilder
                   class Child extends Parent {
                       String firstName;
                   }
-                  
+
                   class Test {
                       void test() {
                           Child child = Child.builder()
@@ -296,13 +296,13 @@ class LombokTest implements RewriteTest {
                 """
                   import lombok.Builder;
                   import lombok.experimental.SuperBuilder;
-                  
+
                   @SuperBuilder
                   class A {
                       @Builder.Default boolean b = false;
                       @Builder.Default int n = 0;
                       @Builder.Default String s = "Hello, Anshuman!";
-                  
+
                       void test() {
                           A x = A.builder().n(1).b(true).s("foo").build();
                           A y = A.builder().n(1).b(true).build();
@@ -321,13 +321,13 @@ class LombokTest implements RewriteTest {
                 """
                   import lombok.Builder;
                   import lombok.experimental.SuperBuilder;
-                  
+
                   @SuperBuilder
                   class A {
                       @Builder.Default private final boolean b = false;
                       @Builder.Default public final int n = 0;
                       @Builder.Default protected final String s = "Hello, Anshuman!";
-                  
+
                       void test() {
                           A x = A.builder().n(1).b(true).s("foo").build();
                           A y = A.builder().n(1).b(true).build();
@@ -347,7 +347,7 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.ToString;
-              
+
               @ToString
               public class ToStringExample {
                 private static final int STATIC_VAR = 10;
@@ -355,13 +355,13 @@ class LombokTest implements RewriteTest {
                 private Shape shape = new Square(5, 10);
                 private String[] tags;
                 @ToString.Exclude private int id;
-              
+
                 public static class Shape {}
-              
+
                 @ToString(callSuper=true, includeFieldNames=true)
                 public static class Square extends Shape {
                   private final int width, height;
-              
+
                   public Square(int width, int height) {
                     this.width = width;
                     this.height = height;
@@ -379,7 +379,7 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.EqualsAndHashCode;
-              
+
               @EqualsAndHashCode
               public class ToStringExample {
                 private static final int STATIC_VAR = 10;
@@ -387,13 +387,13 @@ class LombokTest implements RewriteTest {
                 @EqualsAndHashCode.Exclude private Shape shape = new Square(5, 10);
                 private String[] tags;
                 @EqualsAndHashCode.Exclude private int id;
-              
+
                 public static class Shape {}
-              
+
                 @EqualsAndHashCode(callSuper=true)
                 public static class Square extends Shape {
                   private final int width, height;
-              
+
                   public Square(int width, int height) {
                     this.width = width;
                     this.height = height;
@@ -411,18 +411,18 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.*;
-              
+
               @RequiredArgsConstructor(staticName = "of")
               @AllArgsConstructor(access = AccessLevel.PROTECTED)
               public class ConstructorExample<T> {
                 private int x, y;
                 @NonNull private T description;
-              
+
                 @NoArgsConstructor
                 public static class NoArgsExample {
                   @NonNull private String field;
                 }
-              
+
                 public void test() {
                   ConstructorExample<?> x = ConstructorExample.of("desc");
                   ConstructorExample<?> y = new ConstructorExample<>("1L");
@@ -443,13 +443,13 @@ class LombokTest implements RewriteTest {
               import lombok.Setter;
               import lombok.Data;
               import lombok.ToString;
-              
+
               @Data public class DataExample {
                 private final String name;
                 @Setter(AccessLevel.PACKAGE) private int age;
                 private double score;
                 private String[] tags;
-              
+
                 @ToString(includeFieldNames=true)
                 @Data(staticConstructor="of")
                 public static class Exercise<T> {
@@ -469,13 +469,13 @@ class LombokTest implements RewriteTest {
             """
               import lombok.*;
               import lombok.experimental.*;
-              
+
               @Value public class ValueExample {
                 String name;
                 @With(AccessLevel.PACKAGE) @NonFinal int age;
                 double score;
                 protected String[] tags;
-              
+
                 @ToString(includeFieldNames=true)
                 @Value(staticConstructor="of")
                 public static class Exercise<T> {
@@ -494,20 +494,20 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.Synchronized;
-              
+
               public class SynchronizedExample {
                 private final Object readLock = new Object();
-              
+
                 @Synchronized
                 public static void hello() {
                   System.out.println("world");
                 }
-              
+
                 @Synchronized
                 public int answerToLife() {
                   return 42;
                 }
-              
+
                 @Synchronized("readLock")
                 public void foo() {
                   System.out.println("bar");
@@ -524,20 +524,20 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.Locked;
-              
+
               public class LockedExample {
                 private int value = 0;
-              
+
                 @Locked.Read
                 public int getValue() {
                   return value;
                 }
-              
+
                 @Locked.Write
                 public void setValue(int newValue) {
                   value = newValue;
                 }
-              
+
                 @Locked("baseLock")
                 public void foo() {
                   System.out.println("bar");
@@ -554,14 +554,14 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.Getter;
-              
+
               public class WithExample {
                 @Getter int age;
-              
+
                 public WithExample(int age) {
                   this.age = age;
                 }
-              
+
                 void test() {
                     int x = getAge();
                 }
@@ -579,14 +579,14 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.With;
-              
+
               public class WithExample {
                 @With int age;
-              
+
                 public WithExample(int age) {
                   this.age = age;
                 }
-              
+
                 void test() {
                     WithExample x = withAge("name", 23);
                 }
@@ -606,16 +606,16 @@ class LombokTest implements RewriteTest {
               import lombok.AccessLevel;
               import lombok.NonNull;
               import lombok.With;
-              
+
               public class WithExample {
                 @With(AccessLevel.PROTECTED) @NonNull private final String name;
                 @With private final int age;
-              
+
                 public WithExample(@NonNull String name, int age) {
                   this.name = name;
                   this.age = age;
                 }
-              
+
                 static void test() {
                     WithExample x = new WithExample("old name", 22);
                     x.withName("name", 23);
@@ -636,17 +636,17 @@ class LombokTest implements RewriteTest {
               import lombok.AccessLevel;
               import lombok.NonNull;
               import lombok.With;
-              
+
               @With
               public class WithExample {
                 private final String name;
                 private final int age;
-              
+
                 public WithExample(String name, int age) {
                   this.name = name;
                   this.age = age;
                 }
-              
+
                 void test() {
                     WithExample x = new WithExample("old name", 22);
                     x.withName("name", 23);
@@ -663,10 +663,10 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.Getter;
-              
+
               public class GetterLazyExample {
                 @Getter(lazy=true) private final double[] cached = expensive();
-              
+
                 private double[] expensive() {
                   double[] result = new double[1000000];
                   for (int i = 0; i < result.length; i++) {
@@ -690,7 +690,7 @@ class LombokTest implements RewriteTest {
               import java.util.Collection;
               import java.util.Set;
               import java.util.SortedMap;
-              
+
               @Builder
               public class SingularExample<T extends Number> {
                   private @Singular Set<String> occupations;
@@ -708,9 +708,9 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.extern.java.Log;
-              
+
               import java.util.Map;
-              
+
               @Log
               class A {
                   String string;
@@ -731,7 +731,7 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.var;
-              
+
               class Test {
                   void test() {
                       var s = "foo";
@@ -748,7 +748,7 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.val;
-              
+
               class A {
                   void m() {
                       val foo = "foo";
@@ -765,16 +765,16 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.SneakyThrows;
-              
+
               import java.io.UnsupportedEncodingException;
               import java.nio.charset.StandardCharsets;
-              
+
               public class SneakyThrowsExample implements Runnable {
                   @SneakyThrows(UnsupportedEncodingException.class)
                   public String utf8ToString(byte[] bytes) {
                       return new String(bytes, StandardCharsets.UTF_8);
                   }
-              
+
                   @SneakyThrows
                   public void run() {
                       try {
@@ -797,7 +797,7 @@ class LombokTest implements RewriteTest {
               import lombok.experimental.Accessors;
               import lombok.Getter;
               import lombok.Setter;
-              
+
               @Accessors(fluent = true)
               public class AccessorsExample {
                   @Getter @Setter
@@ -806,7 +806,7 @@ class LombokTest implements RewriteTest {
                         new AccessorsExample().age(20);
                   }
               }
-              
+
               class PrefixExample {
                   @Accessors(prefix = "f") @Getter
                   private String fName = "Hello, World!";
@@ -828,7 +828,7 @@ class LombokTest implements RewriteTest {
               import lombok.experimental.FieldDefaults;
               import lombok.experimental.NonFinal;
               import lombok.experimental.PackagePrivate;
-              
+
               @FieldDefaults(makeFinal=true, level=AccessLevel.PRIVATE)
               public class FieldDefaultsExample {
                 public final int a;
@@ -868,9 +868,9 @@ class LombokTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.Collection;
-              
+
               import lombok.experimental.Delegate;
-              
+
               public class DelegationExample {
                   private interface SimpleCollection {
                       boolean add(String item);
@@ -878,14 +878,14 @@ class LombokTest implements RewriteTest {
                   }
                   @Delegate(types=SimpleCollection.class)
                   private final Collection<String> collection = new ArrayList<>();
-              
+
                   static void test() {
                       DelegationExample example = new DelegationExample();
                       example.add("s");
                       example.remove("s");
                   }
               }
-              
+
               class ExcludesDelegateExample {
                   long counter = 0L;
                   private interface Add {
@@ -914,11 +914,11 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.experimental.UtilityClass;
-              
+
               @UtilityClass
               public class UtilityClassExample {
                 private final int CONSTANT = 5;
-              
+
                 public int addSomething(int in) {
                   return in + CONSTANT;
                 }
@@ -934,13 +934,13 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.experimental.FieldNameConstants;
-              
+
               @FieldNameConstants
               public class FieldNameConstantsExample {
                   private final String iAmAField;
                   private final int andSoAmI;
                   @FieldNameConstants.Exclude private final int asAmI;
-              
+
                   public void test() {
                       System.out.println(FieldNameConstantsExample.Fields.iAmAField);
                       System.out.println(FieldNameConstantsExample.Fields.andSoAmI);
@@ -958,16 +958,16 @@ class LombokTest implements RewriteTest {
             """
               import lombok.experimental.Tolerate;
               import lombok.Setter;
-              
+
               public class TolerateExample {
                   @Setter
                   private String s;
-              
+
                   @Tolerate
                   public void setS(Object s) {
                       this.s = s.toString();
                   }
-              
+
                   public void both(String s) {
                       setS(s);
                       setS((Object)s);
@@ -988,7 +988,7 @@ class LombokTest implements RewriteTest {
               import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
               import lombok.Builder;
               import lombok.extern.jackson.Jacksonized;
-              
+
               @Jacksonized
               @Builder
               @JsonIgnoreProperties(ignoreUnknown = true)
@@ -1006,7 +1006,7 @@ class LombokTest implements RewriteTest {
           java(
             """
               import lombok.experimental.StandardException;
-              
+
               @StandardException
               public class ExampleException extends Exception {
                   public void test() {
@@ -1037,13 +1037,13 @@ class LombokTest implements RewriteTest {
               import lombok.AllArgsConstructor;
               import lombok.Getter;
               import lombok.Setter;
-              
+
               @AllArgsConstructor(onConstructor_=@Inject)
               public class OnXExample {
                   @Getter(onMethod_={@Id, @Column(name="unique-id")})
                   @Setter(onParam_=@Max(10000))
                   private long unid;
-              
+
                   public void test() {
                       OnXExample x = new OnXExample(1L);
                       x.setUnid(2L);
@@ -1069,14 +1069,14 @@ class LombokTest implements RewriteTest {
               import lombok.NoArgsConstructor;
               import lombok.NonNull;
               import lombok.RequiredArgsConstructor;
-              
+
               import javax.inject.Inject;
-              
+
               @NoArgsConstructor(onConstructor_ = @Inject)
               @RequiredArgsConstructor(onConstructor_ = @Inject)
               public class OnXExample {
                   @NonNull private Long unid;
-              
+
                   public void test() {
                       new OnXExample();
                       new OnXExample(1L);
@@ -1108,7 +1108,7 @@ class LombokTest implements RewriteTest {
             String.format("""
               import lombok.%s;
               import org.jspecify.annotations.Nullable;
-              
+
               @%1$s
               public class Foo {
                   @Nullable
@@ -1152,7 +1152,7 @@ class LombokTest implements RewriteTest {
                   import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
                   import lombok.Builder;
                   import lombok.extern.jackson.Jacksonized;
-                  
+
                   @Jacksonized
                   @Builder
                   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -1188,13 +1188,13 @@ class LombokTest implements RewriteTest {
                   import lombok.AllArgsConstructor;
                   import lombok.Getter;
                   import lombok.Setter;
-                  
+
                   @AllArgsConstructor(onConstructor_=@Inject)
                   public class OnXExample {
                       @Getter(onMethod_={@Id, @Column(name="unique-id")})
                       @Setter(onParam_=@Max(10000))
                       private long unid;
-                  
+
                       public void test() {
                           OnXExample x = new OnXExample(1L);
                           x.setUnid(2L);
@@ -1228,14 +1228,14 @@ class LombokTest implements RewriteTest {
                   import lombok.NoArgsConstructor;
                   import lombok.NonNull;
                   import lombok.RequiredArgsConstructor;
-                  
+
                   import javax.inject.Inject;
-                  
+
                   @NoArgsConstructor(onConstructor_=@Inject)
                   @RequiredArgsConstructor(onConstructor_=@Inject)
                   public class OnXExample {
                       @NonNull private Long unid;
-                  
+
                       public void test() {
                           new OnXExample();
                           new OnXExample(1L);
@@ -1254,7 +1254,7 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.experimental.ExtensionMethod;
-                  
+
                   @ExtensionMethod({java.util.Arrays.class, Extensions.class})
                   public class ExtensionMethodExample {
                       public String test() {
@@ -1264,7 +1264,7 @@ class LombokTest implements RewriteTest {
                           return iAmNull.or("hELlO, WORlD!".toTitleCase());
                       }
                   }
-                  
+
                   class Extensions {
                       public static <T> T or(T obj, T ifNull) {
                           return obj != null ? obj : ifNull;
@@ -1286,18 +1286,18 @@ class LombokTest implements RewriteTest {
               java(
                 """
                   import lombok.experimental.Helper;
-                  
+
                   public class HelperExample {
                       int someMethod(int arg1) {
                           int localVar = 5;
-                  
+
                           @Helper
                           class Helpers {
                               int helperMethod(int arg) {
                                   return arg + localVar;
                               }
                           }
-                  
+
                           // helperMethod missing type attribution
                           return helperMethod(10);
                       }

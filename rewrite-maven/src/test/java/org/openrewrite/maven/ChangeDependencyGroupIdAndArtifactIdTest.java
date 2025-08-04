@@ -1577,7 +1577,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-            
+
                 <build>
                     <plugins>
                         <plugin>
@@ -1602,7 +1602,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-            
+
                 <build>
                     <plugins>
                         <plugin>

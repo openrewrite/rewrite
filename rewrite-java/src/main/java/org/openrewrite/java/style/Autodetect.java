@@ -35,9 +35,10 @@ import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
@@ -180,7 +181,7 @@ public class Autodetect extends NamedStyles {
                                         (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
                                         charsToOccurrence.getValue()));
                     })
-                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
+                    .collect(toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
 
             return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
                     .map(Map.Entry::getKey)
@@ -296,7 +297,7 @@ public class Autodetect extends NamedStyles {
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
                                 spaceCountToFrequency.getValue().intValue())))
-                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+                .collect(groupingBy(Map.Entry::getKey, summingInt(Map.Entry::getValue)));
 
         return tabSizeToFrequencyMap.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
@@ -393,7 +394,7 @@ public class Autodetect extends NamedStyles {
                     // Some statement types, like method invocations, are also expressions
                     // If an expression appears in a context where statements are expected, its indent is not a continuation
                     Set<Expression> statementExpressions = getCursor()
-                            .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
+                            .getMessage("STATEMENT_EXPRESSION", newSetFromMap(
                                     new IdentityHashMap<>(block.getStatements().size())));
                     statementExpressions.add((Expression) s);
                     getCursor().putMessage("STATEMENT_EXPRESSION", statementExpressions);
@@ -989,7 +990,7 @@ public class Autodetect extends NamedStyles {
             for (J.Import anImport : cu.getImports()) {
                 importedPackages.add(anImport.getPackageName() + ".");
 
-                if (anImport.getQualid().getSimpleName().equals("*")) {
+                if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
                         int count = 0;
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
@@ -1026,7 +1027,7 @@ public class Autodetect extends NamedStyles {
 
             importsBySourceFile.add(cu.getImports().stream()
                     .map(it -> new ImportAttributes(it.isStatic(), it.getPackageName(), it.getPrefix().getWhitespace()))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
 
             return cu;
         }

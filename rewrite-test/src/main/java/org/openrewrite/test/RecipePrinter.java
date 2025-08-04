@@ -23,7 +23,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 @Incubating(since = "8.12.1")
 public interface RecipePrinter {
@@ -63,7 +64,7 @@ public interface RecipePrinter {
                         return null;
                     }).
                     filter(Objects::nonNull)
-                    .collect(Collectors.joining(", "));
+                    .collect(joining(", "));
             if (!opts.isEmpty()) {
                 recipeString.append(String.format(": {%s}", opts));
             }

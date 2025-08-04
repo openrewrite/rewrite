@@ -857,6 +857,7 @@ export namespace JSX {
     interface BaseTag extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxTag;
         readonly openName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+        readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
     }

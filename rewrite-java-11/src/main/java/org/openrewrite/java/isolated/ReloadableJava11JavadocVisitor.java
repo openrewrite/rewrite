@@ -36,11 +36,13 @@ import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -353,7 +355,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     }
                     // Add trailing linebreaks if they exist.
                     if (!lineBreaks.isEmpty()) {
-                        int pos = Collections.min(lineBreaks.keySet());
+                        int pos = min(lineBreaks.keySet());
                         if (lineBreaks.containsKey(pos)) {
                             body.add(lineBreaks.get(pos));
                             lineBreaks.remove(pos);
@@ -1146,12 +1148,12 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private List<Javadoc> lineBreaksInMultilineJReference() {
         List<Integer> linebreakIndexes = lineBreaks.keySet().stream()
                 .filter(o -> o <= cursor)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         List<Javadoc> referenceLineBreaks = linebreakIndexes.stream()
                 .sorted()
                 .map(lineBreaks::get)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         for (Integer key : linebreakIndexes) {
             lineBreaks.remove(key);

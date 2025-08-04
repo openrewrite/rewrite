@@ -18,8 +18,9 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.UUID;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A recipe that may first scan a repository and study it in one pass over the
@@ -78,7 +79,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
      * @return A list of new source files.
      */
     public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-        return Collections.emptyList();
+        return emptyList();
     }
 
     /**

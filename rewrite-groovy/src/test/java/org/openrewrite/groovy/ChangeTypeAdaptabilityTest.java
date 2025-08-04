@@ -73,14 +73,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -102,14 +102,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -128,7 +128,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import java.util.Collections
-                
+
               class Test {
                   int zero = Collections.emptyList().size()
               }

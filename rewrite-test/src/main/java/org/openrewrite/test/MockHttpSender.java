@@ -18,9 +18,10 @@ package org.openrewrite.test;
 import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Issues no HTTP requests, instead returning the supplied input stream whenever send() is invoked.

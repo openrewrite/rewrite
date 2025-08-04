@@ -279,6 +279,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Javadoc visitSnippet(Javadoc.Snippet snippet, PrintOutputCapture<P> p) {
+        beforeSyntax(snippet, p);
+        p.append("{@snippet");
+        visit(snippet.getAttributes(), p);
+        visit(snippet.getContent(), p);
+        visit(snippet.getEndBrace(), p);
+        afterSyntax(snippet, p);
+        return snippet;
+    }
+
+    @Override
     public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
         beforeSyntax(summary, p);
         p.append("{@summary");

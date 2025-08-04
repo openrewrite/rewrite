@@ -72,7 +72,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.lang.Exception;
-              
+
               class A {
                   void foo() throws Exception {
                   }
@@ -298,7 +298,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.io.Serial;
-              
+
               class Clazz {}
               """,
             """

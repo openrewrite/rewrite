@@ -21,9 +21,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+
+import static java.util.Collections.newSetFromMap;
 
 @Incubating(since = "7.17.0")
 @Value
@@ -32,7 +33,7 @@ class UnsafeReplaceJavaType extends UnsafeJavaTypeVisitor<Integer> {
     JavaType replace;
     JavaType replaceWith;
 
-    Set<JavaType> stack = Collections.newSetFromMap(new IdentityHashMap<>());
+    Set<JavaType> stack = newSetFromMap(new IdentityHashMap<>());
 
     @Override
     public @Nullable JavaType visit(@Nullable JavaType javaType, Integer p) {
