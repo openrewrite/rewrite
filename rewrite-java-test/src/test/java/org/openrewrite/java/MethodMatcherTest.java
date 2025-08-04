@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -455,15 +456,35 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
     }
 
-    static J.MethodInvocation asMethodInvocation(String code) {
-        var cu = JavaParser.fromJavaVersion().build().parse(
-            String.format("""
+    @Issue("https://github.com/openrewrite/rewrite/pull/5833")
+    @Test
+    void matchKnownTypesSingleWildcardArgument() {
+        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");", """
+          class Foo {
+              static String bar() {
+                  return "bar";
+              }
+          }
+          """);
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, java.lang.String)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(String, *)").matches(mi, true));
+        assertFalse(new MethodMatcher("org.junit.Assert assertTrue(double, *)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(java.lang.String, *)").matches(mi, true));
+        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
+    }
+
+    static J.MethodInvocation asMethodInvocation(String code, @Language("java") String... dependsOn) {
+        var cu = JavaParser.fromJavaVersion().dependsOn(dependsOn).build()
+          .parse(
+            """
+              import org.junit.Assert;
               class MyTest {
                   void test() {
                       %s
                   }
               }
-              """, code)
+              """.formatted(code)
           )
           .findFirst()
           .map(J.CompilationUnit.class::cast)
