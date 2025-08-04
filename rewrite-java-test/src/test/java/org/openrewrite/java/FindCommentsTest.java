@@ -21,7 +21,6 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.java.search.FindComments;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
@@ -32,7 +31,7 @@ class FindCommentsTest implements RewriteTest {
     @Test
     void findText() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(Arrays.asList("test", "12.*"))),
+          spec -> spec.recipe(new FindComments(List.of("test", "12.*"))),
           java(
             """
               // not this one
@@ -108,7 +107,7 @@ class FindCommentsTest implements RewriteTest {
     @Test
     void findInLiteralSource() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(Arrays.asList("0xff", "254"))),
+          spec -> spec.recipe(new FindComments(List.of("0xff", "254"))),
           java(
             """
               class Test {

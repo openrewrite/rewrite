@@ -122,4 +122,27 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void cleanupTooMuchEmptyNewlineCRLF() {
+        rewriteRun(
+          generalFormat(true),
+          java(
+            "class Test {}\r\n\r\n",
+            "class Test {}\r\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @Test
+    void dontChangeAnything() {
+        rewriteRun(
+          generalFormat(false),
+          java(
+            "class Test {}\r\n",
+            SourceSpec::noTrim
+          )
+        );
+    }
 }

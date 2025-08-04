@@ -39,9 +39,11 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
@@ -226,7 +228,7 @@ public interface RewriteTest extends SourceSpecs {
         // Clone class-level parsers to ensure that no state leaks between tests
         List<Parser.Builder> testClassSpecParsers = testClassSpec.parsers.stream()
                 .map(Parser.Builder::clone)
-                .collect(Collectors.toList());
+                .collect(toList());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
             if (RewriteTestUtils.groupSourceSpecsByParser(methodSpecParsers, sourceSpecsByParser, sourceSpec)) {
@@ -279,7 +281,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, ctx)
-                    .collect(Collectors.toList());
+                    .collect(toList());
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
@@ -388,8 +390,8 @@ public interface RewriteTest extends SourceSpecs {
             afterRecipe.accept(recipeRun);
         }
 
-        Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
-        Collection<Result> expectedNewResults = Collections.newSetFromMap(new IdentityHashMap<>());
+        Collection<SourceSpec<?>> expectedNewSources = newSetFromMap(new IdentityHashMap<>());
+        Collection<Result> expectedNewResults = newSetFromMap(new IdentityHashMap<>());
 
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             if (sourceSpec.before == null) {
@@ -433,7 +435,7 @@ public interface RewriteTest extends SourceSpecs {
                             String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
                             return "    " + beforePath + " -> " + afterPath;
                         })
-                        .collect(Collectors.joining("\n"));
+                        .collect(joining("\n"));
                 fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath() +
                      "\nAll source file paths, before and after recipe run:\n" + paths);
             }
@@ -586,7 +588,7 @@ public interface RewriteTest extends SourceSpecs {
         newFilesGenerated.assertAll();
 
         Map<Result, Boolean> resultToUnexpected = allResults.stream()
-                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null &&
+                .collect(toMap(result -> result, result -> result.getBefore() == null &&
                                                                       !(result.getAfter() instanceof Remote) &&
                                                                       !expectedNewResults.contains(result) &&
                                                                       testMethodSpec.afterRecipes.isEmpty()));
@@ -600,7 +602,7 @@ public interface RewriteTest extends SourceSpecs {
                         String status = it.getValue() ? "❌️" : "✔";
                         return "    " + beforePath + " | " + afterPath + " | " + status;
                     })
-                    .collect(Collectors.joining("\n"));
+                    .collect(joining("\n"));
             fail("The recipe generated source files the test did not expect.\n" +
                  "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
                  "    before | after | expected\n" + paths);
@@ -615,7 +617,7 @@ public interface RewriteTest extends SourceSpecs {
                     null,
                     expected,
                     actual,
-                    Collections.emptySet()
+                    emptySet()
             )) {
                 assertThat(actual)
                         .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())

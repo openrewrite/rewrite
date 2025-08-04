@@ -379,7 +379,7 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
+        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
         assertThat(changeTextDescriptor.getOptions()).hasSize(1);
@@ -392,7 +392,7 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var styles = env.listStyles();
         assertThat(styles).isNotNull().isNotEmpty();
-        var sampleStyle = styles.stream().filter(s -> s.getName().equals("org.openrewrite.SampleStyle"))
+        var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
         assertThat(sampleStyle).isNotNull();
         assertThat(sampleStyle.getDisplayName()).isEqualTo("Sample style");
@@ -421,7 +421,7 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var helloJon2 = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.HelloJon2"))
+        var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
         assertThat(helloJon2.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.HelloJon");
@@ -510,7 +510,7 @@ class EnvironmentTest implements RewriteTest {
                 causesAnotherCycle: true
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
-                
+
                 """.getBytes()
             ),
             URI.create("rewrite.yml"),

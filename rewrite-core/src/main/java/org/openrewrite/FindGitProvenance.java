@@ -19,8 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
@@ -70,6 +74,6 @@ public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
                     provenance.getEol())
             );
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 }

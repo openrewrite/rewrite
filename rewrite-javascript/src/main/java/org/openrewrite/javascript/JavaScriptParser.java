@@ -19,17 +19,21 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
-import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 public class JavaScriptParser implements Parser {
@@ -44,7 +48,7 @@ public class JavaScriptParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         // Registering `RewriteRpc` due to print-idempotence check
         // Scope is closed using `Stream#onClose()`
-        RewriteRpc.Scope scope = RewriteRpc.Context.current().with(rewriteRpc).attach();
+        ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
         try {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
             return rewriteRpc.parse(sources, relativeTo, this, ctx)
@@ -66,13 +70,13 @@ public class JavaScriptParser implements Parser {
         }
     }
 
-    private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
             ".js", ".jsx", ".mjs", ".cjs",
             ".ts", ".tsx", ".mts", ".cts"
     ));
 
     // Exclude Yarn's Plug'n'Play loader files (https://yarnpkg.com/features/pnp)
-    private final static List<String> EXCLUSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
             ".pnp.cjs", ".pnp.loader.mjs"
     ));
 

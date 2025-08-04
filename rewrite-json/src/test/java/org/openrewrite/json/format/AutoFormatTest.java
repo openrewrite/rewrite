@@ -28,8 +28,8 @@ class AutoFormatTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
-    @Test
     @DocumentExample
+    @Test
     void simple() {
         rewriteRun(
           json(

@@ -48,8 +48,11 @@ import org.openrewrite.kotlin.KotlinIrTypeMapping;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.nCopies;
+import static java.util.Collections.reverse;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 @SuppressWarnings({"unused", "DuplicatedCode"})
@@ -245,8 +248,8 @@ public class PsiTreePrinter {
             Cursor cursor = this.getCursor();
             List<Object> cursorStack =
                     stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
-                            .collect(Collectors.toList());
-            Collections.reverse(cursorStack);
+                            .collect(toList());
+            reverse(cursorStack);
             int depth = cursorStack.size();
 
             // Compare lastCursorStack vs cursorStack, find the fork and print the diff
@@ -429,7 +432,7 @@ public class PsiTreePrinter {
         String sb = " whitespace=\"" +
                     space.getWhitespace() + "\"" +
                     " comments=\"" +
-                    space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.joining(",")) +
+                    space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(joining(",")) +
                     "\"";
         return sb.replace("\n", "\\s\n");
     }
@@ -582,9 +585,9 @@ public class PsiTreePrinter {
         } else if (firElement instanceof FirWhenBranch) {
             FirWhenBranch whenBranch = (FirWhenBranch) firElement;
             return "when(" + firElementToString(whenBranch.getCondition()) + ")" + " -> " + firElementToString(whenBranch.getResult());
-        } else if (firElement.getClass().getSimpleName().equals("FirElseIfTrueCondition")) {
+        } else if ("FirElseIfTrueCondition".equals(firElement.getClass().getSimpleName())) {
             return PsiElementAssociations.Companion.printElement(firElement);
-        } else if (firElement.getClass().getSimpleName().equals("FirSingleExpressionBlock")) {
+        } else if ("FirSingleExpressionBlock".equals(firElement.getClass().getSimpleName())) {
             return PsiElementAssociations.Companion.printElement(firElement);
         }
         return "";
@@ -681,7 +684,7 @@ public class PsiTreePrinter {
         StringBuilder sb = new StringBuilder();
         int tabCount = depth - 1;
         if (tabCount > 0) {
-            sb.append(java.lang.String.join("", Collections.nCopies(tabCount, TAB)));
+            sb.append(java.lang.String.join("", nCopies(tabCount, TAB)));
         }
         // only root has not prefix
         if (depth > 0) {

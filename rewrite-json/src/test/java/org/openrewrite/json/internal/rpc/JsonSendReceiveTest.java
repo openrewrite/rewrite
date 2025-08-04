@@ -51,20 +51,17 @@ class JsonSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut))))
-          .marketplace(env)
-          .batchSize(1)
+        server = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("server",
+          new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
           .timeout(Duration.ofSeconds(10))
-          .build();
+          .build()
+          .batchSize(1);
 
-        client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut))))
-          .marketplace(env)
-          .batchSize(1)
+        client = RewriteRpc.from(new JsonRpc(new TraceMessageHandler("client",
+          new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
           .timeout(Duration.ofSeconds(10))
-          .startServer(true)
-          .build();
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach
@@ -76,8 +73,8 @@ class JsonSendReceiveTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
@@ -111,7 +108,7 @@ class JsonSendReceiveTest implements RewriteTest {
     static class ChangeValue extends JsonVisitor<Integer> {
         @Override
         public Json visitLiteral(Json.Literal literal, Integer p) {
-            if (literal.getValue().equals("value")) {
+            if ("value".equals(literal.getValue())) {
                 return literal.withValue("changed").withSource("\"changed\"");
             }
             return literal;

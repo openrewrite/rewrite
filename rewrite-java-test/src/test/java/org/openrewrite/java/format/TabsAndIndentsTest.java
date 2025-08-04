@@ -35,12 +35,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({
-  "InfiniteRecursion", "UnusedAssignment", "ConstantConditions", "StatementWithEmptyBody", "RedundantThrows",
-  "UnusedLabel", "SwitchStatementWithTooFewBranches", "InfiniteLoopStatement", "rawtypes", "ResultOfMethodCallIgnored",
-  "CodeBlock2Expr", "DuplicateThrows", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock",
-  "PointlessBooleanExpression", "ClassInitializerMayBeStatic", "MismatchedReadAndWriteOfArray"
-  , "TypeParameterExplicitlyExtendsObject"})
+@SuppressWarnings({"InfiniteRecursion", "UnusedAssignment", "ConstantConditions", "StatementWithEmptyBody", "RedundantThrows", "UnusedLabel", "SwitchStatementWithTooFewBranches", "InfiniteLoopStatement", "rawtypes", "ResultOfMethodCallIgnored", "CodeBlock2Expr", "DuplicateThrows", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "PointlessBooleanExpression", "ClassInitializerMayBeStatic", "MismatchedReadAndWriteOfArray", "TypeParameterExplicitlyExtendsObject", "CallToPrintStackTrace"})
 class TabsAndIndentsTest implements RewriteTest {
 
     @Override
@@ -59,10 +54,10 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {{
                   if (true == false)
                   doTheThing();
-                            
+
                   doTheOtherThing();
                   somethingElseEntirely();
-                            
+
                   foo();
               }
                   public static void doTheThing() {}
@@ -75,10 +70,10 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {{
                   if (true == false)
                       doTheThing();
-                            
+
                   doTheOtherThing();
                   somethingElseEntirely();
-                            
+
                   foo();
               }
                   public static void doTheThing() {}
@@ -95,14 +90,14 @@ class TabsAndIndentsTest implements RewriteTest {
         return spec -> spec.recipe(new TabsAndIndents())
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
+              Tree.randomId(), "test", "Test", "Test", emptySet(),
               singletonList(with.apply(IntelliJ.tabsAndIndents()))
             )
           )));
     }
 
-    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
+    @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void multilineCommentStartPositionIsIndented() {
         rewriteRun(
@@ -248,7 +243,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
             import java.util.*;
-            
+
             class Foo {
             	Foo(
             			String var1,
@@ -385,7 +380,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   Test withData(Object... arg0) {
                       return this;
                   }
-              
+
                   void method(Test t) {
                       t = t.withData(withData()
                               .withData(t
@@ -459,8 +454,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
+    @Test
     void methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent() {
         rewriteRun(
           java(
@@ -531,7 +526,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   return 0;
                               })
                       )
-                      .collect(Collectors.toList());
+                      .toList();
                   }
               }
               """
@@ -539,8 +534,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
+    @Test
     void lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent() {
         rewriteRun(
           java(
@@ -553,7 +548,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                       0
                               )
                       )
-                      .collect(Collectors.toList());
+                      .toList();
                   }
               }
               """
@@ -979,7 +974,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   static {
                       System.out.println("hi");
                   }
-                  
+
                   {
                   }
               }
@@ -1222,6 +1217,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("DuplicateCondition")
     @Test
     void nestedIfElse() {
         rewriteRun(
@@ -1264,7 +1260,7 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {
                   Test(String s, int m) {
                   }
-                            
+
                   void method(Test t) {
                       method(new Test("hello" +
                               "world",
@@ -1290,20 +1286,20 @@ class TabsAndIndentsTest implements RewriteTest {
                               m,
                               l);
                   }
-                            
+
                   void method2(int n, File f, int m) {
                       method(n, new File(
                                       "test"
                               ), m,
                               0);
                   }
-                            
+
                   void method3(int n, File f) {
                       method2(n, new File(
                               "test"
                       ), 0);
                   }
-                            
+
                   void method4(int n) {
                       method3(n, new File(
                               "test"
@@ -1433,13 +1429,13 @@ class TabsAndIndentsTest implements RewriteTest {
                   void method() throws IOException,
                           Exception {
                   }
-                  
+
                   void method2()
                           throws IOException,
                           Exception {
                   }
               }
-               """
+              """
           )
         );
     }
@@ -1539,7 +1535,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   throws Exception {
                       try
                       (InputStream is = new ByteArrayInputStream(new byte[0])) {}
-                      int n[] = 
+                      int n[] =
                       {0};
                       switch (1) {
                       case 1:
@@ -1570,7 +1566,7 @@ class TabsAndIndentsTest implements RewriteTest {
                           throws Exception {
                       try
                               (InputStream is = new ByteArrayInputStream(new byte[0])) {}
-                      int n[] = 
+                      int n[] =
                               {0};
                       switch (1) {
                           case 1:
@@ -1597,7 +1593,7 @@ class TabsAndIndentsTest implements RewriteTest {
                               .method(n)
                               .method(n);
                   }
-                            
+
                   Test method2() {
                       return method2().
                               method2().
@@ -1664,7 +1660,7 @@ class TabsAndIndentsTest implements RewriteTest {
               public class Test {
                   @Deprecated
                   final String scope;
-                            
+
                   @Deprecated
                   String classifier;
               }
@@ -1708,7 +1704,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   abstract Test a(Function<Test, Test> f);
                   abstract Test b(Function<Test, Test> f);
                   abstract Test c(Function<Test, Test> f);
-                  
+
                   Test method(Function<Test, Test> f) {
                       return a(f)
                               .b(t ->
@@ -1892,7 +1888,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
                       // shift left.
               package org.openrewrite; // trailing comment.
-                            
+
                       // shift left.
                       public class A { // trailing comment at class.
                 // shift right.
@@ -1902,8 +1898,8 @@ class TabsAndIndentsTest implements RewriteTest {
                           // shift left.
                   if (value == 1) { // trailing comment at if.
                 // suffix contains new lines with whitespace.
-                      
-                      
+
+
                       // shift right.
                                    // shift left.
                               value += 10; // trailing comment.
@@ -1914,12 +1910,12 @@ class TabsAndIndentsTest implements RewriteTest {
                       // shift right at end of block.
                               // shift left at end of block.
                  }
-                            
+
                               if (value == 11)
                       // shift right.
                               // shift left.
                           value += 1;
-                            
+
                   return value;
                   // shift right at end of block.
                           // shift left at end of block.
@@ -1931,7 +1927,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               // shift left.
               package org.openrewrite; // trailing comment.
-                            
+
               // shift left.
               public class A { // trailing comment at class.
                   // shift right.
@@ -1941,8 +1937,8 @@ class TabsAndIndentsTest implements RewriteTest {
                       // shift left.
                       if (value == 1) { // trailing comment at if.
                           // suffix contains new lines with whitespace.
-                      
-                      
+
+
                           // shift right.
                           // shift left.
                           value += 10; // trailing comment.
@@ -1953,12 +1949,12 @@ class TabsAndIndentsTest implements RewriteTest {
                           // shift right at end of block.
                           // shift left at end of block.
                       }
-                            
+
                       if (value == 11)
                           // shift right.
                           // shift left.
                           value += 1;
-                            
+
                       return value;
                       // shift right at end of block.
                       // shift left at end of block.
@@ -2003,12 +1999,12 @@ class TabsAndIndentsTest implements RewriteTest {
               public class A {
               /* Preserve whitespace
                  alignment */
-              
+
                      /* Shift next blank line left
-              
+
                       * This line should be aligned
                       */
-              
+
               /* This comment
                * should be aligned */
               public void method() {}
@@ -2018,12 +2014,12 @@ class TabsAndIndentsTest implements RewriteTest {
               public class A {
                   /* Preserve whitespace
                      alignment */
-              
+
                   /* Shift next blank line left
-              
+
                    * This line should be aligned
                    */
-              
+
                   /* This comment
                    * should be aligned */
                   public void method() {}
@@ -2043,22 +2039,22 @@ class TabsAndIndentsTest implements RewriteTest {
                   public void method() {
                       // inline try, catch, finally.
                       try {
-                            
+
                       } catch (Exception ex) {
-                            
+
                       } finally {
-                            
+
                       }
-                            
+
                       // new line try, catch, finally.
                       try {
-                            
+
                       }
                       catch (Exception ex) {
-                            
+
                       }
                       finally {
-                            
+
                       }
                   }
               }
@@ -2075,7 +2071,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public class Test {
-                              
+
                   public void practiceA()
                   {
                       for (int i = 0; i < 10; ++i)
@@ -2097,7 +2093,7 @@ class TabsAndIndentsTest implements RewriteTest {
                           }
                       }
                   }
-                              
+
                   public void practiceB() {
                       for (int i = 0; i < 10; ++i) {
                           if (i % 2 == 0) {
@@ -2188,8 +2184,8 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("TextBlockMigration")
     @Issue("https://github.com/openrewrite/rewrite/issues/980")
+    @SuppressWarnings("TextBlockMigration")
     @Test
     void alignJavaDocsWithCRLF() {
         rewriteRun(
@@ -2253,7 +2249,7 @@ class TabsAndIndentsTest implements RewriteTest {
                       public int methodOne(int value) {
                           return value + 1;
                       }
-                            
+
                               /** Edge case formatting test.
                  @param value test value.
                                @return value + 1
@@ -2274,7 +2270,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   public int methodOne(int value) {
                       return value + 1;
                   }
-                            
+
                   /** Edge case formatting test.
                    @param value test value.
                    @return value + 1
@@ -2430,6 +2426,80 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesMultipleResourcesOnMultipleLines() {
+        rewriteRun(
+          java(
+            """
+              import java.io.*;
+              class Test {
+                  void method(String file1, String file2) {
+                      try (FileInputStream fis1 = new FileInputStream(file1);
+                      FileInputStream fis2 = new FileInputStream(file2);
+                      BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                          // process files
+                      } catch (IOException e) {
+                          e.printStackTrace();
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              class Test {
+                  void method(String file1, String file2) {
+                      try (FileInputStream fis1 = new FileInputStream(file1);
+                           FileInputStream fis2 = new FileInputStream(file2);
+                           BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                          // process files
+                      } catch (IOException e) {
+                          e.printStackTrace();
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryWithResourcesFirstResourceOnNewLine() {
+        rewriteRun(
+          java(
+            """
+            import java.io.*;
+            class Test {
+                void method(String file1, String file2) {
+                    try (
+                        FileInputStream fis1 = new FileInputStream(file1);
+                    FileInputStream fis2 = new FileInputStream(file2);
+                    BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                        // process files
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """,
+            """
+            import java.io.*;
+            class Test {
+                void method(String file1, String file2) {
+                    try (
+                        FileInputStream fis1 = new FileInputStream(file1);
+                        FileInputStream fis2 = new FileInputStream(file2);
+                        BufferedInputStream bis = new BufferedInputStream(fis1)) {
+                        // process files
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """
           )
         );
     }

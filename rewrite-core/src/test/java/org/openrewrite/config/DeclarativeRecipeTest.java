@@ -29,7 +29,6 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -335,7 +334,7 @@ class DeclarativeRecipeTest implements RewriteTest {
     @Test
     void exposesUnderlyingDataTables() {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
-          "test", emptySet(), null, URI.create("dummy"), true, Collections.emptyList());
+          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of(), Map.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
@@ -378,8 +377,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         assertThat(cycleCount).hasValue(3);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class MaxCycles extends Recipe {
         int maxCycles;
         List<Recipe> recipeList;
@@ -400,8 +399,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class RepeatedFindAndReplace extends Recipe {
         String find;
         String replace;

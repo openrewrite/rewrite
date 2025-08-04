@@ -61,8 +61,8 @@ class HclCommentTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2079")
+    @Test
     void bracesInComment() {
         rewriteRun(
           hcl(
@@ -71,7 +71,7 @@ class HclCommentTest implements RewriteTest {
                   myvar = {
                     # below {attributes}
                     myattribute = "myvalue"
-              
+
                     # add more attributes {here}
                   }
               }

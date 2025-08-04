@@ -89,7 +89,7 @@ class SwitchPatternMatchingTest implements RewriteTest {
             //language=java
             """
               enum Coin  { HEADS, TAILS }
-              
+
               class Test {
                   void switchEnum(Coin c) {
                       switch (c) {
@@ -112,7 +112,7 @@ class SwitchPatternMatchingTest implements RewriteTest {
               sealed interface I permits Foo, Bar {}
               public enum Foo implements I { A, B }
               final class Bar implements I {}
-              
+
               class Test {
                   void switchEnumExtendedType(I c) {
                       switch (c) {
@@ -134,7 +134,7 @@ class SwitchPatternMatchingTest implements RewriteTest {
             """
               record Point(int i, int j) {}
               enum Color { RED, GREEN, BLUE; }
-              
+
               class Test {
                   void typeTester(Object obj) {
                        switch (obj) {
@@ -180,7 +180,7 @@ class SwitchPatternMatchingTest implements RewriteTest {
                   public interface Printable {}
                   record A(String A) implements Printable {}
                   record B(Integer B) implements Printable {}
-              
+
                   void integerTester(Printable prt) {
                       switch (prt) {
                           case A(String a) -> System.out.println(a);

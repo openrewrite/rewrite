@@ -29,7 +29,7 @@ class GroovyParserTest implements RewriteTest {
           groovy(
               """
               package org.openrewrite.groovy
-              
+
               class A {
                   static void main(String[] args) {
                      String name = "John"
@@ -41,7 +41,7 @@ class GroovyParserTest implements RewriteTest {
           groovy(
             """
               package org.openrewrite.groovy;
-              
+
               class B {
                   static void main(String[] args) {
                      String name = "Doe"
@@ -52,14 +52,14 @@ class GroovyParserTest implements RewriteTest {
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4072")
+    @Test
     void groovySpecialCharacters() {
         rewriteRun(
           groovy(
               """
               package openrewrite.issues
-              
+
               class MapIssue {
                   Map<String, Integer> mapTest() {
                       Map map0 = new HashMap()
@@ -70,10 +70,10 @@ class GroovyParserTest implements RewriteTest {
                       Map error0 = new HashMap<>()
                       Map error1 = [:] as Map<String, Object>
                       Map error2 = buildMap()
-              
+
                       return map
                   }
-              
+
                   Map<String, Object> buildMap() {
                       return [:] as Map<String, Object>
                   }
@@ -117,4 +117,110 @@ class GroovyParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void variableDeclarationWithArrayInstantiationAsTheLastStatement() {
+        rewriteRun(
+          groovy(
+            """
+            def arr = new String[2]
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
+    void trailingCommaInMethodCall() {
+        rewriteRun(
+          groovy(
+            """
+              System.out.println("Hello World with no extra space",)
+              System.out.println("Hello World with space before comma" ,)
+              System.out.println("Hello World with space after comma", )
+              System.out.println("Hello World with space before & after comma" , )
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5730")
+    @Test
+    void innerOuter() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def outer() {
+                  f(I<Void>) {
+                    innner() { }
+                  }
+                }
+                def outerWithSpaces() {
+                  g( I < Void > ) {
+                    innner() { }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleTypeParams() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(Map<String, Integer>) {
+                    println "test"
+                  }
+                }
+                def methodWithSpaces() {
+                  f( Map < String , Integer > ) {
+                    println "test"
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parameterizedArgOnly() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<String, Integer>)
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedClosureAfterGeneric() {
+        rewriteRun(
+          groovy(
+            """
+              class C {
+                def method() {
+                  f(I<Void>) {
+                    first {
+                      second { }
+                    }
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
+
 }

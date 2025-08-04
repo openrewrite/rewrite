@@ -182,7 +182,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
         return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
                 .withMarkers(q.receiveMarkers(t.getMarkers()))
                 .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
-                .withCharset(q.<Charset, String>receiveAndGet(t.getCharset(), Charset::forName))
+                .withCharsetName(q.receiveAndGet(t.getCharsetName(), String::toString))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
                 .withChecksum(q.receive(t.getChecksum()))
                 .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))

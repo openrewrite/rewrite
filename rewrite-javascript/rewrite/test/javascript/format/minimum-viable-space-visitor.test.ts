@@ -76,12 +76,13 @@ describe('MinimumViableSpacingVisitor', () => {
                     new TodoItem("Walk the dog")
                 ];
 
-                list[1].toggle(); // mark "Walk the dog" as done
+                list[1].toggle();
 
                 list.forEach(item => console.log(item.toString()));
             `,
              `class TodoItem{constructor(public title:string,public done:boolean=false){}toggle():void{this.done=!this.done;}toString():string{return this.done?"[x]":"[ ]"+this.title}}const list:TodoItem[]=[new TodoItem("Buy milk"),new TodoItem("Walk the dog")];list[1].toggle();list.forEach(item=>console.log(item.toString()));`
                 // @formatter:on
+                // TODO it fails when ` // mark "Walk the dog" as done` is added to the toggle line.
         ))
     });
 

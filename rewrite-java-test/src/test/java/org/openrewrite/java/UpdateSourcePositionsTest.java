@@ -25,8 +25,8 @@ import org.openrewrite.marker.Range;
 
 import java.util.List;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UpdateSourcePositionsTest {
@@ -55,11 +55,11 @@ class UpdateSourcePositionsTest {
         List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(
           """
             package org.test;
-                          
+
             import java.util.function.Consumer;
-                            
+
             public class Application {
-                        
+
                 public Consumer<String> demo() {
                     return (args) -> {
                         log.info("");
@@ -67,16 +67,16 @@ class UpdateSourcePositionsTest {
                 }
             }
             """
-        ).collect(Collectors.toList());
+        ).collect(toList());
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             package [(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
-                        
+
             import [(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
-                        
+
             public class[(5, 14), (5, 25)] Application {
-                        
+
                 public [(7, 12), (7, 20)]Consumer<[(7, 21), (7, 27)]String>[(7, 29), (7, 33)] demo() {
                     return ([(8, 17), (8, 21)]args) -> {
                         [(9, 13), (9, 16)]log.[(9, 17), (9, 21)]info("");
@@ -90,21 +90,21 @@ class UpdateSourcePositionsTest {
     @Test
     void updateSourcePositions() {
         List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(
-          """ 
+          """
             class Test {
                 int n;
-                
+
                 void test() {
                 }
             }
             """
-        ).collect(Collectors.toList());
+        ).collect(toList());
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().getFirst();
         assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             class[(1, 6), (1, 10)] Test {
                 int [(2, 9), (2, 10)]n;
-                        
+
                 void[(4, 10), (4, 14)] test() {
                 }
             }

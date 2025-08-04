@@ -7,8 +7,7 @@
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "files": [
-    "dist/src/**",
-    "src/**"
+    "dist/src/**"
   ],
   "exports": {
     ".": "./dist/src/index.js",
@@ -22,6 +21,7 @@
     "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run build && jest",
+    "ci:test": "jest",
     "start": "npm run build && node ./dist/src/rpc/server.js"
   },
   "dependencies": {
@@ -31,6 +31,7 @@
     "dedent": "^1.5.3",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1"
   },

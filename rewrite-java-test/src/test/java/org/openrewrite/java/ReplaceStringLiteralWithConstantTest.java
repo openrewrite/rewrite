@@ -46,14 +46,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   Object o = "Hello World!";
               }
               """,
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -69,7 +69,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   String s = "FooBar";
               }
@@ -85,7 +85,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               class ReplaceStringLiteralWithConstantTest {
                   static final String EXAMPLE_STRING_CONSTANT = "Hello World!";
               }
@@ -105,7 +105,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -121,7 +121,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package com.abc;
-              
+
               class A {
                   String v = "newValue";
                   private String method() {
@@ -131,9 +131,9 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               package com.abc;
-              
+
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class A {
                   String v = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
                   private String method() {
@@ -150,14 +150,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(null, EXAMPLE_STRING_FQN)),
           java(
-            """ 
+            """
               class Test {
                   Object o = "Hello World!";
               }
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -178,7 +178,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -200,14 +200,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """.formatted(EXAMPLE_STRING_FQN),
             "org.openrewrite.ReplaceStringLiteralWithConstantList"),
           java(
-            """                
+            """
               class Test {
                   Object o = "Hello World!";
               }
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -230,14 +230,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """.formatted("Hello Darkness!", EXAMPLE_STRING_FQN),
             "org.openrewrite.ReplaceStringLiteralWithConstantList"),
           java(
-            """ 
+            """
               class Test {
                   Object o = "Hello Darkness!";
               }
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-              
+
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -260,7 +260,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   Object o = "Hello World!";
               }
@@ -276,7 +276,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               /** @noinspection ALL*/
               class Test {
                   void foo(String bar) {
@@ -294,7 +294,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java;
-              
+
               /** @noinspection ALL*/
               class Test {
                   void foo(String bar) {
@@ -321,7 +321,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               @interface Foo {
                   String bar();
                   String baz();
@@ -331,7 +331,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   @Foo(bar = "Goodbye World!", baz = "Hello World!")
                   void foo(String bar) {
@@ -340,7 +340,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java;
-              
+
               class Test {
                   @Foo(bar = "Goodbye World!", baz = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT)
                   void foo(String bar) {

@@ -30,6 +30,7 @@ import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.rpc.RewriteRpc;
 
 import java.io.*;
@@ -55,14 +56,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     private final CloseableSupplier<JsonRpc> supplier;
 
-    private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, int batchSize, Duration timeout) {
-        super(marketplace, batchSize, timeout);
+    private JavaScriptRewriteRpc(CloseableSupplier<JsonRpc> supplier, Environment marketplace, Duration timeout) {
+        super(supplier.get(), marketplace, timeout);
         this.supplier = supplier;
     }
 
-    @Override
-    protected JsonRpc createJsonRpc() {
-        return supplier.get();
+    private static final ManagedThreadLocal<JavaScriptRewriteRpc> THREAD_LOCAL = new ManagedThreadLocal<>();
+
+    public static ManagedThreadLocal<JavaScriptRewriteRpc> current() {
+        return THREAD_LOCAL;
     }
 
     @Override
@@ -92,107 +94,16 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
-    /**
-     * Extracts the bundled JavaScript installation to the specified directory.
-     * This method can be used to extract the bundled installation independently
-     * of creating a JavaScriptRewriteRpc instance.
-     * <p>
-     * If a package.json file already exists in the extraction directory, it will
-     * be compared with the bundled package.json. If they differ, the entire
-     * extraction directory will be cleaned before extracting the bundled installation.
-     *
-     * @param extractionDirectory The directory where the bundled installation should be extracted
-     * @return The path to the extracted installation directory (specifically the dist folder)
-     * @throws UncheckedIOException if extraction fails
-     */
-    public static Path extractBundledInstallation(Path extractionDirectory) {
-        try {
-            Files.createDirectories(extractionDirectory);
-
-            // Check if we need to clean the directory by comparing package.json files
-            boolean needsCleanup = shouldCleanExtractionDirectory(extractionDirectory);
-
-            if (needsCleanup) {
-                // Delete everything in the extraction directory
-                if (Files.exists(extractionDirectory)) {
-                    try (Stream<Path> stream = Files.walk(extractionDirectory)) {
-                        stream.sorted(Comparator.reverseOrder())
-                                .filter(path -> !path.equals(extractionDirectory)) // Don't delete the directory itself
-                                .map(Path::toFile)
-                                .forEach(File::delete);
-                    }
-                }
-            }
-
-            InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
-            if (packageStream == null) {
-                throw new IllegalStateException("production-package.zip not found in resources");
-            }
-
-            try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
-                ZipEntry entry;
-                while ((entry = zipIn.getNextEntry()) != null) {
-                    if (!entry.isDirectory()) {
-                        Path outputPath = extractionDirectory.resolve(entry.getName());
-                        Files.createDirectories(outputPath.getParent());
-                        Files.copy(zipIn, outputPath, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    zipIn.closeEntry();
-                }
-            }
-
-            return extractionDirectory.resolve("node_modules/@openrewrite/rewrite/dist");
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public static Builder bundledInstallation(Environment marketplace) {
+        return builder(marketplace);
     }
 
-    private static boolean shouldCleanExtractionDirectory(Path extractionDirectory) throws IOException {
-        Path existingPackageJson = extractionDirectory.resolve("package.json");
-        if (!Files.exists(existingPackageJson)) {
-            return false; // No existing package.json, no need to clean
-        }
-
-        String bundledPackageJsonContent = getBundledPackageJsonContent();
-        String existingPackageJsonContent = new String(Files.readAllBytes(existingPackageJson), StandardCharsets.UTF_8);
-        return !bundledPackageJsonContent.equals(existingPackageJsonContent);
+    public static Builder bundledInstallation(Environment marketplace, Path installationDirectory) {
+        return builder(marketplace).installationDirectory(extractBundledInstallation(installationDirectory));
     }
 
-    private static String getBundledPackageJsonContent() throws IOException {
-        InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
-        if (packageStream == null) {
-            throw new IllegalStateException("package.json not found in resources");
-        }
-
-        try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
-            ZipEntry entry;
-            while ((entry = zipIn.getNextEntry()) != null) {
-                if ("package.json".equals(entry.getName())) {
-                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                    int byteCount;
-                    byte[] data = new byte[4096];
-                    while ((byteCount = zipIn.read(data, 0, data.length)) != -1) {
-                        buffer.write(data, 0, byteCount);
-                    }
-                    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-                }
-                zipIn.closeEntry();
-            }
-        }
-
-        throw new IllegalStateException("package.json not found in resources");
-    }
-
-    public static Builder bundledInstallation() {
-        return builder();
-    }
-
-    public static Builder bundledInstallation(Path installationDirectory) {
-        return builder().installationDirectory(extractBundledInstallation(installationDirectory));
-    }
-
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(Environment marketplace) {
+        return new Builder(marketplace);
     }
 
     public static class Builder extends RewriteRpc.Builder<Builder> {
@@ -204,6 +115,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private int port;
         private boolean trace;
         private @Nullable Path logFile;
+
+        private Builder(Environment marketplace) {
+            super(marketplace);
+        }
 
         private static Path getBundledInstallationDirectory() {
             if (bundledInstallationDirectory == null) {
@@ -294,12 +209,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                             throw new UncheckedIOException(e);
                         }
                     }
-                }, marketplace, batchSize, timeout);
+                }, marketplace, timeout);
             } else {
                 // Use default installation directory if none provided (lazy-loaded)
-                Path effectiveInstallationDirectory = installationDirectory != null
-                        ? installationDirectory
-                        : getBundledInstallationDirectory();
+                Path effectiveInstallationDirectory = installationDirectory != null ?
+                        installationDirectory :
+                        getBundledInstallationDirectory();
 
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
@@ -320,7 +235,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                     @Override
                     public JsonRpc get() {
-                        process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));
+                        process = new JavaScriptRewriteRpcProcess(logFile, trace, command.toArray(new String[0]));
                         process.start();
                         return requireNonNull(process.rpcClient);
                     }
@@ -336,15 +251,102 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                             }
                         }
                     }
-                }, marketplace, batchSize, timeout);
-            }
-
-            if (start) {
-                rewriteRpc.ensureInitialized();
+                }, marketplace, timeout);
             }
 
             return rewriteRpc;
         }
+    }
+
+    /**
+     * Extracts the bundled JavaScript installation to the specified directory.
+     * This method can be used to extract the bundled installation independently
+     * of creating a JavaScriptRewriteRpc instance.
+     * <p>
+     * If a package.json file already exists in the extraction directory, it will
+     * be compared with the bundled package.json. If they differ, the entire
+     * extraction directory will be cleaned before extracting the bundled installation.
+     *
+     * @param extractionDirectory The directory where the bundled installation should be extracted
+     * @return The path to the extracted installation directory (specifically the dist folder)
+     * @throws UncheckedIOException if extraction fails
+     */
+    private static Path extractBundledInstallation(Path extractionDirectory) {
+        try {
+            Files.createDirectories(extractionDirectory);
+
+            // Check if we need to clean the directory by comparing package.json files
+            boolean needsCleanup = shouldCleanExtractionDirectory(extractionDirectory);
+
+            if (needsCleanup) {
+                // Delete everything in the extraction directory
+                if (Files.exists(extractionDirectory)) {
+                    try (Stream<Path> stream = Files.walk(extractionDirectory)) {
+                        stream.sorted(Comparator.reverseOrder())
+                                .filter(path -> !path.equals(extractionDirectory)) // Don't delete the directory itself
+                                .map(Path::toFile)
+                                .forEach(File::delete);
+                    }
+                }
+            }
+
+            InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
+            if (packageStream == null) {
+                throw new IllegalStateException("production-package.zip not found in resources");
+            }
+
+            try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
+                ZipEntry entry;
+                while ((entry = zipIn.getNextEntry()) != null) {
+                    if (!entry.isDirectory()) {
+                        Path outputPath = extractionDirectory.resolve(entry.getName());
+                        Files.createDirectories(outputPath.getParent());
+                        Files.copy(zipIn, outputPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    zipIn.closeEntry();
+                }
+            }
+
+            return extractionDirectory.resolve("node_modules/@openrewrite/rewrite/dist");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static boolean shouldCleanExtractionDirectory(Path extractionDirectory) throws IOException {
+        Path existingPackageJson = extractionDirectory.resolve("package.json");
+        if (!Files.exists(existingPackageJson)) {
+            return false; // No existing package.json, no need to clean
+        }
+
+        String bundledPackageJsonContent = getBundledPackageJsonContent();
+        String existingPackageJsonContent = new String(Files.readAllBytes(existingPackageJson), StandardCharsets.UTF_8);
+        return !bundledPackageJsonContent.equals(existingPackageJsonContent);
+    }
+
+    private static String getBundledPackageJsonContent() throws IOException {
+        InputStream packageStream = JavaScriptRewriteRpc.class.getResourceAsStream("/production-package.zip");
+        if (packageStream == null) {
+            throw new IllegalStateException("package.json not found in resources");
+        }
+
+        try (ZipInputStream zipIn = new ZipInputStream(packageStream)) {
+            ZipEntry entry;
+            while ((entry = zipIn.getNextEntry()) != null) {
+                if ("package.json".equals(entry.getName())) {
+                    ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                    int byteCount;
+                    byte[] data = new byte[4096];
+                    while ((byteCount = zipIn.read(data, 0, data.length)) != -1) {
+                        buffer.write(data, 0, byteCount);
+                    }
+                    return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+                }
+                zipIn.closeEntry();
+            }
+        }
+
+        throw new IllegalStateException("package.json not found in resources");
     }
 
     private interface CloseableSupplier<T> extends Supplier<T>, AutoCloseable {
@@ -353,6 +355,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     }
 
     private static class JavaScriptRewriteRpcProcess extends Thread {
+        private final @Nullable Path logFile;
         private final boolean trace;
         private final String[] command;
 
@@ -362,7 +365,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         @Getter
         private @Nullable JsonRpc rpcClient;
 
-        public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
+        public JavaScriptRewriteRpcProcess(@Nullable Path logFile, boolean trace, String... command) {
+            this.logFile = logFile;
             this.trace = trace;
             this.command = command;
             this.setDaemon(false);
@@ -372,6 +376,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         public void run() {
             try {
                 ProcessBuilder pb = new ProcessBuilder(command);
+                pb.redirectError(logFile != null ? ProcessBuilder.Redirect.appendTo(logFile.toFile()) :
+                        ProcessBuilder.Redirect.INHERIT);
                 process = pb.start();
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

@@ -36,9 +36,10 @@ import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.*;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
@@ -157,7 +158,7 @@ public class Autodetect extends NamedStyles {
                                         (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
                                         charsToOccurrence.getValue()));
                     })
-                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
+                    .collect(toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
 
             return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
                     .map(Map.Entry::getKey)
@@ -283,7 +284,7 @@ public class Autodetect extends NamedStyles {
                         .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
                                 (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
                                 spaceCountToFrequency.getValue().intValue())))
-                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+                .collect(groupingBy(Map.Entry::getKey, summingInt(Map.Entry::getValue)));
 
         return tabSizeToFrequencyMap.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
@@ -380,7 +381,7 @@ public class Autodetect extends NamedStyles {
                     // Some statement types, like method invocations, are also expressions
                     // If an expression appears in a context where statements are expected, its indent is not a continuation
                     Set<Expression> statementExpressions = getCursor()
-                            .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
+                            .getMessage("STATEMENT_EXPRESSION", newSetFromMap(
                                     new IdentityHashMap<>(block.getStatements().size())));
                     statementExpressions.add((Expression) s);
                     getCursor().putMessage("STATEMENT_EXPRESSION", statementExpressions);
@@ -866,7 +867,7 @@ public class Autodetect extends NamedStyles {
                             }
                         }
 
-                        Map<String, Double> averageWeightMap = weightMap.entrySet().stream().collect(Collectors.toMap(
+                        Map<String, Double> averageWeightMap = weightMap.entrySet().stream().collect(toMap(
                                 Map.Entry::getKey,
                                 entry -> {
                                     List<Integer> weights = entry.getValue();
@@ -915,7 +916,7 @@ public class Autodetect extends NamedStyles {
             return averageWeightMap.entrySet().stream()
                     .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                     .map(Map.Entry::getKey)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         public ImportLayoutStatistics aggregate() {
@@ -996,7 +997,7 @@ public class Autodetect extends NamedStyles {
                 }
                 importedPackages.add(anImport.getPackageName() + ".");
 
-                if (anImport.getQualid().getSimpleName().equals("*")) {
+                if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
                         int count = 0;
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
@@ -1037,7 +1038,7 @@ public class Autodetect extends NamedStyles {
                     .map(it -> new ImportAttributes(it.getPackageName(),
                             it.getPrefix().getWhitespace(),
                             it.getAlias() != null))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
             return cu;
         }
     }

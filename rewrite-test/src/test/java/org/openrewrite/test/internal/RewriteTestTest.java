@@ -29,8 +29,8 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -109,7 +109,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-              
+
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
@@ -142,9 +142,9 @@ class RewriteTestTest implements RewriteTest {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -173,9 +173,9 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class MutateExecutionContext extends Recipe {
 
     @Override
@@ -200,9 +200,9 @@ class MutateExecutionContext extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ImproperCursorUsage extends Recipe {
 
     @Override
@@ -227,9 +227,9 @@ class ImproperCursorUsage extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -254,7 +254,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }
@@ -269,7 +269,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             return emptyList();
         }
         Path duplicatePath = Paths.get("duplicate.txt");
-        return Arrays.asList(PlainText.builder()
+        return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)
             .build(),
@@ -281,8 +281,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
 @NullMarked
+@SuppressWarnings({"FieldCanBeLocal", "unused"})
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;

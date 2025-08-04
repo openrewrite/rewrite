@@ -23,8 +23,8 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangePackageInStringLiteralTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void changePackageInLiteral() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackageInStringLiteral("javax.type", "jakarta.type")),

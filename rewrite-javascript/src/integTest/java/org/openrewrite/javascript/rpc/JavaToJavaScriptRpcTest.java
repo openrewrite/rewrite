@@ -15,11 +15,11 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -53,11 +53,11 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               try {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder()
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
+//                    .inspectAndBreak()
 //                    .socket(12345)
-                    .batchSize(20)
                     .timeout(Duration.ofMinutes(10))
                     .build();
 
@@ -71,7 +71,7 @@ public class JavaToJavaScriptRpcTest {
 
                   return new JavaVisitor<>() {
                       @Override
-                      public J preVisit(@NonNull J tree, @NonNull ExecutionContext ctx) {
+                      public J preVisit(J tree, ExecutionContext ctx) {
                           SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                           try {
                               assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());

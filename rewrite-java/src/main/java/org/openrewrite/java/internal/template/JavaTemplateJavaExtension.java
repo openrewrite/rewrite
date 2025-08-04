@@ -57,7 +57,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private boolean substituted;
 
             @Override
-            public J visitAnnotation(J.Annotation annotation, Integer integer) {
+            public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
                     isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
@@ -73,7 +73,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
 
-                return super.visitAnnotation(annotation, integer);
+                return super.visitAnnotation(annotation, p);
             }
 
             @Override
@@ -165,8 +165,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
-                            c = c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
-                            return c;
+                            return c.getPadding().withExtends(c.getPadding().getExtends().withBefore(Space.format(" ")));
                         }
                         case IMPLEMENTS: {
                             List<TypeTree> implementings = unsubstitute(templateParser.parseImplements(getCursor(), substitutedTemplate));
@@ -369,9 +368,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
 
                             //noinspection ConstantConditions
-                            m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
+                            return m.getPadding().withThrows(m.getPadding().getThrows().withBefore(Space.format(" ")))
                                     .withMethodType(type).withName(method.getName().withType(type));
-                            return m;
                         }
                         case TYPE_PARAMETERS: {
                             List<J.TypeParameter> typeParameters = unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));

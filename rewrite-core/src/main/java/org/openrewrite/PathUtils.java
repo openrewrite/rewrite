@@ -136,11 +136,11 @@ public class PathUtils {
             if (pattIdxStart > pattIdxEnd) {
                 return !isFileSeparator(pattern.charAt(pattern.length() - 1));
             }
-            if (pattIdxStart == pattIdxEnd && pattTokens[pattIdxStart].equals("*") && isFileSeparator(path.charAt(path.length() - 1))) {
+            if (pattIdxStart == pattIdxEnd && "*".equals(pattTokens[pattIdxStart]) && isFileSeparator(path.charAt(path.length() - 1))) {
                 return true;
             }
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -168,7 +168,7 @@ public class PathUtils {
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -178,7 +178,7 @@ public class PathUtils {
         while (pattIdxStart != pattIdxEnd && pathIdxStart <= pathIdxEnd) {
             int patIdxTmp = -1;
             for (int i = pattIdxStart + 1; i <= pattIdxEnd; i++) {
-                if (pattTokens[i].equals("**")) {
+                if ("**".equals(pattTokens[i])) {
                     patIdxTmp = i;
                     break;
                 }
@@ -212,7 +212,7 @@ public class PathUtils {
         }
 
         for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-            if (!pattTokens[i].equals("**")) {
+            if (!"**".equals(pattTokens[i])) {
                 return false;
             }
         }

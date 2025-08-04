@@ -38,15 +38,15 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test {  
-              
+              class Test {
+
                   public void method(Test t) {\s\s
                   }\s\s
               }\s\s
               """,
             """
               class Test {
-              
+
                   public void method(Test t) {
                   }
               }

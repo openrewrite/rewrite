@@ -18,7 +18,6 @@ package org.openrewrite.rpc;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -57,19 +56,15 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = RewriteRpc.from(() -> new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)))
-          .marketplace(env)
-          .batchSize(1)
+        client = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
           .timeout(Duration.ofMinutes(10))
-          .startServer(true)
-          .build();
+          .build()
+          .batchSize(1);
 
-        server = RewriteRpc.from(() -> new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)))
-          .marketplace(env)
-          .batchSize(1)
+        server = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
           .timeout(Duration.ofMinutes(10))
-          .startServer(true)
-          .build();
+          .build()
+          .batchSize(1);
     }
 
     @AfterEach
@@ -83,9 +78,9 @@ class RewriteRpcTest implements RewriteTest {
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @SneakyThrows
               @Override
-              public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
                   Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();
                   return requireNonNull(t);
