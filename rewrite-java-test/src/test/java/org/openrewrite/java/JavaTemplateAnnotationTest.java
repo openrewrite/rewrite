@@ -128,7 +128,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                  if (annotation.getSimpleName().equals("NotNull")) {
+                  if ("NotNull".equals(annotation.getSimpleName())) {
                       maybeRemoveImport("org.jetbrains.annotations.NotNull");
                       maybeAddImport("lombok.NonNull");
                       return JavaTemplate.builder("@NonNull")
@@ -184,12 +184,12 @@ class JavaTemplateAnnotationTest implements RewriteTest {
         private final Recipe recipe = toRecipe(() -> new JavaIsoVisitor<>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                if (annotation.getSimpleName().equals("NestedAnnotation") &&
+                if ("NestedAnnotation".equals(annotation.getSimpleName()) &&
                   !annotation.getArguments().isEmpty()) {
                     // Check if this annotation still has the 'a' attribute that needs to be replaced
                     J.Assignment arg = (J.Assignment) annotation.getArguments().get(0);
                     if (arg.getVariable() instanceof J.Identifier &&
-                      ((J.Identifier) arg.getVariable()).getSimpleName().equals("a")) {
+                      "a".equals(((J.Identifier) arg.getVariable()).getSimpleName())) {
                         // Only apply the template if we haven't already transformed this annotation
                         J.Literal value = (J.Literal) arg.getAssignment();
 
@@ -215,7 +215,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations({
                       @NestedAnnotation(a = "first"),
@@ -227,7 +227,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations({
                       @NestedAnnotation(b = "first"),
@@ -251,7 +251,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations(value = {
                       @NestedAnnotation(a = "first"),
@@ -263,7 +263,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations(value = {
                       @NestedAnnotation(b = "first"),
@@ -287,7 +287,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations({
                       @NestedAnnotation(a = "first"),
@@ -298,7 +298,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations({
                       @NestedAnnotation(b = "first"),
@@ -321,7 +321,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations(value = {
                       @NestedAnnotation(a = "first"),
@@ -332,7 +332,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                     @NestedAnnotations(value = {
                       @NestedAnnotation(b = "first"),
@@ -355,7 +355,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   @NestedAnnotations({
                     @NestedAnnotation(a = "first"),
                     @NestedAnnotation(a = "second")
@@ -366,7 +366,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   @NestedAnnotations({
                     @NestedAnnotation(b = "first"),
                     @NestedAnnotation(b = "second")
@@ -389,7 +389,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   @NestedAnnotations(value = {
                     @NestedAnnotation(a = "first"),
                     @NestedAnnotation(a = "second")
@@ -400,7 +400,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   @NestedAnnotations(value = {
                     @NestedAnnotation(b = "first"),
                     @NestedAnnotation(b = "second")
@@ -423,7 +423,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                       @NestedAnnotations({
                         @NestedAnnotation(a = "first"),
@@ -436,7 +436,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                       @NestedAnnotations({
                         @NestedAnnotation(b = "first"),
@@ -461,7 +461,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               java(
                 """
                   import foo.*;
-                  
+
                   class A {
                       @NestedAnnotations(value = {
                         @NestedAnnotation(a = "first"),
@@ -474,7 +474,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   """,
                 """
                   import foo.*;
-                  
+
                   class A {
                       @NestedAnnotations(value = {
                         @NestedAnnotation(b = "first"),

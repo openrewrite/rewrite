@@ -29,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.parseBoolean;
@@ -92,7 +91,7 @@ public class CheckstyleConfigLoader {
         }
         return moduleList.stream()
                 .map(module -> new DefaultComesLastStyle(parseBoolean(module.properties.get("skipIfLastAndSharedWithCase"))))
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<EmptyBlockStyle> emptyBlock(Map<String, List<Module>> conf) {
@@ -141,7 +140,7 @@ public class CheckstyleConfigLoader {
                             literalElse, literalFinally, literalFor, literalIf, literalSwitch, literalSynchronized, literalTry,
                             literalWhile, staticInit);
                 })
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<EmptyForInitializerPadStyle> emptyForInitializerPadStyle(Map<String, List<Module>> conf) {
@@ -156,7 +155,7 @@ public class CheckstyleConfigLoader {
                     boolean pad = option != null && "space".equals(option.trim());
                     return new EmptyForInitializerPadStyle(pad);
                 })
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<EmptyForIteratorPadStyle> emptyForIteratorPadStyle(Map<String, List<Module>> conf) {
@@ -520,7 +519,7 @@ public class CheckstyleConfigLoader {
                             starAssign, lambda
                     );
                 })
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<HideUtilityClassConstructorStyle> hideUtilityClassConstructorStyle(Map<String, List<Module>> conf) {
@@ -530,7 +529,7 @@ public class CheckstyleConfigLoader {
         }
         return moduleList.stream()
                 .map(module -> Checkstyle.hideUtilityClassConstructorStyle())
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<UnusedImportsStyle> unusedImportsStyles(Map<String, List<Module>> conf) {
@@ -582,7 +581,7 @@ public class CheckstyleConfigLoader {
         }
         return moduleList.stream()
                 .map(module -> new ExplicitInitializationStyle(module.prop("onlyObjectReferences", false)))
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static @Nullable Set<CustomImportOrderStyle> customImportOrderStyle(Map<String, List<Module>> conf) {
@@ -603,7 +602,7 @@ public class CheckstyleConfigLoader {
                     return new CustomImportOrderStyle(customImportOrderRules, separateLineBetweenGroups, sortImportsInGroupAlphabetically,
                             specialImportsRegExp, standardPackageRegExp, thirdPartyPackageRegExp);
                 })
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     private static Map<String, List<Module>> loadConfiguration(InputStream inputStream, Map<String, Object> properties) throws CheckstyleException {
@@ -611,7 +610,7 @@ public class CheckstyleConfigLoader {
                 name -> {
                     Object prop = properties.get(name);
                     return prop == null ?
-                            name.equals("config_loc") ? "config/checkstyle" : null :
+                            "config_loc".equals(name) ? "config/checkstyle" : null :
                             prop.toString();
                 },
                 ConfigurationLoader.IgnoredModulesOptions.OMIT);

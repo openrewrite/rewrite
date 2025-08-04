@@ -29,9 +29,13 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ObjectMappers.propertyBasedMapper;
 
 /**
@@ -115,7 +119,7 @@ public class RawGradleModule {
     }
 
     public List<org.openrewrite.maven.tree.Dependency> getDependencies(String variant, String... categories) {
-        return variants == null ? Collections.emptyList() : variants.stream()
+        return variants == null ? emptyList() : variants.stream()
                 .filter(v -> v.getName().equals(variant))
                 .map(Variant::getDependencies)
                 .filter(Objects::nonNull)
@@ -125,6 +129,6 @@ public class RawGradleModule {
                 .map(gav -> org.openrewrite.maven.tree.Dependency.builder()
                         .gav(gav)
                         .build())
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 }

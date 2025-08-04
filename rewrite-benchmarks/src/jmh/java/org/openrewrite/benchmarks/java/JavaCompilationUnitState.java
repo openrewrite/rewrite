@@ -37,7 +37,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
 @State(Scope.Benchmark)
@@ -105,7 +106,7 @@ public class JavaCompilationUnitState {
         JavaParser parser = javaParser.typeCache(typeCache).build();
         sourceFiles = parser
                 .parse(inputs, null, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         radixMapTypeCache = new JavaTypeCache();
         for (Map.Entry<String, Object> entry : typeCache.map().entrySet()) {

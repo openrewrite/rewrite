@@ -389,7 +389,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    if (method.getSimpleName().equals("test")) {
+                    if ("test".equals(method.getSimpleName())) {
                         J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
                         J.TypeCast cast = (J.TypeCast) return_.getExpression();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), BOUND)).isFalse();
@@ -409,17 +409,17 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.List;
-              
+
               import static java.util.Collections.singletonList;
-              
+
               class Test<T extends Collection<String>> {
-              
+
                   void consumeClass(T collection) {
                   }
-              
+
                   <T extends Collection<String>> void consumeMethod(T collection) {
                   }
-              
+
                   void test() {
                       List<String> list = singletonList("hello");
                       consumeMethod(null);
@@ -430,7 +430,7 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    if (method.getSimpleName().equals("test")) {
+                    if ("test".equals(method.getSimpleName())) {
                         J.Block block = getCursor().getParentTreeCursor().getValue();
                         J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
                         J.MethodDeclaration consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);
@@ -749,20 +749,20 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.io.*;
               import java.util.*;
-              
+
               @SuppressWarnings("all")
               public class Test<A extends B, B extends Number, C extends Comparable<? super C> & Serializable> {
-              
+
                   // Plain generics
                   A a;
                   B b;
                   C c;
-              
+
                   // Parameterized
                   Optional<A> oa;
                   Optional<B> ob;
                   Optional<C> oc;
-              
+
                   // Wildcards
                   Optional<?> ow;
                   Optional<? extends A> oea;
@@ -771,15 +771,15 @@ class TypeUtilsTest implements RewriteTest {
                   Optional<? super A> osa;
                   Optional<? super B> osb;
                   Optional<? super C> osc;
-              
+
                   // === Raw types ===
                   List rawList;
                   Map rawMap;
-              
+
                   // === Recursive generic ===
                   static class Recursive<T extends Comparable<T>> {}
                   Recursive<Recursive<String>> rec;
-              
+
                   // === Arrays ===
                   int[] intArray;
                   boolean[] boolArray;
@@ -841,7 +841,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.io.*;
               import java.util.*;
-              
+
               @SuppressWarnings("all")
               public class Test {
                   void test() {
@@ -873,18 +873,18 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.io.*;
               import java.util.*;
-              
+
               abstract class Rec<T extends Rec<T>> {}
-              
+
               abstract class One<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               abstract class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
-              
+
               @SuppressWarnings("all")
               public class Test {
                   void run(Rec<?> r, One<?, ?> m) {
                       Optional.of(r).get();
                       Optional.of(m).get();
-              
+
                       Optional.of(r).ifPresent(sr -> {});
                       Optional.of(m).ifPresent(sm -> {});
                   }
@@ -919,7 +919,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Map;
-              
+
               class Test<T extends Number, U extends List<String>, V extends U, X> {
                   Integer integer;
                   int[] intArray;
@@ -931,20 +931,20 @@ class TypeUtilsTest implements RewriteTest {
                   U[] uArray;
                   V[] vArray;
                   X[] xArray;
-              
+
                   T numberType;
                   U listType;
                   V nestedListType;
                   X generic;
-              
+
                   List<T> numberList;
                   List<String> listString;
                   Map<String, T> stringToNumberMap;
                   Map<String, X> stringToGenericMap;
-              
+
                   List<? extends Number> extendsNumberList;
                   List<? super Integer> superIntegerList;
-              
+
                   Map<String, List<Map<Integer, String>>> complexNested;
               }
               """,
@@ -1034,7 +1034,7 @@ class TypeUtilsTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.Collection;
               import java.util.List;
-              
+
               @SuppressWarnings("all")
               class Test<T extends Number & Serializable, U> {
                   Integer integer;
@@ -1044,7 +1044,7 @@ class TypeUtilsTest implements RewriteTest {
                   Cloneable cloneable;
                   Serializable serializable;
                   String[] array;
-              
+
                   Object obj;
                   String str;
                   List listRaw;
@@ -1116,7 +1116,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.function.Supplier;
-              
+
               class Test<T, U extends T, N extends Number, CS extends CharSequence> {
                   ArrayList v1;
                   Comparable<?> v2;
@@ -1149,7 +1149,7 @@ class TypeUtilsTest implements RewriteTest {
                   Map<String, String> mapSS;
                   Map<Integer, Integer> mapII;
                   Map<Long, Integer> mapLI;
-              
+
                   static abstract class ImplementsComparable implements Comparable<ImplementsComparable> {}
                   static abstract class ExtendsComparable extends ImplementsComparable {}
                   static abstract class MySupplier<T> implements Supplier<T> {}
@@ -1313,7 +1313,7 @@ class TypeUtilsTest implements RewriteTest {
                   Float boxedFloat;
                   Double boxedDouble;
                   Boolean boxedBoolean;
-              
+
                   T genericT;
                   U genericU;
               }
@@ -1386,7 +1386,7 @@ class TypeUtilsTest implements RewriteTest {
                       V v;
                       X x;
                   }
-              
+
                   class B<T, U extends T, V extends U, X> {
                       T t;
                       U u;
@@ -1441,7 +1441,7 @@ class TypeUtilsTest implements RewriteTest {
               abstract class Two<TwoT extends Two<TwoT, OneT>, OneT extends One<TwoT, OneT>> {}
               class OneType extends One<TwoType, OneType> {}
               class TwoType extends Two<TwoType, OneType> {}
-              
+
               class Test<E extends Enum<E>, C extends Comparable<? super C>, T> {
                   E e;
                   C c;
@@ -1514,7 +1514,7 @@ class TypeUtilsTest implements RewriteTest {
             """
               import java.io.*;
               import java.util.*;
-              
+
               @SuppressWarnings("all")
               public class Test {
                   void test() {

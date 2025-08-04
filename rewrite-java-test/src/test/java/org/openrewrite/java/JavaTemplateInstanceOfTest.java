@@ -34,8 +34,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
@@ -564,18 +564,18 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         if (!expectedMissing.isEmpty()) {
             fail("Expected missing types not found:\n" + expectedMissing.entrySet().stream()
               .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(joining("->"));
                   return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
               })
-              .collect(Collectors.joining("\n")));
+              .collect(joining("\n")));
         }
         if (!actualMissing.isEmpty()) {
             fail("Unexpected missing types found:\n" + actualMissing.entrySet().stream()
               .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(joining("->"));
                   return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
               })
-              .collect(Collectors.joining("\n")));
+              .collect(joining("\n")));
         }
 
     }

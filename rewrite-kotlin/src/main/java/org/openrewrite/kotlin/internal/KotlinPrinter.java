@@ -980,7 +980,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("?");
                 }
 
-                if (!method.getName().getSimpleName().equals("<empty>") &&
+                if (!"<empty>".equals(method.getName().getSimpleName()) &&
                     !method.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
                     p.append(".");
                 }
@@ -1180,7 +1180,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("val");
                 }
 
-                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && m.getKeyword().equals("typealias")) {
+                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && "typealias".equals(m.getKeyword())) {
                     isTypeAlias = true;
                 }
             }

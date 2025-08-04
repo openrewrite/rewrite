@@ -40,8 +40,8 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -123,10 +123,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
                     dependency = parseDependency(Arrays.asList(((J.Binary) argument).getLeft()));
                 } else if (argument instanceof J.MethodInvocation) {
-                    if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {
+                    if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
                         dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
-                    } else if (((J.MethodInvocation) argument).getSimpleName().equals("project")) {
+                    } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
                         // project dependencies are not yet supported
                         return null;
                     }
@@ -204,7 +204,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
 
             String methodName = methodInvocation.getSimpleName();
-            if (methodName.equals("classpath")) {
+            if ("classpath".equals(methodName)) {
                 return gradleProject.getBuildscript().getConfiguration(methodName);
             } else {
                 return gradleProject.getConfiguration(methodName);
@@ -233,7 +233,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
                         .stream()
                         .map(e -> (Expression) e)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
                 return getMapEntriesDependency(arguments);

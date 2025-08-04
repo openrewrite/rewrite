@@ -109,7 +109,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-              
+
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
@@ -254,7 +254,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }

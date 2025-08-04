@@ -130,7 +130,7 @@ public class FindRepository extends Recipe {
                             url.equals(((J.Literal) assignment.getAssignment()).getValue())) {
                             return true;
                         } else if (assignment.getAssignment() instanceof J.MethodInvocation &&
-                                   ((J.MethodInvocation) assignment.getAssignment()).getSimpleName().equals("uri") &&
+                                   "uri".equals(((J.MethodInvocation) assignment.getAssignment()).getSimpleName()) &&
                                    ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof J.Literal &&
                                    url.equals(((J.Literal) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getValue())) {
                             return true;
@@ -142,12 +142,12 @@ public class FindRepository extends Recipe {
                     }
                 } else if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m1 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                    if (m1.getSimpleName().equals("setUrl") || m1.getSimpleName().equals("url")) {
+                    if ("setUrl".equals(m1.getSimpleName()) || "url".equals(m1.getSimpleName())) {
                         if (m1.getArguments().get(0) instanceof J.Literal &&
                             url.equals(((J.Literal) m1.getArguments().get(0)).getValue())) {
                             return true;
                         } else if (m1.getArguments().get(0) instanceof J.MethodInvocation &&
-                                   ((J.MethodInvocation) m1.getArguments().get(0)).getSimpleName().equals("uri") &&
+                                   "uri".equals(((J.MethodInvocation) m1.getArguments().get(0)).getSimpleName()) &&
                                    ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0) instanceof J.Literal &&
                                    url.equals(((J.Literal) ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0)).getValue())) {
                             return true;

@@ -66,7 +66,7 @@ public class NoStaticImport extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(m) && m.getSelect() == null && m.getMethodType() != null) {
                     // Do not replace calls to super() in constructors
-                    if (m.getName().getSimpleName().equals("super")) {
+                    if ("super".equals(m.getName().getSimpleName())) {
                         return m;
                     }
 

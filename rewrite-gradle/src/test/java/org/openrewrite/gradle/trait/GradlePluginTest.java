@@ -23,8 +23,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
-
+import static java.util.Collections.singletonList;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
@@ -262,7 +261,7 @@ class GradlePluginTest implements RewriteTest {
                   .name("name")
                   .version("version")
                   .path("path")
-                  .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+                  .plugins(singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
                   .build()
                 )
               )
@@ -289,7 +288,7 @@ class GradlePluginTest implements RewriteTest {
                   .name("name")
                   .version("version")
                   .path("path")
-                  .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+                  .plugins(singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
                   .build()
                 )
               )
@@ -689,7 +688,7 @@ class GradlePluginTest implements RewriteTest {
                   .name("name")
                   .version("version")
                   .path("path")
-                  .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+                  .plugins(singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
                   .build()
                 )
               )
@@ -716,7 +715,7 @@ class GradlePluginTest implements RewriteTest {
                   .name("name")
                   .version("version")
                   .path("path")
-                  .plugins(Collections.singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
+                  .plugins(singletonList(new GradlePluginDescriptor("org.openrewrite.gradle.GradlePlugin", "org.openrewrite.rewrite")))
                   .build()
                 )
               )

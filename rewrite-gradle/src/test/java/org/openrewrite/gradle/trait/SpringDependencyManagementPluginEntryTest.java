@@ -53,11 +53,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -77,11 +77,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'jakarta.validation:jakarta.validation-api:3.0.2'
@@ -112,7 +112,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -135,7 +135,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("jakarta.validation:jakarta.validation-api:3.0.2")
@@ -172,7 +172,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                 implementation platform("com.google.guava:guava:29.0-jre")
               }
@@ -190,7 +190,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                 implementation platform("com.google.guava:guava:29.0-jre")
               }
@@ -224,7 +224,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                 implementation(platform("com.google.guava:guava:29.0-jre"))
               }
@@ -243,7 +243,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                 implementation(platform("com.google.guava:guava:29.0-jre"))
               }
@@ -267,11 +267,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -293,11 +293,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'jakarta.validation:jakarta.validation-api:3.0.2'
@@ -330,7 +330,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -355,7 +355,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("jakarta.validation:jakarta.validation-api:3.0.2")
@@ -392,11 +392,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -416,11 +416,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'jakarta.validation:validation-api:2.0.1.Final'
@@ -458,7 +458,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -481,7 +481,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("jakarta.validation:validation-api:2.0.1.Final")
@@ -516,11 +516,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -540,11 +540,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:jakarta.validation-api:2.0.1.Final'
@@ -582,7 +582,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -605,7 +605,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:jakarta.validation-api:2.0.1.Final")
@@ -640,11 +640,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -664,11 +664,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.0.Final'
@@ -706,7 +706,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -729,7 +729,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.0.Final")
@@ -764,11 +764,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependencySet('javax.validation:2.0.1.Final') {
@@ -788,11 +788,11 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependencySet('jakarta.validation:2.0.1.Final') {
@@ -830,7 +830,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependencySet("javax.validation:2.0.1.Final") {
@@ -853,7 +853,7 @@ class SpringDependencyManagementPluginEntryTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependencySet("jakarta.validation:2.0.1.Final") {

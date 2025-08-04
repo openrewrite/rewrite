@@ -99,7 +99,7 @@ class RemovePluginDependencyTest implements RewriteTest {
                 <groupId>org.sample</groupId>
                 <artifactId>sample</artifactId>
                 <version>1.0.0</version>
-              
+
                 <build>
                   <plugins>
                     <plugin>

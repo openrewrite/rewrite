@@ -40,7 +40,7 @@ class PrintMavenAsDotTest implements RewriteTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
-              
+
               <dependencies>
                 <dependency>
                     <groupId>org.yaml</groupId>
@@ -83,7 +83,7 @@ class PrintMavenAsDotTest implements RewriteTest {
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
-              
+
               <dependencies>
                 <dependency>
                     <groupId>org.yaml</groupId>
@@ -130,7 +130,7 @@ class PrintMavenAsDotTest implements RewriteTest {
                         <groupId>org.springframework.cloud</groupId>
                         <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
                       </dependency>
-                  
+
                       <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-test</artifactId>

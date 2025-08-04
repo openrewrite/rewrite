@@ -145,7 +145,7 @@ class RemoveTrailingSemicolonTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Map;
-              
+
               class T
               """,
             """

@@ -88,7 +88,7 @@ class RemoveBuildPluginTest implements RewriteTest {
                       id "com.jfrog.bintray" version "1.0"
                   }
               }
-                            
+
               rootProject.name = "example"
               """
           )
@@ -111,7 +111,7 @@ class RemoveBuildPluginTest implements RewriteTest {
                   classpath "org.openrewrite:plugin:6.1.6"
                 }
               }
-                              
+
               apply plugin: "org.openrewrite.rewrite"
               """,
             """

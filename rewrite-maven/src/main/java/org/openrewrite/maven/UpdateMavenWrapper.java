@@ -38,8 +38,12 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -277,21 +281,21 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Override
     public Collection<SourceFile> generate(MavenWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         MavenWrapper mavenWrapper = getMavenWrapper(ctx);
         if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
             if (!(acc.addMavenWrapperJar || acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.OnlyScript) {
             if (!(acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         } else {
             if (!(acc.addMavenWrapperDownloader || acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         }
 
