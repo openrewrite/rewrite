@@ -23,7 +23,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.*;
 
@@ -211,7 +214,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
                         return fieldAccess;
                     }
-                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) : newAttributeValue;
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
+                            getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) :
+                            newAttributeValue;
                     //noinspection ConstantConditions
                     return ((J.Annotation) JavaTemplate
                             .apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal))
@@ -318,9 +323,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private String getAttributeValuesAsString() {
-        return getAttributeValues().stream()
-                .map(String::valueOf)
-                .collect(joining("\", \"", "{\"", "\"}"));
+        return getAttributeValues().stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
@@ -371,8 +374,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 .orElse(false);
     }
 
-    private Optional<JavaType.Method> findMethod(J.Annotation annotation, String methodName) {
-        return getMethods(annotation).stream().filter(it -> methodName.equals(it.getName())).findAny();
+    private static Optional<JavaType.Method> findMethod(J.Annotation annotation, String methodName) {
+        for (JavaType.Method it : getMethods(annotation)) {
+            if (methodName.equals(it.getName())) {
+                return Optional.of(it);
+            }
+        }
+        return Optional.empty();
     }
 
     private static List<JavaType.Method> getMethods(J.Annotation annotation) {
@@ -380,7 +388,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private boolean attributeNameOrValIsAlreadyPresent(Collection<Expression> expression, Collection<?> values) {
-        return expression.stream().anyMatch(e -> attributeNameOrValIsAlreadyPresent(e, values));
+        for (Expression e : expression) {
+            if (attributeNameOrValIsAlreadyPresent(e, values)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean attributeNameOrValIsAlreadyPresent(Expression e, Collection<?> values) {
