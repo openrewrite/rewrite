@@ -279,11 +279,7 @@ public class RewriteRpc implements AutoCloseable {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
                     ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-
-                    // If batch is empty, we're done
-                    if (ids.isEmpty()) {
-                        return false;
-                    }
+                    assert ids.size() == inputList.size();
                 }
 
                 // Process current item in batch
