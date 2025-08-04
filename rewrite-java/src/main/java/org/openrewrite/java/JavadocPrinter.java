@@ -456,6 +456,28 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitWildcard(J.Wildcard wildcard, PrintOutputCapture<P> p) {
+            beforeSyntax(wildcard, Space.Location.WILDCARD_PREFIX, p);
+            p.append('?');
+            if (wildcard.getPadding().getBound() != null) {
+                //noinspection ConstantConditions
+                switch (wildcard.getBound()) {
+                    case Extends:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("extends");
+                        break;
+                    case Super:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("super");
+                        break;
+                }
+            }
+            visit(wildcard.getBoundedType(), p);
+            afterSyntax(wildcard, p);
+            return wildcard;
+        }
+
+        @Override
         public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
             List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("JAVADOC_LINE_BREAKS");
             Integer index = getCursor().getNearestMessage("JAVADOC_LINE_BREAK_INDEX");
