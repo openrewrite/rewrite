@@ -596,8 +596,7 @@ public interface RewriteTest extends SourceSpecs {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
-                        assert result.getAfter() != null;
-                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getBefore().getSourcePath().toString();
                         String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
                         return "    " + beforePath + " | " + afterPath + " | " + status;
