@@ -33,6 +33,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 public class PlainTextParser implements Parser {
 
@@ -78,6 +79,11 @@ public class PlainTextParser implements Parser {
                         .fileAttributes(input.getFileAttributes())
                         .text(sourceStr)
                         .build();
+                
+                if (path.getFileName() != null && "package.json".equals(path.getFileName().toString())) {
+                    plainText = plainText.withMarkers(plainText.getMarkers().add(new NpmRcSettings(randomId())));
+                }
+                
                 parsingListener.parsed(input, plainText);
                 return plainText;
             } catch (Throwable t) {

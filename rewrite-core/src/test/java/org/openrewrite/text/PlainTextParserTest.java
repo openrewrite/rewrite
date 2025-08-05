@@ -19,14 +19,12 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Paths;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.text.Assertions.plainText;
 
 class PlainTextParserTest {
@@ -71,6 +69,28 @@ class PlainTextParserTest {
                   .path("package.json")
                   .afterRecipe(plainText -> {
                       assertThat(plainText.getMarkers().getMarkers()).isNotEmpty();
+                      assertThat(plainText.getMarkers().findFirst(NpmRcSettings.class)).isPresent();
+                  })
+              )
+            );
+        }
+
+        @Test
+        void packageJsonInSubdirectory() {
+            rewriteRun(
+              plainText(
+                """
+                {
+                  "name": "subproject",
+                  "version": "2.0.0",
+                  "description": "A subproject package"
+                }
+                """,
+                spec -> spec
+                  .path("some/nested/directory/package.json")
+                  .afterRecipe(plainText -> {
+                      assertThat(plainText.getMarkers().getMarkers()).isNotEmpty();
+                      assertThat(plainText.getMarkers().findFirst(NpmRcSettings.class)).isPresent();
                   })
               )
             );
