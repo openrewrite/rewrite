@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -1432,7 +1432,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("There is no way to determine right now to determine whether the `attributeValue` is meant as constant or as String value")
+    @Disabled("There is no way to determine right now to determine whether the `attributeValue` is meant as constant or as String value")
     @Test
     void updateConstantWithConstant() {
         rewriteRun(
@@ -1607,7 +1607,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             );
         }
 
-        @ExpectedToFail("We can't support this right now, as there is no reference to the actual string literal of the constant")
+        @Disabled("We can't support this right now, as there is no reference to the actual string literal of the constant")
         @Test
         void matchConstantLiteral() {
             rewriteRun(
