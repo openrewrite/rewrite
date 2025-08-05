@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -23,6 +24,7 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -219,6 +221,41 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               class A
+              """
+          )
+        );
+    }
+
+    @Disabled("We cannot use Java sources as dependencies in Kotlin sources yet")
+    @Test
+    void keepStarFoldWhenUsingStaticChildAndParentMembersFromJavaClasses() {
+        rewriteRun(
+          // This kind of setup is only possible in Java, as you cannot use star imports for companion object members
+          java(
+            """
+              package org.example;
+              public class Parent {
+                  public static void a() {}
+                  public static void b() {}
+              }
+              public class Child extends Parent {
+                   public static void x() {}
+                   public static void y() {}
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.Child.*
+              
+              class A {
+                  fun test() {
+                      a()
+                      b()
+                      x()
+                      y()
+                  }
+              }
               """
           )
         );
