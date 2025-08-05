@@ -15,14 +15,19 @@
  */
 package org.openrewrite.text;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Paths;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.text.Assertions.plainText;
 
 class PlainTextParserTest {
 
@@ -40,5 +45,35 @@ class PlainTextParserTest {
           .parseInputs(inputs, null, new InMemoryExecutionContext())
           .findFirst()
         ).containsInstanceOf(PlainText.class);
+    }
+
+    @Nested
+    class NpmTest implements RewriteTest {
+        @Test
+        void packageJson() {
+            rewriteRun(
+              plainText(
+                """
+                {
+                  "name": "hello-world",
+                  "version": "1.0.0",
+                  "description": "A simple hello world package",
+                  "main": "index.js",
+                  "scripts": {
+                    "test": "echo \\"Error: no test specified\\" && exit 1"
+                  },
+                  "keywords": ["hello", "world"],
+                  "author": "Tony Wroten",
+                  "license": "MIT"
+                }
+                """,
+                spec -> spec
+                  .path("package.json")
+                  .afterRecipe(plainText -> {
+                      assertThat(plainText.getMarkers().getMarkers()).isNotEmpty();
+                  })
+              )
+            );
+        }
     }
 }
