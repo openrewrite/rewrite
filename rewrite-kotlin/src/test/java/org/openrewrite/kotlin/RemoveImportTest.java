@@ -247,6 +247,7 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               import org.example.Child.*
+              import org.example.Child.a
               
               class A {
                   fun test() {
