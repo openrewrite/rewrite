@@ -147,7 +147,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;
                         } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
-                                methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
+                                   methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                             return unfoldStarImport(import_, methodsAndFieldsUsed);
                         }
