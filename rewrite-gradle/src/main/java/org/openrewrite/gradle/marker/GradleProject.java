@@ -21,8 +21,12 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.maven.DownloadingFunction;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.tree.*;
 
 import java.io.Serializable;
 import java.util.*;
@@ -39,7 +43,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @SuppressWarnings("unused")
 @Value
-@AllArgsConstructor(onConstructor_ = { @JsonCreator })
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
 public class GradleProject implements Marker, Serializable {
 
@@ -178,6 +182,112 @@ public class GradleProject implements Marker, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 configurations,
+                buildscript
+        );
+    }
+
+
+    public GradleProject removeDirectDependencies(Collection<GroupArtifact> gas, ExecutionContext ctx) throws MavenDownloadingException {
+        return mapConfigurations(
+                conf -> conf.removeDirectDependencies(gas, getMavenRepositories(), ctx),
+                ctx
+        );
+    }
+
+    /**
+     * Upgrade the specified dependency within all configurations.
+     */
+    public GradleProject upgradeDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
+        return mapConfigurations(
+                conf -> conf.upgradeDirectDependencies(gavs, getMavenRepositories(), ctx),
+                ctx
+        );
+    }
+
+    /**
+     * Upgrade the specified dependency within the specified configuration and all configurations which extend from that configuration.
+     */
+    public GradleProject upgradeDependencyVersion(String configuration, GroupArtifactVersion gav, ExecutionContext ctx) throws MavenDownloadingException {
+        return mapConfiguration(
+                configuration,
+                conf -> conf.upgradeDirectDependency(gav, getMavenRepositories(), ctx),
+                ctx);
+    }
+
+    /**
+     * Applies the specified mapping function to the named configuration and all configurations which extend from it.
+     * @param configuration name of the configuration to apply the mapping function to
+     * @param mapping mapping function which is expected to either return a new configuration with modifications or the original configuration unchanged
+     * @return a GradleProject marker with updated configurations, or the original GradleProject marker if no updates were made
+     * @throws MavenDownloadingException if problems were encountered downloading dependency information while applying the mapping function
+     */
+    public GradleProject mapConfiguration(
+            String configuration,
+            DownloadingFunction<GradleDependencyConfiguration, GradleDependencyConfiguration> mapping,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        GradleDependencyConfiguration original = getConfiguration(configuration);
+        if (original == null) {
+            return this;
+        }
+        GradleDependencyConfiguration updated = mapping.apply(original);
+        if (updated == original) {
+            return this;
+        }
+        Map<String, GradleDependencyConfiguration> nameToUpdatedConf = new HashMap<>();
+        nameToUpdatedConf.put(updated.getName(), updated);
+        for (GradleDependencyConfiguration conf : configurationsExtendingFrom(updated, true)) {
+            nameToUpdatedConf.put(conf.getName(), mapping.apply(conf));
+        }
+
+        HashMap<String, GradleDependencyConfiguration> finalUpdatedConfigurations = new HashMap<>(nameToConfiguration);
+        finalUpdatedConfigurations.putAll(nameToUpdatedConf);
+        // Update each configuration's "extendsFrom" so they aren't still pointing to the old, un-updated objects
+        for (GradleDependencyConfiguration descendant : finalUpdatedConfigurations.values()) {
+            descendant.unsafeSetExtendsFrom(ListUtils.map(descendant.getExtendsFrom(), it -> nameToUpdatedConf.getOrDefault(it.getName(), it)));
+        }
+        return new GradleProject(
+                id,
+                group,
+                name,
+                version,
+                path,
+                plugins,
+                mavenRepositories,
+                mavenPluginRepositories,
+                finalUpdatedConfigurations,
+                buildscript
+        );
+    }
+
+    public GradleProject mapConfigurations(
+            DownloadingFunction<GradleDependencyConfiguration, GradleDependencyConfiguration> mapping,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        Map<String, GradleDependencyConfiguration> updatedConfigurations = new HashMap<>(nameToConfiguration.size());
+        boolean anyUpdated = false;
+        for (GradleDependencyConfiguration configuration : getConfigurations()) {
+            GradleDependencyConfiguration mapped = mapping.apply(configuration);
+            anyUpdated |= mapped != configuration;
+            updatedConfigurations.put(mapped.getName(), mapped);
+        }
+        if (!anyUpdated) {
+            return this;
+        }
+        // Update each configuration's "extendsFrom" so they aren't still pointing to the old, un-updated objects
+        for (GradleDependencyConfiguration descendant : updatedConfigurations.values()) {
+            descendant.unsafeSetExtendsFrom(ListUtils.map(descendant.getExtendsFrom(), it -> updatedConfigurations.getOrDefault(it.getName(), it)));
+        }
+        return new GradleProject(
+                id,
+                group,
+                name,
+                version,
+                path,
+                plugins,
+                mavenRepositories,
+                mavenPluginRepositories,
+                updatedConfigurations,
                 buildscript
         );
     }

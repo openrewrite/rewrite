@@ -227,4 +227,11 @@ public class Pom {
     public boolean hasJarPackaging() {
         return JAR_PACKAGING_TYPES.contains(packaging);
     }
+
+    /**
+     * Represent the information in this pom as a Dependency.
+     */
+    public Dependency asDependency() {
+        return new Dependency(gav.asGroupArtifactVersion(), null, null, null, null, null);
+    }
 }

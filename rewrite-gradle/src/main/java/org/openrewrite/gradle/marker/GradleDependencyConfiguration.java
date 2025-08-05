@@ -21,8 +21,18 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.attributes.Attributed;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -30,6 +40,7 @@ import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -206,19 +217,19 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return new ArrayList<>(result);
     }
 
-    public @Nullable Dependency findRequestedDependency(String groupId, String artifactId) {
+    public @Nullable Dependency findRequestedDependency(@Nullable String groupId, String artifactId) {
         for (Dependency d : requested) {
             if (StringUtils.matchesGlob(d.getGav().getGroupId(), groupId) &&
-                    StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
+                StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
                 return d;
             }
         }
         return null;
     }
 
-    public @Nullable ResolvedDependency findResolvedDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedDependency findResolvedDependency(@Nullable String groupId, String artifactId) {
         for (ResolvedDependency d : directResolved) {
-            ResolvedDependency dependency = d.findDependency(groupId, artifactId);
+            ResolvedDependency dependency = d.findDependency(groupId == null ? "" : groupId, artifactId);
             if (dependency != null) {
                 return dependency;
             }
@@ -274,5 +285,114 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             results.putIfAbsent(new GroupArtifact(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
         }
         return new ArrayList<>(results.values());
+    }
+
+    public GradleDependencyConfiguration removeDirectDependencies(
+            Collection<GroupArtifact> gas,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        return mapDependencies(d -> {
+            for (GroupArtifact gav : gas) {
+                if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
+                    Objects.equals(d.getArtifactId(), gav.getArtifactId())) {
+                    return null;
+                }
+            }
+            return d;
+        }, repositories, ctx);
+    }
+
+    public GradleDependencyConfiguration upgradeDirectDependencies(
+            Collection<GroupArtifactVersion> gavs,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        return mapDependencies(d -> {
+            for (GroupArtifactVersion gav : gavs) {
+                if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
+                    Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
+                    !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
+                        return d.withGav(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+                }
+            }
+            return d;
+        }, repositories, ctx);
+    }
+
+    /**
+     * Produces a GradleDependencyConfiguration where dependencies with the specified GroupId and ArtifactId have been
+     * updated to use a new version number.
+     */
+    public GradleDependencyConfiguration upgradeDirectDependency(
+            GroupArtifactVersion gav,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        return mapDependencies(d -> {
+            if ( Objects.equals(d.getGroupId(), gav.getGroupId()) &&
+                 Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
+                 !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
+                return d.withGav(gav);
+            }
+            return d;
+        }, repositories, ctx);
+    }
+
+    /**
+     * Produce a new GradleDependencyConfiguration according to the supplied mapping function.
+     *
+     * @param mapping An arbitrary mapping function which is applied to the requested dependencies of the named configuration.
+     * @param repositories The repositories to resolve the new requested dependencies from.
+     * @param ctx the ExecutionContext of a recipe run suitable for retrieving HTTP communication and dependency caching configuration.
+     * @return A GradleDependencyConfiguration with its requested and resolved dependencies upgraded according to the mapping function.
+     *         Or the original GradleDependencyConfiguration if the mapping function made no changes.
+     * @throws MavenDownloadingException if there was a problem resolving the new requested dependencies.
+     */
+    public GradleDependencyConfiguration mapDependencies(
+            Function<Dependency, @Nullable Dependency> mapping,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        List<Dependency> newRequested = new ArrayList<>(requested.size());
+        Map<GroupArtifact, @Nullable Dependency> updated = new HashMap<>(requested.size());
+        for (Dependency dependency : requested) {
+            Dependency maybeUpdated = mapping.apply(dependency);
+            if (maybeUpdated != null) {
+                newRequested.add(maybeUpdated);
+            }
+            if (maybeUpdated != dependency) {
+                updated.put(dependency.getGav().asGroupArtifact(), maybeUpdated);
+            }
+        }
+        if(updated.isEmpty()) {
+            return this;
+        }
+
+        GradleDependencyConfiguration result = withRequested(newRequested);
+        if (isCanBeResolved) {
+            try {
+                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                List<ResolvedDependency> newResolved = new ArrayList<>(directResolved.size());
+                for (ResolvedDependency oldResolved : directResolved) {
+                    GroupArtifact ga = oldResolved.getGav().asGroupArtifact();
+                    if (updated.containsKey(ga)) {
+                        Dependency updatedRequest = updated.get(ga);
+                        if (updatedRequest != null) {
+                            newResolved.add(mpd.download(updatedRequest.getGav(), null, null, repositories)
+                                    .resolve(emptyList(), mpd, ctx)
+                                    .asResolvedDependency(Scope.Runtime, mpd, ctx));
+                        }
+                    } else {
+                        newResolved.add(oldResolved);
+                    }
+                }
+                result = result.withDirectResolved(newResolved);
+            } catch (MavenDownloadingExceptions e) {
+                throw e.getExceptions().get(0);
+            }
+        }
+
+        return result;
     }
 }
