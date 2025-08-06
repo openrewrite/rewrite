@@ -226,7 +226,7 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("link-to-companion-object-fixes")
+    @Disabled("First fix: https://github.com/openrewrite/rewrite/pull/5862")
     @Test
     void dontRemoveUsedParentMembers() {
         rewriteRun(

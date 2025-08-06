@@ -71,12 +71,13 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             for (J.Import cuImport : cu.getImports()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
                 if (fq != null) {
-                    originalImports.add(fq.getFullyQualifiedName().replace("$", "."));
+                    String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
+                    originalImports.add(fqnType);
                     // For Kotlin, there is the option star imports reference to Java types of superclasses
-                    if (type.equals(fq.getFullyQualifiedName())) {
+                    if (type.equals(fqnType)) {
                         while (fq.getSupertype() != null) {
                             fq = fq.getSupertype();
-                            typeWithSuperTypes.add(fq.toString());
+                            typeWithSuperTypes.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
                         }
                     }
                 }
@@ -91,16 +92,14 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             }
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                if (method.hasFlags(Flag.Static)) {
-                    String declaringType = method.getDeclaringType().getFullyQualifiedName();
-                    if (fullyQualifiedNamesAreEqual(declaringType, typeWithSuperTypes)) {
+                String declaringType = TypeUtils.toFullyQualifiedName(method.getDeclaringType().getFullyQualifiedName());
+                if (fullyQualifiedNamesAreEqual(declaringType, typeWithSuperTypes)) {
+                    methodsAndFieldsUsed.add(method.getName());
+                } else if (declaringType.equals(owner)) {
+                    if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
                         methodsAndFieldsUsed.add(method.getName());
-                    } else if (declaringType.equals(owner)) {
-                        if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
-                            methodsAndFieldsUsed.add(method.getName());
-                        } else {
-                            otherMethodsAndFieldsInTypeUsed.add(method.getName());
-                        }
+                    } else {
+                        otherMethodsAndFieldsInTypeUsed.add(method.getName());
                     }
                 }
             }
