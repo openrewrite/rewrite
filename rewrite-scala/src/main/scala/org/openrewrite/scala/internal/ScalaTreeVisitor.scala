@@ -4519,7 +4519,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // Extract arrow and spacing
     val arrowIndex = funcSource.indexOf("=>")
     var arrowPrefix = Space.EMPTY
-    if (arrowIndex > 0) {
+    if (arrowIndex >= 0) {
       // Find the space before =>
       var spaceStart = arrowIndex - 1
       while (spaceStart >= 0 && Character.isWhitespace(funcSource.charAt(spaceStart))) {
@@ -4528,11 +4528,12 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       if (spaceStart < arrowIndex - 1) {
         arrowPrefix = Space.format(funcSource.substring(spaceStart + 1, arrowIndex))
       }
-      // Move cursor past the arrow
-      cursor = Math.max(cursor, func.span.start + arrowIndex + 2 - offsetAdjustment)
+      // Move cursor to right after the arrow (past =>)
+      val arrowEndPos = func.span.start + arrowIndex + 2 - offsetAdjustment
+      cursor = arrowEndPos
     }
     
-    // Visit the lambda body
+    // Visit the lambda body - it will extract its own prefix including space after =>
     val body = visitTree(func.body)
     
     new J.Lambda(
