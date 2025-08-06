@@ -347,27 +347,84 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     )
   }
   
-  private def visitPostfixOp(postfixOp: untpd.PostfixOp): J.Unary = {
-    val prefix = extractPrefix(postfixOp.span)
-    
-    val expr = visitTree(postfixOp.od) match {
-      case e: Expression => e
-      case _ => return visitUnknown(postfixOp).asInstanceOf[J.Unary]
+  private def visitPostfixOp(postfixOp: untpd.PostfixOp): J = {
+    // Check if this is a member reference (method _)
+    postfixOp.op match {
+      case id: untpd.Ident if id.name.toString == "_" =>
+        // This is a member reference like "greet _"
+        // Extract prefix for the entire member reference expression
+        val prefix = extractPrefix(postfixOp.span)
+        
+        // Visit the containing expression (e.g., "greet")
+        // It already has its content, we just need to convert it to a J node
+        val expr = visitTree(postfixOp.od) match {
+          case id: J.Identifier => id.withPrefix(Space.EMPTY)
+          case fa: J.FieldAccess => fa.withPrefix(Space.EMPTY)
+          case mi: J.MethodInvocation => mi.withPrefix(Space.EMPTY)
+          case e: Expression => e  // For other expressions, keep as is
+          case _ => return visitUnknown(postfixOp)
+        }
+        
+        // Update cursor to the end of the expression to avoid duplication
+        updateCursor(postfixOp.span.end)
+        
+        // Extract the space between the method and underscore
+        // Use the od (operand) span and op span to find the space
+        val spaceBeforeUnderscore = if (postfixOp.od.span.exists && postfixOp.op.span.exists) {
+          val odEnd = postfixOp.od.span.end - offsetAdjustment
+          val opStart = postfixOp.op.span.start - offsetAdjustment
+          if (odEnd < opStart && odEnd >= 0 && opStart <= source.length) {
+            Space.format(source.substring(odEnd, opStart))
+          } else {
+            Space.SINGLE_SPACE
+          }
+        } else {
+          Space.SINGLE_SPACE
+        }
+        
+        // Create a member reference
+        new J.MemberReference(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          JRightPadded.build(expr),
+          null, // No type parameters for now
+          JLeftPadded.build(new J.Identifier(
+            Tree.randomId(),
+            spaceBeforeUnderscore,
+            Markers.EMPTY,
+            Collections.emptyList(),
+            "_",
+            null,
+            null
+          )),
+          null, // type
+          null, // method type
+          null  // variable type  
+        )
+        
+      case _ =>
+        // Other postfix operators - treat as unary for now
+        val prefix = extractPrefix(postfixOp.span)
+        
+        val expr = visitTree(postfixOp.od) match {
+          case e: Expression => e
+          case _ => return visitUnknown(postfixOp)
+        }
+        
+        // For postfix operators, we need to determine the operator type
+        // Currently only handling as PostDecrement (as a placeholder)
+        val operator = J.Unary.Type.PostDecrement // This is a placeholder
+        
+        new J.Unary(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          JLeftPadded.build(operator).withBefore(Space.EMPTY),
+          expr,
+          JavaType.Primitive.Boolean
+        )
     }
-    
-    // For postfix operators, we need to determine the operator type
-    // Currently only handling "!" as PostDecrement (as a placeholder)
-    // In a real implementation, we'd need to map specific postfix operators
-    val operator = J.Unary.Type.PostDecrement // This is a placeholder
-    
-    new J.Unary(
-      Tree.randomId(),
-      prefix,
-      Markers.EMPTY,
-      JLeftPadded.build(operator).withBefore(Space.EMPTY),
-      expr,
-      JavaType.Primitive.Boolean
-    )
   }
   
   private def mapPrefixOperator(op: String): J.Unary.Type = op match {
