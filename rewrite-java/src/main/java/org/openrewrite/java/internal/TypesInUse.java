@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeTree;
 
 import java.util.IdentityHashMap;
 import java.util.Objects;
@@ -73,6 +74,21 @@ public class TypesInUse {
                 return identifier;
             }
             return super.visitIdentifier(identifier, p);
+        }
+
+        @Override
+        public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, Integer integer) {
+            for (J j : parameters.getParameters()) {
+                if (j instanceof J.VariableDeclarations) {
+                    TypeTree typeExpression = ((J.VariableDeclarations) j).getTypeExpression();
+                    if (typeExpression == null || typeExpression instanceof J.Empty) {
+                        // Type is inferred, so no need to visit type to retain import statements
+                        return parameters;
+                    }
+                }
+                break; // only need to check the first parameter
+            }
+            return super.visitLambdaParameters(parameters, integer);
         }
 
         @Override
