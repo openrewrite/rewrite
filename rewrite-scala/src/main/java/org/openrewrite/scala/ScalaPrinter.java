@@ -722,6 +722,26 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+        // Check if this is function application syntax (arr(0) instead of arr.apply(0))
+        if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+            
+            // Print the select (e.g., "arr" or "println")
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            
+            // Print arguments directly with parentheses (no ".apply")
+            visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+            
+            afterSyntax(method, p);
+            return method;
+        }
+        
+        // For regular method calls, use the default Java printing
+        return super.visitMethodInvocation(method, p);
+    }
+    
+    @Override
     public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
         beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
         

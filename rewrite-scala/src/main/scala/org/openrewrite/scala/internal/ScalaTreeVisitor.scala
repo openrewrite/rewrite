@@ -246,6 +246,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       case sel: untpd.Select =>
         // Method call with dot notation like "obj.method(args)"
         visitMethodInvocation(app)
+      case id: untpd.Ident =>
+        // Function application syntax: func(args)
+        // This includes array access (arr(0)), function calls, and more
+        visitFunctionApplication(app, id)
       case _ =>
         // Other kinds of applications - for now treat as unknown
         visitUnknown(app)
@@ -455,6 +459,53 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     case "-" => J.Unary.Type.Negative
     case "~" => J.Unary.Type.Complement
     case _ => J.Unary.Type.Not // default
+  }
+  
+  private def visitFunctionApplication(app: untpd.Apply, id: untpd.Ident): J.MethodInvocation = {
+    val prefix = extractPrefix(app.span)
+    
+    // In Scala, arr(0) is syntactic sugar for arr.apply(0)
+    // We'll represent it as a method invocation with "apply" as the method name
+    
+    // The select is the identifier (e.g., "arr")
+    val select = visitIdent(id).asInstanceOf[Expression]
+    
+    // Visit the arguments
+    val args = new util.ArrayList[JRightPadded[Expression]]()
+    for ((arg, i) <- app.args.zipWithIndex) {
+      visitTree(arg) match {
+        case expr: Expression => 
+          val isLast = i == app.args.length - 1
+          args.add(JRightPadded.build(expr).withAfter(if (isLast) Space.EMPTY else Space.SINGLE_SPACE))
+        case _ => // Skip non-expressions
+      }
+    }
+    
+    // Create the method invocation
+    // We use "apply" as the method name since that's what Scala desugars to
+    val methodName = new J.Identifier(
+      Tree.randomId(),
+      Space.EMPTY,
+      Markers.EMPTY,
+      Collections.emptyList(),
+      "apply",
+      null,
+      null
+    )
+    
+    // Add a marker to indicate this is function application syntax
+    import org.openrewrite.scala.marker.FunctionApplication
+    
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.build(Collections.singletonList(FunctionApplication.create())),
+      JRightPadded.build(select),
+      null, // typeParameters
+      methodName,
+      JContainer.build(Space.EMPTY, args, Markers.EMPTY),
+      null  // method type
+    )
   }
   
   private def visitMethodInvocation(app: untpd.Apply): J = {
