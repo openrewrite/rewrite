@@ -265,8 +265,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                     }
 
                                                     for (GradleDependencyConfiguration config : all.keySet()) {
-                                                        if (c.allExtendsFrom().contains(config)) {
-                                                            return true;
+                                                        outer:
+                                                        for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
+                                                            if (gc.getName().equals(config.getName()) && gc.getRequested().size() == config.getRequested().size()) {
+                                                                for (int i = 0; i < gc.getRequested().size(); i++) {
+                                                                    if (!Objects.equals(gc.getRequested().get(i).getGroupId(), config.getRequested().get(i).getGroupId()) ||
+                                                                        !gc.getRequested().get(i).getArtifactId().equals(config.getRequested().get(i).getArtifactId())) {
+                                                                        continue outer;
+                                                                    }
+                                                                }
+                                                                return true;
+                                                            }
                                                         }
 
                                                         // TODO there has to be a better way!
