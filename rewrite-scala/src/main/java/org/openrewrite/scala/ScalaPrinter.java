@@ -677,6 +677,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
+        beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
+        
+        // Print the containing object
+        visitRightPadded(memberRef.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p);
+        
+        // In Scala, member references use space + underscore instead of ::
+        // e.g., "greet _" instead of "greet::apply"
+        visit(memberRef.getPadding().getReference().getElement(), p);
+        
+        afterSyntax(memberRef, p);
+        return memberRef;
+    }
+    
     public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
         beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
         

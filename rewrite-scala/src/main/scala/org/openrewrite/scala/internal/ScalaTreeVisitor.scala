@@ -78,6 +78,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       case ta: untpd.TypeApply => visitTypeApply(ta)
       case at: untpd.AppliedTypeTree => visitAppliedTypeTree(at)
       case func: untpd.Function => visitFunction(func)
+      case typed: untpd.Typed => visitTyped(typed)
       case _ => visitUnknown(tree)
     }
   }
@@ -1801,6 +1802,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     var beforeEquals = Space.EMPTY
     var initializer: Expression = null
     
+    if (vd.rhs != null && !vd.rhs.isEmpty) {
+      System.out.println(s"DEBUG visitValDef: vd.name=${vd.name}, vd.rhs=${vd.rhs}, rhs.class=${vd.rhs.getClass}, rhs.span=${vd.rhs.span}")
+    }
+    
     if (vd.rhs != null && !vd.rhs.isEmpty && vd.rhs.span.exists) {
       val rhsStart = Math.max(0, vd.rhs.span.start - offsetAdjustment)
       
@@ -1841,6 +1846,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         }
       }
     } else if (vd.rhs != null && vd.rhs.toString == "_") {
+      System.out.println(s"DEBUG visitValDef: Underscore initializer, vd.rhs=${vd.rhs}, class=${vd.rhs.getClass}")
       // Handle uninitialized var: var x: Int = _
       // Look for the underscore in source
       val underscoreIndex = source.indexOf('_', cursor)
@@ -3965,6 +3971,11 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
     
+    // Debug what's being marked as unknown
+    if (sourceText.contains("greet") || sourceText.contains("_")) {
+      System.out.println(s"DEBUG visitUnknown: sourceText='$sourceText', tree=$tree, tree.class=${tree.getClass}")
+    }
+    
     // Debug: Check if this is a New node
     if (tree.isInstanceOf[untpd.New]) {
       System.out.println(s"DEBUG visitUnknown for New: sourceText='$sourceText', tree=$tree, span=${tree.span}")
@@ -4299,6 +4310,47 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       null, // default value
       null  // method type
     )
+  }
+  
+  private def visitTyped(typed: untpd.Typed): J = {
+    System.out.println(s"DEBUG visitTyped: typed=$typed, expr=${typed.expr}, tpt=${typed.tpt}")
+    
+    // Check if this is a member reference pattern (expr _)
+    typed.tpt match {
+      case id: untpd.Ident if id.name.toString == "_" =>
+        // This is a member reference like "greet _"
+        val prefix = extractPrefix(typed.span)
+        
+        // Visit the expression part (the method/field being referenced)
+        val expr = visitTree(typed.expr) match {
+          case e: Expression => e
+          case _ => return visitUnknown(typed)
+        }
+        
+        // Create a member reference
+        new J.MemberReference(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          JRightPadded.build(expr),
+          null, // No type parameters for now
+          JLeftPadded.build(new J.Identifier(
+            Tree.randomId(),
+            Space.SINGLE_SPACE,
+            Markers.EMPTY,
+            Collections.emptyList(),
+            "_",
+            null,
+            null
+          )),
+          null, // type
+          null, // method type
+          null  // variable type  
+        )
+      case _ =>
+        // Other typed expressions - for now treat as unknown
+        visitUnknown(typed)
+    }
   }
   
   private def visitFunction(func: untpd.Function): J.Lambda = {
