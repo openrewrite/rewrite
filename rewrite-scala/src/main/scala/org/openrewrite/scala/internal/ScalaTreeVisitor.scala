@@ -1895,6 +1895,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               case unknown: J.Unknown => unknown.withPrefix(Space.format(afterEqualsStr))
               case nc: J.NewClass => nc.withPrefix(Space.format(afterEqualsStr))
               case lambda: J.Lambda => lambda.withPrefix(Space.format(afterEqualsStr))
+              case mr: J.MemberReference => mr.withPrefix(Space.format(afterEqualsStr))
               case _ => 
                 // For any other expression type, just return it as-is
                 rhsExpr
