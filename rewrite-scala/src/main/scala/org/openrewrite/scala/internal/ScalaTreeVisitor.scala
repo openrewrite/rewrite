@@ -1551,8 +1551,81 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     null
   }
   
-  private def visitValDef(vd: untpd.ValDef): J = {
+  private def visitLambdaParameter(vd: untpd.ValDef): J = {
     val prefix = extractPrefix(vd.span)
+    
+    // If there's no type, just return an identifier
+    if (vd.tpt == untpd.EmptyTree) {
+      new J.Identifier(
+        Tree.randomId(),
+        prefix,
+        Markers.EMPTY,
+        Collections.emptyList(),
+        vd.name.toString,
+        null,
+        null
+      )
+    } else {
+      // With a type, we need a full variable declaration
+      val name = new J.Identifier(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        Collections.emptyList(),
+        vd.name.toString,
+        null,
+        null
+      )
+      
+      // Extract the type
+      val sourceText = extractSource(vd.span)
+      val colonIdx = sourceText.indexOf(':')
+      val typeSpace = if (colonIdx >= 0 && colonIdx + 1 < sourceText.length) {
+        Space.format(sourceText.substring(colonIdx + 1).takeWhile(_.isWhitespace))
+      } else {
+        Space.SINGLE_SPACE
+      }
+      
+      val typeExpr: TypeTree = visitTree(vd.tpt) match {
+        case tt: TypeTree => tt.withPrefix(typeSpace)
+        case id: J.Identifier => id.withPrefix(typeSpace)
+        case _ => null
+      }
+      
+      // Create the variable
+      val variable = new J.VariableDeclarations.NamedVariable(
+        Tree.randomId(),
+        Space.EMPTY,
+        Markers.EMPTY,
+        name,
+        Collections.emptyList(),
+        null,
+        null
+      )
+      
+      // Create the variable declarations with a marker to indicate it's a lambda parameter
+      import org.openrewrite.scala.marker.LambdaParameter
+      new J.VariableDeclarations(
+        Tree.randomId(),
+        prefix,
+        Markers.build(Collections.singletonList(new LambdaParameter())),
+        Collections.emptyList(), // no annotations
+        Collections.emptyList(), // no modifiers
+        typeExpr,
+        null,
+        Collections.emptyList(),
+        Collections.singletonList(JRightPadded.build(variable))
+      )
+    }
+  }
+  
+  private def visitValDef(vd: untpd.ValDef, isLambdaParam: Boolean = false): J = {
+    val prefix = extractPrefix(vd.span)
+    
+    // For lambda parameters, don't look for val/var keywords
+    if (isLambdaParam) {
+      return visitLambdaParameter(vd)
+    }
     
     // Extract modifiers and keywords from source
     val adjustedStart = Math.max(0, vd.span.start - offsetAdjustment)
@@ -1759,6 +1832,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               case paren: J.Parentheses[_] => paren.withPrefix(Space.format(afterEqualsStr))
               case unknown: J.Unknown => unknown.withPrefix(Space.format(afterEqualsStr))
               case nc: J.NewClass => nc.withPrefix(Space.format(afterEqualsStr))
+              case lambda: J.Lambda => lambda.withPrefix(Space.format(afterEqualsStr))
               case _ => 
                 // For any other expression type, just return it as-is
                 rhsExpr
@@ -4228,6 +4302,9 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitFunction(func: untpd.Function): J.Lambda = {
+    System.out.println(s"DEBUG visitFunction: func=$func, span=${func.span}")
+    System.out.println(s"DEBUG visitFunction: args=${func.args}, body=${func.body}")
+    
     val prefix = extractPrefix(func.span)
     
     // Build lambda parameters
@@ -4249,31 +4326,14 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     for (i <- func.args.indices) {
       val param = func.args(i)
-      val paramTree = visitTree(param) match {
-        case vd: J.VariableDeclarations =>
-          // Convert VariableDeclarations to a simple parameter
-          if (vd.getVariables.size() == 1) {
-            val variable = vd.getVariables.get(0)
-            new J.VariableDeclarations(
-              vd.getId,
-              vd.getPrefix,
-              vd.getMarkers,
-              vd.getLeadingAnnotations,
-              vd.getModifiers,
-              vd.getTypeExpression,
-              null,
-              vd.getDimensionsBeforeName,
-              util.Arrays.asList(
-                JRightPadded.build(variable).withAfter(
-                  if (i < func.args.length - 1) Space.format(", ") else Space.EMPTY
-                )
-              )
-            )
-          } else {
-            vd
-          }
-        case other => other
+      // Visit parameter as lambda parameter
+      val paramTree = param match {
+        case vd: untpd.ValDef => visitLambdaParameter(vd)
+        case _ => visitTree(param)
       }
+      
+      paramTree
+      // Don't add any after space - the printer handles commas and spacing
       params.add(JRightPadded.build(paramTree))
     }
     

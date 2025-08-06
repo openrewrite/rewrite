@@ -495,6 +495,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         visit(multiVariable.getLeadingAnnotations(), p);
         
+        // Check if this is a lambda parameter - if so, don't print val/var
+        boolean isLambdaParam = multiVariable.getMarkers().findFirst(
+            org.openrewrite.scala.marker.LambdaParameter.class).isPresent();
+        
         // Print modifiers but handle final specially since Scala has val/var
         boolean isVal = false;
         boolean hasLazy = false;
@@ -529,8 +533,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append("lazy ");
         }
         
-        // Print val or var
-        p.append(isVal ? "val" : "var");
+        // Print val or var (unless it's a lambda parameter)
+        if (!isLambdaParam) {
+            p.append(isVal ? "val" : "var");
+        }
         
         // In Scala, variable declarations don't have a type at the declaration level
         // Each variable has its own type annotation
