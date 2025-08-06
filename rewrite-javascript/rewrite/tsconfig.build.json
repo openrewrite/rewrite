@@ -8,7 +8,6 @@
     "removeComments": true
   },
   "include": [
-    "src/**/*",
-    "test/**/*"
+    "src/**/*"
   ]
 }
