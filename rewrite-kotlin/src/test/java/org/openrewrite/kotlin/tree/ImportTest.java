@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
@@ -53,12 +54,12 @@ class ImportTest implements RewriteTest {
           kotlin("%s".formatted(_import),
             spec -> spec.afterRecipe(cu ->
               new KotlinIsoVisitor<Integer>() {
-                @Override
-                public J.Import visitImport(J.Import _import, Integer i) {
-                    assertThat(_import.isStatic()).isEqualTo(isStatic);
-                    return super.visitImport(_import, i);
-                }
-            }.visit(cu, 0)))
+                  @Override
+                  public J.Import visitImport(J.Import _import, Integer i) {
+                      assertThat(_import.isStatic()).isEqualTo(isStatic);
+                      return super.visitImport(_import, i);
+                  }
+              }.visit(cu, 0)))
         );
     }
 
@@ -83,7 +84,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.method
-
+              
               class A
               """
           )
@@ -111,7 +112,7 @@ class ImportTest implements RewriteTest {
             """
               import kotlin.collections.List as L
               import kotlin.collections.Set as S
-
+              
               class T
               """
           )
@@ -137,7 +138,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import kotlin . collections . List ;
-
+              
               class T
               """
           )
@@ -152,7 +153,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import Foo as Bar
-
+              
               class Test
               """
           )
@@ -179,6 +180,33 @@ class ImportTest implements RewriteTest {
             """
               import my.org.`$x`
               """
+          )
+        );
+    }
+
+    @Test
+    void superTypeInformation() {
+        rewriteRun(
+          kotlin(
+            """
+              package org.example
+              interface Shared {
+                  fun one() = "one"
+              }
+              class A {
+                  companion object : Shared
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.A.Companion.one
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                //noinspection DataFlowIssue
+                assertThat(TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getSupertype()).isNotNull();
+              }
+            )
           )
         );
     }
