@@ -2026,4 +2026,33 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotDowngradeVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+    
+              repositories {
+                  mavenCentral()
+              }
+    
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
 }
