@@ -24,7 +24,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeTree;
 
 import java.util.IdentityHashMap;
 import java.util.Objects;
