@@ -4493,18 +4493,59 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // Check if parameters are parenthesized by looking at the source
     val funcSource = extractSource(func.span)
     hasParentheses = funcSource.trim.startsWith("(")
+    val arrowIndex = funcSource.indexOf("=>")
     
     for (i <- func.args.indices) {
       val param = func.args(i)
-      // Visit parameter as lambda parameter
+      
+      // For parameters after the first, we need to handle the comma and space
+      if (i > 0) {
+        // Look for comma between previous and current parameter
+        val prevParam = func.args(i - 1)
+        val prevEnd = prevParam.span.end - offsetAdjustment
+        val currentStart = param.span.start - offsetAdjustment
+        
+        if (prevEnd < currentStart && prevEnd >= cursor && currentStart <= source.length) {
+          val between = source.substring(prevEnd, currentStart)
+          val commaIdx = between.indexOf(',')
+          if (commaIdx >= 0) {
+            // Move cursor past the comma
+            cursor = prevEnd + commaIdx + 1
+          }
+        }
+      }
+      
+      // Visit parameter as lambda parameter - it will extract its own prefix
       val paramTree = param match {
         case vd: untpd.ValDef => visitLambdaParameter(vd)
         case _ => visitTree(param)
       }
       
-      paramTree
-      // Don't add any after space - the printer handles commas and spacing
-      params.add(JRightPadded.build(paramTree))
+      // Extract space after the parameter (before comma or closing paren)
+      var afterSpace = Space.EMPTY
+      if (i < func.args.length - 1) {
+        // Not the last parameter, space before comma
+        val currentEnd = param.span.end - offsetAdjustment
+        if (currentEnd >= cursor) {
+          // Look for comma after this parameter
+          val searchStart = Math.max(cursor, currentEnd)
+          val commaSearchEnd = Math.min(searchStart + 20, source.length) // reasonable search distance
+          val searchStr = source.substring(searchStart, commaSearchEnd)
+          val commaIdx = searchStr.indexOf(',')
+          if (commaIdx >= 0) {
+            afterSpace = Space.format(searchStr.substring(0, commaIdx))
+            cursor = searchStart + commaIdx + 1
+          }
+        }
+      } else {
+        // Last parameter, look for space before closing paren
+        val paramEnd = param.span.end - offsetAdjustment
+        if (paramEnd >= cursor) {
+          cursor = paramEnd
+        }
+      }
+      
+      params.add(JRightPadded.build(paramTree).withAfter(afterSpace))
     }
     
     // Update parameters with the actual params
@@ -4516,8 +4557,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
       params
     )
     
-    // Extract arrow and spacing
-    val arrowIndex = funcSource.indexOf("=>")
+    // Extract arrow and spacing (arrowIndex already computed above)
     var arrowPrefix = Space.EMPTY
     if (arrowIndex >= 0) {
       // Find the space before =>
