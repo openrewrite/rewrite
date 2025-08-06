@@ -79,14 +79,12 @@ public class TypesInUse {
         @Override
         public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, Integer integer) {
             for (J j : parameters.getParameters()) {
-                if (j instanceof J.VariableDeclarations) {
-                    TypeTree typeExpression = ((J.VariableDeclarations) j).getTypeExpression();
-                    if (typeExpression == null || typeExpression instanceof J.Empty) {
-                        // Type is inferred, so no need to visit type to retain import statements
-                        return parameters;
-                    }
+                if (j instanceof J.VariableDeclarations && ((J.VariableDeclarations) j).getTypeExpression() == null) {
+                    // Type is inferred, so no need to visit type to retain import statements
+                    return parameters;
                 }
-                break; // only need to check the first parameter
+                // We only need to check the first parameter, as the rest will be using the same
+                break;
             }
             return super.visitLambdaParameters(parameters, integer);
         }
