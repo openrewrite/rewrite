@@ -20,6 +20,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -29,6 +30,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.ScalaForLoop;
+import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
 
 import java.util.List;
@@ -180,6 +182,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
             return visitScalaCompilationUnit((S.CompilationUnit) tree, p);
+        } else if (tree instanceof S.Wildcard) {
+            return visitWildcard((S.Wildcard) tree, p);
+        } else if (tree instanceof S.TuplePattern) {
+            return visitTuplePattern((S.TuplePattern) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -474,6 +480,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
+        // Check if this is an implicit return (last expression in a block)
+        if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+            // Print only the expression, not the return keyword
+            beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
+            visit(return_.getExpression(), p);
+            afterSyntax(return_, p);
+            return return_;
+        }
+        // Otherwise use the default Java printing
+        return super.visitReturn(return_, p);
+    }
+    
+    @Override
     public J visitForLoop(J.ForLoop forLoop, PrintOutputCapture<P> p) {
         // Check if this is a Scala range-based for loop
         ScalaForLoop marker = forLoop.getMarkers().findFirst(ScalaForLoop.class).orElse(null);
@@ -693,6 +713,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
         beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
+        
+        // Check if this is an underscore placeholder lambda
+        if (lambda.getMarkers().findFirst(UnderscorePlaceholderLambda.class).isPresent()) {
+            // For underscore placeholder lambdas, just print the body
+            // The underscores in the body will be printed as S.Wildcard
+            visit(lambda.getBody(), p);
+            afterSyntax(lambda, p);
+            return lambda;
+        }
         
         // Print lambda parameters
         J.Lambda.Parameters params = lambda.getParameters();

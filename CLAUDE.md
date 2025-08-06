@@ -7,6 +7,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Scala Language Support**: See [Scala.md](./Scala.md) for the implementation plan and progress tracking.
 - **Language Support Documentation**: As we implement Scala support, we're documenting the process in [Contributing Additional Language Support](./rewrite-docs/docs/authoring-recipes/contributing-language-support.md). This guide should be continuously updated with lessons learned during implementation.
 
+## CRITICAL PRINCIPLES - NEVER VIOLATE THESE
+
+### Never Regress from Rich Types to J.Unknown
+**ABSOLUTE RULE**: Once a syntax element has been mapped to a rich type (J.* or S.*), NEVER revert it back to J.Unknown. This is a fundamental architectural principle. J.Unknown should only be used for:
+1. Syntax we haven't implemented yet
+2. Temporary placeholders during initial development
+3. Truly unparseable or corrupted code
+
+If you find yourself wanting to use J.Unknown for something already mapped, you're doing it wrong. Instead:
+- Create a new S.* type if needed
+- Use markers to preserve special behavior
+- Extend existing J.* types with Scala-specific markers
+- Find a way to map it to existing rich types
+
+Going back to J.Unknown breaks type safety, loses semantic information, and makes the AST less useful for recipes.
+
 ## Project Overview
 
 OpenRewrite is an automated refactoring ecosystem for source code that eliminates technical debt through AST-based transformations. The project uses a visitor pattern architecture where **Recipes** define transformations and **TreeVisitors** traverse and modify Abstract Syntax Trees (ASTs).

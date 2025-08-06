@@ -22,16 +22,19 @@ import dotty.tools.dotc.core.Flags
 import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
+import org.openrewrite.java.marker.ImplicitReturn
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.Implicit
+import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.SObject
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.ScalaLazyVal
+import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.tree.S
 
 import java.util
-import java.util.{Collections, Arrays}
+import java.util.{Collections, Arrays, UUID}
 
 /**
  * Visitor that traverses the Scala compiler AST and builds OpenRewrite LST nodes.
@@ -40,6 +43,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   
   private var cursor = 0
   private var isInImportContext = false
+  private var currentSyntheticParams: Set[String] = Set.empty
   
   def getCursor: Int = cursor
   
@@ -162,10 +166,9 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         null, // type will be set later
         null  // variable will be set later
       )
-    } else if (simpleName == "_" || simpleName.startsWith("_$")) {
+    } else if (simpleName == "_" || (currentSyntheticParams.nonEmpty && currentSyntheticParams.contains(simpleName))) {
       // This is an expression wildcard for partially applied functions or pattern matching
-      // Also handle synthetic parameters like _$1, _$2 that the compiler generates
-      // Java constructor call with all fields
+      // Also handle synthetic parameters like _$1, _$2 when we're in an underscore placeholder context
       val wildcard = new S.Wildcard(
         Tree.randomId(),
         prefix,
@@ -1633,8 +1636,13 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   private def visitLambdaParameter(vd: untpd.ValDef): J = {
     val prefix = extractPrefix(vd.span)
     
-    // If there's no type, just return an identifier
-    if (vd.tpt == untpd.EmptyTree) {
+    // Check if the type was explicitly written in source or inferred
+    // If the source doesn't contain a colon after the name, it's inferred
+    val sourceText = extractSource(vd.span)
+    val hasExplicitType = sourceText.contains(":")
+    
+    // If there's no explicit type in source, just return an identifier
+    if (!hasExplicitType || vd.tpt == untpd.EmptyTree) {
       new J.Identifier(
         Tree.randomId(),
         prefix,
@@ -1882,7 +1890,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     var initializer: Expression = null
     
     if (vd.rhs != null && !vd.rhs.isEmpty) {
-      System.out.println(s"DEBUG visitValDef: vd.name=${vd.name}, vd.rhs=${vd.rhs}, rhs.class=${vd.rhs.getClass}, rhs.span=${vd.rhs.span}")
     }
     
     if (vd.rhs != null && !vd.rhs.isEmpty && vd.rhs.span.exists) {
@@ -1918,6 +1925,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               case nc: J.NewClass => nc.withPrefix(Space.format(afterEqualsStr))
               case lambda: J.Lambda => lambda.withPrefix(Space.format(afterEqualsStr))
               case mr: J.MemberReference => mr.withPrefix(Space.format(afterEqualsStr))
+              case tc: J.TypeCast => tc.withPrefix(Space.format(afterEqualsStr))
               case _ => 
                 // For any other expression type, just return it as-is
                 rhsExpr
@@ -1926,7 +1934,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         }
       }
     } else if (vd.rhs != null && vd.rhs.toString == "_") {
-      System.out.println(s"DEBUG visitValDef: Underscore initializer, vd.rhs=${vd.rhs}, class=${vd.rhs.getClass}")
       // Handle uninitialized var: var x: Int = _
       // Look for the underscore in source
       val underscoreIndex = source.indexOf('_', cursor)
@@ -2940,7 +2947,30 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // Handle the expression part of the block (if any)
     if (!block.expr.isEmpty) {
       visitTree(block.expr) match {
+        case expr: Expression =>
+          // In Scala, the last expression in a block is the return value
+          // Wrap it in a J.Return with ImplicitReturn marker
+          val implicitReturn = new J.Return(
+            Tree.randomId(),
+            expr.getPrefix(),
+            Markers.build(Collections.singletonList(new ImplicitReturn(UUID.randomUUID()))),
+            expr.withPrefix(Space.EMPTY)
+          )
+          
+          // Extract space before closing brace
+          val exprEnd = Math.max(0, block.expr.span.end - offsetAdjustment)
+          val blockEnd = Math.max(0, block.span.end - offsetAdjustment)
+          var endSpace = Space.EMPTY
+          if (exprEnd < blockEnd && cursor <= exprEnd) {
+            val remaining = source.substring(exprEnd, blockEnd)
+            val braceIndex = remaining.lastIndexOf('}')
+            if (braceIndex > 0) {
+              endSpace = Space.format(remaining.substring(0, braceIndex))
+            }
+          }
+          statements.add(JRightPadded.build(implicitReturn.asInstanceOf[Statement]).withAfter(endSpace))
         case stmt: Statement => 
+          // If it's already a statement (like a variable declaration), just add it
           // Extract space before closing brace
           val exprEnd = Math.max(0, block.expr.span.end - offsetAdjustment)
           val blockEnd = Math.max(0, block.span.end - offsetAdjustment)
@@ -3638,26 +3668,35 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
         if (sel.name.toString == "asInstanceOf" && ta.args.size == 1) {
           // This is a type cast operation: obj.asInstanceOf[Type]
           
-          // For TypeCast, we need to extract prefix carefully
-          // The prefix should be any whitespace before the entire expression
-          val startPos = Math.max(0, ta.span.start - offsetAdjustment)
-          val prefix = if (startPos > cursor && startPos <= source.length) {
-            Space.format(source.substring(cursor, startPos))
-          } else {
-            Space.EMPTY
-          }
-          
-          // Update cursor to start of the expression (sel.qualifier)
-          cursor = Math.max(0, sel.qualifier.span.start - offsetAdjustment)
-          
-          // Visit the expression being cast
+          // Visit the expression being cast (with its own prefix)
+          // The expression (sel.qualifier) is the object before .asInstanceOf
           val expr = visitTree(sel.qualifier) match {
             case e: Expression => e
             case _ => return visitUnknown(ta)
           }
           
-          // Update cursor to start of type argument
-          cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
+          // Update cursor past ".asInstanceOf"
+          val asInstanceOfEnd = sel.span.end
+          if (asInstanceOfEnd > cursor) {
+            cursor = asInstanceOfEnd
+          }
+          
+          // Now handle the type argument in brackets
+          // Extract any space before the opening bracket
+          val typeArgStart = ta.args.head.span.start - offsetAdjustment
+          val spaceBeforeBracket = if (cursor < typeArgStart && typeArgStart <= source.length) {
+            val between = source.substring(cursor, typeArgStart)
+            // Find the bracket position
+            val bracketPos = between.indexOf('[')
+            if (bracketPos >= 0) {
+              cursor = cursor + bracketPos + 1  // Move past the bracket
+              Space.format(between.substring(0, bracketPos))
+            } else {
+              Space.EMPTY
+            }
+          } else {
+            Space.EMPTY
+          }
           
           // Visit the target type
           val targetType = visitTree(ta.args.head) match {
@@ -3665,16 +3704,18 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
             case _ => return visitUnknown(ta)
           }
           
-          // Update cursor to the end of the TypeApply to consume the entire expression
-          updateCursor(ta.span.end)
+          // Update cursor past the closing bracket
+          if (ta.span.end > cursor) {
+            cursor = ta.span.end
+          }
           
           return new J.TypeCast(
             Tree.randomId(),
-            prefix,
+            Space.EMPTY,  // TypeCast itself has no prefix - the space is handled by the variable initializer
             Markers.EMPTY,
             new J.ControlParentheses[TypeTree](
               Tree.randomId(),
-              Space.EMPTY,
+              spaceBeforeBracket,
               Markers.EMPTY,
               JRightPadded.build(targetType)
             ),
@@ -4393,7 +4434,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitTyped(typed: untpd.Typed): J = {
-    System.out.println(s"DEBUG visitTyped: typed=$typed, expr=${typed.expr}, tpt=${typed.tpt}")
     
     // Check if this is a member reference pattern (expr _)
     typed.tpt match {
@@ -4434,45 +4474,93 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitFunction(func: untpd.Function): J = {
-    System.out.println(s"DEBUG visitFunction: func=$func, span=${func.span}")
-    System.out.println(s"DEBUG visitFunction: args=${func.args}, body=${func.body}")
     
-    // Check if this is a partially applied function
+    // Check if this is a partially applied function or underscore placeholder lambda
     // In Scala, `add(5, _)` is parsed as Function(List(_$1), Apply(add, List(5, _$1)))
-    // We need to detect this pattern and handle it specially
-    func.body match {
-      case app: untpd.Apply =>
-        // Get the parameter names generated by the compiler (like _$1, _$2, etc.)
-        val syntheticParams = func.args.collect {
-          case vd: untpd.ValDef if vd.name.toString.startsWith("_$") => vd.name.toString
-        }.toSet
-        
-        // Check if the Apply contains these synthetic parameters
-        var hasSyntheticParams = false
-        def checkForSyntheticParams(tree: untpd.Tree): Unit = tree match {
-          case id: untpd.Ident if syntheticParams.contains(id.name.toString) =>
-            hasSyntheticParams = true
+    // Also `_ * 2` is parsed as Function(List(_$1), InfixOp(_$1, *, 2))
+    // We need to detect these patterns and handle them specially
+    
+    // Get the parameter names generated by the compiler (like _$1, _$2, etc.)
+    val syntheticParams = func.args.collect {
+      case vd: untpd.ValDef if vd.name.toString.startsWith("_$") => vd.name.toString
+    }.toSet
+    
+    if (syntheticParams.nonEmpty) {
+      // Check if the source contains actual underscore placeholders
+      val funcSource = extractSource(func.span)
+      val hasUnderscorePlaceholder = funcSource.contains("_")
+      
+      // If we have synthetic params and underscore in source, it's likely a placeholder lambda
+      // These should be treated as regular lambdas but we skip the synthetic param
+      if (hasUnderscorePlaceholder) {
+        func.body match {
+          case app: untpd.Apply =>
+            // This might be a partially applied function like add(5, _)
+            // Check if it's a method invocation with underscore arguments
+            var hasPartialApplication = false
+            app.args.foreach {
+              case id: untpd.Ident if syntheticParams.contains(id.name.toString) =>
+                hasPartialApplication = true
+              case _ =>
+            }
+            
+            if (hasPartialApplication) {
+              // Partially applied function - return the method invocation
+              val prefix = extractPrefix(func.span)
+              val result = visitApply(app)
+              result match {
+                case mi: J.MethodInvocation => return mi.withPrefix(prefix)
+                case _ => return result
+              }
+            }
           case _ =>
-            // Could recurse here but for now just check top level
+            // For other cases like `_ * 2`, this is an underscore placeholder lambda
+            // We need to create a proper lambda with S.Wildcard in the body
+            val prefix = extractPrefix(func.span)
+            
+            // Set a flag to indicate we're in an underscore placeholder context
+            val oldSyntheticParams = currentSyntheticParams
+            currentSyntheticParams = syntheticParams
+            
+            // Visit the body - the visitIdent method will now create S.Wildcard for synthetic params
+            val body = visitTree(func.body)
+            
+            // Restore the flag
+            currentSyntheticParams = oldSyntheticParams
+            
+            // Create a wildcard parameter for the lambda parameter list
+            val wildcard = new S.Wildcard(
+              Tree.randomId(),
+              Space.EMPTY,
+              Markers.EMPTY,
+              null
+            )
+            
+            val params = new util.ArrayList[JRightPadded[J]]()
+            params.add(JRightPadded.build(wildcard))
+            
+            val parameters = new J.Lambda.Parameters(
+              Tree.randomId(),
+              Space.EMPTY,
+              Markers.EMPTY,
+              false, // no parentheses for underscore syntax
+              params
+            )
+            
+            // Create lambda with the underscore placeholder marker
+            val lambda = new J.Lambda(
+              Tree.randomId(),
+              prefix,
+              Markers.build(Collections.singletonList(new UnderscorePlaceholderLambda(UUID.randomUUID()))),
+              parameters,
+              Space.EMPTY, // no space before => for underscore syntax
+              body,
+              null
+            )
+            
+            return lambda
         }
-        
-        app.args.foreach(checkForSyntheticParams)
-        
-        if (hasSyntheticParams && syntheticParams.nonEmpty) {
-          // This is a partially applied function
-          // We need to replace synthetic parameter references with S.Wildcard
-          val prefix = extractPrefix(func.span)
-          
-          // Visit the Apply but we'll handle the synthetic params specially
-          val result = visitApply(app)
-          
-          // Apply the prefix from the function to the result
-          result match {
-            case mi: J.MethodInvocation => return mi.withPrefix(prefix)
-            case _ => return result
-          }
-        }
-      case _ =>
+      }
     }
     
     val prefix = extractPrefix(func.span)
