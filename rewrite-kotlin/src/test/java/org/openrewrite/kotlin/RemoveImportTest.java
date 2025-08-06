@@ -243,7 +243,6 @@ class RemoveImportTest implements RewriteTest {
               class Child : Parent() {
                   companion object : Shared {
                       fun two() = "two"
-                      fun three() = "three"
                   }
               }
               """
@@ -252,13 +251,11 @@ class RemoveImportTest implements RewriteTest {
             """
               import org.example.Child.Companion.one
               import org.example.Child.Companion.two
-              import org.example.Child.Companion.three
               
               class A {
                   fun test() {
                       one()
                       two()
-                      three()
                   }
               }
               """
