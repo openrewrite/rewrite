@@ -57,7 +57,7 @@ public class DependencyPluginGoalResolveSources extends Recipe {
             }
 
             private boolean isPlugInVersionInRange() {
-                Cursor pluginCursor = getCursor().dropParentUntil(i -> i instanceof Xml.Tag && ((Xml.Tag) i).getName().equals("plugin"));
+                Cursor pluginCursor = getCursor().dropParentUntil(i -> i instanceof Xml.Tag && "plugin".equals(((Xml.Tag) i).getName()));
                 Xml.Tag pluginTag = pluginCursor.getValue();
                 Plugin plugin = findPlugin(pluginTag);
                 if (plugin == null || plugin.getVersion() == null) {

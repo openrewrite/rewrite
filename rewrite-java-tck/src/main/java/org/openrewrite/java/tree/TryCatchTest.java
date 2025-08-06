@@ -189,8 +189,8 @@ class TryCatchTest implements RewriteTest {
         );
     }
 
-    @MinimumJava11
     @Issue("https://github.com/openrewrite/rewrite/issues/763")
+    @MinimumJava11
     @Test
     void tryWithResourcesIdentifier() {
         rewriteRun(
@@ -209,8 +209,8 @@ class TryCatchTest implements RewriteTest {
         );
     }
 
-    @MinimumJava11
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
+    @MinimumJava11
     @Test
     void tryWithResourcesIdentifierAndVariables() {
         rewriteRun(
@@ -219,7 +219,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-              
+
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");
@@ -232,9 +232,9 @@ class TryCatchTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("UnnecessarySemicolon")
-    @MinimumJava11
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
+    @MinimumJava11
+    @SuppressWarnings("UnnecessarySemicolon")
     @Test
     void tryWithResourcesIdentifierAndSemicolon() {
         rewriteRun(
@@ -243,7 +243,7 @@ class TryCatchTest implements RewriteTest {
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
-              
+
               class A {
                   void a() throws Exception {
                       FileInputStream fis = new FileInputStream("file.txt");

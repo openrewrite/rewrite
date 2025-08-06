@@ -29,17 +29,14 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddOrUpdateChild;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toCollection;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.RemoveRedundantDependencyVersions.Comparator.GTE;
 import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
@@ -120,10 +117,10 @@ public class ChangeParentPom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, "
-                + "and updating it to a new groupId, artifactId, version, and optional relativePath. "
-                + "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. "
-                + "Removes redundant dependency versions already managed by the new parent.";
+        return "Change the parent pom of a Maven pom.xml by matching the existing parent via groupId and artifactId, " +
+                "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
+                "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
+                "Removes redundant dependency versions already managed by the new parent.";
     }
 
     @Override
@@ -214,7 +211,7 @@ public class ChangeParentPom extends Recipe {
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
                             Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
-                                if (!newParentProps.containsKey(propInUse.getKey())) {
+                                if (!newParentProps.containsKey(propInUse.getKey()) && propInUse.getValue() != null) {
                                     changeParentTagVisitors.add(new AddPropertyVisitor(propInUse.getKey(), propInUse.getValue(), false));
                                 }
                             }
@@ -330,7 +327,7 @@ public class ChangeParentPom extends Recipe {
 
             private boolean isGlobalProperty(String propertyName) {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
-                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                        propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
         }.reduce(pomXml, new HashMap<>());
     }
@@ -375,7 +372,7 @@ public class ChangeParentPom extends Recipe {
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
                 .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                .collect(Collectors.toSet());
+                .collect(toSet());
 
         return depsWithoutExplicitVersion.stream()
                 .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))

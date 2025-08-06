@@ -23,10 +23,10 @@ import org.openrewrite.java.tree.JavaType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 /**
@@ -436,7 +436,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                     }
                 }
             } else {
-                defaultValues = Collections.singletonList(method.getDefaultValue().toString());
+                defaultValues = singletonList(method.getDefaultValue().toString());
             }
         }
 

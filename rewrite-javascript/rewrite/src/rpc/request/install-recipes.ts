@@ -87,7 +87,12 @@ export class InstallRecipes {
             }
 
             if (typeof recipeModule.activate === "function") {
-                recipeModule.activate(registry);
+                // noinspection JSVoidFunctionReturnValueUsed
+                const activatePromise = recipeModule.activate(registry);
+                // noinspection SuspiciousTypeOfGuard
+                if (activatePromise instanceof Promise) {
+                    await activatePromise;
+                }
             } else {
                 throw new Error(`${recipesName} does not export an 'activate' function`);
             }

@@ -300,7 +300,6 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
     @Override
     public J visitIntersectionType(J.IntersectionType intersectionType, RpcSendQueue q) {
         q.getAndSend(intersectionType, i -> i.getPadding().getBounds(), bounds -> visitContainer(bounds, q));
-        q.getAndSend(intersectionType, a -> asRef(a.getType()), type -> visitType(getValueNonNull(type), q));
         return intersectionType;
     }
 

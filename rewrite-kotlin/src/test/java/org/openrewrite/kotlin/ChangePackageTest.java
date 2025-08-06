@@ -50,14 +50,14 @@ class ChangePackageTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type = Original()
               }
               """,
             """
               import x.y.Original
-              
+
               class A {
                   val type = Original()
               }
@@ -185,14 +185,14 @@ class ChangePackageTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A() : Original() {
                     constructor(s1: String): this()
               }
               """,
             """
               import x.y.Original
-              
+
               class A() : Original() {
                     constructor(s1: String): this()
               }

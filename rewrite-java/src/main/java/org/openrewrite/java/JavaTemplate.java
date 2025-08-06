@@ -34,10 +34,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
+
+import static java.util.Collections.addAll;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
@@ -249,7 +250,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public Builder genericTypes(String... genericTypes) {
-            Collections.addAll(this.genericTypes, genericTypes);
+            addAll(this.genericTypes, genericTypes);
             return this;
         }
 

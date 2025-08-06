@@ -32,6 +32,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -250,7 +251,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
                     MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
-                            .resolve(Collections.emptyList(), mpd, ctx);
+                            .resolve(emptyList(), mpd, ctx);
                     ResolvedManagedDependency parentManagedVersion = parentPom.getDependencyManagement().stream()
                             .filter(dep -> dep.getGroupId().equals(d.getGroupId()) && dep.getArtifactId().equals(d.getArtifactId()))
                             .findFirst()
@@ -300,7 +301,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     GroupArtifactVersion parentGav = mrr.getPom().getRequested().getParent().getGav();
                     MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
                     ResolvedPom parentPom = mpd.download(parentGav, null, mrr.getPom(), mrr.getPom().getRepositories())
-                            .resolve(Collections.emptyList(), mpd, ctx);
+                            .resolve(emptyList(), mpd, ctx);
                     return parentPom.getPluginManagement().stream()
                             .filter(plugin -> plugin.getGroupId().equals(p.getGroupId()) && plugin.getArtifactId().equals(p.getArtifactId()))
                             .findFirst()

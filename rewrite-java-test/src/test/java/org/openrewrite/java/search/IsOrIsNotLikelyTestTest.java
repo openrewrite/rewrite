@@ -68,7 +68,7 @@ public class IsOrIsNotLikelyTestTest {
         @Language("java")
         String JUNIT_TEST_INITIAL = """
           import org.junit.jupiter.api.Test;
-                    
+
           class TestTest {
             @Test
             void test() {}
@@ -78,7 +78,7 @@ public class IsOrIsNotLikelyTestTest {
         @Language("java")
         String JUNIT_TEST_SEARCH_RESULT = """
           /*~~>*/import org.junit.jupiter.api.Test;
-                    
+
           class TestTest {
             @Test
             void test() {}
@@ -127,8 +127,8 @@ public class IsOrIsNotLikelyTestTest {
             );
         }
 
-        @Test
         @SuppressWarnings("SpellCheckingInspection")
+        @Test
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainNoChanges()),
@@ -184,8 +184,8 @@ public class IsOrIsNotLikelyTestTest {
             );
         }
 
-        @Test
         @SuppressWarnings("SpellCheckingInspection")
+        @Test
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
               srcMainJava(assertMainIsFound()),

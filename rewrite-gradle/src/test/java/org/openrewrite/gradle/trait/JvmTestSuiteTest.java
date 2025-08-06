@@ -26,13 +26,12 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.trait.Traits.jvmTestSuite;
 
 class JvmTestSuiteTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(RewriteTest.toRecipe(() -> jvmTestSuite().asVisitor(suite ->
+          .recipe(RewriteTest.toRecipe(() -> new JvmTestSuite.Matcher().asVisitor(suite ->
             SearchResult.found(suite.getTree()))));
     }
 
@@ -48,17 +47,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -72,17 +71,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           /*~~>*/test {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -98,7 +97,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void findByName() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> jvmTestSuite().name("integrationTest").asVisitor(suite ->
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new JvmTestSuite.Matcher().name("integrationTest").asVisitor(suite ->
                 SearchResult.found(suite.getTree())))),
               buildGradle(
                 """
@@ -106,17 +105,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -130,17 +129,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -156,7 +155,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void addDependency() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> jvmTestSuite().asVisitor((suite, ctx) ->
+              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
                 suite.addDependency("implementation", "com.google.guava", "guava", "29.0-jre", null, null, null, new MavenMetadataFailures(recipe), null, ctx).visitNonNull(suite.getTree(), ctx, suite.getCursor().getParentOrThrow())))),
               buildGradle(
                 """
@@ -164,17 +163,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -188,21 +187,21 @@ class JvmTestSuiteTest implements RewriteTest {
                       id "java"
                       id "jvm-test-suite"
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
                               useJUnitJupiter()
-                  
+
                               dependencies {
                                   implementation "com.google.guava:guava:29.0-jre"
                               }
                           }
-                  
+
                           integrationTest(JvmTestSuite) {
                               dependencies {
                                   implementation project()
@@ -229,23 +228,23 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
                               }
                           }
-                  
+
                           val functionalTest by registering(JvmTestSuite::class) {
                               dependencies {
                                   implementation(project())
@@ -259,23 +258,23 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           /*~~>*/val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
                               }
                           }
-                  
+
                           /*~~>*/val functionalTest by registering(JvmTestSuite::class) {
                               dependencies {
                                   implementation(project())
@@ -291,7 +290,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void findByName() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(() -> jvmTestSuite().name("integrationTest").asVisitor(suite ->
+              spec -> spec.recipe(RewriteTest.toRecipe(() -> new JvmTestSuite.Matcher().name("integrationTest").asVisitor(suite ->
                 SearchResult.found(suite.getTree())))),
               buildGradleKts(
                 """
@@ -299,17 +298,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -323,17 +322,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           /*~~>*/register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -349,7 +348,7 @@ class JvmTestSuiteTest implements RewriteTest {
         @Test
         void addDependency() {
             rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> jvmTestSuite().asVisitor((suite, ctx) ->
+              spec -> spec.recipe(RewriteTest.toRecipe((recipe) -> new JvmTestSuite.Matcher().asVisitor((suite, ctx) ->
                 suite.addDependency("implementation", "com.google.guava", "guava", "29.0-jre", null, null, null, new MavenMetadataFailures(recipe), null, ctx).visitNonNull(suite.getTree(), ctx, suite.getCursor().getParentOrThrow())))),
               buildGradleKts(
                 """
@@ -357,17 +356,17 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())
@@ -381,21 +380,21 @@ class JvmTestSuiteTest implements RewriteTest {
                       java
                       `jvm-test-suite`
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           val test by getting(JvmTestSuite::class) {
                               useJUnitJupiter()
-                  
+
                               dependencies {
                                   implementation("com.google.guava:guava:29.0-jre")
                               }
                           }
-                  
+
                           register<JvmTestSuite>("integrationTest") {
                               dependencies {
                                   implementation(project())

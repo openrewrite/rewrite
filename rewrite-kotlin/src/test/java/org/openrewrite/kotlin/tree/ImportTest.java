@@ -43,11 +43,11 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "import kotlin.collections.List,false",
       "import java.util.regex.Pattern.CASE_INSENSITIVE,true",
     })
+    @ParameterizedTest
     void staticImports(String _import, Boolean isStatic) {
         rewriteRun(
           kotlin("%s".formatted(_import),
@@ -83,7 +83,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import a.b.method
-              
+
               class A
               """
           )
@@ -111,7 +111,7 @@ class ImportTest implements RewriteTest {
             """
               import kotlin.collections.List as L
               import kotlin.collections.Set as S
-              
+
               class T
               """
           )
@@ -137,7 +137,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import kotlin . collections . List ;
-              
+
               class T
               """
           )
@@ -152,7 +152,7 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               import Foo as Bar
-              
+
               class Test
               """
           )

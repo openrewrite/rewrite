@@ -251,4 +251,50 @@ class UpgradeParentVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5707")
+    @Test
+    void upgradeParentWithCIFriendlyVersionsAndNullProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion("org.openrewrite", "rewrite-bom", "8.56.0", null, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-bom</artifactId>
+                  <version>8.55.0</version>
+                </parent>
+                <groupId>foo</groupId>
+                <artifactId>bar</artifactId>
+                <version>${revision}${sha1}${changelist}</version>
+                <properties>
+                  <revision>1.2.3</revision>
+                  <changelist>-SNAPSHOT</changelist>
+                  <sha1 />
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-bom</artifactId>
+                  <version>8.56.0</version>
+                </parent>
+                <groupId>foo</groupId>
+                <artifactId>bar</artifactId>
+                <version>${revision}${sha1}${changelist}</version>
+                <properties>
+                  <revision>1.2.3</revision>
+                  <changelist>-SNAPSHOT</changelist>
+                  <sha1 />
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
 }

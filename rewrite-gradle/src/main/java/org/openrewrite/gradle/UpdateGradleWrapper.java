@@ -42,6 +42,7 @@ import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
@@ -99,7 +100,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
                     "When this option is set, the version and distribution fields must not be specified — only one source of truth is allowed. The URI should point to a valid and reachable Gradle wrapper distribution (typically a .zip archive containing the wrapper files).\n" +
-                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" + 
+                    "This is particularly helpful in environments where access to Gradle's central services is restricted or where custom Gradle wrapper setups are required.\n" +
                     "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
@@ -139,7 +140,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 return gradleWrapper = GradleWrapper.create(URI.create(wrapperUri), ctx);
             }
             try {
-                gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
+                gradleWrapper = GradleWrapper.create(distribution, version, ctx);
             } catch (Exception e) {
                 // services.gradle.org is unreachable
                 // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
@@ -286,15 +287,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public Collection<SourceFile> generate(GradleWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         if (!acc.gradleProject) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         if (!(acc.addGradleWrapperJar || acc.addGradleWrapperProperties || acc.addGradleBatchScript || acc.addGradleShellScript)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<SourceFile> gradleWrapperFiles = new ArrayList<>();
@@ -475,9 +476,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         script = script.replace("\\$", "$");
         script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
         script = script.replace("\\\\", "\\");
-        script = script.replaceAll("\r\n|\r|\n", lineSeparator);
-
-        return script;
+        return script.replaceAll("\r\n|\r|\n", lineSeparator);
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

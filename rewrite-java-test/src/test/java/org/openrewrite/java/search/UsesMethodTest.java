@@ -66,7 +66,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               import java.util.Collections;
               import java.util.concurrent.ConcurrentHashMap;
@@ -84,7 +84,7 @@ class UsesMethodTest implements RewriteTest {
           java(
             """
               package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();
@@ -92,7 +92,7 @@ class UsesMethodTest implements RewriteTest {
               """,
             """
               /*~~>*/package abc;
-                            
+
               import java.util.Set;
               class Test {
                   Set<String> s = Thing.newConcurrentHashSet();

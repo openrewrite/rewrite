@@ -124,8 +124,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void anonymousTypeAttribution() {
         rewriteRun(
           java(
@@ -157,7 +157,7 @@ class NewClassTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-              
+
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
                       /* Javadoc */
@@ -182,12 +182,12 @@ class NewClassTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.Arrays;
               import java.util.Comparator;
-              
+
               class Test {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-              
+
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
@@ -202,8 +202,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1() {
         rewriteRun(
           java(
@@ -221,8 +221,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1WithComment() {
         rewriteRun(
           java(
@@ -240,8 +240,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2() {
         rewriteRun(
           java(
@@ -259,8 +259,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2WithComment() {
         rewriteRun(
           java(

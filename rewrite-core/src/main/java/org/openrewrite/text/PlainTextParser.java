@@ -29,9 +29,10 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.stream.Collectors.toList;
 
 public class PlainTextParser implements Parser {
 
@@ -116,7 +117,7 @@ public class PlainTextParser implements Parser {
         public Builder plainTextMasks(Path basePath, Iterable<String> plainTextMaskGlobs) {
             return plainTextMasks(StreamSupport.stream(plainTextMaskGlobs.spliterator(), false)
                     .map((o) -> basePath.getFileSystem().getPathMatcher("glob:" + o))
-                    .collect(Collectors.toList()));
+                    .collect(toList()));
         }
 
         @Override

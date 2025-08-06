@@ -25,10 +25,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -91,7 +91,7 @@ public class AdHocRecipe extends Recipe {
 
     @Override
     public List<Maintainer> getMaintainers() {
-        return maintainers == null ? Collections.emptyList() : maintainers;
+        return maintainers == null ? emptyList() : maintainers;
     }
 
     @Override

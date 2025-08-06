@@ -107,7 +107,7 @@ class SpacesTest implements RewriteTest {
               resource "custom_resource" {
                 size = 1
                 x = 1
-                
+
                 longerattribute = "long"
                 y = 2
               }
@@ -116,7 +116,7 @@ class SpacesTest implements RewriteTest {
               resource "custom_resource" {
                 size = 1
                 x    = 1
-                
+
                 longerattribute = "long"
                 y               = 2
               }
@@ -138,7 +138,7 @@ class SpacesTest implements RewriteTest {
                   multiline_var = object({
                     x = string
                     foo = string
-                    
+
                     y = string
                   })
                   another_string_var = string
@@ -146,7 +146,7 @@ class SpacesTest implements RewriteTest {
                 })
               }
               """,
-            """ 
+            """
               variable myvar {
                 description = "Sample Variable"
                 type = object({
@@ -155,7 +155,7 @@ class SpacesTest implements RewriteTest {
                   multiline_var = object({
                     x   = string
                     foo = string
-                    
+
                     y = string
                   })
                   another_string_var   = string
@@ -181,7 +181,7 @@ class SpacesTest implements RewriteTest {
                      multiline_var = {
                        x = "value"
                        foo = "value"
-                    
+
                        y = "value"
                      }
                      another_string_var = "value"
@@ -190,7 +190,7 @@ class SpacesTest implements RewriteTest {
                 }
               }
               """,
-            """ 
+            """
               locals {
                  myvar = {
                    description = "Sample Variable"
@@ -200,7 +200,7 @@ class SpacesTest implements RewriteTest {
                      multiline_var = {
                        x   = "value"
                        foo = "value"
-                    
+
                        y = "value"
                      }
                      another_string_var   = "value"
@@ -222,7 +222,7 @@ class SpacesTest implements RewriteTest {
                 size   = 1
 
                 x = 1
-                
+
                 longerattribute   = "long"
 
                 y = 2
@@ -233,7 +233,7 @@ class SpacesTest implements RewriteTest {
                 size = 1
 
                 x = 1
-                
+
                 longerattribute = "long"
 
                 y = 2

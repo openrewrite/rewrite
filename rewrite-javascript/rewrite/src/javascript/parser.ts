@@ -28,7 +28,7 @@ import {
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {Asterisk, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {Generator, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
 import {
     emptyMarkers,
     markers,
@@ -295,8 +295,11 @@ export class JavaScriptParserVisitor {
                 // in case of `J.Unknown` its source will already contain any `;`
                 return this.rightPadded(j, emptySpace, emptyMarkers);
             }
+            let last: ts.Node | undefined = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile)
+            if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement) && n.kind === ts.SyntaxKind.LabeledStatement) {
+                last = last.getLastToken(this.sourceFile);
+            }
             return this.rightPadded(j, this.semicolonPrefix(n), (n => {
-                const last = n.getChildAt(n.getChildCount(this.sourceFile) - 1, this.sourceFile);
                 return last?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                     kind: J.Markers.Semicolon,
                     id: randomId()
@@ -463,7 +466,10 @@ export class JavaScriptParserVisitor {
     }
 
     private semicolonPrefix = (node: ts.Node) => {
-        const last = node.getChildren(this.sourceFile).slice(-1)[0];
+        let last: ts.Node | undefined = node.getChildren(this.sourceFile).slice(-1)[0];
+        if (last && (last.kind === ts.SyntaxKind.ExpressionStatement || last.kind == ts.SyntaxKind.DoStatement)) {
+           last = last.getLastToken(this.sourceFile);
+        }
         return last?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(last) : emptySpace;
     }
 
@@ -943,10 +949,10 @@ export class JavaScriptParserVisitor {
         const markers = produce(emptyMarkers, draft => {
             if (node.asteriskToken) {
                 draft.markers.push({
-                    kind: JS.Markers.Asterisk,
+                    kind: JS.Markers.Generator,
                     id: randomId(),
                     prefix: this.prefix(node.asteriskToken)
-                } satisfies Asterisk as Asterisk);
+                } satisfies Generator as Generator);
             }
         });
 
@@ -1791,7 +1797,7 @@ export class JavaScriptParserVisitor {
         };
     }
 
-    visitCallExpression(node: ts.CallExpression): J.MethodInvocation {
+    visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
         const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
 
@@ -1806,37 +1812,59 @@ export class JavaScriptParserVisitor {
             type: undefined,
             fieldType: undefined
         };
-
         if (ts.isIdentifier(node.expression) && !node.questionDotToken) {
             select = undefined;
             name = this.convert(node.expression);
         } else if (node.questionDotToken) {
             select = this.rightPadded(
                 produce(this.convert<Expression>(node.expression), draft => {
-                    if (node.questionDotToken) {
-                        draft.markers.markers.push({
-                            kind: JS.Markers.Optional,
-                            id: randomId(),
-                            prefix: this.suffix(node.expression)
-                        } satisfies Optional as Optional);
-                    }
+                    draft.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: emptySpace,
+                    } satisfies Optional as Optional)
                 }),
-                emptySpace
+                this.suffix(node.expression)
             )
+        } else if (ts.isPropertyAccessExpression(node.expression)) {
+            select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
+            if (node.expression.questionDotToken) {
+                select = produce(select, draft => {
+                    draft!.element.markers.markers.push({
+                        kind: JS.Markers.Optional,
+                        id: randomId(),
+                        prefix: emptySpace
+                    } as Optional);
+                });
+            }
+            name = this.visit(node.expression.name);
         } else {
             select = this.rightPadded(this.visit(node.expression), this.suffix(node.expression))
         }
 
-        return {
-            kind: J.Kind.MethodInvocation,
-            id: randomId(),
-            prefix,
-            markers: emptyMarkers,
-            select,
-            typeParameters: typeArguments,
-            name,
-            arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-            methodType: this.mapMethodType(node)
+        if (name && name.simpleName.length > 0) {
+            return {
+                kind: J.Kind.MethodInvocation,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                select,
+                typeParameters: typeArguments,
+                name,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                methodType: this.mapMethodType(node)
+            }
+        } else {
+            return {
+                kind: JS.Kind.FunctionCall,
+                id: randomId(),
+                prefix,
+                markers: emptyMarkers,
+                function: select,
+                typeParameters: typeArguments,
+                arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
+                functionType: this.mapMethodType(node)
+            }
         }
     }
 
@@ -2410,14 +2438,13 @@ export class JavaScriptParserVisitor {
         return this.visit(node.expression);
     }
 
-    visitAsExpression(node: ts.AsExpression): JS.Binary {
+    visitAsExpression(node: ts.AsExpression): JS.As {
         return {
-            kind: JS.Kind.Binary,
+            kind: JS.Kind.As,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            left: this.convert(node.expression),
-            operator: this.leftPadded(this.prefix(node.getChildAt(1, this.sourceFile)), JS.Binary.Type.As),
+            left: this.rightPadded(this.convert(node.expression), this.prefix(node.getChildAt(1, this.sourceFile))),
             right: this.convert(node.type),
             type: this.mapType(node),
         };
@@ -2709,17 +2736,23 @@ export class JavaScriptParserVisitor {
                             }, this.suffix(node.initializer));
                         } else if (ts.isArrayLiteralExpression(node.initializer)) {
                             return this.rightPadded({
-                                kind: JS.Kind.ArrayBindingPattern,
+                                kind: JS.Kind.ExpressionStatement,
                                 id: randomId(),
-                                elements: {
-                                    kind: J.Kind.Container,
-                                    before: emptySpace,
-                                    elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
-                                    markers: emptyMarkers
-                                } satisfies J.Container<Expression> as J.Container<Expression>,
+                                prefix: emptySpace,
                                 markers: emptyMarkers,
-                                prefix: emptySpace
-                            }, this.suffix(node.initializer))
+                                expression: {
+                                    kind: JS.Kind.ArrayBindingPattern,
+                                    id: randomId(),
+                                    elements: {
+                                        kind: J.Kind.Container,
+                                        before: emptySpace,
+                                        elements: node.initializer.elements.map(e => this.rightPadded(this.visit(e) as Expression, this.suffix(e))),
+                                        markers: emptyMarkers
+                                    } satisfies J.Container<Expression> as J.Container<Expression>,
+                                    markers: emptyMarkers,
+                                    prefix: emptySpace
+                                } satisfies JS.ArrayBindingPattern as JS.ArrayBindingPattern,
+                            } satisfies JS.ExpressionStatement as JS.ExpressionStatement, this.suffix(node.initializer));
                         } else if (ts.isObjectLiteralExpression(node.initializer)) {
                             return this.rightPadded({
                                 kind: JS.Kind.ObjectBindingPattern,
@@ -2834,21 +2867,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             label: this.rightPadded(this.visit(node.label), this.suffix(node.label)),
-            statement: {
-                kind: JS.Kind.TrailingTokenStatement,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                expression: this.rightPadded(
-                    this.visit(node.statement),
-                    this.semicolonPrefix(node.statement),
-                    node.statement.getChildAt(node.statement.getChildCount() - 1)?.kind === ts.SyntaxKind.SemicolonToken ? markers({
-                        kind: J.Markers.Semicolon,
-                        id: randomId()
-                    }) : emptyMarkers
-                ),
-                type: this.mapType(node.statement)
-            } satisfies JS.TrailingTokenStatement as JS.TrailingTokenStatement
+            statement: this.visit(node.statement),
         };
     }
 
@@ -3025,10 +3044,10 @@ export class JavaScriptParserVisitor {
 
                 if (node.asteriskToken) {
                     draft.markers.push({
-                        kind: JS.Markers.Asterisk,
+                        kind: JS.Markers.Generator,
                         id: randomId(),
                         prefix: this.prefix(node.asteriskToken)
-                    } satisfies Asterisk as Asterisk);
+                    } satisfies Generator as Generator);
                 }
             }),
             leadingAnnotations: [],
@@ -3529,13 +3548,14 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.openingElement), this.visit(node.openingElement.tagName)),
+            typeArguments: node.openingElement.typeArguments && this.mapTypeArguments(this.suffix(node.openingElement.tagName), node.openingElement.typeArguments),
             afterName: attrs.length === 0 ?
-                this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
+                this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
             attributes:
                 this.mapJsxAttributes<Attribute | SpreadAttribute>(
                     attrs,
-                    this.prefix(this.findChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
+                    this.prefix(this.findLastChildNode(node.openingElement, ts.SyntaxKind.GreaterThanToken)!),
                     () => emptyMarkers
                 ),
             children: this.mapJsxChildren<JSX.EmbeddedExpression | JSX.Tag | J.Identifier | J.Literal>(node.children),
@@ -3552,6 +3572,7 @@ export class JavaScriptParserVisitor {
             prefix: this.prefix(node),
             markers: emptyMarkers,
             openName: this.leftPadded(this.prefix(node.tagName), this.visit(node.tagName)),
+            typeArguments: node.typeArguments && this.mapTypeArguments(this.suffix(node.tagName), node.typeArguments),
             afterName: attrs.length === 0 ?
                 this.prefix(this.findChildNode(node, ts.SyntaxKind.GreaterThanToken)!) :
                 emptySpace,
@@ -4240,6 +4261,15 @@ export class JavaScriptParserVisitor {
 
     private findChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
         for (let i = 0; i < node.getChildCount(this.sourceFile); i++) {
+            if (node.getChildAt(i, this.sourceFile).kind === kind) {
+                return node.getChildAt(i, this.sourceFile);
+            }
+        }
+        return undefined;
+    }
+
+    private findLastChildNode(node: ts.Node, kind: ts.SyntaxKind): ts.Node | undefined {
+        for (let i = node.getChildCount(this.sourceFile) - 1; i >= 0; i--) {
             if (node.getChildAt(i, this.sourceFile).kind === kind) {
                 return node.getChildAt(i, this.sourceFile);
             }

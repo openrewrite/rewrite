@@ -17,15 +17,11 @@ package org.openrewrite.java.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.Style;
-
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -90,22 +86,6 @@ public class NoWhitespaceAfter extends Recipe {
                 m = (J.MemberReference) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
             }
             return m;
-        }
-
-        @SuppressWarnings("deprecation")
-        @Override
-        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-            J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
-            if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
-                // For backwards compatibility.
-                if (vd.getDimensionsBeforeName().stream().anyMatch(d -> d.getBefore().getWhitespace().contains(" "))) {
-                    vd = vd.withDimensionsBeforeName(ListUtils.map(vd.getDimensionsBeforeName(), d -> {
-                        d = d.withBefore(d.getBefore().withWhitespace(""));
-                        return d;
-                    }));
-                }
-            }
-            return vd;
         }
 
         @Override

@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Asterisk, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
+import {Generator, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -75,22 +75,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statement.prefix, p);
+        await this.visitMarkers(statement.markers, p);
         await this.visit(statement.expression, p);
         return statement;
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statementExpression.prefix, p);
+        await this.visitMarkers(statementExpression.markers, p);
         await this.visit(statementExpression.statement, p);
         return statementExpression;
-    }
-
-    override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(statement, p);
-        await this.visitRightPadded(statement.expression, p);
-        await this.afterSyntax(statement, p);
-        return statement;
     }
 
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
@@ -103,6 +98,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
         await this.visitLeftPaddedLocal("<", element.openName, p);
+        if (element.typeArguments) {
+            await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
+        }
         await this.visitSpace(element.afterName, p);
         await this.visitRightPaddedLocal(element.attributes, "", p);
 
@@ -618,6 +616,23 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return mod;
     }
 
+    override async visitFunctionCall(functionCall: JS.FunctionCall, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(functionCall, p);
+
+        if (functionCall.function) {
+            await this.visitRightPadded(functionCall.function, p);
+            if (functionCall.function.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                p.append("?.");
+            }
+        }
+
+        functionCall.typeParameters && await this.visitContainerLocal("<", functionCall.typeParameters, ",", ">", p);
+        await this.visitContainerLocal("(", functionCall.arguments, ",", ")", p);
+
+        await this.afterSyntax(functionCall, p);
+        return functionCall;
+    }
+
     override async visitFunctionType(functionType: JS.FunctionType, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(functionType, p);
         for (const m of functionType.modifiers) {
@@ -698,7 +713,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             p.append("function");
         }
 
-        const asterisk = findMarker<Asterisk>(method, JS.Markers.Asterisk);
+        const asterisk = findMarker<Generator>(method, JS.Markers.Generator);
         if (asterisk) {
             await this.visitSpace(asterisk.prefix, p);
             p.append("*");
@@ -735,6 +750,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitModifier(it, p);
         }
 
+        const generator = findMarker<Generator>(method, JS.Markers.Generator);
+        if (generator) {
+            await this.visitSpace(generator.prefix, p);
+            p.append("*");
+        }
+
         await this.visit(method.name, p);
 
         const typeParameters = method.typeParameters;
@@ -760,10 +781,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitMethodInvocation(method: J.MethodInvocation, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(method, p);
 
-        if (method.name.toString().length === 0) {
+        if (method.name.simpleName.length === 0) {
             method.select && await this.visitRightPadded(method.select, p);
         } else {
-            method.select && await this.visitRightPaddedLocalSingle(method.select, "", p);
+            if (method.select) {
+                await this.visitRightPadded(method.select, p);
+                if (!method.select.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                    p.append(".");
+                } else {
+                    p.append("?.");
+                }
+            }
             await this.visit(method.name, p);
         }
 
@@ -1343,6 +1371,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return type;
     }
 
+    override async visitAs(as_: JS.As, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(as_, p);
+        await this.visitRightPadded(as_.left, p);
+        p.append("as");
+        await this.visit(as_.right, p);
+        await this.afterSyntax(as_, p);
+
+        return as_;
+    }
+
     override async visitAssignment(assignment: J.Assignment, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(assignment, p);
         await this.visit(assignment.variable, p);
@@ -1558,9 +1596,6 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         let keyword = "";
 
         switch (binary.operator.element) {
-            case JS.Binary.Type.As:
-                keyword = "as";
-                break;
             case JS.Binary.Type.IdentityEquals:
                 keyword = "===";
                 break;
@@ -1857,31 +1892,27 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
-        if (tree.markers) {
-            for (const marker of tree.markers.markers) {
-                if (marker.kind === JS.Markers.Spread) {
-                    await this.visitSpace((marker as Spread).prefix, p);
-                    p.append("...");
-                }
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.Spread) {
+                await this.visitSpace((marker as Spread).prefix, p);
+                p.append("...");
             }
         }
         return tree;
     }
 
     protected async postVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        // FIXME: This is currently only required for `ExpressionStatement` and `StatementExpression`
-        if (tree.markers) {
-            for (const marker of tree.markers.markers) {
-                if (marker.kind === JS.Markers.NonNullAssertion) {
-                    await this.visitSpace((marker as NonNullAssertion).prefix, p);
-                    p.append("!");
-                }
-                if (marker.kind === JS.Markers.Optional) {
-                    await this.visitSpace((marker as Optional).prefix, p);
+        for (const marker of tree.markers.markers) {
+            if (marker.kind === JS.Markers.NonNullAssertion) {
+                await this.visitSpace((marker as NonNullAssertion).prefix, p);
+                p.append("!");
+            }
+            if (marker.kind === JS.Markers.Optional) {
+                await this.visitSpace((marker as Optional).prefix, p);
+                if (this.cursor.parent?.value?.kind !== J.Kind.MethodInvocation &&
+                    this.cursor.parent?.value?.kind !== JS.Kind.FunctionCall) {
                     p.append("?");
-                    if (this.cursor.parent?.value?.kind === J.Kind.MethodInvocation ||
-                        this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
+                    if (this.cursor.parent?.value?.kind === J.Kind.ArrayAccess) {
                         p.append(".");
                     }
                 }

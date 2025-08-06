@@ -24,7 +24,7 @@ export class GetObject {
     static handle(
         connection: rpc.MessageConnection,
         remoteObjects: Map<string, any>,
-        localObjects: Map<string, any>,
+        localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
@@ -32,16 +32,23 @@ export class GetObject {
         const pendingData = new Map<string, RpcObjectData[]>();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
-            if (!localObjects.has(request.id)) {
+            let objId = request.id;
+            if (!localObjects.has(objId)) {
                 return [
                     {state: RpcObjectState.DELETE},
                     {state: RpcObjectState.END_OF_OBJECT}
                 ];
             }
 
-            let allData = pendingData.get(request.id);
+            let objectOrGenerator = localObjects.get(objId)!;
+            if (typeof objectOrGenerator === 'function') {
+                let obj = await objectOrGenerator(objId);
+                localObjects.set(objId, obj);
+            }
+
+            let allData = pendingData.get(objId);
             if (!allData) {
-                const after = localObjects.get(request.id);
+                const after = localObjects.get(objId);
                 
                 // Determine what the remote has cached
                 let before = undefined;
@@ -54,16 +61,16 @@ export class GetObject {
                 }
 
                 allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
-                pendingData.set(request.id, allData);
+                pendingData.set(objId, allData);
 
-                remoteObjects.set(request.id, after);
+                remoteObjects.set(objId, after);
             }
 
             const batch = allData.splice(0, batchSize);
 
             // If we've sent all data, remove from pending
             if (allData.length === 0) {
-                pendingData.delete(request.id);
+                pendingData.delete(objId);
             }
 
             return batch;

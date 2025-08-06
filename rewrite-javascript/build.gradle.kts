@@ -234,7 +234,7 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     dependsOn(setupNpmrc)
 
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath, "--dry-run") }
+    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
     if (!project.hasProperty("releasing")) {
         args.addAll("--tag", "next")
     }

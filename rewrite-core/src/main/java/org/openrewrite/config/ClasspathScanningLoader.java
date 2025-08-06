@@ -35,7 +35,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
+import static java.util.Collections.emptyMap;
 
 public class ClasspathScanningLoader implements ResourceLoader {
 
@@ -49,6 +49,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
     private final ClassLoader classLoader;
+    private final RecipeLoader recipeLoader;
     private @Nullable Runnable performScan;
 
     /**
@@ -59,6 +60,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
         this.classLoader = ClasspathScanningLoader.class.getClassLoader();
+        this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
             scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
             scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
@@ -76,6 +78,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
         this.classLoader = classLoader;
+        this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
             scanClasses(new ClassGraph()
                     .ignoreParentClassLoaders()
@@ -93,6 +96,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
+        this.recipeLoader = new RecipeLoader(classLoader);
         String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
@@ -118,6 +122,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private ClasspathScanningLoader() {
         this.classLoader = ClasspathScanningLoader.class.getClassLoader();
+        this.recipeLoader = new RecipeLoader(classLoader);
     }
 
     /**
@@ -125,7 +130,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * non-declarative recipes they depend on that would be discovered by scanClasses
      */
     private void scanYaml(ClassGraph classGraph, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
-        try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
+        try (ScanResult scanResult = classGraph.scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
@@ -186,7 +191,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass);
+                Recipe recipe = recipeLoader.load(recipeClass, emptyMap());
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.put(recipe.getName(), recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
@@ -202,7 +207,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
         if (performScan != null) {
             try {
-                return new RecipeLoader(classLoader).load(recipeName, null);
+                return recipeLoader.load(recipeName, null);
             } catch (NoClassDefFoundError | IllegalArgumentException ignored) {
                 // it's probably declarative
             }
