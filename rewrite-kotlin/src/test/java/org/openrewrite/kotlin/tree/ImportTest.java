@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
@@ -204,7 +205,9 @@ class ImportTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 //noinspection DataFlowIssue
-                assertThat(TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getSupertype()).isNotNull();
+                var supertype = TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getSupertype();
+                assertThat(supertype).isNotNull();
+                assertThat(supertype.getFullyQualifiedName()).isEqualTo("org.example.Shared");
               }
             )
           )
