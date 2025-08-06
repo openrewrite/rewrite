@@ -727,4 +727,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         afterSyntax(tuplePattern, p);
         return tuplePattern;
     }
+
+    public J visitWildcard(S.Wildcard wildcard, PrintOutputCapture<P> p) {
+        beforeSyntax(wildcard, Space.Location.LANGUAGE_EXTENSION, p);
+        p.append('_');
+        afterSyntax(wildcard, p);
+        return wildcard;
+    }
 }

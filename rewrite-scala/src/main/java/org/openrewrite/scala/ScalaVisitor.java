@@ -67,4 +67,11 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         t = t.getPadding().withElements(visitContainer(t.getPadding().getElements(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return t;
     }
+
+    public J visitWildcard(S.Wildcard wildcard, P p) {
+        S.Wildcard w = wildcard;
+        w = w.withPrefix(visitSpace(w.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), p));
+        return w;
+    }
 }

@@ -363,4 +363,46 @@ public interface S extends J {
             }
         }
     }
+
+    /**
+     * Represents a wildcard/underscore placeholder in expressions.
+     * Used for partially applied functions (e.g., add(5, _)) and pattern matching.
+     * This is NOT for type wildcards (use J.Wildcard) or import wildcards (use * in J.Import).
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class Wildcard implements S, Expression, TypedTree {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        public Wildcard(UUID id, Space prefix, Markers markers, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitWildcard(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
 }

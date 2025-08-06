@@ -14,15 +14,39 @@ As a JVM-based language, Scala's LST implementation will:
 - Add Scala-specific constructs to the S interface (pattern matching, traits, implicits, etc.)
 - Follow the established pattern used by Groovy (`G extends J`) and Kotlin (`K extends J`)
 
-### Composition Pattern
+### LST Mapping Principles
 
-When implementing Scala-specific LST elements, we will use composition of J elements rather than duplication. This ensures that Java-focused recipes can still operate on Scala code by accessing the composed J elements. For example:
+**Core Principle: Maximize J type reuse to ensure recipe compatibility across JVM languages.**
 
-- A Scala pattern match might compose a `J.Switch` internally
-- Scala's `for` comprehension could compose `J.ForEachLoop` elements
-- Implicit parameters might compose `J.VariableDeclarations`
+1. **Always prefer J types over new S types** when the syntactic constructs are similar
+2. **Only create S types when absolutely necessary** - when Scala constructs have no meaningful J equivalent
+3. **Use JavaType to differentiate semantic variations** of the same syntactic construct
 
-This composition approach maximizes recipe reusability across all JVM languages.
+#### Specific Mapping Guidelines:
+
+- **Wildcards/Underscores**: Use `S.Wildcard` for underscore as an expression
+  - Partially applied functions: `add(5, _)` → J.MethodInvocation with S.Wildcard argument
+  - Pattern matching: `case List(1, _, 3)` → patterns with S.Wildcard
+  - NOT for import wildcards (use `*` in J.Import as Java does)
+  - NOT for type wildcards (use J.Wildcard for `List[_]` type parameters)
+
+- **Partially Applied Functions**: Use `J.MethodInvocation` with `S.Wildcard` arguments
+  - Represent `add(5, _)` as a J.MethodInvocation where `_` is an S.Wildcard
+  - The JavaType.Method return type will be a function type, not the original method's return type
+  - This allows Java recipes to still understand the non-placeholder arguments while the different JavaType prevents incorrect transformations
+  
+- **Eta Expansion**: Use `J.MemberReference` for method-to-function conversion (`greet _`)
+
+- **For Loops**: 
+  - Simple for loops → `J.ForLoop` or `J.ForEachLoop`
+  - Complex for comprehensions with yields → S types only when necessary
+
+- **Pattern Matching**:
+  - Simple switches → `J.Switch` where possible
+  - Complex pattern matching → S types for patterns that have no J equivalent
+  - Use S.Wildcard for underscore in patterns
+
+This approach ensures maximum recipe reusability - Java-focused recipes can operate on Scala code wherever the syntactic constructs overlap, while Scala-aware recipes can handle the full semantic richness through JavaType inspection.
 
 ## Implementation Phases
 
