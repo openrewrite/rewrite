@@ -171,10 +171,25 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // Annotations like "@deprecated" are parsed as Apply(Select(New(Ident(deprecated)), <init>), List())
     
     // Check if this is an annotation pattern (will be handled specially when called from visitClassDef)
+    // Annotations look like Apply(Select(New(...), <init>), args) with @ in source
+    // Constructor calls look the same but have "new" in source
     val isAnnotationPattern = app.fun match {
       case sel: untpd.Select if sel.name.toString == "<init>" =>
         sel.qualifier match {
-          case _: untpd.New => true
+          case newNode: untpd.New =>
+            // Check if the source has @ before the type (annotation) or "new" (constructor)
+            if (app.span.exists) {
+              val adjustedStart = Math.max(0, app.span.start - offsetAdjustment)
+              val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
+              if (adjustedStart < adjustedEnd && adjustedEnd <= source.length) {
+                val sourceText = source.substring(adjustedStart, adjustedEnd)
+                sourceText.trim.startsWith("@")
+              } else {
+                false
+              }
+            } else {
+              false
+            }
           case _ => false
         }
       case _ => false
@@ -187,8 +202,18 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     app.fun match {
       case newTree: untpd.New =>
-        // This is a constructor call with arguments
+        // This is a constructor call with arguments (shouldn't happen in Scala 3)
+        System.out.println(s"DEBUG visitApply: Handling new class with New node, app.span=${app.span}, newTree.span=${newTree.span}")
         visitNewClassWithArgs(newTree, app)
+      case sel: untpd.Select if sel.name.toString == "<init>" =>
+        // This is a constructor call like new Person()
+        sel.qualifier match {
+          case newTree: untpd.New =>
+            System.out.println(s"DEBUG visitApply: Handling new class with Select <init>, app.span=${app.span}")
+            visitNewClassWithArgs(newTree, app)
+          case _ =>
+            visitUnknown(app)
+        }
       case sel: untpd.Select if app.args.isEmpty && isUnaryOperator(sel.name.toString) =>
         // This is a unary operation
         visitUnary(sel)
@@ -440,18 +465,41 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val args = new util.ArrayList[JRightPadded[Expression]]()
     for (i <- app.args.indices) {
       val arg = app.args(i)
+      
+      // Extract prefix space for this argument (space after previous comma)
+      var argPrefix = Space.EMPTY
+      if (i > 0) {
+        val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+        val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+        if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
+          val between = source.substring(prevEnd, thisStart)
+          val commaIndex = between.indexOf(',')
+          if (commaIndex >= 0) {
+            argPrefix = Space.format(between.substring(commaIndex + 1))
+            cursor = prevEnd + commaIndex + 1
+          }
+        }
+      }
+      
       visitTree(arg) match {
         case expr: Expression => 
-          // Extract space after this argument (before comma or closing paren)
-          val afterSpace = if (i < app.args.length - 1) {
-            // Not the last argument, look for comma
-            sourceBefore(",")
-          } else {
-            // Last argument, look for closing paren
-            sourceBefore(")")
+          // Apply the prefix space to the expression
+          val exprWithPrefix = expr match {
+            case lit: J.Literal => lit.withPrefix(argPrefix)
+            case id: J.Identifier => id.withPrefix(argPrefix)
+            case mi: J.MethodInvocation => mi.withPrefix(argPrefix)
+            case na: J.NewArray => na.withPrefix(argPrefix)
+            case bin: J.Binary => bin.withPrefix(argPrefix)
+            case aa: J.ArrayAccess => aa.withPrefix(argPrefix)
+            case fa: J.FieldAccess => fa.withPrefix(argPrefix)
+            case paren: J.Parentheses[_] => paren.withPrefix(argPrefix)
+            case unknown: J.Unknown => unknown.withPrefix(argPrefix)
+            case nc: J.NewClass => nc.withPrefix(argPrefix)
+            case asg: J.Assignment => asg.withPrefix(argPrefix)
+            case _ => expr
           }
-          val rightPadded = JRightPadded.build(expr).withAfter(afterSpace)
-          args.add(rightPadded)
+          
+          args.add(JRightPadded.build(exprWithPrefix))
         case _ => return visitUnknown(app) // If any argument fails, fall back
       }
     }
@@ -1007,14 +1055,31 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
   
   private def visitNewClassWithArgs(newTree: untpd.New, app: untpd.Apply): J.NewClass = {
-    // Extract prefix from the new keyword
-    val prefix = extractPrefix(newTree.span)
+    // The Apply node has the full span including "new", use its prefix
+    val prefix = extractPrefix(app.span)
+    
+    // Extract space between "new" and the type
+    // First, consume "new" keyword
+    val newPos = positionOfNext("new")
+    if (newPos >= 0 && newPos == cursor) {
+      cursor += 3 // Move past "new"
+    }
+    
+    // Extract space between "new" and type
+    val typeStart = Math.max(0, newTree.tpt.span.start - offsetAdjustment)
+    val typeSpace = if (cursor < typeStart && typeStart <= source.length) {
+      val spaceStr = source.substring(cursor, typeStart)
+      cursor = typeStart
+      Space.format(spaceStr)
+    } else {
+      Space.EMPTY
+    }
     
     // Visit the type being instantiated
     val clazz = visitTree(newTree.tpt) match {
-      case typeTree: TypeTree => typeTree
-      case id: J.Identifier => id // Simple class name
-      case fieldAccess: J.FieldAccess => fieldAccess // Qualified name like java.util.Date
+      case typeTree: TypeTree => typeTree.withPrefix(typeSpace)
+      case id: J.Identifier => id.withPrefix(typeSpace)
+      case fieldAccess: J.FieldAccess => fieldAccess.withPrefix(typeSpace)
       case _ => return visitUnknown(app).asInstanceOf[J.NewClass]
     }
     
@@ -1027,12 +1092,26 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     }
     
     var beforeParenSpace = Space.EMPTY
+    var hasParentheses = false
     if (typeEnd < argsStart && typeEnd >= cursor && argsStart <= source.length) {
       val between = source.substring(typeEnd, argsStart)
       val parenIndex = between.indexOf('(')
       if (parenIndex >= 0) {
+        hasParentheses = true
         beforeParenSpace = Space.format(between.substring(0, parenIndex))
         cursor = typeEnd + parenIndex + 1
+      }
+    } else if (app.args.isEmpty && typeEnd >= cursor) {
+      // Check if there are parentheses for empty args
+      val endBound = Math.min(source.length, Math.max(0, app.span.end - offsetAdjustment))
+      if (typeEnd < endBound) {
+        val after = source.substring(typeEnd, endBound)
+        hasParentheses = after.contains("(") && after.contains(")")
+        if (hasParentheses) {
+          val parenIndex = after.indexOf('(')
+          beforeParenSpace = Space.format(after.substring(0, parenIndex))
+          cursor = typeEnd + after.indexOf(')') + 1
+        }
       }
     }
     
@@ -1040,25 +1119,41 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     val args = new util.ArrayList[JRightPadded[Expression]]()
     for (i <- app.args.indices) {
       val arg = app.args(i)
+      
+      // Extract prefix space for this argument (space after previous comma)
+      var argPrefix = Space.EMPTY
+      if (i > 0) {
+        val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+        val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+        if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
+          val between = source.substring(prevEnd, thisStart)
+          val commaIndex = between.indexOf(',')
+          if (commaIndex >= 0) {
+            argPrefix = Space.format(between.substring(commaIndex + 1))
+            cursor = prevEnd + commaIndex + 1
+          }
+        }
+      }
+      
       visitTree(arg) match {
         case expr: Expression =>
-          var trailingSpace = Space.EMPTY
-          
-          // Extract space after this argument (comma and space)
-          if (i < app.args.length - 1) {
-            val thisEnd = Math.max(0, arg.span.end - offsetAdjustment)
-            val nextStart = Math.max(0, app.args(i + 1).span.start - offsetAdjustment)
-            if (thisEnd < nextStart && thisEnd >= cursor && nextStart <= source.length) {
-              val between = source.substring(thisEnd, nextStart)
-              val commaIndex = between.indexOf(',')
-              if (commaIndex >= 0) {
-                trailingSpace = Space.format(between.substring(commaIndex + 1))
-                cursor = thisEnd + commaIndex + 1
-              }
-            }
+          // Apply the prefix space to the expression
+          val exprWithPrefix = expr match {
+            case lit: J.Literal => lit.withPrefix(argPrefix)
+            case id: J.Identifier => id.withPrefix(argPrefix)
+            case mi: J.MethodInvocation => mi.withPrefix(argPrefix)
+            case na: J.NewArray => na.withPrefix(argPrefix)
+            case bin: J.Binary => bin.withPrefix(argPrefix)
+            case aa: J.ArrayAccess => aa.withPrefix(argPrefix)
+            case fa: J.FieldAccess => fa.withPrefix(argPrefix)
+            case paren: J.Parentheses[_] => paren.withPrefix(argPrefix)
+            case unknown: J.Unknown => unknown.withPrefix(argPrefix)
+            case nc: J.NewClass => nc.withPrefix(argPrefix)
+            case asg: J.Assignment => asg.withPrefix(argPrefix)
+            case _ => expr
           }
           
-          args.add(JRightPadded.build(expr).withAfter(trailingSpace))
+          args.add(JRightPadded.build(exprWithPrefix))
         case _ => return visitUnknown(app).asInstanceOf[J.NewClass]
       }
     }
@@ -1066,9 +1161,14 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     // Update cursor to the end
     updateCursor(app.span.end)
     
-    val argContainer = if (args.isEmpty) {
+    val argContainer = if (!hasParentheses && args.isEmpty) {
+      // No parentheses and no arguments - e.g. "new Person"
+      null
+    } else if (args.isEmpty) {
+      // Empty parentheses - e.g. "new Person()"
       JContainer.build(beforeParenSpace, Collections.emptyList[JRightPadded[Expression]](), Markers.EMPTY)
     } else {
+      // Has arguments - e.g. "new Person(name, age)"
       JContainer.build(beforeParenSpace, args, Markers.EMPTY)
     }
     
@@ -1086,32 +1186,236 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   }
 
   private def visitNew(newTree: untpd.New): J.NewClass = {
-    val prefix = extractPrefix(newTree.span)
+    // Anonymous classes in Scala are represented as New nodes with Template bodies
+    // Example: new Runnable { def run() = ... }
+    // The Template contains the parent types and the body implementation
     
-    // The 'New' node represents just the 'new' keyword and type
-    // The actual constructor call (if any) will be in the parent Apply node
+    // Extract prefix but skip the "new" keyword
+    var prefix = extractPrefix(newTree.span)
     
-    // Visit the type being instantiated
-    val clazz = visitTree(newTree.tpt) match {
-      case typeTree: TypeTree => typeTree
-      case id: J.Identifier => id // Simple class name
-      case fieldAccess: J.FieldAccess => fieldAccess // Qualified name like java.util.Date
-      case _ => return visitUnknown(newTree).asInstanceOf[J.NewClass]
+    // Skip past "new" in the source if present
+    if (newTree.span.exists) {
+      val start = Math.max(0, newTree.span.start - offsetAdjustment)
+      val end = Math.max(0, newTree.span.end - offsetAdjustment)
+      if (start >= cursor && end <= source.length && start < end) {
+        val sourceText = source.substring(start, end)
+        val newIndex = sourceText.indexOf("new")
+        if (newIndex >= 0) {
+          // Move cursor past "new" and any following space
+          val afterNew = start + newIndex + 3
+          if (afterNew < end) {
+            updateCursor(afterNew)
+            // Extract space after "new" keyword  
+            val afterNewText = source.substring(afterNew, end)
+            val spaceMatch = afterNewText.takeWhile(_.isWhitespace)
+            if (spaceMatch.nonEmpty) {
+              updateCursor(afterNew + spaceMatch.length)
+            }
+          }
+        }
+      }
     }
     
-    // For now, create a NewClass without arguments
-    // The Apply node handling will need to be updated to handle constructor calls
-    new J.NewClass(
-      Tree.randomId(),
-      prefix,
-      Markers.EMPTY,
-      null, // enclosing
-      Space.EMPTY,
-      clazz,
-      JContainer.empty[Expression](), // arguments will be added by Apply
-      null, // body for anonymous classes
-      null // constructorType
-    )
+    // The New node's tpt is the Template containing the anonymous class definition
+    newTree.tpt match {
+      case template: untpd.Template =>
+        // Extract the parent type(s) - usually the first parent is the main type
+        val parents = template.parents
+        if (parents.isEmpty) {
+          return visitUnknown(newTree).asInstanceOf[J.NewClass]
+        }
+        
+        // The first parent is typically an Apply node for constructor calls
+        // or just an Ident/Select for interfaces/traits
+        val firstParent = parents.head
+        
+        // Extract the class type and arguments
+        val (clazz, args) = firstParent match {
+          case app: untpd.Apply if app.fun.isInstanceOf[untpd.Select] && 
+               app.fun.asInstanceOf[untpd.Select].name.toString == "<init>" =>
+            // Constructor call with arguments: new Person("John", 30) { ... }
+            val sel = app.fun.asInstanceOf[untpd.Select]
+            sel.qualifier match {
+              case newInner: untpd.New =>
+                // Visit the type tree directly
+                val typeTree = visitTree(newInner.tpt).asInstanceOf[TypeTree]
+                
+                // Now handle the arguments
+                val argContainer = if (app.args.nonEmpty) {
+                  val args = new util.ArrayList[JRightPadded[Expression]]()
+                  
+                  // Find the opening parenthesis
+                  var beforeParenSpace = Space.EMPTY
+                  if (app.span.exists) {
+                    val typeEnd = Math.max(0, newInner.tpt.span.end - offsetAdjustment)
+                    val argsStart = Math.max(0, app.span.start - offsetAdjustment)
+                    
+                    if (typeEnd < argsStart && typeEnd >= cursor && argsStart <= source.length) {
+                      val between = source.substring(typeEnd, argsStart)
+                      val parenIndex = between.indexOf('(')
+                      if (parenIndex >= 0) {
+                        beforeParenSpace = Space.format(between.substring(0, parenIndex))
+                        updateCursor(typeEnd + parenIndex + 1)
+                      }
+                    }
+                  }
+                  
+                  // Visit arguments
+                  for ((arg, i) <- app.args.zipWithIndex) {
+                    var argPrefix = Space.EMPTY
+                    if (i > 0) {
+                      val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+                      val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+                      if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
+                        val between = source.substring(prevEnd, thisStart)
+                        val commaIndex = between.indexOf(',')
+                        if (commaIndex >= 0) {
+                          argPrefix = Space.format(between.substring(commaIndex + 1))
+                          updateCursor(prevEnd + commaIndex + 1)
+                        }
+                      }
+                    }
+                    
+                    val argJ = visitTree(arg)
+                    val visitedArg: Expression = if (argJ.isInstanceOf[Expression]) {
+                      argJ.asInstanceOf[Expression].withPrefix(argPrefix)
+                    } else {
+                      System.out.println(s"DEBUG visitNew: Unexpected type for argument: ${argJ.getClass}, argJ=$argJ, arg=$arg")
+                      visitUnknown(arg).asInstanceOf[Expression].withPrefix(argPrefix)
+                    }
+                    args.add(new JRightPadded[Expression](visitedArg, Space.EMPTY, Markers.EMPTY))
+                  }
+                  
+                  // Extract space before closing parenthesis for last argument
+                  if (app.span.exists && app.args.nonEmpty) {
+                    val lastArgEnd = Math.max(0, app.args.last.span.end - offsetAdjustment)
+                    val appEnd = Math.max(0, app.span.end - offsetAdjustment)
+                    if (lastArgEnd < appEnd && lastArgEnd >= cursor && appEnd <= source.length) {
+                      val remaining = source.substring(lastArgEnd, appEnd)
+                      val closeParenIndex = remaining.indexOf(')')
+                      if (closeParenIndex >= 0) {
+                        val beforeCloseSpace = Space.format(remaining.substring(0, closeParenIndex))
+                        updateCursor(lastArgEnd + closeParenIndex + 1)
+                        
+                        // Update the last argument's after space
+                        if (!args.isEmpty) {
+                          val lastArg = args.get(args.size() - 1)
+                          args.set(args.size() - 1, lastArg.withAfter(beforeCloseSpace))
+                        }
+                      }
+                    }
+                  }
+                  
+                  JContainer.build(beforeParenSpace, args, Markers.EMPTY)
+                } else {
+                  null
+                }
+                
+                (typeTree, argContainer)
+              case _ =>
+                (visitUnknown(sel.qualifier).asInstanceOf[TypeTree], null)
+            }
+          case _ =>
+            // Simple interface/trait: new Runnable { ... }
+            val typeTree = visitTree(firstParent).asInstanceOf[TypeTree]
+            (typeTree, null)
+        }
+        
+        // Create the anonymous class body
+        val body = if (template.body.nonEmpty) {
+          // Filter out the synthetic constructor and self-reference
+          val bodyStatements = template.body.filter {
+            case dd: untpd.DefDef if dd.name.toString == "<init>" => false
+            case vd: untpd.ValDef if vd.name.toString == "_" => false
+            case _ => true
+          }
+          
+          if (bodyStatements.nonEmpty) {
+            // Extract space before the opening brace
+            var beforeBrace = Space.EMPTY
+            if (newTree.span.exists && clazz.getPrefix.getWhitespace.isEmpty) {
+              val newStart = Math.max(0, newTree.span.start - offsetAdjustment)
+              val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
+              
+              // Find the position after the type/arguments and before the brace
+              val searchStart = if (args != null && args.getElements != null && args.getElements.size() > 0) {
+                // After the closing parenthesis of arguments
+                Math.max(cursor, newStart)
+              } else {
+                // After the type name
+                Math.max(cursor, newStart)
+              }
+              
+              if (searchStart < newEnd && searchStart >= 0 && newEnd <= source.length) {
+                val sourceText = source.substring(searchStart, newEnd)
+                val braceIndex = sourceText.indexOf('{')
+                if (braceIndex >= 0) {
+                  beforeBrace = Space.format(sourceText.substring(0, braceIndex))
+                  updateCursor(searchStart + braceIndex + 1)
+                }
+              }
+            }
+            
+            // Convert body statements
+            val statements = new util.ArrayList[J]()
+            val statementPaddings = new util.ArrayList[JRightPadded[Statement]]()
+            
+            bodyStatements.foreach { stmt =>
+              val stmtJ = visitTree(stmt)
+              if (stmtJ.isInstanceOf[Statement]) {
+                statementPaddings.add(new JRightPadded[Statement](
+                  stmtJ.asInstanceOf[Statement],
+                  Space.EMPTY,
+                  Markers.EMPTY
+                ))
+              }
+            }
+            
+            // Extract space before closing brace
+            var beforeCloseBrace = Space.EMPTY
+            if (newTree.span.exists) {
+              val newEnd = Math.max(0, newTree.span.end - offsetAdjustment)
+              if (cursor < newEnd && cursor >= 0 && newEnd <= source.length) {
+                val remaining = source.substring(cursor, newEnd)
+                val closeBraceIndex = remaining.lastIndexOf('}')
+                if (closeBraceIndex >= 0) {
+                  beforeCloseBrace = Space.format(remaining.substring(0, closeBraceIndex))
+                  updateCursor(cursor + closeBraceIndex + 1)
+                }
+              }
+            }
+            
+            new J.Block(
+              Tree.randomId(),
+              beforeBrace,
+              Markers.EMPTY,
+              new JRightPadded[java.lang.Boolean](false, Space.EMPTY, Markers.EMPTY),
+              statementPaddings,
+              beforeCloseBrace
+            )
+          } else {
+            null
+          }
+        } else {
+          null
+        }
+        
+        new J.NewClass(
+          Tree.randomId(),
+          prefix,
+          Markers.EMPTY,
+          null, // enclosing
+          Space.SINGLE_SPACE, // Space after "new" keyword
+          clazz,
+          args,
+          body,
+          null // constructorType
+        )
+        
+      case _ =>
+        // Not an anonymous class, shouldn't happen in visitNew
+        visitUnknown(newTree).asInstanceOf[J.NewClass]
+    }
   }
 
   private def visitImport(imp: untpd.Import): J = {
@@ -1454,6 +1758,7 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               case fa: J.FieldAccess => fa.withPrefix(Space.format(afterEqualsStr))
               case paren: J.Parentheses[_] => paren.withPrefix(Space.format(afterEqualsStr))
               case unknown: J.Unknown => unknown.withPrefix(Space.format(afterEqualsStr))
+              case nc: J.NewClass => nc.withPrefix(Space.format(afterEqualsStr))
               case _ => 
                 // For any other expression type, just return it as-is
                 rhsExpr
@@ -3585,6 +3890,11 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
   private def visitUnknown(tree: untpd.Tree): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
+    
+    // Debug: Check if this is a New node
+    if (tree.isInstanceOf[untpd.New]) {
+      System.out.println(s"DEBUG visitUnknown for New: sourceText='$sourceText', tree=$tree, span=${tree.span}")
+    }
     
     val unknownSource = new J.Unknown.Source(
       Tree.randomId(),

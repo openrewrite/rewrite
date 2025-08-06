@@ -576,6 +576,27 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         afterSyntax(variable, p);
         return variable;
     }
+    
+    @Override
+    public J visitNewClass(J.NewClass newClass, PrintOutputCapture<P> p) {
+        beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
+        if (newClass.getPadding().getEnclosing() != null) {
+            visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
+        }
+        p.append("new");
+        // Ensure space between "new" and the class name
+        if (newClass.getClazz() != null && newClass.getClazz().getPrefix().isEmpty()) {
+            p.append(" ");
+        }
+        visit(newClass.getClazz(), p);
+        // In Scala, constructors can be called without parentheses
+        if (newClass.getPadding().getArguments() != null) {
+            visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+        }
+        visit(newClass.getBody(), p);
+        afterSyntax(newClass, p);
+        return newClass;
+    }
 
     @Override
     public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
