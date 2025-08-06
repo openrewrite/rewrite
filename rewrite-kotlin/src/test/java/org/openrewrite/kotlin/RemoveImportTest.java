@@ -226,6 +226,46 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Disabled("link-to-companion-object-fixes")
+    @Test
+    void dontRemoveUsedParentMembers() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("org.example.Child.Companion.one")),
+          kotlin(
+            """
+              package org.example
+              interface Shared {
+                  fun one() = "one"
+              }
+              open class Parent {
+                  companion object : Shared
+              }
+              class Child : Parent() {
+                  companion object : Shared {
+                      fun two() = "two"
+                      fun three() = "three"
+                  }
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.Child.Companion.one
+              import org.example.Child.Companion.two
+              import org.example.Child.Companion.three
+              
+              class A {
+                  fun test() {
+                      one()
+                      two()
+                      three()
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled("We cannot use Java sources as dependencies in Kotlin sources yet")
     @Test
     void keepStarFoldWhenUsingStaticChildAndParentMembersFromJavaClasses() {

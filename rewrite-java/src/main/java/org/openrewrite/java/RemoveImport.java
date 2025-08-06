@@ -72,7 +72,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(cuImport.getQualid().getType());
                 if (fq != null) {
                     originalImports.add(fq.getFullyQualifiedName().replace("$", "."));
-                    // For Kotlin, there is the option star imports reference to types of superclasses
+                    // For Kotlin, there is the option star imports reference to Java types of superclasses
                     if (type.equals(fq.getFullyQualifiedName())) {
                         while (fq.getSupertype() != null) {
                             fq = fq.getSupertype();
@@ -122,7 +122,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             JavaSourceFile c = cu;
 
             boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
-            AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
+            AtomicReference<@Nullable Space> spaceForNextImport = new AtomicReference<>();
             c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 if (spaceForNextImport.get() != null) {
                     Space removedPrefix = spaceForNextImport.get();
