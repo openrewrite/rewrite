@@ -265,7 +265,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                     }
 
                                                     for (GradleDependencyConfiguration config : all.keySet()) {
-                                                        outer:
+                                                        extendsFrom:
                                                         for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
                                                             if (gc.getName().equals(config.getName()) &&
                                                                     gc.getRequested().size() == config.getRequested().size()) {
@@ -277,7 +277,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                                         !Objects.equals(
                                                                                 gc.getRequested().get(i).getArtifactId(),
                                                                                 config.getRequested().get(i).getArtifactId())) {
-                                                                        continue outer;
+                                                                        continue extendsFrom;
                                                                     }
                                                                 }
                                                                 return true;
