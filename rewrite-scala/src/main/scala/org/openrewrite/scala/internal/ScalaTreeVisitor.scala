@@ -228,13 +228,11 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     app.fun match {
       case newTree: untpd.New =>
         // This is a constructor call with arguments (shouldn't happen in Scala 3)
-        System.out.println(s"DEBUG visitApply: Handling new class with New node, app.span=${app.span}, newTree.span=${newTree.span}")
         visitNewClassWithArgs(newTree, app)
       case sel: untpd.Select if sel.name.toString == "<init>" =>
         // This is a constructor call like new Person()
         sel.qualifier match {
           case newTree: untpd.New =>
-            System.out.println(s"DEBUG visitApply: Handling new class with Select <init>, app.span=${app.span}")
             visitNewClassWithArgs(newTree, app)
           case _ =>
             visitUnknown(app)
@@ -1362,7 +1360,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
                     val visitedArg: Expression = if (argJ.isInstanceOf[Expression]) {
                       argJ.asInstanceOf[Expression].withPrefix(argPrefix)
                     } else {
-                      System.out.println(s"DEBUG visitNew: Unexpected type for argument: ${argJ.getClass}, argJ=$argJ, arg=$arg")
                       visitUnknown(arg).asInstanceOf[Expression].withPrefix(argPrefix)
                     }
                     args.add(new JRightPadded[Expression](visitedArg, Space.EMPTY, Markers.EMPTY))
@@ -1926,6 +1923,8 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
               case lambda: J.Lambda => lambda.withPrefix(Space.format(afterEqualsStr))
               case mr: J.MemberReference => mr.withPrefix(Space.format(afterEqualsStr))
               case tc: J.TypeCast => tc.withPrefix(Space.format(afterEqualsStr))
+              case io: J.InstanceOf => io.withPrefix(Space.format(afterEqualsStr))
+              case un: J.Unary => un.withPrefix(Space.format(afterEqualsStr))
               case _ => 
                 // For any other expression type, just return it as-is
                 rhsExpr
@@ -3790,7 +3789,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     // Extract the source to find bracket positions
     val source = extractSource(at.span)
-    System.out.println(s"DEBUG visitAppliedTypeTree: full source='$source', cursor before args=$cursor")
     val openBracketIdx = source.indexOf('[')
     val closeBracketIdx = source.lastIndexOf(']')
     
@@ -3817,17 +3815,14 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     if (at.args.nonEmpty) {
       // Update cursor to the start of the first argument
       val firstArgStart = Math.max(0, at.args.head.span.start - offsetAdjustment)
-      System.out.println(s"DEBUG: Moving cursor from $cursor to $firstArgStart for first arg")
       cursor = firstArgStart
       
       for (i <- at.args.indices) {
         val arg = at.args(i)
-        System.out.println(s"DEBUG: Processing arg $i, cursor=$cursor")
         val argTree = visitTree(arg) match {
           case expr: Expression => expr
           case _ => return visitUnknown(at)
         }
-        System.out.println(s"DEBUG: After visiting arg $i, cursor=$cursor, argTree=$argTree")
         
         // Extract trailing comma/space
         val isLast = i == at.args.size - 1
@@ -3836,7 +3831,6 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
           val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
           if (argEnd < closeBracketIdx + originalCursor) {
             val spaceStr = this.source.substring(argEnd, closeBracketIdx + originalCursor)
-            System.out.println(s"DEBUG: Last arg space='$spaceStr'")
             Space.format(spaceStr)
           } else {
             Space.EMPTY
@@ -3853,9 +3847,11 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
           if (argEnd < nextArgStart && argEnd < this.source.length && nextArgStart <= this.source.length) {
             val between = this.source.substring(argEnd, nextArgStart)
             val commaIdx = between.indexOf(',')
-            if (commaIdx >= 0 && commaIdx + 1 < between.length) {
-              cursor = argEnd + commaIdx + 1
-              Space.format(between.substring(commaIdx + 1))
+            if (commaIdx >= 0) {
+              // The "after" space should be everything from the end of the argument up to (but not including) the comma
+              // The visitContainer will add the comma and then the prefix of the next element will have the space after the comma
+              cursor = argEnd + commaIdx + 1  // Move cursor past the comma
+              Space.format(between.substring(0, commaIdx))
             } else {
               Space.EMPTY
             }
@@ -4094,12 +4090,10 @@ class ScalaTreeVisitor(source: String, offsetAdjustment: Int = 0)(implicit ctx: 
     
     // Debug what's being marked as unknown
     if (sourceText.contains("greet") || sourceText.contains("_")) {
-      System.out.println(s"DEBUG visitUnknown: sourceText='$sourceText', tree=$tree, tree.class=${tree.getClass}")
     }
     
     // Debug: Check if this is a New node
     if (tree.isInstanceOf[untpd.New]) {
-      System.out.println(s"DEBUG visitUnknown for New: sourceText='$sourceText', tree=$tree, span=${tree.span}")
     }
     
     val unknownSource = new J.Unknown.Source(

@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;
@@ -300,6 +301,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             needsScalaHandling = true;
         }
         
+        // Or if we have type parameters (to ensure square brackets in Scala)
+        if (classDecl.getPadding().getTypeParameters() != null &&
+            !classDecl.getPadding().getTypeParameters().getElements().isEmpty()) {
+            needsScalaHandling = true;
+        }
+        
         if (needsScalaHandling) {
             // Custom handling for Scala classes
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
@@ -424,7 +431,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     "trait" : classDecl.getKind().name().toLowerCase();
                 p.append(classKind);
                 visit(classDecl.getName(), p);
-                visit(classDecl.getTypeParameters(), p);
+                // Use our custom type parameter printing for Scala
+                visitTypeParameters(classDecl.getPadding().getTypeParameters(), p);
                 // Skip the empty primary constructor
                 
                 if (classDecl.getPadding().getExtends() != null) {
@@ -459,7 +467,24 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             List<JRightPadded<J.TypeParameter>> elements = typeParams.getPadding().getElements();
             for (int i = 0; i < elements.size(); i++) {
                 JRightPadded<J.TypeParameter> elem = elements.get(i);
-                visit(elem.getElement(), p);
+                J.TypeParameter typeParam = elem.getElement();
+                
+                // Check if the type parameter name starts with variance
+                if (typeParam.getName() instanceof J.Identifier) {
+                    J.Identifier nameId = (J.Identifier) typeParam.getName();
+                    String name = nameId.getSimpleName();
+                    if (name.startsWith("-") || name.startsWith("+")) {
+                        // For variance annotations, print them directly without visiting
+                        // to avoid any special handling
+                        visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
+                        p.append(name);
+                    } else {
+                        visit(elem.getElement(), p);
+                    }
+                } else {
+                    visit(elem.getElement(), p);
+                }
+                
                 if (i < elements.size() - 1) {
                     visitSpace(elem.getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
                     p.append(',');
