@@ -58,6 +58,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
+            boolean isKotlin = tree.toString().contains("K.CompilationUnit"); // poor man's `cu instanceof K.CompilationUnit`
             ImportLayoutStyle importLayoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
@@ -74,7 +75,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
                     originalImports.add(fqnType);
                     // For Kotlin, there is the option star imports reference to Java types of superclasses
-                    if (type.equals(fqnType)) {
+                    if (isKotlin && type.equals(fqnType)) {
                         while (fq.getSupertype() != null) {
                             fq = fq.getSupertype();
                             typeWithSuperTypes.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
