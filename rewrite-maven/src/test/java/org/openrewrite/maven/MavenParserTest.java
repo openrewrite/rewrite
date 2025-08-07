@@ -3971,8 +3971,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"2.15.0,2.13.0", "2.13.0,2.15.0", "2.13.0,2.13.0"})
+    @ParameterizedTest
     void lastListedDependencyIsUsed(String firstVersion, String secondVersion) {
         rewriteRun(
           pomXml(
@@ -4009,8 +4009,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"2.15.0,runtime,2.13.0,test", "2.13.0,runtime,2.15.0,test", "2.13.0,runtime,2.13.0,test", "2.15.0,compile,2.13.0,test", "2.13.0,compile,2.15.0,test", "2.13.0,compile,2.13.0,test"})
+    @ParameterizedTest
     void lastListedDependencyIsUsedForScope(String firstVersion, String firstScope, String secondVersion, String secondScope) {
         rewriteRun(
           pomXml(
@@ -4054,8 +4054,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"2.15.0,2.13.0", "2.13.0,2.15.0", "2.13.0,2.13.0"})
+    @ParameterizedTest
     void lastListedDependencyIsUsedForTransitiveScope(String firstVersion, String secondVersion) {
         rewriteRun(
           pomXml(
@@ -4099,8 +4099,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @ValueSource(strings = {"latest", "release"})
+    @ParameterizedTest
     void latestOrReleaseVersionInDependencyManagement(String version) {
         rewriteRun(
           pomXml(
