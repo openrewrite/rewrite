@@ -1738,6 +1738,58 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Currently any direct dependency's scope is broadened, even when consciously overridden in a child")
+    @Test
+    void addDependencyWithBroaderScopeDoesNotChangeTransitiveOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.annotation</groupId>
+                            <artifactId>jakarta.annotation-api</artifactId>
+                            <version>2.1.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.annotation</groupId>
+                            <artifactId>jakarta.annotation-api</artifactId>
+                            <version>2.1.1</version>
+                            <scope>provided</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """)
+          )
+        );
+    }
+
     @ExpectedToFail("With duplicate direct dependencies last declaration wins, however this is not taken into account")
     @Test
     void addDependencyWithDuplicateDependencyWithBroaderScopeChangesExistingScopeImplicit() {
