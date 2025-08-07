@@ -45,6 +45,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.openrewrite.ExecutionContext.MAVEN_SETTINGS_LOAD_FROM_DISK;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
@@ -378,6 +379,7 @@ public interface RewriteTest extends SourceSpecs {
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
                 .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
+        recipeCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, true);
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,
