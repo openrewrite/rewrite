@@ -1645,6 +1645,101 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void defaultConfigurationEscaped2() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.apache.httpcomponents.client5:httpclient5:5.4.x")),
+          mavenProject("project",
+            buildGradleKts(
+              """
+                import org.gradle.plugins.ide.idea.model.IdeaModel
+                import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+                
+                plugins {
+                    val kotlinVersion = "1.9.25"
+                
+                    kotlin("jvm") version kotlinVersion
+                    id("idea")
+                    application
+                    jacoco
+                }
+                
+                repositories {
+                    mavenCentral()
+                    maven {
+                        url = uri("https://maven.pkg.github.com/some-org/some-repo")
+                        credentials {
+                            username = System.getenv("GITHUB_PACKAGE_USERNAME") ?: githubPackages().first
+                            password = System.getenv("GITHUB_PACKAGE_TOKEN") ?: githubPackages().second
+                        }
+                    }
+                }
+                
+                dependencies {
+                    // Kotlin
+                    implementation(kotlin("stdlib-jdk8"))
+                    implementation(kotlin("reflect"))
+                
+                    implementation("org.apache.httpcomponents:httpclient:4.5.14")
+                
+                    testImplementation("org.apache.httpcomponents:httpclient:4.5.14")
+                }
+                
+                inline fun <reified T : Task> task(noinline configuration: T.() -> Unit) =
+                    tasks.creating(T::class, configuration)
+                
+                fun githubPackages(): Pair<String, String> {
+                    return Pair("a", "b")
+                }
+                """,
+              """
+                import org.gradle.plugins.ide.idea.model.IdeaModel
+                import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+                
+                plugins {
+                    val kotlinVersion = "1.9.25"
+                
+                    kotlin("jvm") version kotlinVersion
+                    id("idea")
+                    application
+                    jacoco
+                }
+                
+                repositories {
+                    mavenCentral()
+                    maven {
+                        url = uri("https://maven.pkg.github.com/some-org/some-repo")
+                        credentials {
+                            username = System.getenv("GITHUB_PACKAGE_USERNAME") ?: githubPackages().first
+                            password = System.getenv("GITHUB_PACKAGE_TOKEN") ?: githubPackages().second
+                        }
+                    }
+                }
+                
+                dependencies {
+                    // Kotlin
+                    implementation(kotlin("stdlib-jdk8"))
+                    implementation(kotlin("reflect"))
+                
+                    implementation("org.apache.httpcomponents:httpclient:4.5.14")
+                
+                    implementation("org.apache.httpcomponents.client5:httpclient5:5.4.4")
+                
+                    testImplementation("org.apache.httpcomponents:httpclient:4.5.14")
+                }
+                
+                inline fun <reified T : Task> task(noinline configuration: T.() -> Unit) =
+                    tasks.creating(T::class, configuration)
+                
+                fun githubPackages(): Pair<String, String> {
+                    return Pair("a", "b")
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
