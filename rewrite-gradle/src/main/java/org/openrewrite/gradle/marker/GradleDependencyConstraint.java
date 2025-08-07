@@ -19,8 +19,9 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Models a dependency constraint in Gradle. These are typically used to manage the versions of transitive dependencies.
@@ -50,5 +51,5 @@ public class GradleDependencyConstraint {
     @Nullable
     String reason;
     @Builder.Default
-    List<String> rejectedVersions = Collections.emptyList();
+    List<String> rejectedVersions = emptyList();
 }

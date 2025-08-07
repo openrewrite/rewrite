@@ -157,7 +157,7 @@ public class GradleDependencyConfiguration implements Serializable {
         this.directResolved = directResolved;
         this.exceptionType = exceptionType;
         this.message = message;
-        this.constraints = Collections.emptyList();
+        this.constraints = emptyList();
     }
 
     /**
