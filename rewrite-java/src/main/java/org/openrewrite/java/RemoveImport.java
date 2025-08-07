@@ -58,7 +58,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            boolean isKotlin = !(cu instanceof J.CompilationUnit) && tree.toString().contains("K.CompilationUnit"); // poor man's `cu instanceof K.CompilationUnit`
+            boolean isKotlin = !(cu instanceof J.CompilationUnit) && (cu.getSourcePath().toString().endsWith("kt") || cu.getSourcePath().toString().endsWith("kts")); // poor man's `cu instanceof K.CompilationUnit`
             ImportLayoutStyle importLayoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
