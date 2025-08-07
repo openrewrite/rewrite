@@ -93,14 +93,16 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             }
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                String declaringType = TypeUtils.toFullyQualifiedName(method.getDeclaringType().getFullyQualifiedName());
-                if (fullyQualifiedNamesAreEqual(declaringType, typeWithSuperTypes)) {
-                    methodsAndFieldsUsed.add(method.getName());
-                } else if (declaringType.equals(owner)) {
-                    if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
+                if (method.hasFlags(Flag.Static) || isKotlin) {
+                    String declaringType = TypeUtils.toFullyQualifiedName(method.getDeclaringType().getFullyQualifiedName());
+                    if (fullyQualifiedNamesAreEqual(declaringType, typeWithSuperTypes)) {
                         methodsAndFieldsUsed.add(method.getName());
-                    } else {
-                        otherMethodsAndFieldsInTypeUsed.add(method.getName());
+                    } else if (declaringType.equals(owner)) {
+                        if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
+                            methodsAndFieldsUsed.add(method.getName());
+                        } else {
+                            otherMethodsAndFieldsInTypeUsed.add(method.getName());
+                        }
                     }
                 }
             }
