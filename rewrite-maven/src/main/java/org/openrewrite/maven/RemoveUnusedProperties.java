@@ -267,6 +267,14 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
         }
 
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+            if (!"pom.xml".equals(sourceFile.getSourcePath().getFileName().toString())) {
+                return false;
+            }
+            return super.isAcceptable(sourceFile, executionContext);
+        }
+
+        @Override
         public PlainText visitText(PlainText text, ExecutionContext ctx) {
             Matcher matcher = dollarMatcher.matcher(text.getText());
             while (matcher.find()) {
