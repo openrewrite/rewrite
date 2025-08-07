@@ -676,7 +676,7 @@ public class Autodetect extends NamedStyles {
                                     addNewLine = false;
                                 }
 
-                                if (!(i - 1 >= 0 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
+                                if (!(i >= 1 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
                                       i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
@@ -696,7 +696,7 @@ public class Autodetect extends NamedStyles {
                                     addNewLine = false;
                                 }
 
-                                if (!(i - 1 >= 0 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
+                                if (!(i >= 1 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
                                       i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
@@ -938,7 +938,7 @@ public class Autodetect extends NamedStyles {
                     if (containsNewLine ||
                         i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
                         !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
-                        if (i - blockStart > 0) {
+                        if (i > blockStart) {
                             ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                                     ImportLayoutStatistics.BlockType.Import,
                                     previousPkg,
@@ -962,7 +962,7 @@ public class Autodetect extends NamedStyles {
                     previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
                 }
 
-                if (i - blockStart > 0) {
+                if (i > blockStart) {
                     ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
                             ImportLayoutStatistics.BlockType.Import,
                             previousPkg,
