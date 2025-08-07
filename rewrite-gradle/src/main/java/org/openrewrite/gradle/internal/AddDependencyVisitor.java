@@ -120,9 +120,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 !(getCursor().getParentOrThrow().getValue() instanceof K.CompilationUnit)) {
                 try {
                     getCursor().dropParentUntil(value -> value instanceof J.MethodInvocation &&
-                                                         (((J.MethodInvocation) value).getSimpleName().equals("testing") ||
-                                                         ((J.MethodInvocation) value).getSimpleName().equals("sourceSets ") ||
-                                                         ((J.MethodInvocation) value).getSimpleName().equals("configurations "))
+                                                         ("testing".equals(((J.MethodInvocation) value).getSimpleName()) ||
+                                                         "sourceSets ".equals(((J.MethodInvocation) value).getSimpleName()) ||
+                                                         "configurations ".equals(((J.MethodInvocation) value).getSimpleName()))
                             );
                 } catch (IllegalStateException e) {
                     return b;
