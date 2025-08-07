@@ -154,15 +154,15 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
         rewriteRun(
           spec -> {
-              var executionCtx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-              executionCtx.setLocalRepository(mavenLocal);
-              executionCtx.setPomCache(new InMemoryMavenPomCache());
-              executionCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
+              var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+              ctx.setLocalRepository(mavenLocal);
+              ctx.setPomCache(new InMemoryMavenPomCache());
+              ctx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
 
               spec
                 .recipe(updateModel())
                 .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()).setLocalRepository(mavenLocal))
-                .recipeExecutionContext(executionCtx)
+                .recipeExecutionContext(ctx)
                 .cycles(1)
                 .expectedCyclesThatMakeChanges(1);
           },

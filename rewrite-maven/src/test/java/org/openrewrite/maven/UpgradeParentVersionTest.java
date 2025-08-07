@@ -36,15 +36,15 @@ class UpgradeParentVersionTest implements RewriteTest {
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> {
-              var executionCtx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-              executionCtx.setRepositories(List.of(
+              var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+              ctx.setRepositories(List.of(
                 MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
               ));
-              executionCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
+              ctx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
 
               spec
                 .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
-                .executionContext(executionCtx);
+                .executionContext(ctx);
           },
           pomXml(
             """
