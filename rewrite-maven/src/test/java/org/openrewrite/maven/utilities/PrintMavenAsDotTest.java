@@ -59,8 +59,8 @@ class PrintMavenAsDotTest implements RewriteTest {
             """
             <!--~~(digraph main {
             0 [label="com.mycompany.app:my-app:1"];
-            1 [label="org.yaml:snakeyaml:1.27"];
-            2 [label="org.junit.jupiter:junit-jupiter:5.7.0"];
+            1 [label="org.junit.jupiter:junit-jupiter:5.7.0"];
+            2 [label="org.yaml:snakeyaml:1.27"];
             3 [label="org.junit.jupiter:junit-jupiter-api:5.7.0"];
             4 [label="org.junit.jupiter:junit-jupiter-params:5.7.0"];
             5 [label="org.junit.jupiter:junit-jupiter-engine:5.7.0"];
@@ -69,16 +69,16 @@ class PrintMavenAsDotTest implements RewriteTest {
             8 [label="org.opentest4j:opentest4j:1.2.0"];
             9 [label="org.junit.platform:junit-platform-commons:1.7.0"];
             10 [label="org.junit.platform:junit-platform-engine:1.7.0"];
-            0 -> 1 [taillabel="Compile"];
-            0 -> 2 [taillabel="Test"];
-            2 -> 3 [taillabel="Test"];
+            0 -> 2 [taillabel="Compile"];
+            0 -> 1 [taillabel="Test"];
+            1 -> 3 [taillabel="Test"];
             3 -> 7 [taillabel="Test"];
             3 -> 8 [taillabel="Test"];
             3 -> 9 [taillabel="Test"];
-            2 -> 4 [taillabel="Test"];
-            2 -> 5 [taillabel="Test"];
+            1 -> 4 [taillabel="Test"];
+            1 -> 5 [taillabel="Test"];
             5 -> 10 [taillabel="Test"];
-            2 -> 6 [taillabel="Test"];
+            1 -> 6 [taillabel="Test"];
             })~~>--><project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
