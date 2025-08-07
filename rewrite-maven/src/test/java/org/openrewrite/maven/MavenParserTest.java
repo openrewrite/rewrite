@@ -4099,8 +4099,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ValueSource(strings = {"latest", "release"})
     @ParameterizedTest
+    @ValueSource(strings = {"latest", "release"})
     void latestOrReleaseVersionInDependencyManagement(String version) {
         rewriteRun(
           pomXml(
