@@ -147,12 +147,14 @@ class RewriteTestTest implements RewriteTest {
     void allowNonWhitespaceInWhitespace() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
-          java("""
+          java(
+                """
           import java.util.List;;
           interface A {
               List<String> getList();
           }
-          """)
+          """
+          )
         );
     }
 }
