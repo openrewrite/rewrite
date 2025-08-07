@@ -35,7 +35,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
@@ -269,7 +271,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
@@ -1387,7 +1391,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-arc",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
