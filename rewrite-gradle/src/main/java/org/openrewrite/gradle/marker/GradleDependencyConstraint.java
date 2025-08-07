@@ -15,10 +15,12 @@
  */
 package org.openrewrite.gradle.marker;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -37,7 +39,8 @@ import static java.util.Collections.emptyList;
  */
 @Value
 @Builder
-public class GradleDependencyConstraint {
+@AllArgsConstructor
+public class GradleDependencyConstraint implements Serializable {
     String groupId;
     String artifactId;
     @Nullable
