@@ -116,8 +116,17 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         J.Block b = super.visitBlock(block, ctx);
         if (b == block && insertPredicate != null && insertPredicate.test(getCursor())) {
             // If we're visiting a gradle kotlin file but we're not visiting the highest level block we should not add a dependencies block.
-            if (getCursor().firstEnclosing(K.CompilationUnit.class) != null && !(getCursor().getParentOrThrow().getValue() instanceof K.CompilationUnit)) {
-                return b;
+            if (getCursor().firstEnclosing(K.CompilationUnit.class) != null &&
+                !(getCursor().getParentOrThrow().getValue() instanceof K.CompilationUnit)) {
+                try {
+                    getCursor().dropParentUntil(value -> value instanceof J.MethodInvocation &&
+                                                         (((J.MethodInvocation) value).getSimpleName().equals("testing") ||
+                                                         ((J.MethodInvocation) value).getSimpleName().equals("sourceSets ") ||
+                                                         ((J.MethodInvocation) value).getSimpleName().equals("configurations "))
+                            );
+                } catch (IllegalStateException e) {
+                    return b;
+                }
             }
             if (!hasDependenciesBlock(b.getStatements())) {
                 Cursor parent = getCursor().dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
