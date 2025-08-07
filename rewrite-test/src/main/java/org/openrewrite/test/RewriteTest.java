@@ -379,7 +379,7 @@ public interface RewriteTest extends SourceSpecs {
         recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
                 .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
-        recipeCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, true);
+        recipeCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, recipeCtx.getMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, true));
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,

@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.ExecutionContext.MAVEN_SETTINGS_LOAD_FROM_DISK;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -152,17 +153,19 @@ class MavenDependencyFailuresTest implements RewriteTest {
           .snapshots(false).knownToExist(true).build();
 
         rewriteRun(
-          spec -> spec
-            .recipe(updateModel())
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-            )
-            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-              .setPomCache(new InMemoryMavenPomCache())
-            )
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+          spec -> {
+              var executionCtx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+              executionCtx.setLocalRepository(mavenLocal);
+              executionCtx.setPomCache(new InMemoryMavenPomCache());
+              executionCtx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
+
+              spec
+                .recipe(updateModel())
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()).setLocalRepository(mavenLocal))
+                .recipeExecutionContext(executionCtx)
+                .cycles(1)
+                .expectedCyclesThatMakeChanges(1);
+          },
           pomXml(
             """
               <project>
