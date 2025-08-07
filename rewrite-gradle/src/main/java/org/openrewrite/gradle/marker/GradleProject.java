@@ -197,7 +197,7 @@ public class GradleProject implements Marker, Serializable {
     /**
      * Upgrade the specified dependency within all configurations.
      */
-    public GradleProject upgradeDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject upgradeDirectDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
         return mapConfigurations(
                 conf -> conf.upgradeDirectDependencies(gavs, getMavenRepositories(), ctx),
                 ctx
@@ -207,7 +207,7 @@ public class GradleProject implements Marker, Serializable {
     /**
      * Upgrade the specified dependency within the specified configuration and all configurations which extend from that configuration.
      */
-    public GradleProject upgradeDependencyVersion(String configuration, GroupArtifactVersion gav, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject upgradeDirectDependencyVersion(String configuration, GroupArtifactVersion gav, ExecutionContext ctx) throws MavenDownloadingException {
         return mapConfiguration(
                 configuration,
                 conf -> conf.upgradeDirectDependency(gav, getMavenRepositories(), ctx),

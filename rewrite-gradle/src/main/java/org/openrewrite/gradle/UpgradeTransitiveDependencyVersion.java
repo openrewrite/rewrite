@@ -62,7 +62,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
-import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -489,9 +488,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                for (GroupArtifactVersion gav : gavs) {
-                    gp = replaceVersion(gp, ctx, gav, configNames);
-                }
+                gp = gp.upgradeTransitiveDependencyVersions(gavs, ctx);
                 return gp;
             }
         };

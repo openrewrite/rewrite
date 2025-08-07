@@ -220,9 +220,9 @@ class UpgradeMarker extends Recipe {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated;
                 if (configuration == null) {
-                    updated = original.upgradeDependencyVersions(newGavs, ctx);
+                    updated = original.upgradeDirectDependencyVersions(newGavs, ctx);
                 } else {
-                    updated = original.upgradeDependencyVersion(configuration, newGavs.getFirst(), ctx);
+                    updated = original.upgradeDirectDependencyVersion(configuration, newGavs.getFirst(), ctx);
                 }
                 testAssertion.accept(original, updated);
                 return tree;
