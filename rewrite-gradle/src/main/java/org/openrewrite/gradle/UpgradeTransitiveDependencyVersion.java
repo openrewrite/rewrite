@@ -241,7 +241,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
-                            if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
+                            if (resolved.isTransitive() && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {
