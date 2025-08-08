@@ -1292,12 +1292,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void upgradeDependencyVersionBeforeApplyingTheUpgradeTransitiveDependencyVersion() {
         rewriteRun(
           // We use an imperative recipe rather than a declarative recipeList, because in a declarative recipeList, all recipes perform their scanning phase first and only then perform their editing phase.
-          // In this test case, we want the UpgradeTransitiveDependencyVersion recipe to scan and edit based on the output of the first recipe’s changes.
+          // In this test case, we want the UpgradeTransitiveDependencyVersion recipe to scan and edit based on the output of the first recipe’s changes,
+          // to reflect a recipe downstream that uses this kind of setup.
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   if (tree instanceof G.CompilationUnit) {
-                      // A recipe that makes changes to Gradle's build file
+                      // A recipe that makes changes to an existing dependency in the Gradle's build file
                       UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
                       UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
                       upgrade.getScanner(acc).visit(tree, ctx);
@@ -1323,9 +1324,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.0'
                   }
-
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
-                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
               }
               """,
             """
@@ -1338,9 +1337,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
                   }
-
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
-                  testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
               }
               """
           )
