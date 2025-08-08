@@ -28,6 +28,7 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.toList;
@@ -70,27 +71,30 @@ public class PrintMavenAsDot extends Recipe {
                                 null);
                 dotLabel(dot, 0, root);
                 index.put(root, 0);
-
-                for (List<ResolvedDependency> deps : mrr.getDependencies().values()) {
-                    for (ResolvedDependency dep : deps) {
-                        if (!index.containsKey(dep.getGav())) {
-                            dotLabel(dot, index.size(), dep.getGav());
-                            index.put(dep.getGav(), index.size());
-                        }
+                Map<Scope, List<ResolvedDependency>> dependencyMap = mrr.getDependencies();
+                List<ResolvedDependency> flattenedDependencyList = Stream.of(
+                        dependencyMap.get(Scope.Compile),
+                        dependencyMap.get(Scope.Runtime),
+                        dependencyMap.get(Scope.Test),
+                        dependencyMap.get(Scope.Provided)
+                ).flatMap(Collection::stream).collect(toList());
+                for (ResolvedDependency dep : flattenedDependencyList) {
+                    if (!index.containsKey(dep.getGav())) {
+                        dotLabel(dot, index.size(), dep.getGav());
+                        index.put(dep.getGav(), index.size());
                     }
                 }
 
                 Set<ResolvedGroupArtifactVersion> seen = newSetFromMap(new IdentityHashMap<>());
-                for (Scope scope : Scope.values()) {
-                    if (scope.ordinal() >= Scope.Compile.ordinal() && scope.ordinal() <= Scope.Test.ordinal()) {
-                        dotEdges(
-                                dot, root, scope,
-                                mrr.getDependencies().get(scope).stream()
-                                        .filter(dep -> dep.getDepth() == 0 && seen.add(dep.getGav()))
-                                        .collect(toList()),
-                                index
-                        );
-                    }
+                List<Scope> scopes = Arrays.asList(Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided);
+                for (Scope scope : scopes) {
+                    dotEdges(
+                            dot, root, scope,
+                            dependencyMap.get(scope).stream()
+                                    .filter(dep -> dep.getDepth() == 0 && seen.add(dep.getGav()))
+                                    .collect(toList()),
+                            index
+                    );
                 }
 
                 dot.append("}");
