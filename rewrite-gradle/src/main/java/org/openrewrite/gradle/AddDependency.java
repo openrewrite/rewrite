@@ -241,10 +241,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
-                        // If we're visiting a block in a Kotlin Gradle build file, we should only
-                        // mark it as top level when the direct parent is the compilation unit.
-                        if (cursor.firstEnclosing(K.CompilationUnit.class) != null && cursor.getValue() instanceof J.Block) {
-                            return cursor.getParentOrThrow().getValue() instanceof K.CompilationUnit;
+                        if (cursor.getValue() instanceof J.Block) {
+                            return cursor.getParentOrThrow().getValue() instanceof JavaSourceFile;
                         }
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
