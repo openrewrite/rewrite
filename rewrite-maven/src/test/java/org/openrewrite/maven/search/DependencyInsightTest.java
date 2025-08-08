@@ -18,8 +18,10 @@ package org.openrewrite.maven.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class DependencyInsightTest implements RewriteTest {
@@ -28,7 +30,13 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).singleElement().satisfies(row -> {
+                assertThat(row.getGroupId()).isEqualTo("com.google.guava");
+                assertThat(row.getArtifactId()).isEqualTo("guava");
+                assertThat(row.getVersion()).isEqualTo("29.0-jre");
+              })
+            ),
           pomXml(
             """
               <project>
