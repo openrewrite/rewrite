@@ -19,6 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.gradle.internal.impldep.org.bouncycastle.oer.its.ieee1609dot2.LinkageData;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -127,6 +128,7 @@ public class DependencyInsight extends Recipe {
                 // configuration -> dependency which is or transitively depends on search target -> search target
                 Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
                 Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
+                Set<DependenciesInUse.Row> rows = new LinkedHashSet<>();
                 for (GradleDependencyConfiguration c : gp.getConfigurations()) {
                     if (!(configuration == null || configuration.isEmpty() || c.getName().equals(configuration))) {
                         continue;
@@ -151,7 +153,7 @@ public class DependencyInsight extends Recipe {
                             GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
                             configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(requestedGav);
                             directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
-                            dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                            rows.add(new DependenciesInUse.Row(
                                     projectName,
                                     sourceSetName,
                                     dep.getGroupId(),
@@ -163,6 +165,9 @@ public class DependencyInsight extends Recipe {
                             ));
                         }
                     }
+                }
+                for (DependenciesInUse.Row row : rows) {
+                    dependenciesInUse.insertRow(ctx, row);
                 }
                 if (directDependencyToTargetDependency.isEmpty()) {
                     return sourceFile;

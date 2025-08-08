@@ -256,13 +256,11 @@ class DependencyInsightTest implements RewriteTest {
     void pattern() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
-            .dataTable(DependenciesInUse.Row.class, rows -> {
-                assertThat(rows).isNotEmpty();
-                DependenciesInUse.Row row = rows.getFirst();
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).singleElement().satisfies(row -> {
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getVersion()).isEqualTo("2.13.4");
-            }),
+            })),
           buildGradle(
             """
               plugins {
@@ -411,7 +409,7 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.datatype");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-datatype-jsr310");
                 assertThat(row.getDepth()).isEqualTo(2);
-                row = rows.get(4);
+                row = rows.get(1);
                 assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getDepth()).isEqualTo(3);
