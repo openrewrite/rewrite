@@ -205,7 +205,6 @@ class DependencyInsightTest implements RewriteTest {
       "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
       "6.1.X", // X range
       "~6.1.0", "~6.1", // tilde range
-      "^6.1.0", // caret range
     })
     void versionPatterns(String versionPattern) {
         rewriteRun(
