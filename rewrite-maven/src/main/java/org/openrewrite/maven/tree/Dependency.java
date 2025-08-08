@@ -20,8 +20,11 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @Builder
@@ -37,15 +40,29 @@ public class Dependency implements Serializable {
     String type;
 
     @With
-    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
+    @Nullable
     String scope;
 
     @Builder.Default
-    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
+    @Nullable
     List<GroupArtifact> exclusions = emptyList();
 
     @Nullable
     String optional;
+
+    @Builder.Default
+    Set<DependencyAttribute> attributes = emptySet();
+
+    /**
+     * Lookup an attribute by its class. There should only ever be one attribute of a given type in the set, although
+     * this is enforced only by convention.
+     */
+    <T extends DependencyAttribute> Optional<T> findAttribute(Class<T> clazz) {
+        return attributes.stream()
+                .filter(clazz::isInstance)
+                .findAny()
+                .map(clazz::cast);
+    }
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();
