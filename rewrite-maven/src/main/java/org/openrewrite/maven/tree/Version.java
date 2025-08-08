@@ -268,7 +268,7 @@ public class Version implements Comparable<Version> {
                     }
                 }
 
-                if (end - start > 0) {
+                if (end > start) {
                     this.token = this.version.substring(start, end);
                     this.number = state >= 0;
                 } else {
