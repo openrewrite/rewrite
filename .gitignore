@@ -15,3 +15,5 @@ IDE.properties
 .tool-versions
 .aider*
 /worktrees
+.worktrees/
+.local/
