@@ -202,4 +202,48 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5882")
+    @Test
+    void datatableRowsWhenPresentMoreThanOnce() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("*", "jackson-core", null, null, null))
+            .dataTable(DependenciesInUse.Row.class, rows -> assertThat(rows).singleElement().satisfies(row -> {
+                  assertThat(row.getArtifactId()).isEqualTo("jackson-core");
+                  assertThat(row.getVersion()).isEqualTo("2.13.4");
+              })
+            ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>7.39.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~(com.fasterxml.jackson.core:jackson-core:2.13.4)~~>--><dependency>
+                      <groupId>org.openrewrite</groupId>
+                      <artifactId>rewrite-core</artifactId>
+                      <version>7.39.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
