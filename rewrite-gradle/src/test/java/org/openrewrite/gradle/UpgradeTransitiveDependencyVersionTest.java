@@ -1298,7 +1298,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   if (tree instanceof G.CompilationUnit) {
-                      // A recipe that makes changes to an existing dependency in the Gradle's build file
+                      // A recipe that updates an existing dependency in the Gradle build file.
+                      // That dependency itself declares the one targeted by UpgradeTransitiveDependencyVersion as a transitive dependency.
+                      // In this case, "org.openrewrite:rewrite-java" has "com.fasterxml.jackson.core:jackson-databind" as a transitive dependency.
                       UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
                       UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
                       upgrade.getScanner(acc).visit(tree, ctx);
