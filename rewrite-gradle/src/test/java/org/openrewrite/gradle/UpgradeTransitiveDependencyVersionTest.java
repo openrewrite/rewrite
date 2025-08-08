@@ -1291,18 +1291,19 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeDependencyVersionBeforeApplyingTheUpgradeTransitiveDependencyVersion() {
         rewriteRun(
-          // This test simulates a scenario where a recipe first applies an UpgradeDependencyVersion, followed immediately by an UpgradeTransitiveDependencyVersion internally.
           // We use an imperative recipe rather than a declarative recipeList, because in a declarative recipeList, all recipes perform their scanning phase first and only then perform their editing phase.
-          // In this test case, we want the second recipe to scan and edit based on the output of the first recipe’s changes.
+          // In this test case, we want the UpgradeTransitiveDependencyVersion recipe to scan and edit based on the output of the first recipe’s changes.
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   if (tree instanceof G.CompilationUnit) {
+                      // A recipe that makes changes to Gradle's build file
                       UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
                       UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
                       upgrade.getScanner(acc).visit(tree, ctx);
                       tree = upgrade.getVisitor(acc).visit(tree, ctx);
 
+                      // Use the changed tree as input for a UpgradeTransitiveDependencyVersion run
                       UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
                       UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive.getInitialValue(ctx);
                       upgradeTransitive.getScanner(accTransitive2).visit(tree, ctx);
