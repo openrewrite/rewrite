@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
@@ -319,6 +320,48 @@ class DependencyInsightTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:8.0.0'
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "6.1.5", // exact
+      "6.1.1-6.1.15", // hyphenated
+      "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
+      "6.1.X", // X range
+      "~6.1.0", "~6.1", // tilde range
+      "^6.1.0", // caret range
+    })
+    void versionPatterns(String versionPattern) {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", versionPattern, null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.springframework:spring-core:6.1.5'
+                  implementation 'org.springframework:spring-aop:6.2.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~(org.springframework:*:%s)~~>*/implementation 'org.springframework:spring-core:6.1.5'
+                  implementation 'org.springframework:spring-aop:6.2.2'
+              }
+              """.formatted(versionPattern)
           )
         );
     }
