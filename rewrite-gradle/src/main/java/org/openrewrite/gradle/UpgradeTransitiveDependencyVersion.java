@@ -265,21 +265,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                     }
 
                                                     for (GradleDependencyConfiguration config : all.keySet()) {
-                                                        extendsFrom:
                                                         for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
-                                                            if (gc.getName().equals(config.getName()) &&
-                                                                    gc.getRequested().size() == config.getRequested().size()) {
-                                                                // Check if all dependencies match, only looking at groupId and artifactId
-                                                                for (int i = 0; i < gc.getRequested().size(); i++) {
-                                                                    if (!Objects.equals(
-                                                                            gc.getRequested().get(i).getGroupId(),
-                                                                            config.getRequested().get(i).getGroupId()) ||
-                                                                        !Objects.equals(
-                                                                                gc.getRequested().get(i).getArtifactId(),
-                                                                                config.getRequested().get(i).getArtifactId())) {
-                                                                        continue extendsFrom;
-                                                                    }
-                                                                }
+                                                            if (gc.getName().equals(config.getName())) {
                                                                 return true;
                                                             }
                                                         }

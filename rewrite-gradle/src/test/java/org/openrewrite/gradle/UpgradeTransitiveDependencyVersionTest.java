@@ -1329,7 +1329,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   constraints {
-                      testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.12.0'
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.0'
                   }
 
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
@@ -1344,7 +1344,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-databind:2.15.1')
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
                   }
 
                   implementation 'org.openrewrite:rewrite-java:8.0.1'
