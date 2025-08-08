@@ -2167,6 +2167,122 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5855")
+    @Nested
+    class GenericWildcard {
+        @Test
+        void wildcardInJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link List<?>}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void wildcardExtendsInJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link List<? extends Number>}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void wildcardSuperInJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link List<? super Integer>}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void nestedWildcardsInJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.Map;
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link Map<String, List<? extends Number>>}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void wildcardInMethodParameterJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link #process(List)}
+                       */
+                      void method() {}
+                      
+                      void process(List<?> items) {}
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void wildcardWithSpacesInJavadocLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+    
+                  class Test {
+                      /**
+                       * {@link List< ? >}
+                       * {@link List< ? extends Number >}
+                       */
+                      void method() {}
+                  }
+                  """
+              )
+            );
+        }
+    }
+
     // Snippet tests based on https://docs.oracle.com/en/java/javase/21/javadoc/snippets.html
     @Nested
     class Snippet {

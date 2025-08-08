@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -181,6 +183,58 @@ class ImportTest implements RewriteTest {
           java(
             """
               import java.util.List ;
+              """
+          )
+        );
+    }
+
+    @Disabled("Parser does not support semicolon after package declaration yet")
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonAfterPackage() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              package p;;
+              import java.util.List;
+              class AfterPackage { }
+              """
+          )
+        );
+    }
+
+    @Disabled("Parser does not support semicolon between imports yet")
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonBetweenImports() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;
+              ;import java.util.Set;
+              class BetweenImport { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonAfterImports() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;
+              ;class BetweenImport { }
               """
           )
         );

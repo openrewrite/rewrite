@@ -125,7 +125,6 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
-        jsonRpc.rpc("GetRef", new GetRef.Handler(remoteRefs, localRefs, batchSize, traceSendPackets));
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
@@ -280,11 +279,7 @@ public class RewriteRpc implements AutoCloseable {
                 if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
                     ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-
-                    // If batch is empty, we're done
-                    if (ids.isEmpty()) {
-                        return false;
-                    }
+                    assert ids.size() == inputList.size();
                 }
 
                 // Process current item in batch
@@ -364,7 +359,7 @@ public class RewriteRpc implements AutoCloseable {
         String lastKnownId = localObject != null ? id : null;
 
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
+                new GetObject(id, lastKnownId), GetObjectResponse.class));
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -375,27 +370,6 @@ public class RewriteRpc implements AutoCloseable {
 
         //noinspection unchecked
         return (T) remoteObject;
-    }
-
-    private Object getRef(Integer refId) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetRef",
-                new GetRef(refId), GetRefResponse.class), nestedRefId -> {
-            throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
-        });
-
-        Object ref = q.receive(null, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
-        }
-
-        if (ref == null) {
-            throw new IllegalStateException("Reference " + refId + " not found on remote");
-        }
-
-        remoteRefs.put(refId, ref);
-        localRefs.put(ref, refId);
-
-        return ref;
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {

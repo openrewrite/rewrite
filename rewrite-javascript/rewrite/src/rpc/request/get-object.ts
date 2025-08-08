@@ -24,8 +24,7 @@ export class GetObject {
     static handle(
         connection: rpc.MessageConnection,
         remoteObjects: Map<string, any>,
-        localObjectGenerators: Map<string, (input: string) => any>,
-        localObjects: Map<string, any>,
+        localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
         trace: boolean
@@ -35,17 +34,16 @@ export class GetObject {
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
             let objId = request.id;
             if (!localObjects.has(objId)) {
-                if (localObjectGenerators.has(objId)) {
-                    const generator = localObjectGenerators.get(objId)!;
-                    let obj = await generator(objId);
-                    localObjects.set(objId, obj);
-                    localObjectGenerators.delete(request.id);
-                } else {
-                    return [
-                        {state: RpcObjectState.DELETE},
-                        {state: RpcObjectState.END_OF_OBJECT}
-                    ];
-                }
+                return [
+                    {state: RpcObjectState.DELETE},
+                    {state: RpcObjectState.END_OF_OBJECT}
+                ];
+            }
+
+            let objectOrGenerator = localObjects.get(objId)!;
+            if (typeof objectOrGenerator === 'function') {
+                let obj = await objectOrGenerator(objId);
+                localObjects.set(objId, obj);
             }
 
             let allData = pendingData.get(objId);

@@ -168,7 +168,7 @@ public class JsonPathMatcher {
             // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
-            if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
+            if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
                     JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, path, null, false);

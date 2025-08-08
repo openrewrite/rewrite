@@ -98,6 +98,62 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recurringDependenciesGetUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.google.guava",
+            "guava",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>25.0-jre</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>23.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExists() {
