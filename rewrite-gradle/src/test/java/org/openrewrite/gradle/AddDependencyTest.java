@@ -1706,6 +1706,61 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addDependencyDependenciesButNotToFunctionsInKotlinGradle() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.apache.httpcomponents.client5:httpclient5:5.4.x")),
+          mavenProject("project",
+            buildGradleKts(
+              """
+                plugins {
+                    application
+                }
+                
+                repositories {
+                    mavenCentral()
+                    maven {
+                        url = uri("https://maven.pkg.github.com/some-org/some-repo")
+                        credentials {
+                            username = System.getenv("GITHUB_PACKAGE_USERNAME") ?: githubPackages().first
+                            password = System.getenv("GITHUB_PACKAGE_TOKEN") ?: githubPackages().second
+                        }
+                    }
+                }
+                
+                fun githubPackages(): Pair<String, String> {
+                    return Pair("a", "b")
+                }
+                """,
+              """
+                plugins {
+                    application
+                }
+                
+                repositories {
+                    mavenCentral()
+                    maven {
+                        url = uri("https://maven.pkg.github.com/some-org/some-repo")
+                        credentials {
+                            username = System.getenv("GITHUB_PACKAGE_USERNAME") ?: githubPackages().first
+                            password = System.getenv("GITHUB_PACKAGE_TOKEN") ?: githubPackages().second
+                        }
+                    }
+                }
+                
+                fun githubPackages(): Pair<String, String> {
+                    return Pair("a", "b")
+                }
+                
+                dependencies {
+                    implementation("org.apache.httpcomponents.client5:httpclient5:5.4.4")
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);
     }
