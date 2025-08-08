@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -1288,35 +1289,25 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void upgradeDependencyVersionAndThenTransitiveTwice() {
+    void upgradeDependencyVersionBeforeApplyingTheUpgradeTransitiveDependencyVersion() {
         rewriteRun(
+          // This test simulates a scenario where a recipe first applies an UpgradeDependencyVersion, followed immediately by an UpgradeTransitiveDependencyVersion internally.
+          // We use an imperative recipe rather than a declarative recipeList, because in a declarative recipeList, all recipes perform their scanning phase first and only then perform their editing phase.
+          // In this test case, we want the second recipe to scan and edit based on the output of the first recipe’s changes.
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  // First round
-                  UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
-                  UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
-                  upgrade.getScanner(acc).visit(tree, ctx);
+                  if (tree instanceof G.CompilationUnit) {
+                      UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
+                      UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
+                      upgrade.getScanner(acc).visit(tree, ctx);
+                      tree = upgrade.getVisitor(acc).visit(tree, ctx);
 
-                  UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.12.3", null, null, null);
-                  UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive = upgradeTransitive.getInitialValue(ctx);
-                  upgradeTransitive.getScanner(accTransitive).visit(tree, ctx);
-
-                  tree = upgrade.getVisitor(acc).visit(tree, ctx);
-                  tree = upgradeTransitive.getVisitor(accTransitive).visit(tree, ctx);
-
-                  // Second round
-                  UpgradeDependencyVersion upgrade2 = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.1", null);
-                  UpgradeDependencyVersion.DependencyVersionState acc2 = upgrade2.getInitialValue(ctx);
-                  upgrade2.getScanner(acc2).visit(tree, ctx);
-
-                  UpgradeTransitiveDependencyVersion upgradeTransitive2 = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
-                  UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive2.getInitialValue(ctx);
-                  upgradeTransitive2.getScanner(accTransitive2).visit(tree, ctx);
-
-                  tree = upgrade2.getVisitor(acc2).visit(tree, ctx);
-                  tree = upgradeTransitive2.getVisitor(accTransitive2).visit(tree, ctx);
-
+                      UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
+                      UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive.getInitialValue(ctx);
+                      upgradeTransitive.getScanner(accTransitive2).visit(tree, ctx);
+                      tree = upgradeTransitive.getVisitor(accTransitive2).visit(tree, ctx);
+                  }
                   return super.visit(tree, ctx);
               }
           })),
@@ -1347,7 +1338,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
                   }
 
-                  implementation 'org.openrewrite:rewrite-java:8.0.1'
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
                   testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
               }
               """
