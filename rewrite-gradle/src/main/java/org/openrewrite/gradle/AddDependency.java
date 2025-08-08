@@ -29,6 +29,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
@@ -240,6 +241,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
+                        if (cursor.getValue() instanceof J.Block) {
+                            return cursor.getParentOrThrow().getValue() instanceof JavaSourceFile;
+                        }
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
 
