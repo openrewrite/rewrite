@@ -1732,4 +1732,80 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeVersionPropertyInParentPom() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null
+          )),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <activation.api.groupId>javax.activation</activation.api.groupId>
+                    <activation.api.artifact>javax.activation-api</activation.api.artifact>
+                    <activation.api.version>1.2.0</activation.api.version>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                    <activation.api.groupId>jakarta.activation</activation.api.groupId>
+                    <activation.api.artifact>jakarta.activation-api</activation.api.artifact>
+                    <activation.api.version>1.2.2</activation.api.version>
+                  </properties>
+                  <modules>
+                    <module>sub-project</module>
+                  </modules>
+                </project>
+                """,
+              spec -> spec.path("pom.xml")
+            ),
+            mavenProject("sub-project",
+              //language=xml
+              pomXml(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>sub-project</artifactId>
+                    <version>1</version>
+                    <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>parent-project</artifactId>
+                      <version>1</version>
+                      <relatiavePath>../pom.xml</relatiavePath>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>${activation.api.groupId}</groupId>
+                        <artifactId>${activation.api.artifact}</artifactId>
+                        <version>${activation.api.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("sub-project/pom.xml")
+              )
+            )
+          )
+        );
+    }
 }
