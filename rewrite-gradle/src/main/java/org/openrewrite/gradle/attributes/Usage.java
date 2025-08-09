@@ -16,17 +16,16 @@
 package org.openrewrite.gradle.attributes;
 
 import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Attribute representing the <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/Usage.html">usage</a> of a dependency variant.
  * This describes the intended consumer use case for a variant (e.g., compiling against an API, runtime execution).
  * See <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/Usage.html">usage javadoc</a>
  */
-public enum Usage implements DependencyAttribute {
+public enum Usage implements Attribute {
     /**
      * The Java API of a library, packaged as class path elements, either a JAR or a classes directory.
      */
@@ -62,17 +61,11 @@ public enum Usage implements DependencyAttribute {
      */
     VERSION_CATALOG;
 
-    // No compiled reference made to org.gradle.api.attributes.Usage for backwards-compatibility with older Gradle
-    public static @Nullable Usage from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable Usage from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable Usage from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.Usage"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.Usage"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }

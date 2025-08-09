@@ -16,16 +16,15 @@
 package org.openrewrite.gradle.attributes;
 
 import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Attribute to be used on variants containing the output <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/VerificationType.html">verification checks</a> verification checks (Test data, Jacoco results, etc) which specify the type of verification data.
  * This attribute is usually found on variants that have the Category attribute valued at Category.VERIFICATION.
  */
-public enum VerificationType implements DependencyAttribute {
+public enum VerificationType implements Attribute {
     /**
      * Binary test coverage data gathered by JaCoCo
      */
@@ -39,16 +38,11 @@ public enum VerificationType implements DependencyAttribute {
      */
     TEST_RESULTS;
 
-    public static @Nullable VerificationType from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable VerificationType from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable VerificationType from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.VerificationType"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.VerificationType"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }

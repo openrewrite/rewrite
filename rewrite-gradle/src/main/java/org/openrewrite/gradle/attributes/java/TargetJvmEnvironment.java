@@ -16,17 +16,16 @@
 package org.openrewrite.gradle.attributes.java;
 
 import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Attribute representing the <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/java/TargetJvmEnvironment.html">target JVM environment</a> of a dependency variant.
  * This attribute can be used by libraries to indicate that a certain variant is better suited for a certain JVM environment.
  * It does however NOT strictly require environments to match, as the general assumption is that Java libraries can also run on environments they are not optimized for.
  */
-public enum TargetJvmEnvironment implements DependencyAttribute {
+public enum TargetJvmEnvironment implements Attribute {
     /**
      * An Android environment.
      */
@@ -37,17 +36,11 @@ public enum TargetJvmEnvironment implements DependencyAttribute {
      */
     STANDARD_JVM;
 
-    // No compiled reference made to org.gradle.api.attributes.java.TargetJvmEnvironment for backwards-compatibility with older Gradle
-    public static @Nullable TargetJvmEnvironment from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable TargetJvmEnvironment from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable TargetJvmEnvironment from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.java.TargetJvmEnvironment"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.java.TargetJvmEnvironment"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }

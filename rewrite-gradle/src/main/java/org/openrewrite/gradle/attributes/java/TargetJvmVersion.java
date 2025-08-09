@@ -16,10 +16,9 @@
 package org.openrewrite.gradle.attributes.java;
 
 import lombok.Value;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Represents the <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/java/TargetJvmVersion.html">target version</a>
@@ -27,21 +26,15 @@ import org.openrewrite.maven.tree.DependencyAttribute;
  * For example, "5" for Java 5, "8" for Java 8, or "11" for Java 11.
  */
 @Value
-public class TargetJvmVersion implements DependencyAttribute {
+public class TargetJvmVersion implements Attribute {
     /**
      * The minimal target version for a Java library. Any consumer below this version would not be able to consume it.
      */
     int version;
 
-    public static @Nullable TargetJvmVersion from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable TargetJvmVersion from(org.gradle.api.attributes.AttributeContainer attributes) {
-        Integer version = attributes.getAttribute(Attribute.of("org.gradle.jvm.version", Integer.class));
+    public static @Nullable TargetJvmVersion from(HasAttributes hasAttributes) {
+        Integer version = hasAttributes.getAttributes()
+                .getAttribute(org.gradle.api.attributes.Attribute.of("org.gradle.jvm.version", Integer.class));
         if (version == null) {
             return null;
         }

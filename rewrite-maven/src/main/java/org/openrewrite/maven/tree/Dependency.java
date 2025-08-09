@@ -17,20 +17,21 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.attributes.Attribute;
+import org.openrewrite.maven.attributes.Attributed;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @With
-public class Dependency implements Serializable {
+public class Dependency implements Serializable, Attributed {
     GroupArtifactVersion gav;
 
     @Nullable
@@ -51,18 +52,7 @@ public class Dependency implements Serializable {
     String optional;
 
     @Builder.Default
-    Set<DependencyAttribute> attributes = emptySet();
-
-    /**
-     * Lookup an attribute by its class. There should only ever be one attribute of a given type in the set, although
-     * this is enforced only by convention.
-     */
-    <T extends DependencyAttribute> Optional<T> findAttribute(Class<T> clazz) {
-        return attributes.stream()
-                .filter(clazz::isInstance)
-                .findAny()
-                .map(clazz::cast);
-    }
+    Map<String, Attribute> attributes = emptyMap();
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();

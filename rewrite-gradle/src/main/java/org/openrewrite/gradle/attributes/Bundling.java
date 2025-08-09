@@ -17,14 +17,14 @@ package org.openrewrite.gradle.attributes;
 
 import org.gradle.api.Named;
 import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Attribute representing the <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/Bundling.html">bundling</a> of a dependency variant.
  */
-public enum Bundling implements DependencyAttribute {
+public enum Bundling implements Attribute {
     /**
      * Dependencies are provided externally at runtime (not bundled)
      */
@@ -40,16 +40,11 @@ public enum Bundling implements DependencyAttribute {
      */
     SHADOWED;
 
-    public static @Nullable Bundling from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable Bundling from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable Bundling from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.Bundling"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.Bundling"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }

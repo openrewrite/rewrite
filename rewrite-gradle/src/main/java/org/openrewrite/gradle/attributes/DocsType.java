@@ -16,15 +16,14 @@
 package org.openrewrite.gradle.attributes;
 
 import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * See Gradle javadocs for <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/DocsType.html">org.gradle.api.attributes.DocsType</a>
  */
-public enum DocsType implements DependencyAttribute {
+public enum DocsType implements Attribute {
     /**
      * The typical documentation for Java APIs
      */
@@ -47,16 +46,11 @@ public enum DocsType implements DependencyAttribute {
      */
     DOXYGEN;
 
-    public static @Nullable DocsType from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable DocsType from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable DocsType from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.DocsType"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.DocsType"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }

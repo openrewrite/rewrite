@@ -16,15 +16,14 @@
 package org.openrewrite.gradle.attributes;
 
 import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.Attribute;
+import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.tree.DependencyAttribute;
+import org.openrewrite.maven.attributes.Attribute;
 
 /**
  * Attribute representing the technical elements of a  <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/LibraryElements.html">library variant</a>.
  */
-public enum LibraryElements implements DependencyAttribute {
+public enum LibraryElements implements Attribute {
     /**
      * The JVM classes format
      */
@@ -64,16 +63,11 @@ public enum LibraryElements implements DependencyAttribute {
      */
     RESOURCES;
 
-    public static @Nullable LibraryElements from(org.gradle.api.artifacts.Dependency dependency) {
-        if (!(dependency instanceof ModuleDependency)) {
-            return null;
-        }
-        return from(((ModuleDependency) dependency).getAttributes());
-    }
-
-    public static @Nullable LibraryElements from(org.gradle.api.attributes.AttributeContainer attributes) {
+    public static @Nullable LibraryElements from(HasAttributes hasAttributes) {
         try {
-            return from((Named) attributes.getAttribute(Attribute.of(Class.forName("org.gradle.api.attributes.LibraryElements"))));
+            return from((Named) hasAttributes.getAttributes()
+                    .getAttribute(org.gradle.api.attributes.Attribute.of(
+                            Class.forName("org.gradle.api.attributes.LibraryElements"))));
         } catch (ClassCastException | ClassNotFoundException e) {
             return null;
         }
