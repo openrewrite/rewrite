@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -29,6 +29,8 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 }
 
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
+kotlin {
+    compilerOptions {
+        jvmTarget.set(if (name.contains("Test")) JvmTarget.JVM_21 else JvmTarget.JVM_1_8)
+    }
 }
