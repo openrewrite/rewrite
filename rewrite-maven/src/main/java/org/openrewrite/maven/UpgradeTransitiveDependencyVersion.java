@@ -136,7 +136,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Set<ResolvedDependency> matchingDependencies = getResolutionResult().findDependencies(groupId, artifactId, null)
                         .stream()
-                        .filter(dep -> dep.getDepth() > 0)
+                        .filter(ResolvedDependency::isTransitive)
                         .collect(toCollection(LinkedHashSet::new));
                 if (matchingDependencies.isEmpty()) {
                     return document;

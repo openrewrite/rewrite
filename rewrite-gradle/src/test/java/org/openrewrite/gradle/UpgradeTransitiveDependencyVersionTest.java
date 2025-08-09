@@ -23,6 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,6 +34,7 @@ import java.util.List;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
@@ -1278,6 +1282,64 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             """
               gradle.ext {
                   jacksonVersion = '2.12.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeDependencyVersionBeforeApplyingTheUpgradeTransitiveDependencyVersion() {
+        rewriteRun(
+          // We use an imperative recipe rather than a declarative recipeList, because in a declarative recipeList, all recipes perform their scanning phase first and only then perform their editing phase.
+          // In this test case, we want the UpgradeTransitiveDependencyVersion recipe to scan and edit based on the output of the first recipe’s changes,
+          // to reflect a recipe downstream that uses this kind of setup.
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  if (tree instanceof G.CompilationUnit) {
+                      // A recipe that updates an existing dependency in the Gradle build file.
+                      // That dependency itself declares the one targeted by UpgradeTransitiveDependencyVersion as a transitive dependency.
+                      // In this case, "org.openrewrite:rewrite-java" has "com.fasterxml.jackson.core:jackson-databind" as a transitive dependency.
+                      UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
+                      UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
+                      upgrade.getScanner(acc).visit(tree, ctx);
+                      tree = upgrade.getVisitor(acc).visit(tree, ctx);
+
+                      // Use the changed tree as input for a UpgradeTransitiveDependencyVersion run
+                      UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
+                      UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive.getInitialValue(ctx);
+                      upgradeTransitive.getScanner(accTransitive2).visit(tree, ctx);
+                      tree = upgradeTransitive.getVisitor(accTransitive2).visit(tree, ctx);
+                  }
+                  return super.visit(tree, ctx);
+              }
+          })),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.0'
+                  }
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  constraints {
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
+                  }
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
               }
               """
           )
