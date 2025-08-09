@@ -1060,7 +1060,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (accessor.getReturnTypeReference() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(accessor.getRightParenthesis())));
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(getRightParenthesis(accessor))));
             returnTypeExpression = accessor.getReturnTypeReference().accept(this, data).withPrefix(prefix(accessor.getReturnTypeReference()));
         }
 
@@ -1094,7 +1094,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         ));
     }
 
-    private static PsiElement getLeftParenthesis(KtPropertyAccessor accessor) {
+    private static @org.jetbrains.annotations.Nullable PsiElement getRightParenthesis(KtPropertyAccessor accessor) {
+        PsiElement rpar = accessor.getRightParenthesis();
+        if (rpar == null) {
+            return null;
+        }
+        if (rpar.getNextSibling() == null) {
+            return rpar.getParent();
+        }
+        return rpar;
+    }
+
+    private static @org.jetbrains.annotations.Nullable PsiElement getLeftParenthesis(KtPropertyAccessor accessor) {
         PsiElement lpar = accessor.getLeftParenthesis();
         if (lpar == null) {
             return null;
