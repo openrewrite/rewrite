@@ -13,9 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.tree;
+package org.openrewrite.gradle.attributes;
 
 import lombok.Value;
+import org.gradle.api.artifacts.Dependency;
+import org.gradle.api.artifacts.ProjectDependency;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.DependencyAttribute;
 
 /**
@@ -30,4 +33,11 @@ public class ProjectAttribute implements DependencyAttribute {
      * A subproject may have a path like ":someDir:projectName"
      */
     String path;
+
+    public static @Nullable ProjectAttribute from(Dependency dependency) {
+        if(!(dependency instanceof ProjectDependency)) {
+            return null;
+        }
+        return new ProjectAttribute(((ProjectDependency)dependency).getPath());
+    }
 }
