@@ -291,9 +291,15 @@ public class ChangeDependency extends Recipe {
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                List<Expression> newArguments;
+                                if (newVersion == null) {
+                                    newArguments = ListUtils.mapFirst(m.getArguments(), gstr ->
+                                            gstring.withStrings(ListUtils.mapFirst(gstring.getStrings(), lit ->
+                                                    literal.withValue(replacement).withValueSource(replacement))));
+                                } else {
+                                    newArguments = singletonList(literal.withValue(replacement).withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter()));
+                                }
+                                m = m.withArguments(newArguments);
                             }
                         }
                     }
@@ -584,9 +590,15 @@ public class ChangeDependency extends Recipe {
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                List<Expression> newArguments;
+                                if (newVersion == null) {
+                                    newArguments = ListUtils.mapFirst(m.getArguments(), tmplt ->
+                                            template.withStrings(ListUtils.mapFirst(template.getStrings(), lit ->
+                                                    literal.withValue(replacement).withValueSource(replacement))));
+                                } else {
+                                    newArguments = singletonList(literal.withValue(replacement).withValueSource(template.getDelimiter() + replacement + template.getDelimiter()));
+                                }
+                                m = m.withArguments(newArguments);
                             }
                         }
                     }
