@@ -1050,10 +1050,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 parameters.add(padRight(stmt, prefix(accessor.getRightParenthesis())));
             }
 
-            params = JContainer.build(prefix(accessor.getLeftParenthesis()), parameters, Markers.EMPTY);
+            params = JContainer.build(prefix(accessor.getLeftParenthesis().getParent()), parameters, Markers.EMPTY);
         } else {
             params = JContainer.build(
-                    prefix(accessor.getLeftParenthesis()),
+                    prefix(accessor.getLeftParenthesis().getParent()),
                     singletonList(padRight(new J.Empty(randomId(), prefix(accessor.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
             );
