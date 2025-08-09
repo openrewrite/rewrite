@@ -17,11 +17,14 @@ package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.attributes.Attribute;
+import org.openrewrite.maven.attributes.Attributed;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -31,12 +34,13 @@ import java.io.Serializable;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 @SuppressWarnings("unused")
 @Value
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
-public class GradleDependencyConfiguration implements Serializable {
+public class GradleDependencyConfiguration implements Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -114,6 +118,8 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     List<GradleDependencyConstraint> constraints;
 
+    Map<String, Attribute> attributes;
+
     /**
      * Lists all the constraints in effect for the current configuration, including those constraints inherited from
      * parent configurations.
@@ -173,6 +179,7 @@ public class GradleDependencyConfiguration implements Serializable {
         this.exceptionType = exceptionType;
         this.message = message;
         this.constraints = emptyList();
+        this.attributes = emptyMap();
     }
 
     /**
