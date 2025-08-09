@@ -974,17 +974,20 @@ public class ResolvedPom {
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
-        List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
+        Map<GroupArtifact, DependencyAndDependent> rootDependencies = new HashMap<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+                // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
+                //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
+                rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
             }
         }
 
         MavenDownloadingExceptions exceptions = null;
         int depth = 0;
+        Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
 

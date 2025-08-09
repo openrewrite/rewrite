@@ -53,6 +53,16 @@ public interface MethodSignatureParserListener extends ParseTreeListener {
 	 */
 	void exitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * @param ctx the parse tree
+	 */
+	void enterWildcard(MethodSignatureParser.WildcardContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * @param ctx the parse tree
+	 */
+	void exitWildcard(MethodSignatureParser.WildcardContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link MethodSignatureParser#dotDot}.
 	 * @param ctx the parse tree
 	 */

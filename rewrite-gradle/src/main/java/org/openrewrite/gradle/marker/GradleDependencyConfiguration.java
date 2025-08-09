@@ -106,6 +106,26 @@ public class GradleDependencyConfiguration implements Serializable {
     @Nullable
     String message;
 
+    /**
+     * Lists the constraints applied to manage the versions of transitive dependencies.
+     * Produces a list of _only_ those constraints applied directly to this configuration.
+     * But configurations inherit the constraints of the configurations they extend, so to get all the constraints
+     * actually in effect for a given configuration call getAllConstraints()
+     */
+    List<GradleDependencyConstraint> constraints;
+
+    /**
+     * Lists all the constraints in effect for the current configuration, including those constraints inherited from
+     * parent configurations.
+     */
+    List<GradleDependencyConstraint> getAllConstraints() {
+        Set<GradleDependencyConstraint> constraintSet = new LinkedHashSet<>(constraints);
+        for (GradleDependencyConfiguration parentConfiguration : allExtendsFrom()) {
+            constraintSet.addAll(parentConfiguration.getConstraints());
+        }
+        return new ArrayList<>(constraintSet);
+    }
+
     @Deprecated
     public GradleDependencyConfiguration(
             String name,
@@ -119,19 +139,40 @@ public class GradleDependencyConfiguration implements Serializable {
             @Nullable String exceptionType,
             @Nullable String message
     ) {
+        this(name, description, isTransitive, isCanBeResolved, isCanBeConsumed,
+                // Introduced in Gradle 8.2, but the concept is relevant for earlier versions as well.
+                // Most of the time this means excluding "runtimeClasspath" and "compileClasspath", but not just the buildscript's "classpath"
+                !name.endsWith("Classpath"),
+                extendsFrom, requested, directResolved, exceptionType, message);
+
+    }
+
+    @Deprecated
+    public GradleDependencyConfiguration(
+            String name,
+            @Nullable String description,
+            boolean isTransitive,
+            boolean isCanBeResolved,
+            boolean isCanBeConsumed,
+            boolean isCanBeDeclared,
+            List<GradleDependencyConfiguration> extendsFrom,
+            List<Dependency> requested,
+            List<ResolvedDependency> directResolved,
+            @Nullable String exceptionType,
+            @Nullable String message
+    ) {
         this.name = name;
         this.description = description;
         this.isTransitive = isTransitive;
         this.isCanBeResolved = isCanBeResolved;
         this.isCanBeConsumed = isCanBeConsumed;
-        // Introduced in Gradle 8.2, but the concept is relevant for earlier versions as well.
-        // Most of the time this means excluding "runtimeClasspath" and "compileClasspath", but not just the buildscript's "classpath"
-        this.isCanBeDeclared = !name.endsWith("Classpath");
+        this.isCanBeDeclared = isCanBeDeclared;
         this.extendsFrom = extendsFrom;
         this.requested = requested;
         this.directResolved = directResolved;
         this.exceptionType = exceptionType;
         this.message = message;
+        this.constraints = emptyList();
     }
 
     /**
