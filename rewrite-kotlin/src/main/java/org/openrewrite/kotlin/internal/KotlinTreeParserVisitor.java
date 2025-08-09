@@ -1050,10 +1050,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 parameters.add(padRight(stmt, prefix(accessor.getRightParenthesis())));
             }
 
-            params = JContainer.build(prefix(accessor.getLeftParenthesis().getParent()), parameters, Markers.EMPTY);
+            params = JContainer.build(prefix(getLeftParenthesis(accessor)), parameters, Markers.EMPTY);
         } else {
             params = JContainer.build(
-                    prefix(accessor.getLeftParenthesis().getParent()),
+                    prefix(getLeftParenthesis(accessor)),
                     singletonList(padRight(new J.Empty(randomId(), prefix(accessor.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
             );
@@ -1092,6 +1092,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 type
         ));
+    }
+
+    private static PsiElement getLeftParenthesis(KtPropertyAccessor accessor) {
+        PsiElement lpar = accessor.getLeftParenthesis();
+        if (lpar == null) {
+            return null;
+        }
+        if (lpar.getPrevSibling() == null) {
+            return lpar.getParent();
+        }
+        return lpar;
     }
 
     @Override
