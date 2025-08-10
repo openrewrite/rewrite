@@ -43,6 +43,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.util.*;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -165,7 +166,7 @@ public class DependencyInsight extends ScanningRecipe<Map<GradleProject, Map<Str
                         }
                         List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
                         for (ResolvedDependency dep : nestedMatchingDependencies) {
-                            String versionToCheck = getDeclaredVersion(dep, acc.getOrDefault(gp, Collections.emptyMap()));
+                            String versionToCheck = getDeclaredVersion(dep, acc.getOrDefault(gp, emptyMap()));
                             if (version != null) {
                                 VersionComparator versionComparator = Semver.validate(version, null).getValue();
                                 if (versionComparator == null) {
