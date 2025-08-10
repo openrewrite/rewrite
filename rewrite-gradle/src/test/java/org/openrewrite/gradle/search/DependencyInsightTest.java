@@ -90,11 +90,9 @@ class DependencyInsightTest implements RewriteTest {
         }
 
         private SourceSpecs expectationHelper(String configuration, String template, String matchComment, boolean matched) {
-            @Language("groovy")
-            final String before = String.format(template, configuration);
+            @Language("groovy") final String before = String.format(template, configuration);
             if (matched) {
-                @Language("groovy")
-                final String after = String.format(template, matchComment + configuration);
+                @Language("groovy") final String after = String.format(template, matchComment + configuration);
                 return buildGradle(before, after);
             }
             return buildGradle(before);
@@ -102,8 +100,7 @@ class DependencyInsightTest implements RewriteTest {
 
         private void rewriteRunHelper(String existingConfiguration, String checkingConfiguration, boolean matched) {
             final String matchComment = "/*~~(com.google.guava:guava:31.1-jre)~~>*/";
-            @Language("groovy")
-            final String gradleTemplate = """
+            @Language("groovy") final String gradleTemplate = """
               plugins {
                   id 'java-library'
               }
@@ -326,11 +323,13 @@ class DependencyInsightTest implements RewriteTest {
 
     @Nested
     class VersionParameter {
+
         @ParameterizedTest
         @ValueSource(strings = {
           "1.0.1", // exact
           "1.0.1-1.0.5", // hyphenated
           "[1.0.1,1.0.5)", "[1.0.1,1.0.5]", "[1.0.1,1.0.5]", "(1.0.0,1.0.5]", // full range
+          "~1.0.1"// tilde range
         })
         void singleMatch(String versionPattern) {
             rewriteRun(
@@ -360,19 +359,18 @@ class DependencyInsightTest implements RewriteTest {
                       /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
                       implementation 'jakarta.data:jakarta.data-spec:1.0.0'
                   }
-                  """.formatted(versionPattern)
+                  """
               )
             );
         }
 
-        @ParameterizedTest
-        @ValueSource(strings = {
-          "1.0.X", // X range
-          "~1.0.0"// tilde range
-        })
-        void multiMatch(String versionPattern) {
+        /**
+         * `1.0.X` is expected to match both dependencies.
+         */
+        @Test
+        void multiMatch() {
             rewriteRun(
-              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", versionPattern, null)),
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", "1.0.X", null)),
               //language=groovy
               buildGradle(
                 """
@@ -398,7 +396,52 @@ class DependencyInsightTest implements RewriteTest {
                       /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
                       /*~~(jakarta.data:jakarta.data-spec:1.0.0)~~>*/implementation 'jakarta.data:jakarta.data-spec:1.0.0'
                   }
-                  """.formatted(versionPattern)
+                  """
+              )
+            );
+        }
+
+        /**
+         * Gradle supports defining constraints on the framework side.
+         * f.i. `org.springframework:spring-aop:6.2.2` enforces version 6.2.2 on every other dependency causing `org.springframework:spring-core:6.1.5` to be `org.springframework:spring-core:6.2.2` in fact.
+         * This infers with the naively expected behavior when coming from Maven.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "6.1.1-6.1.15", // hyphenated
+          "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
+          "6.1.X", // X range
+          "~6.1.0", "~6.1", // tilde range
+        })
+        void withConstraintsInvolved(String versionPattern) {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", versionPattern, null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'org.springframework:spring-core:6.1.5'
+                      implementation 'org.springframework:spring-aop:6.2.2'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      /*~~(org.springframework:spring-core:6.2.2)~~>*/implementation 'org.springframework:spring-core:6.1.5'
+                      /*~~(org.springframework:spring-core:6.2.2)~~>*/implementation 'org.springframework:spring-aop:6.2.2'
+                  }
+                  """
               )
             );
         }
@@ -433,15 +476,15 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
-
+              
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter-web'
                   implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
@@ -463,15 +506,15 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
-
+              
               dependencies {
                   /*~~(org.springframework.boot:spring-boot-starter-web:2.6.6,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-json:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-starter-tomcat:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
                   /*~~(org.springframework.boot:spring-boot-starter-actuator:2.6.4,org.springframework.boot:spring-boot-starter:2.6.6,org.springframework.boot:spring-boot-autoconfigure:2.6.6,org.springframework.boot:spring-boot:2.6.6,org.springframework.boot:spring-boot-actuator-autoconfigure:2.6.6,org.springframework.boot:spring-boot-starter-logging:2.6.6,org.springframework.boot:spring-boot-actuator:2.6.6)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
@@ -513,15 +556,15 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
-
+              
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter-web'
                   implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
@@ -543,15 +586,15 @@ class DependencyInsightTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-
+              
               apply plugin: 'org.springframework.boot'
               apply plugin: 'io.spring.dependency-management'
               apply plugin: 'java'
-
+              
               java {
                   sourceCompatibility = '11'
               }
-
+              
               dependencies {
                   /*~~(com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
                   /*~~(com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
@@ -577,7 +620,7 @@ class DependencyInsightTest implements RewriteTest {
               dependencies {
                   compileOnly("org.projectlombok:lombok:1.18.38")
                   annotationProcessor("org.projectlombok:lombok:1.18.38")
-
+              
                   testCompileOnly("org.projectlombok:lombok:1.18.38")
                   testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
               }
@@ -592,7 +635,7 @@ class DependencyInsightTest implements RewriteTest {
               dependencies {
                   /*~~(org.projectlombok:lombok:1.18.38)~~>*/compileOnly("org.projectlombok:lombok:1.18.38")
                   /*~~(org.projectlombok:lombok:1.18.38)~~>*/annotationProcessor("org.projectlombok:lombok:1.18.38")
-
+              
                   /*~~(org.projectlombok:lombok:1.18.38)~~>*/testCompileOnly("org.projectlombok:lombok:1.18.38")
                   /*~~(org.projectlombok:lombok:1.18.38)~~>*/testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
               }
