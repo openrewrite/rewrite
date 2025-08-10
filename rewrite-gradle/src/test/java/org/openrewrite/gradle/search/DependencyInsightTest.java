@@ -324,45 +324,84 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {
-      "6.1.5", // exact
-      "6.1.1-6.1.15", // hyphenated
-      "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
-      "6.1.X", // X range
-      "~6.1.0", "~6.1", // tilde range
-    })
-    void versionPatterns(String versionPattern) {
-        rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", versionPattern, null)),
-          //language=groovy
-          buildGradle(
-            """
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  implementation 'org.springframework:spring-core:6.1.5'
-                  implementation 'org.springframework:spring-aop:6.2.2'
-              }
-              """,
-            """
-              plugins {
-                  id 'java-library'
-              }
-              repositories {
-                  mavenCentral()
-              }
-              dependencies {
-                  /*~~(org.springframework:*:%s)~~>*/implementation 'org.springframework:spring-core:6.1.5'
-                  implementation 'org.springframework:spring-aop:6.2.2'
-              }
-              """.formatted(versionPattern)
-          )
-        );
+    @Nested
+    class VersionParameter {
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "1.0.1", // exact
+          "1.0.1-1.0.5", // hyphenated
+          "[1.0.1,1.0.5)", "[1.0.1,1.0.5]", "[1.0.1,1.0.5]", "(1.0.0,1.0.5]", // full range
+        })
+        void singleMatch(String versionPattern) {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", versionPattern, null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """.formatted(versionPattern)
+              )
+            );
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "1.0.X", // X range
+          "~1.0.0"// tilde range
+        })
+        void multiMatch(String versionPattern) {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", versionPattern, null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      /*~~(jakarta.data:jakarta.data-spec:1.0.0)~~>*/implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """.formatted(versionPattern)
+              )
+            );
+        }
     }
 
     @Test

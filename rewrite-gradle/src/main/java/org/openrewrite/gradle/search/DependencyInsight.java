@@ -24,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
@@ -47,7 +48,7 @@ import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class DependencyInsight extends Recipe {
+public class DependencyInsight extends ScanningRecipe<Map<GradleProject, Map<String, String>>> {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
@@ -101,7 +102,34 @@ public class DependencyInsight extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Map<GradleProject, Map<String, String>> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<GradleProject, Map<String, String>> acc) {
+        return new GradleDependency.Matcher().asVisitor((dep, ctx) -> {
+            dep.getCursor()
+                    .firstEnclosingOrThrow(SourceFile.class)
+                    .getMarkers()
+                    .findFirst(GradleProject.class)
+                    .ifPresent(gp -> {
+                        ResolvedDependency resolved = dep.getResolvedDependency();
+                        String groupArtifactIDs = resolved.getGroupId() + ":" + resolved.getArtifactId();
+                        String declaredVersion = resolved.getRequested().getGav().getVersion();
+
+                        if (StringUtils.isNotEmpty(declaredVersion)) {
+                            acc.computeIfAbsent(gp, k -> new HashMap<>())
+                                    .put(groupArtifactIDs, declaredVersion);
+                        }
+                    });
+
+            return dep.getTree();
+        });
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GradleProject, Map<String, String>> acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -137,12 +165,14 @@ public class DependencyInsight extends Recipe {
                         }
                         List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
                         for (ResolvedDependency dep : nestedMatchingDependencies) {
+                            String versionToCheck = getDeclaredVersion(dep, acc.getOrDefault(gp, Collections.emptyMap()));
                             if (version != null) {
                                 VersionComparator versionComparator = Semver.validate(version, null).getValue();
                                 if (versionComparator == null) {
                                     sourceFile = Markup.warn(sourceFile, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
                                 } else {
-                                    if (!versionComparator.isValid(null, dep.getVersion())) {
+                                    // Use declared version if available, otherwise fall back to resolved version
+                                    if (!versionComparator.isValid(null, versionToCheck)) {
                                         continue;
                                     }
                                 }
@@ -255,5 +285,15 @@ public class DependencyInsight extends Recipe {
             }
             return m;
         }
+    }
+
+    /**
+     * Gets the declared version for a dependency from scanned data,
+     * falling back to resolved version if not found.
+     */
+    private String getDeclaredVersion(ResolvedDependency dep, Map<String, String> declaredVersions) {
+        String key = dep.getGroupId() + ":" + dep.getArtifactId();
+        String declaredVersion = declaredVersions.get(key);
+        return declaredVersion != null ? declaredVersion : dep.getVersion();
     }
 }
