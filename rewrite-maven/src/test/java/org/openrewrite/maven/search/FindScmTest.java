@@ -17,17 +17,22 @@ package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindScmTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new FindScm());
+    }
+
     @DocumentExample
     @Test
     void findsScmTag() {
         rewriteRun(
-          spec -> spec.recipe(new FindScm()),
           pomXml(
             """
               <project>
@@ -58,7 +63,6 @@ class FindScmTest implements RewriteTest {
     @Test
     void doesNotFindScmNotAtRoot() {
         rewriteRun(
-          spec -> spec.recipe(new FindScm()),
           pomXml(
             """
               <project>
@@ -87,7 +91,6 @@ class FindScmTest implements RewriteTest {
     @Test
     void doesNotFindScmTag() {
         rewriteRun(
-          spec -> spec.recipe(new FindScm()),
           pomXml(
             """
               <project>
