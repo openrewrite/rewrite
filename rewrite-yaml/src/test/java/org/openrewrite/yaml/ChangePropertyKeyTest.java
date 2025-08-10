@@ -486,7 +486,8 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Nested
     class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
 
-        @Override public void defaults(RecipeSpec spec) {
+        @Override
+        public void defaults(RecipeSpec spec) {
             spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null));
         }
 
@@ -547,7 +548,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Nested
         class DotAndIndentCombinationsTest implements RewriteTest {
 
-            @Override public void defaults(RecipeSpec spec) {
+            @Override
+            public void defaults(RecipeSpec spec) {
                 spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null));
             }
 
