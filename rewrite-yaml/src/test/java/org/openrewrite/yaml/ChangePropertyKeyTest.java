@@ -485,11 +485,15 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
     @Nested
     class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
+
+        @Override public void defaults(RecipeSpec spec) {
+            spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null));
+        }
+
         @DocumentExample
         @Test
         void scalarValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
               yaml(
                 """
                   spring.profiles.group.prod: proddb,prodmq,prodmetrics
@@ -504,7 +508,6 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void mappingValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
               yaml(
                 """
                   spring.profiles.group:
@@ -521,7 +524,6 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void matchSplitAcrossParentEntries() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
               yaml(
                 """
                   spring:
@@ -544,10 +546,14 @@ class ChangePropertyKeyTest implements RewriteTest {
 
         @Nested
         class DotAndIndentCombinationsTest implements RewriteTest {
+
+            @Override public void defaults(RecipeSpec spec) {
+                spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null));
+            }
+
             @Test
             void dotDotDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring.profiles.group.prod: proddb,prodmq,prodmetrics
@@ -559,7 +565,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotDotIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring.profiles.group:
@@ -572,7 +577,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotIndentDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring.profiles:
@@ -585,7 +589,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotIndentIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring.profiles:
@@ -599,7 +602,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentDotDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring:
@@ -612,7 +614,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentDotIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring:
@@ -626,7 +627,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentIndentDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring:
@@ -640,7 +640,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentIndentIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"), null)),
                   yaml(
                     """
                       spring:
