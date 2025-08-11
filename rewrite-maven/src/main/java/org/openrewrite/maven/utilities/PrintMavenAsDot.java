@@ -73,6 +73,9 @@ public class PrintMavenAsDot extends Recipe {
 
                 // Build up index of all dependencies, so we can reference them by index in the DOT output
                 for (Scope scope : Scope.values()) {
+                    if (scope.ordinal() < Scope.Compile.ordinal() || Scope.Test.ordinal() < scope.ordinal()) {
+                        continue;
+                    }
                     List<ResolvedDependency> resolvedDependencies = mrr.getDependencies().get(scope);
                     if (resolvedDependencies == null) {
                         continue;
@@ -87,15 +90,16 @@ public class PrintMavenAsDot extends Recipe {
 
                 Set<ResolvedGroupArtifactVersion> seen = newSetFromMap(new IdentityHashMap<>());
                 for (Scope scope : Scope.values()) {
-                    if (scope.ordinal() >= Scope.Compile.ordinal() && scope.ordinal() <= Scope.Test.ordinal()) {
-                        dotEdges(
-                                dot, root, scope,
-                                mrr.getDependencies().get(scope).stream()
-                                        .filter(dep -> dep.getDepth() == 0 && seen.add(dep.getGav()))
-                                        .collect(toList()),
-                                index
-                        );
+                    if (scope.ordinal() < Scope.Compile.ordinal() || Scope.Test.ordinal() < scope.ordinal()) {
+                        continue;
                     }
+                    dotEdges(
+                            dot, root, scope,
+                            mrr.getDependencies().get(scope).stream()
+                                    .filter(dep -> dep.isDirect() && seen.add(dep.getGav()))
+                                    .collect(toList()),
+                            index
+                    );
                 }
 
                 dot.append("}");
