@@ -61,7 +61,7 @@ class AddCommentToImportTest implements RewriteTest {
               import foo.bar.*;
               import foo.bar.Baz;
               import static foo.bar.Baz.someStaticMethod;
-              class Other {}
+              class OtherOne {}
               """,
             """
               package blah;
@@ -69,11 +69,53 @@ class AddCommentToImportTest implements RewriteTest {
               import foo.*;
               /* Short comment to add */
               import foo.bar.*;
+              import foo.bar.Baz;
+              import static foo.bar.Baz.someStaticMethod;
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
+              import foo.bar.Baz;
+              import foo.bar.*;
+              import static foo.bar.Baz.someStaticMethod;
+              class OtherTwo {}
+              """,
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
               /* Short comment to add */
               import foo.bar.Baz;
+              import foo.bar.*;
+              import static foo.bar.Baz.someStaticMethod;
+              class OtherTwo {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
+              import static foo.bar.Baz.someStaticMethod;
+              import foo.bar.*;
+              import foo.bar.Baz;
+              class OtherThree {}
+              """,
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
               /* Short comment to add */
               import static foo.bar.Baz.someStaticMethod;
-              class Other {}
+              import foo.bar.*;
+              import foo.bar.Baz;
+              class OtherThree {}
               """
           )
         );
@@ -87,21 +129,36 @@ class AddCommentToImportTest implements RewriteTest {
           java(
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               import foo.Foo;
-              /* Existing Comment 2 */
               import foo.Bar;
-              class Other {}
+              class OtherOne {}
               """,
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               /* Short comment to add */
               import foo.Foo;
-              /* Existing Comment 2 */
-              /* Short comment to add */
               import foo.Bar;
-              class Other {}
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              /* Existing Comment */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
+              """,
+            """
+              package blah;
+              /* Existing Comment */
+              /* Short comment to add */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
               """
           )
         );
@@ -115,27 +172,42 @@ class AddCommentToImportTest implements RewriteTest {
           java(
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               import foo.Foo;
-              /* Existing Comment 2 */
               import foo.Bar;
-              class Other {}
+              class OtherOne {}
               """,
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               /*
                * This is a very long comment to add.
                * The comment uses multiple lines.
                */
               import foo.Foo;
-              /* Existing Comment 2 */
+              import foo.Bar;
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              /* Existing Comment */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
+              """,
+            """
+              package blah;
+              /* Existing Comment */
               /*
                * This is a very long comment to add.
                * The comment uses multiple lines.
                */
+              import foo.Foo;
               import foo.Bar;
-              class Other {}
+              class OtherTwo {}
               """
           )
         );
@@ -149,29 +221,44 @@ class AddCommentToImportTest implements RewriteTest {
           java(
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               import foo.Foo;
-              /* Existing Comment 2 */
               import foo.Bar;
-              class Other {}
+              class OtherOne {}
               """,
             """
               package blah;
-              // Existing Comment 1
+              // Existing Comment
               /*
                * Line 1
                * Line 2
                * Line 3
                */
               import foo.Foo;
-              /* Existing Comment 2 */
+              import foo.Bar;
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              /* Existing Comment */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
+              """,
+            """
+              package blah;
+              /* Existing Comment */
               /*
                * Line 1
                * Line 2
                * Line 3
                */
+              import foo.Foo;
               import foo.Bar;
-              class Other {}
+              class OtherTwo {}
               """
           )
         );
@@ -187,9 +274,18 @@ class AddCommentToImportTest implements RewriteTest {
               package blah;
               // Short comment to add
               import foo.Foo;
-              /* Short comment to add */
               import foo.Bar;
-              class Other {}
+              class OtherOne {}
+              """
+          ),
+          //language=java
+          java(
+            """
+              package blah;
+              /* Short comment to add */
+              import foo.Foo;
+              import foo.Bar;
+              class OtherTwo {}
               """
           )
         );

@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -55,7 +54,6 @@ public class AddCommentToImport extends Recipe {
     @Option(displayName = "Type pattern",
             description = "A type pattern that is used to find matching imports uses.",
             example = "org.springframework..*")
-    @Nullable
     String typePattern;
 
     @Override
@@ -67,9 +65,15 @@ public class AddCommentToImport extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TypeMatcher typeMatcher = new TypeMatcher(typePattern);
         return new JavaIsoVisitor<ExecutionContext>() {
+            private boolean foundImport = false;
+
             @Override
             public J.Import visitImport(J.Import anImport, ExecutionContext ctx) {
+                if (foundImport) {
+                    return anImport;
+                }
                 if (typeMatcher.matchesPackage(anImport.getTypeName())) {
+                    foundImport = true;
                     String prefixWhitespace = anImport.getPrefix().getWhitespace();
                     Matcher newlineMatcher = Pattern.compile("\\R").matcher(comment.trim());
                     String newCommentText = comment.trim()
