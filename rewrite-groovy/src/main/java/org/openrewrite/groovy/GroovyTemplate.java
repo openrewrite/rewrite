@@ -88,7 +88,7 @@ public class GroovyTemplate extends JavaTemplate {
             return this;
         }
 
-        Builder parser(GroovyParser.Builder parser) {
+        public Builder parser(GroovyParser.Builder parser) {
             this.parser = parser;
             return this;
         }
