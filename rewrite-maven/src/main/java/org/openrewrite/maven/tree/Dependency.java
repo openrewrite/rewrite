@@ -17,17 +17,19 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.attributes.Attributed;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @With
-public class Dependency implements Serializable {
+public class Dependency implements Serializable, Attributed {
     GroupArtifactVersion gav;
 
     @Nullable
@@ -37,15 +39,18 @@ public class Dependency implements Serializable {
     String type;
 
     @With
-    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
+    @Nullable
     String scope;
 
     @Builder.Default
-    @Nullable // Calls of `@AllArgsConstructor` result in a `null` value for this field
+    @Nullable
     List<GroupArtifact> exclusions = emptyList();
 
     @Nullable
     String optional;
+
+    @Builder.Default
+    Map<String, String> attributes = emptyMap();
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();
