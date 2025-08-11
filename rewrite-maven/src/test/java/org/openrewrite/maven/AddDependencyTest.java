@@ -1701,8 +1701,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @NullSource
+    @ParameterizedTest
     @ValueSource(strings = { "compile"})
     void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeProvidedScope(String scope) {
         rewriteRun(
@@ -1727,8 +1727,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @NullSource
+    @ParameterizedTest
     @ValueSource(strings = { "compile"})
     void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeTransitiveProvidedScopeOverride(String scope) {
         rewriteRun(
@@ -1780,8 +1780,8 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @NullSource
+    @ParameterizedTest
     @ValueSource(strings = { "compile"})
     void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(String scope) {
         rewriteRun(
