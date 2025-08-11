@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.maven.tree.MavenMetadata;
 
-import java.io.IOException;
 import java.time.ZonedDateTime;
 
 import static java.time.ZoneOffset.UTC;
@@ -29,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MavenMetadataTest {
 
     @Test
-    void deserializeMetadata() throws IOException {
+    void deserializeMetadata() throws Exception {
         @Language("xml") String metadata = """
           <metadata>
               <groupId>org.springframework.boot</groupId>
@@ -56,7 +55,7 @@ class MavenMetadataTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializeSnapshotMetadata() throws IOException {
+    void deserializeSnapshotMetadata() throws Exception {
         @Language("xml") String metadata = """
           <metadata modelVersion="1.1.0">
               <groupId>org.openrewrite.recipe</groupId>
@@ -99,7 +98,7 @@ class MavenMetadataTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4285")
-    void deserializeMetadataWithEmptyVersions() throws IOException {
+    void deserializeMetadataWithEmptyVersions() throws Exception {
         assertThat(MavenMetadata.parse("<?xml version=\"1.0\" encoding=\"UTF-8\"?><metadata/>\n".getBytes())).isNull();
     }
 }
