@@ -62,7 +62,6 @@ class KotlinTemplateTest implements RewriteTest {
 
     @Test
     void parserClasspath() {
-        var mapper = new ObjectMapper();
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
