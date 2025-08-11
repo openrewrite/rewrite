@@ -998,7 +998,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             MavenPomDownloader mpd = new MavenPomDownloader(ctx);
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
-            List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+            List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ResolutionStrategy.NEWEST_WINS, ctx);
             org.openrewrite.maven.tree.Dependency newRequested = org.openrewrite.maven.tree.Dependency.builder()
                     .gav(gav)
                     .build();
@@ -1170,7 +1170,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
 
                     List<ResolvedDependency> transitiveDependencies = filterTransitiveDependencies(
-                            resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx),
+                            resolvedPom.resolveDependencies(Scope.Runtime, mpd, ResolutionStrategy.NEWEST_WINS, ctx),
                             existingTransitiveGAs,
                             newTransitiveGAs
                     );

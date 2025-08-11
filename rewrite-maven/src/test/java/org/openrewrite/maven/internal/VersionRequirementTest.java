@@ -15,54 +15,96 @@
  */
 package org.openrewrite.maven.internal;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.tree.ResolutionStrategy;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class VersionRequirementTest {
-    private Iterable<String> available() {
+    static Iterable<String> available() {
         return List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
     }
 
-    @Test
-    void rangeSet() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(this::available))
-          .isEqualTo("10");
+    @Nested
+    class NearestWins {
+
+        @Test
+        void rangeSet() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("[1,11)", ResolutionStrategy.NEAREST_WINS, 0).resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
+
+        @Test
+        void multipleSoftRequirements() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("1", ResolutionStrategy.NEAREST_WINS, 1).addRequirement("2").resolve(VersionRequirementTest::available))
+              .isEqualTo("1");
+        }
+
+        @Test
+        void softRequirementThenHardRequirement() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("1", ResolutionStrategy.NEAREST_WINS, 1).addRequirement("[1,11]")
+              .resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
+
+        @Test
+        void hardRequirementThenSoftRequirement() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("[1,11]", ResolutionStrategy.NEAREST_WINS, 1).addRequirement("1")
+              .resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
+
+        @Test
+        void nearestRangeWins() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("[1,2]", ResolutionStrategy.NEAREST_WINS, 1).addRequirement("[9,10]")
+              .resolve(VersionRequirementTest::available))
+              .isEqualTo("2");
+        }
+
+        @Test
+        void emptyUnboundedRange() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("(,)", ResolutionStrategy.NEAREST_WINS, 0).resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
     }
 
-    @Test
-    void multipleSoftRequirements() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("2").resolve(this::available))
-          .isEqualTo("1");
-    }
+    @Nested
+    class NewestWins {
 
-    @Test
-    void softRequirementThenHardRequirement() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("[1,11]")
-          .resolve(this::available))
-          .isEqualTo("10");
-    }
+        @Test
+        void rangeSet() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("[1,11)", ResolutionStrategy.NEWEST_WINS, 0).resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
 
-    @Test
-    void hardRequirementThenSoftRequirement() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("[1,11]", 1).addRequirement("1")
-          .resolve(this::available))
-          .isEqualTo("10");
-    }
+        @Test
+        void multipleSpecificVersions() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("1", ResolutionStrategy.NEWEST_WINS, 0).addRequirement("2").resolve(VersionRequirementTest::available))
+              .isEqualTo("2");
+        }
 
-    @Test
-    void nearestRangeWins() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
-          .resolve(this::available))
-          .isEqualTo("2");
-    }
+        @Test
+        void versionAndRange() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("1", ResolutionStrategy.NEWEST_WINS, 0).addRequirement("[1,11]")
+              .resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
 
-    @Test
-    void emptyUnboundedRange() throws MavenDownloadingException {
-        assertThat(VersionRequirement.fromVersion("(,)", 0).resolve(this::available))
-                .isEqualTo("10");
+        @Test
+        void highestRangeWins() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("[1,2]", ResolutionStrategy.NEWEST_WINS, 0).addRequirement("[9,10]")
+              .resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
+
+        @Test
+        void emptyUnboundedRange() throws MavenDownloadingException {
+            assertThat(VersionRequirement.fromVersion("(,)", ResolutionStrategy.NEWEST_WINS, 0).resolve(VersionRequirementTest::available))
+              .isEqualTo("10");
+        }
     }
 }

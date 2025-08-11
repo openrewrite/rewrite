@@ -29,6 +29,7 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -41,6 +42,8 @@ import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
 import org.openrewrite.maven.tree.Plugin.Execution;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.function.Function;
@@ -551,7 +554,7 @@ public class ResolvedPom {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
 
-            VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), 0);
+            VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), ResolutionStrategy.NEAREST_WINS, 0);
             GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
             String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
             if (newRequiredVersion == null) {
@@ -967,11 +970,17 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+        return resolveDependencies(scope, downloader, ResolutionStrategy.NEAREST_WINS, ctx);
+    }
+
+    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ResolutionStrategy resolutionStrategy, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return resolveDependencies(scope, new HashMap<>(), downloader, resolutionStrategy, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
-                                                        MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+                                                        MavenPomDownloader downloader, ResolutionStrategy resolutionStrategy,
+                                                        ExecutionContext ctx) throws MavenDownloadingExceptions {
+        MavenDownloadingExceptions exceptions = null;
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         Map<GroupArtifact, DependencyAndDependent> rootDependencies = new HashMap<>();
@@ -979,13 +988,55 @@ public class ResolvedPom {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
-                //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
-                rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+                GroupArtifact key = d.getGav().asGroupArtifact();
+                DependencyAndDependent value = new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this);
+                if (!rootDependencies.containsKey(key)) {
+                    rootDependencies.put(key, value);
+                } else {
+                    if (ResolutionStrategy.NEAREST_WINS == resolutionStrategy) {
+                        rootDependencies.put(key, value);
+                    } else {
+                        // TODO Is any of these classes loaded parent-first in cli/workers? Do we need a deploy?
+                        // TODO Can we not do this in a more efficient way?
+                        String lastRequestedVersion = d.getVersion();
+                        String lastResolvedVersion = null;
+                        try {
+                            if (lastRequestedVersion == null) {
+                                continue;
+                            }
+                            lastResolvedVersion = VersionRequirement.fromVersion(lastRequestedVersion, resolutionStrategy, 0).resolve(key, downloader, getRepositories());
+                        } catch (MavenDownloadingException e) {
+                            exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(d.getGav()));
+                        }
+                        if (lastResolvedVersion == null) {
+                            continue;
+                        }
+
+                        DependencyAndDependent previousRequested = rootDependencies.get(key);
+                        String previousRequestedVersion = getValues(previousRequested.getDependency(), 0).getVersion();
+                        String previousResolvedVersion = null;
+                        try {
+                            previousResolvedVersion = previousRequestedVersion == null ? null : VersionRequirement.fromVersion(previousRequestedVersion, resolutionStrategy, 0).resolve(key, downloader, getRepositories());
+                        } catch (MavenDownloadingException e) {
+                            exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(d.getGav()));
+                        }
+                        if (previousResolvedVersion == null) {
+                            rootDependencies.put(key, value);
+                            continue;
+                        }
+                        Validated<VersionComparator> validatedComparator = Semver.validate(previousResolvedVersion, null);
+                        if (validatedComparator.isValid() && validatedComparator.getValue() != null) {
+                            if (validatedComparator.getValue().compare(null, previousResolvedVersion, lastResolvedVersion) < 0) {
+                                rootDependencies.put(key, value);
+                            }
+                        } else {
+                            throw new MavenParsingException("Could not resolve version for [" + key + "]");
+                        }
+                    }
+                }
             }
         }
 
-        MavenDownloadingExceptions exceptions = null;
         int depth = 0;
         Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
@@ -1012,7 +1063,7 @@ public class ResolvedPom {
                     GroupArtifact ga = new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId());
                     VersionRequirement existingRequirement = requirements.get(ga);
                     if (existingRequirement == null) {
-                        VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
+                        VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), resolutionStrategy, depth);
                         requirements.put(ga, newRequirement);
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
                         if (newRequiredVersion == null) {
@@ -1020,10 +1071,10 @@ public class ResolvedPom {
                         }
                         d = d.withGav(d.getGav().withVersion(newRequiredVersion));
                     } else {
+                        String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
+
                         VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
                         requirements.put(ga, newRequirement);
-
-                        String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
                         if (newRequiredVersion == null) {
                             throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
@@ -1037,7 +1088,7 @@ public class ResolvedPom {
                             MavenExecutionContextView.view(ctx)
                                     .getResolutionListener()
                                     .clear();
-                            return resolveDependencies(scope, requirements, downloader, ctx);
+                            return resolveDependencies(scope, requirements, downloader, resolutionStrategy, ctx);
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on

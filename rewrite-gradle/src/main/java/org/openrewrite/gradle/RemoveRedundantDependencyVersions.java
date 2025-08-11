@@ -341,7 +341,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     try {
                                         List<ResolvedDependency> resolved = mpd.download(toSearch, null, null, repositories)
                                                 .resolve(emptyList(), mpd, repositories, ctx)
-                                                .resolveDependencies(Scope.Runtime, mpd, ctx);
+                                                .resolveDependencies(Scope.Runtime, mpd, ResolutionStrategy.NEWEST_WINS, ctx);
                                         for (ResolvedDependency r : resolved) {
                                             if (Objects.equals(searchGav.getGroupId(), r.getGroupId()) && Objects.equals(searchGav.getArtifactId(), r.getArtifactId())) {
                                                 return searchGav.getVersion() == null || matchesComparator(r.getVersion(), searchGav.getVersion());

@@ -241,7 +241,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
                 ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
                 resolvedGav = resolvedPom.getGav();
-                transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+                transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ResolutionStrategy.NEWEST_WINS, ctx);
             }
             Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
             Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());

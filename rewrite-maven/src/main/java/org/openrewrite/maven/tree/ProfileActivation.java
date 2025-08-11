@@ -67,7 +67,7 @@ public class ProfileActivation {
         }
 
         try {
-            return version.equals(VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)));
+            return version.equals(VersionRequirement.fromVersion(jdk, ResolutionStrategy.NEAREST_WINS, 0).resolve(() -> singletonList(version)));
         } catch (MavenDownloadingException e) {
             // unreachable
             return false;

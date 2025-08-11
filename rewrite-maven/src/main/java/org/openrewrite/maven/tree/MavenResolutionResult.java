@@ -180,13 +180,17 @@ public class MavenResolutionResult implements Marker {
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return resolveDependencies(downloader, ResolutionStrategy.NEAREST_WINS, ctx);
+    }
+
+    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ResolutionStrategy resolutionStrategy, ExecutionContext ctx) throws MavenDownloadingExceptions {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
         MavenDownloadingExceptions exceptions = null;
 
         Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
         for (Scope scope : RESOLVE_SCOPES) {
             try {
-                dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
+                dependencies.put(scope, pom.resolveDependencies(scope, downloader, resolutionStrategy, ctx));
             } catch (MavenDownloadingExceptions e) {
                 for (MavenDownloadingException exception : e.getExceptions()) {
                     if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(
