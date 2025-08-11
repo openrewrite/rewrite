@@ -70,19 +70,10 @@ public class GroovyTemplate extends JavaTemplate {
     @SuppressWarnings("unused")
     public static class Builder extends JavaTemplate.Builder {
 
-        private final String code;
-        private final Set<String> imports = new HashSet<>();
-
         private GroovyParser.Builder parser = GroovyParser.builder();
-
-        private Consumer<String> onAfterVariableSubstitution = s -> {
-        };
-        private Consumer<String> onBeforeParseTemplate = s -> {
-        };
 
         Builder(String code) {
             super(code);
-            this.code = code;
         }
 
         @Override
@@ -99,30 +90,8 @@ public class GroovyTemplate extends JavaTemplate {
             return this;
         }
 
-        private void validateImport(String typeName) {
-            if (StringUtils.isBlank(typeName)) {
-                throw new IllegalArgumentException("Imports must not be blank");
-            } else if (typeName.startsWith("import ")) {
-                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" prefix");
-            } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
-                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
-            }
-        }
-
         Builder parser(GroovyParser.Builder parser) {
             this.parser = parser;
-            return this;
-        }
-
-        @Override
-        public Builder doAfterVariableSubstitution(Consumer<String> afterVariableSubstitution) {
-            this.onAfterVariableSubstitution = afterVariableSubstitution;
-            return this;
-        }
-
-        @Override
-        public Builder doBeforeParseTemplate(Consumer<String> beforeParseTemplate) {
-            this.onBeforeParseTemplate = beforeParseTemplate;
             return this;
         }
 
