@@ -25,6 +25,8 @@ import org.openrewrite.scheduling.RecipeRunCycle;
 import java.util.*;
 import java.util.function.*;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -42,13 +44,13 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
-                () -> Collections.newSetFromMap(new IdentityHashMap<>()));
+                () -> newSetFromMap(new IdentityHashMap<>()));
         return this;
     }
 
     @Incubating(since = "7.20.0")
     default Set<TreeObserver.Subscription> getObservers() {
-        return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
+        return getMessage("org.openrewrite.internal.treeObservers", emptySet());
     }
 
     Map<String, @Nullable Object> getMessages();

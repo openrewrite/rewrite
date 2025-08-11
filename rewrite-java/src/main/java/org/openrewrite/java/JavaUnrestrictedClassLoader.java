@@ -29,9 +29,9 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Rewrite's JavaParser is reliant on java's compiler internal classes that are now encapsulated within Java's
@@ -62,7 +62,7 @@ public class JavaUnrestrictedClassLoader extends URLClassLoader {
                 } catch (MalformedURLException e) {
                     throw new RuntimeException(e);
                 }
-            }).collect(Collectors.toList());
+            }).collect(toList());
         } catch (Exception e) {
             return emptyList();
         }

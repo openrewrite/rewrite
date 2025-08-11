@@ -207,7 +207,7 @@ class ChangeTagValueTest implements RewriteTest {
                       </version>
                   </dependency>
                   """,
-                """ 
+                """
                   <dependency>
                       <version>
                           3.0

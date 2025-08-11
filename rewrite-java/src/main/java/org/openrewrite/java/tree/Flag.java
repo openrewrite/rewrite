@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
 import java.util.*;
 import java.util.stream.Stream;
 
+import static java.util.Collections.unmodifiableSet;
+
 public enum Flag {
     Public(1L),
     Private(1L << 1),
@@ -83,7 +85,7 @@ public enum Flag {
                     flags.add(flag);
                 }
             }
-            flags = Collections.unmodifiableSet(flags);
+            flags = unmodifiableSet(flags);
             flagSets.put(flagsBitMap, flags);
         }
         return flags;

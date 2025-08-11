@@ -16,6 +16,7 @@
 package org.openrewrite.internal;
 
 import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 
@@ -31,12 +32,12 @@ import java.util.function.Supplier;
  * <p>
  * <strong>Resource Creation:</strong>
  * Resources are created lazily - the factory function is not called until the
- * resource is first accessed via the returned scope's {@code map()} method. This
- * avoids creating expensive resources that may never be used.
+ * resource is first accessed via the returned scope's {@code map()} method or
+ * via {@code require()}. This avoids creating expensive resources that may never be used.
  * <p>
  * Typical usage:
  * <pre>
- * // At entry point (e.g., request handler) - resource NOT created yet
+ * // At entry point (e.g., request handler): resource was NOT created yet
  * try (var scope = DatabaseConnection.current().requireOrCreate(() -> new DatabaseConnection(...))) {
  *     // Application code can conditionally use the resource
  *     if (needsDatabase()) {
@@ -60,23 +61,46 @@ import java.util.function.Supplier;
  * instance. Resources are not shared between threads.
  */
 public class ManagedThreadLocal<T extends AutoCloseable> {
-    private final ThreadLocal<@Nullable T> threadLocal = new ThreadLocal<>();
+    private final ThreadLocal<@Nullable PendingResource<T>> threadLocal = new ThreadLocal<>();
+
+    // Wrapper for deferred resource creation
+    @RequiredArgsConstructor
+    private static class PendingResource<T extends AutoCloseable> {
+        final Supplier<T> factory;
+        final AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
+
+        T getOrCreate() {
+            T resource = resourceRef.get();
+            if (resource == null) {
+                resource = factory.get();
+                resourceRef.set(resource);
+            }
+            return resource;
+        }
+
+        @Nullable
+        T getIfCreated() {
+            return resourceRef.get();
+        }
+    }
 
     /**
      * Gets the current resource, throwing if not present.
      * <p>
      * This is the primary method for accessing the resource throughout your call chain.
      * It fails fast with a clear error if no resource has been established.
+     * If a deferred resource factory is present, it will be triggered to create the resource.
      *
      * @return the current resource
      * @throws IllegalStateException if no resource is present in the current thread
      */
     public T require() {
-        T value = threadLocal.get();
-        if (value == null) {
+        PendingResource<T> pending = threadLocal.get();
+        if (pending == null) {
             throw new IllegalStateException("No managed resource found in current thread context");
         }
-        return value;
+
+        return pending.getOrCreate();
     }
 
     /**
@@ -84,15 +108,15 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * <p>
      * If a resource already exists, returns it in a scope with no-op cleanup.
      * If no resource exists, defers creation until the resource is first accessed via
-     * the returned scope's {@code map()} method. The resource is created using the
-     * provided factory and automatic cleanup of both the ThreadLocal state and the
-     * resource itself is handled when the scope is closed.
+     * the returned scope's {@code map()} method or via {@code require()}. The resource 
+     * is created using the provided factory, and automatic cleanup of both the ThreadLocal
+     * state and the resource itself is handled when the scope is closed.
      * <p>
      * <strong>Deferred creation behavior:</strong>
      * <ul>
      * <li>The factory is <em>not</em> called when this method returns</li>
-     * <li>Resource creation happens on first access via {@code scope.map()}</li>
-     * <li>Once created, the same resource instance is used for subsequent accesses</li>
+     * <li>Resource creation happens on first access via {@code scope.map()} or {@code require()}</li>
+     * <li>Once created, the same resource instance is used for further accesses</li>
      * <li>If the scope is never accessed, no resource is created and no cleanup occurs</li>
      * </ul>
      * <p>
@@ -102,28 +126,21 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * @return a Scope that provides access to the resource and handles cleanup
      */
     public Scope<T> requireOrCreate(Supplier<T> factory) {
-        T existing = threadLocal.get();
+        PendingResource<T> existing = threadLocal.get();
         if (existing != null) {
-            // Return existing value with no-op cleanup
-            return new Scope<>(existing, () -> {
+            // Return existing pending resource with no-op cleanup
+            return new Scope<>(existing::getOrCreate, () -> {
             });
         }
 
-        // No existing resource - set up lazy creation
-        AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
+        // No existing resource: set up deferred creation
+        PendingResource<T> pending = new PendingResource<>(factory);
+        threadLocal.set(pending);
 
         return new Scope<>(
-                (Supplier<T>) () -> {
-                    T resource = resourceRef.get();
-                    if (resource == null) {
-                        resource = factory.get();
-                        threadLocal.set(resource);
-                        resourceRef.set(resource);
-                    }
-                    return resource;
-                },
+                pending::getOrCreate,
                 () -> {
-                    T resource = resourceRef.get();
+                    T resource = pending.getIfCreated();
                     if (resource != null) {
                         try {
                             threadLocal.remove();
@@ -131,7 +148,6 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
                             try {
                                 resource.close();
                             } catch (Exception e) {
-                                // Log appropriately in real implementation
                                 System.err.println("Error closing managed resource: " + e.getMessage());
                             }
                         }
@@ -145,15 +161,15 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * <p>
      * Always creates a new resource using the factory, regardless of whether a resource
      * already exists in the current thread. The new resource is created when first accessed
-     * via the returned scope's {@code map()} method and will be automatically closed when
-     * the scope is closed. Any existing resource is temporarily replaced and restored when
-     * the scope closes.
+     * via the returned scope's {@code map()} method or via {@code require()}. The resource 
+     * will be automatically closed when the scope is closed. Any existing resource is 
+     * temporarily replaced and restored when the scope closes.
      * <p>
      * <strong>Deferred creation behavior:</strong>
      * <ul>
      * <li>The factory is <em>not</em> called when this method returns</li>
-     * <li>Resource creation happens on first access via {@code scope.map()}</li>
-     * <li>Once created, the same resource instance is used for subsequent accesses</li>
+     * <li>Resource creation happens on first access via {@code scope.map()} or {@code require()}</li>
+     * <li>Once created, the same resource instance is used for further accesses</li>
      * <li>If the scope is never accessed, no resource is created and no cleanup occurs</li>
      * </ul>
      * <p>
@@ -165,8 +181,13 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * // Create a temporary database connection for audit logging
      * try (var scope = DatabaseConnection.current().create(() ->
      *         new DatabaseConnection("jdbc:audit://localhost"))) {
-     *     scope.map(auditConn -> {
-     *         auditConn.logEvent("User action performed");
+     *     // Resource is created on first access via require()
+     *     DatabaseConnection auditConn = DatabaseConnection.current().require();
+     *     auditConn.logEvent("User action performed");
+     *
+     *     // Or via scope.map()
+     *     scope.map(conn -> {
+     *         conn.logEvent("Another audit event");
      *         return null;
      *     });
      * } // Audit connection is closed, original connection restored
@@ -179,21 +200,14 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * @return a Scope that provides access to the new resource and handles cleanup
      */
     public Scope<T> create(Supplier<T> factory) {
-        T previousValue = threadLocal.get();
-        AtomicReference<@Nullable T> resourceRef = new AtomicReference<>();
+        PendingResource<T> previousValue = threadLocal.get();
+        PendingResource<T> pending = new PendingResource<>(factory);
+        threadLocal.set(pending);
 
         return new Scope<>(
-                (Supplier<T>) () -> {
-                    T resource = resourceRef.get();
-                    if (resource == null) {
-                        resource = factory.get();
-                        threadLocal.set(resource);
-                        resourceRef.set(resource);
-                    }
-                    return resource;
-                },
+                pending::getOrCreate,
                 () -> {
-                    T resource = resourceRef.get();
+                    T resource = pending.getIfCreated();
                     try {
                         // Restore the previous ThreadLocal state
                         if (previousValue != null) {
@@ -227,10 +241,11 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
      * @return a Scope that restores the previous resource when closed
      */
     public Scope<T> using(T value) {
-        T previousValue = threadLocal.get();
-        threadLocal.set(value);
+        PendingResource<T> previousValue = threadLocal.get();
+        PendingResource<T> pending = new PendingResource<>(() -> value);
+        threadLocal.set(pending);
 
-        return new Scope<>(value, () -> {
+        return new Scope<>(() -> value, () -> {
             if (previousValue != null) {
                 threadLocal.set(previousValue);
             } else {
@@ -240,20 +255,8 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
     }
 
     /**
-     * Provides access to the underlying ThreadLocal for advanced use cases.
-     * <p>
-     * Use with caution - direct ThreadLocal manipulation bypasses the managed
-     * resource lifecycle. Prefer the managed methods (require, requireOrCreate, create, using)
-     * for typical usage.
-     *
-     * @return the underlying ThreadLocal instance
-     */
-    public ThreadLocal<@Nullable T> asThreadLocal() {
-        return threadLocal;
-    }
-
-    /**
      * Checks if a resource is present in the current thread.
+     * This includes both actual resources and pending (deferred) resources.
      *
      * @return true if a resource is present, false otherwise
      */
@@ -272,13 +275,6 @@ public class ManagedThreadLocal<T extends AutoCloseable> {
         Supplier<T> resourceSupplier;
         AutoCloseable cleanup;
 
-        // Constructor for eager resources (using)
-        Scope(T resource, AutoCloseable cleanup) {
-            this.resourceSupplier = () -> resource;
-            this.cleanup = cleanup;
-        }
-
-        // Constructor for lazy resources (requireOrCreate, create)
         Scope(Supplier<T> resourceSupplier, AutoCloseable cleanup) {
             this.resourceSupplier = resourceSupplier;
             this.cleanup = cleanup;

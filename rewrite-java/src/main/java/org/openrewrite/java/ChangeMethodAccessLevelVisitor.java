@@ -26,7 +26,10 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 
@@ -69,7 +72,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
             // If current access level is package-private (no modifier), add the new modifier
             else if (currentMethodAccessLevel == null) {
-                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, null, newAccessLevel, Collections.emptyList());
+                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, null, newAccessLevel, emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
 
                 if(method.getModifiers().isEmpty()) {

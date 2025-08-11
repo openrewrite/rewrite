@@ -40,16 +40,15 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 public interface K extends J {
     @SuppressWarnings("unchecked")
@@ -232,7 +231,7 @@ public interface K extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         /**
@@ -307,18 +306,18 @@ public interface K extends J {
                 return t.statements.stream()
                         .filter(s -> s.getElement() instanceof J.ClassDeclaration)
                         .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             public K.CompilationUnit withClasses(List<JRightPadded<J.ClassDeclaration>> classes) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 //noinspection unchecked
                 statements.addAll(0, classes.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(Collectors.toList()));
+                        .collect(toList()));
 
                 return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
@@ -1087,7 +1086,7 @@ public interface K extends J {
         public List<Annotation> getLeadingAnnotations() {
             // for backwards compatibility with older LST before there was a leading annotations field
             //noinspection ConstantConditions
-            return leadingAnnotations == null ? Collections.emptyList() : leadingAnnotations;
+            return leadingAnnotations == null ? emptyList() : leadingAnnotations;
         }
 
         @With
@@ -1096,7 +1095,7 @@ public interface K extends J {
         public List<Modifier> getModifiers() {
             // for backwards compatibility with older LST before there was a modifiers field
             //noinspection ConstantConditions
-            return modifiers == null ? Collections.emptyList() : modifiers;
+            return modifiers == null ? emptyList() : modifiers;
         }
 
         @Nullable

@@ -33,11 +33,11 @@ class FindDependencyHandlerTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'com.google.guava:guava:23.0'
               }
@@ -46,11 +46,11 @@ class FindDependencyHandlerTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               /*~~>*/dependencies {
                   api 'com.google.guava:guava:23.0'
               }

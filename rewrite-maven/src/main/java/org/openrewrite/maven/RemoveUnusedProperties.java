@@ -40,6 +40,9 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedProperties.Accumulator> {
@@ -186,11 +189,11 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                         resolutionResult.getMavenSettings(), resolutionResult.getActiveProfiles());
                 try {
                     ResolvedPom resolvedBarePom = resolutionResult.getPom().getRequested()
-                            .withProperties(Collections.emptyMap())
-                            .withDependencies(Collections.emptyList())
-                            .withDependencyManagement(Collections.emptyList())
-                            .withPlugins(Collections.emptyList())
-                            .withPluginManagement(Collections.emptyList())
+                            .withProperties(emptyMap())
+                            .withDependencies(emptyList())
+                            .withDependencyManagement(emptyList())
+                            .withPlugins(emptyList())
+                            .withPluginManagement(emptyList())
                             .resolve(resolutionResult.getActiveProfiles(), downloader, ctx);
                     return resolvedBarePom.getProperties().containsKey(propertyName);
                 } catch (MavenDownloadingException e) {

@@ -58,7 +58,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import b.B;
-                            
+
               class C {
                  public void test() {
                      B.foo();
@@ -93,7 +93,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
           java(
             """
               import static a.A.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -102,7 +102,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import static b.B.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -195,7 +195,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
           java(
             """
               package org.codehaus.plexus.util;
-                            
+
               public class StringUtils {
                  public boolean isBlank(String s) {
                      s.isBlank();

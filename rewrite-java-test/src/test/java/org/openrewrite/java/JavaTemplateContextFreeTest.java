@@ -72,7 +72,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations vd, ExecutionContext ctx) {
-                  if (vd.getVariables().size() == 1 && vd.getVariables().getFirst().getSimpleName().equals("i")) {
+                  if (vd.getVariables().size() == 1 && "i".equals(vd.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.apply("Integer i = 2;", getCursor(), vd.getCoordinates().replace());
                   }
                   return super.visitVariableDeclarations(vd, ctx);
@@ -112,7 +112,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
-                      (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
+                      (Objects.equals(literal.getValue(), 1) || "s".equals(Objects.requireNonNull(literal.getValue())))) {
                       return JavaTemplate.apply("java.util.List.of(#{any()})", getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
                   }
                   return super.visitLiteral(literal, executionContext);
@@ -166,7 +166,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().getFirst().getSimpleName().equals("o")) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.builder("var o = #{any()};")
                         .build()
                         .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
@@ -177,7 +177,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           java(
             """
               import java.util.Optional;
-              
+
               class Test {
                   <T extends Number> void test(T element) {
                       Optional<T> o = Optional.of(element);
@@ -186,7 +186,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               """,
             """
               import java.util.Optional;
-              
+
               class Test {
                   <T extends Number> void test(T element) {
                       var o = Optional.of(element);
@@ -276,7 +276,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().getFirst().getSimpleName().equals("o")) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.builder("var o = #{any()};")
                         .build()
                         .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
@@ -316,7 +316,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().getFirst().getSimpleName().equals("o")) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.builder("var o = #{any()};")
                         .build()
                         .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
@@ -358,7 +358,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getVariables().getFirst().getSimpleName().equals("o")) {
+                  if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.builder("var o = #{any()};")
                         .build()
                         .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());

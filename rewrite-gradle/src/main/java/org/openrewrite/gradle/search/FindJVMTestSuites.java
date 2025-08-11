@@ -24,9 +24,10 @@ import org.openrewrite.gradle.table.JVMTestSuitesDefined;
 import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -62,10 +63,10 @@ public class FindJVMTestSuites extends Recipe {
 
     public static Set<JvmTestSuite> jvmTestSuites(SourceFile sourceFile) {
         if (!IsBuildGradle.matches(sourceFile.getSourcePath())) {
-            return Collections.emptySet();
+            return emptySet();
         }
 
         return new JvmTestSuite.Matcher().lower(sourceFile)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 }

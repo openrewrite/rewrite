@@ -76,6 +76,19 @@ public class TypesInUse {
         }
 
         @Override
+        public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, Integer integer) {
+            for (J j : parameters.getParameters()) {
+                if (j instanceof J.VariableDeclarations && ((J.VariableDeclarations) j).getTypeExpression() == null) {
+                    // Type is inferred, so no need to visit type to retain import statements
+                    return parameters;
+                }
+                // We only need to check the first parameter, as the rest will be using the same
+                break;
+            }
+            return super.visitLambdaParameters(parameters, integer);
+        }
+
+        @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
             if (javaType != null && !(javaType instanceof JavaType.Unknown)) {
                 Cursor cursor = getCursor();

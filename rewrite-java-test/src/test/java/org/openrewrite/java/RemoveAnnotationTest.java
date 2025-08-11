@@ -110,10 +110,10 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package org.b;
-                          
+
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-                          
+
               @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
               public @interface ThirdAnnotation {
               }
@@ -178,10 +178,10 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package org.b;
-                          
+
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-                          
+
               @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
               public @interface ThirdAnnotation {
               }
@@ -194,7 +194,7 @@ class RemoveAnnotationTest implements RewriteTest {
               @Deprecated @SuppressWarnings("") @ThirdAnnotation
               public class PosOneWithModifier {
               }
-                            
+
               @SuppressWarnings("") @Deprecated @ThirdAnnotation
               public class PosTwoWithModifier {
               }
@@ -202,15 +202,15 @@ class RemoveAnnotationTest implements RewriteTest {
               @SuppressWarnings("") @ThirdAnnotation @Deprecated
               public class PosThreeWithModifier {
               }
-                            
+
               @Deprecated @SuppressWarnings("") @ThirdAnnotation
               class PosOneNoModifier {
               }
-                            
+
               @SuppressWarnings("") @Deprecated @ThirdAnnotation
               class PosTwoNoModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation @Deprecated
               class PosThreeNoModifier {
               }
@@ -221,23 +221,23 @@ class RemoveAnnotationTest implements RewriteTest {
               @SuppressWarnings("") @ThirdAnnotation
               public class PosOneWithModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation
               public class PosTwoWithModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation
               public class PosThreeWithModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation
               class PosOneNoModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation
               class PosTwoNoModifier {
               }
-                            
+
               @SuppressWarnings("") @ThirdAnnotation
               class PosThreeNoModifier {
               }
@@ -254,10 +254,10 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package org.b;
-                          
+
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-                          
+
               @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
               public @interface ThirdAnnotation {
               }
@@ -266,13 +266,13 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               import org.b.ThirdAnnotation;
-                            
+
               public class RemoveAnnotation {
-                            
+
                   private Integer intValue;
                   private Double doubleValue;
                   private Long longValue;
-                  
+
                   // Pos 1 with modifier.
                   @Deprecated
                   @SuppressWarnings("")
@@ -280,7 +280,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   public RemoveAnnotation(Integer intValue) {
                       this.intValue = intValue;
                   }
-                  
+
                   // Pos 2 with modifier.
                   @SuppressWarnings("")
                   @Deprecated
@@ -288,7 +288,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   public RemoveAnnotation(Double doubleValue) {
                       this.doubleValue = doubleValue;
                   }
-                  
+
                   // Pos 3 with modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
@@ -296,7 +296,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   public RemoveAnnotation(Long longValue) {
                       this.longValue = longValue;
                   }
-                  
+
                   // Pos 1 no modifier.
                   @Deprecated
                   @SuppressWarnings("")
@@ -305,7 +305,7 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.intValue = intValue;
                       this.doubleValue = doubleValue;
                   }
-                  
+
                   // Pos 2 no modifier.
                   @SuppressWarnings("")
                   @Deprecated
@@ -314,7 +314,7 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.doubleValue = doubleValue;
                       this.longValue = longValue;
                   }
-                  
+
                   // Pos 3 no modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
@@ -324,37 +324,37 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.doubleValue = doubleValue;
                       this.longValue = longValue;
                   }
-                  
+
                   @Deprecated
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public void pos1WithModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @Deprecated
                   @ThirdAnnotation
                   public void pos2WithModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   @Deprecated
                   public void pos3WithModifier() {
                   }
-                  
+
                   @Deprecated
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   void pos1NoModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @Deprecated
                   @ThirdAnnotation
                   void pos2NoModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   @Deprecated
@@ -364,34 +364,34 @@ class RemoveAnnotationTest implements RewriteTest {
               """,
             """
               import org.b.ThirdAnnotation;
-                            
+
               public class RemoveAnnotation {
-                            
+
                   private Integer intValue;
                   private Double doubleValue;
                   private Long longValue;
-                  
+
                   // Pos 1 with modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public RemoveAnnotation(Integer intValue) {
                       this.intValue = intValue;
                   }
-                  
+
                   // Pos 2 with modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public RemoveAnnotation(Double doubleValue) {
                       this.doubleValue = doubleValue;
                   }
-                  
+
                   // Pos 3 with modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public RemoveAnnotation(Long longValue) {
                       this.longValue = longValue;
                   }
-                  
+
                   // Pos 1 no modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
@@ -399,7 +399,7 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.intValue = intValue;
                       this.doubleValue = doubleValue;
                   }
-                  
+
                   // Pos 2 no modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
@@ -407,7 +407,7 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.doubleValue = doubleValue;
                       this.longValue = longValue;
                   }
-                  
+
                   // Pos 3 no modifier.
                   @SuppressWarnings("")
                   @ThirdAnnotation
@@ -416,32 +416,32 @@ class RemoveAnnotationTest implements RewriteTest {
                       this.doubleValue = doubleValue;
                       this.longValue = longValue;
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public void pos1WithModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public void pos2WithModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public void pos3WithModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   void pos1NoModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   void pos2NoModifier() {
                   }
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   void pos3NoModifier() {
@@ -460,10 +460,10 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package org.b;
-                            
+
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-                            
+
               @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
               public @interface ThirdAnnotation {
               }
@@ -472,34 +472,34 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               import org.b.ThirdAnnotation;
-                            
+
               public class RemoveAnnotation {
-                            
+
                   @Deprecated
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public final Integer pos1WithModifiers;
-                  
+
                   @SuppressWarnings("")
                   @Deprecated
                   @ThirdAnnotation
                   public final Integer pos2WithModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   @Deprecated
                   public final Integer pos3WithModifiers;
-                  
+
                   @Deprecated
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   Integer pos1NoModifiers;
-                  
+
                   @SuppressWarnings("")
                   @Deprecated
                   @ThirdAnnotation
                   Integer pos2NoModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   @Deprecated
@@ -508,29 +508,29 @@ class RemoveAnnotationTest implements RewriteTest {
               """,
             """
               import org.b.ThirdAnnotation;
-                            
+
               public class RemoveAnnotation {
-                            
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public final Integer pos1WithModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public final Integer pos2WithModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   public final Integer pos3WithModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   Integer pos1NoModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   Integer pos2NoModifiers;
-                  
+
                   @SuppressWarnings("")
                   @ThirdAnnotation
                   Integer pos3NoModifiers;
@@ -547,12 +547,12 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package javax.ejb;
-               
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-               
+
               /**
                * The transaction attribute annotation.
                */
@@ -566,7 +566,7 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package javax.ejb;
-                        
+
               /**
                * The Transaction annotations
                */
@@ -584,7 +584,7 @@ class RemoveAnnotationTest implements RewriteTest {
             """
               import javax.ejb.TransactionAttributeType;
               import javax.ejb.TransactionAttribute;
-                            
+
               @TransactionAttribute(TransactionAttributeType.NEVER)
               public class ClassAnnotatedTransactionalService {
                   public void doWork() {}
@@ -600,7 +600,7 @@ class RemoveAnnotationTest implements RewriteTest {
             """
               import javax.ejb.TransactionAttributeType;
               import javax.ejb.TransactionAttribute;
-                            
+
               public class MethodAnnotatedTransactionalService {
                   @TransactionAttribute(TransactionAttributeType.NEVER)
                   public void doWork() {}
@@ -623,7 +623,7 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package constants.pkg;
-               
+
               public class TestConstants {
                   public static final String CONSTANT_1 = "Test";
                   public static final String CONSTANT_2 = "Test";
@@ -633,14 +633,14 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package annotations.pkg;
-               
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                            
+
               import constants.pkg.TestConstants;
-               
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.METHOD,ElementType.TYPE,ElementType.FIELD})
               public @interface TestAnnotation {
@@ -655,7 +655,7 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package sample.pkg;
-               
+
               public class TestArrayClass {
               }
               """
@@ -663,23 +663,23 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package another.pkg;
-                            
+
               import annotations.pkg.TestAnnotation;
               import constants.pkg.TestConstants;
               import sample.pkg.TestArrayClass;
-                            
+
               @TestAnnotation(clazz = String.class, ints = {1, 2, 3}, longValue = 1L, text = TestConstants.CONSTANT_1, classArray = {TestArrayClass.class})
               public class AnnotatedClass {
-                            
+
                   @TestAnnotation(clazz = String.class, ints = {1, 2, 3}, longValue = 1L, text = TestConstants.CONSTANT_2)
                   String testField;
               }
               """,
             """
               package another.pkg;
-                            
+
               public class AnnotatedClass {
-                            
+
                   String testField;
               }
               """
@@ -695,7 +695,7 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package constants.pkg;
-               
+
               public class TestConstants {
                   public static final String CONSTANT_1 = "Test";
                   public static final String CONSTANT_2 = "Test";
@@ -705,12 +705,12 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package annotations.pkg;
-               
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-               
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target({ElementType.TYPE})
               public @interface TestAnnotation {
@@ -721,7 +721,7 @@ class RemoveAnnotationTest implements RewriteTest {
           java(
             """
               package another.pkg;
-              
+
               import annotations.pkg.TestAnnotation;
 
               import static constants.pkg.TestConstants.CONSTANT_1;
@@ -729,7 +729,7 @@ class RemoveAnnotationTest implements RewriteTest {
 
               @TestAnnotation(text = CONSTANT_1)
               public class AnnotatedClass {
-              
+
                   String constant = CONSTANT_2;
               }
               """,
@@ -737,9 +737,9 @@ class RemoveAnnotationTest implements RewriteTest {
               package another.pkg;
 
               import static constants.pkg.TestConstants.CONSTANT_2;
-              
+
               public class AnnotatedClass {
-              
+
                   String constant = CONSTANT_2;
               }
               """

@@ -185,7 +185,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void method1 
+                  void method1
                   () {
                   }
               }
@@ -3194,9 +3194,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test<T, U> {
-                            
+
                   <T2 extends T> T2 foo() {
                       List<T2> myList = new ArrayList<>();
                       return null;
@@ -3206,9 +3206,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test< T, U > {
-                            
+
                   < T2 extends T > T2 foo() {
                       List< T2 > myList = new ArrayList<>();
                       return null;
@@ -3227,9 +3227,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test< T, U > {
-                            
+
                   < T2 extends T > T2 foo() {
                       List< T2 > myList = new ArrayList<>();
                       return null;
@@ -3239,9 +3239,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test<T, U> {
-                            
+
                   <T2 extends T> T2 foo() {
                       List<T2> myList = new ArrayList<>();
                       return null;
@@ -4059,7 +4059,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4068,7 +4068,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
@@ -4086,7 +4086,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
@@ -4095,7 +4095,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4113,7 +4113,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4122,7 +4122,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1,str2) -> "Hello";
@@ -4140,7 +4140,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1,str2) -> "Hello";
@@ -4149,7 +4149,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4269,7 +4269,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4278,7 +4278,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
-                  
+
                   Test(String str , int num) {
                   }
               }
@@ -4296,7 +4296,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
-                  
+
                   Test(String str , int num) {
                   }
               }
@@ -4305,7 +4305,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4323,7 +4323,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4332,7 +4332,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1",1),
                   TEST2("str2",2);
-                  
+
                   Test(String str,int num) {
                   }
               }
@@ -4350,7 +4350,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1",1),
                   TEST2("str2",2);
-                  
+
                   Test(String str,int num) {
                   }
               }
@@ -4359,7 +4359,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }

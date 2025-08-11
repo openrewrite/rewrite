@@ -59,7 +59,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class EnumTypeB(val label: String) {
-                  FOO (  "foo"   ) 
+                  FOO (  "foo"   )
               }
               """
           )
@@ -102,7 +102,7 @@ class EnumTest implements RewriteTest {
             """
               enum class A {
                   B , C ,
-                  D ,  // trailing comma 
+                  D ,  // trailing comma
                  }
               """
           )
@@ -147,7 +147,7 @@ class EnumTest implements RewriteTest {
               private enum class TargetLanguage {
                   JAVA,
                   KOTLIN;
-              
+
                   fun expectedFile(): String = "foo"
               }
               """
@@ -161,7 +161,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class EnumTypeA {
-                  FOO, 
+                  FOO,
                   BAR( ),
                   @Suppress
                   FUZ

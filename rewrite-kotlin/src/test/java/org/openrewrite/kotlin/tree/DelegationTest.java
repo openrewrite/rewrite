@@ -46,11 +46,11 @@ class DelegationTest implements RewriteTest {
             """
               var topLevelInt: Int = 0
               class ClassWithDelegate(val anotherClassInt: Int)
-              
+
               class MyClass(var memberInt: Int, val anotherClassInstance: ClassWithDelegate) {
                   var delegatedToMember: Int by this::memberInt
                   var delegatedToTopLevel: Int by ::topLevelInt
-              
+
                   val delegatedToAnotherClass: Int by anotherClassInstance::anotherClassInt
               }
               var MyClass.extDelegated: Int by ::topLevelInt
@@ -77,7 +77,7 @@ class DelegationTest implements RewriteTest {
           kotlin(
             """
               import kotlin.properties.Delegates
-              
+
               class User {
                   var name: String by Delegates.observable("<no name>") {
                       prop, old, new ->

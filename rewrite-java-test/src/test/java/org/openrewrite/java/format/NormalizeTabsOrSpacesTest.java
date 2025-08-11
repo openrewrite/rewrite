@@ -107,14 +107,14 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	int b;
               	int c;
               	int d;
-              
+
               	/*
               	 *
               	 *
               	 *
               	 *
               	 */
-              
+
               	/**
               	 *
               	 *
@@ -131,14 +131,14 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   int b;
                   int c;
                   int d;
-              
+
                   /*
                    *
                    *
                    *
                    *
                    */
-              
+
                   /**
                    *
                    *

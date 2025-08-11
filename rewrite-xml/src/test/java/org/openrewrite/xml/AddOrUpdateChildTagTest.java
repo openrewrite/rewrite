@@ -42,7 +42,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                                     <groupId>com.example</groupId>
                                     <artifactId>my-project</artifactId>
                                     <version>1.0</version>
-                                
+
                                     <build>
                                         <pluginManagement>
                                             <plugins>
@@ -114,7 +114,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                                     <groupId>com.example</groupId>
                                     <artifactId>my-project</artifactId>
                                     <version>1.0</version>
-                                
+
                                     <build>
                                         <pluginManagement>
                                             <plugins>
@@ -204,7 +204,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                                     <groupId>com.example</groupId>
                                     <artifactId>my-project</artifactId>
                                     <version>1.0</version>
-                                
+
                                     <build>
                                         <pluginManagement>
                                             <plugins>
@@ -272,7 +272,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                                     <groupId>com.example</groupId>
                                     <artifactId>my-project</artifactId>
                                     <version>1.0</version>
-                                
+
                                     <build>
                                         <pluginManagement>
                                             <plugins>
@@ -352,7 +352,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                                     <groupId>com.example</groupId>
                                     <artifactId>my-project</artifactId>
                                     <version>1.0</version>
-                                
+
                                     <build>
                                         <pluginManagement>
                                             <plugins>
@@ -434,7 +434,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
                             <groupId>com.example</groupId>
                             <artifactId>my-project</artifactId>
                             <version>1.0</version>
-                        
+
                             <build>
                                 <pluginManagement>
                                     <plugins>

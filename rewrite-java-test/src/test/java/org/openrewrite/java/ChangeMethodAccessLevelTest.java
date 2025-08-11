@@ -32,42 +32,42 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   public void aMethod() {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
-                      
+
                   public void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                            
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   private void aMethod(String s) {
                   }
-                            
+
                   // comment
                   @SuppressWarnings("ALL")
                   private void aMethod() {
                   }
-                            
+
                   // comment
                   private void aMethod(Integer i) {
                   }
-                            
+
                   private void aMethod(Double i) {
                   }
               }
@@ -83,42 +83,42 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   static void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                      
+
                   // comment
                   void aMethod(Integer i) {
                   }
-                      
+
                   void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                    
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   protected static void aMethod(String s) {
                   }
-                    
+
                   // comment
                   @SuppressWarnings("ALL")
                   protected void aMethod() {
                   }
-                    
+
                   // comment
                   protected void aMethod(Integer i) {
                   }
-                    
+
                   protected void aMethod(Double i) {
                   }
               }
@@ -134,43 +134,43 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   public void aMethod() {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
-                      
+
                   public void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                    
+
               class A {
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod(String s) {
                   }
-                    
+
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                    
+
                   // comment
                   void aMethod(Integer i) {
                   }
-                    
+
                   void aMethod(Double i) {
                   }
               }
@@ -186,20 +186,20 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   // comment
                   public A(Integer i) {
                   }
-                      
+
                   @Deprecated // comment
                   public A(Float f) {
                   }
-                      
+
                   @Deprecated // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
@@ -207,22 +207,22 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               """,
             """
               package com.abc;
-                    
+
               class A {
                   // comment
                   A(Integer i) {
                   }
-                    
+
                   // comment
                   @Deprecated
                   A(Float f) {
                   }
-                    
+
                   // comment
                   @Deprecated
                   void aMethod(String s) {
                   }
-                    
+
                   // comment
                   void aMethod(Integer i) {
                   }

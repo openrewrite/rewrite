@@ -35,8 +35,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("UnnecessarySemicolon")
 class RewriteTestTest implements RewriteTest {
 
     @Test
@@ -109,7 +111,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-              
+
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
@@ -138,6 +140,21 @@ class RewriteTestTest implements RewriteTest {
             .typeValidationOptions(TypeValidation.builder().immutableScanning(false).build())
             .recipe(new ScannerEdit()),
           text("foo")
+        );
+    }
+
+    @Test
+    void allowNonWhitespaceInWhitespace() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;;
+              interface A {
+                  List<String> getList();
+              }
+              """
+          )
         );
     }
 }
@@ -221,7 +238,8 @@ class ImproperCursorUsage extends Recipe {
         return new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
-                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+                return new TreeVisitor<>() {
+                }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
     }
@@ -240,7 +258,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "A source file's path must be unique. " +
-               "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
+          "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
     }
 
     @Override
@@ -254,7 +272,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }

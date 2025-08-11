@@ -40,11 +40,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
@@ -54,11 +54,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.apache.commons:commons-lang3:3.11"
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
@@ -77,11 +77,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
@@ -91,11 +91,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.apache.commons:commons-lang:2.6"
                   implementation group: "org.apache.commons", name: "commons-lang", version: "2.6"
@@ -114,11 +114,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
@@ -128,11 +128,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "commons-lang:commons-lang3:2.6"
                   implementation group: "commons-lang", name: "commons-lang3", version: "2.6"
@@ -151,11 +151,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation platform("commons-lang:commons-lang:2.6")
               }
@@ -164,11 +164,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation platform("org.apache.commons:commons-lang3:3.11")
               }
@@ -186,11 +186,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = '2.6'
               dependencies {
                   implementation platform("commons-lang:commons-lang:${version}")
@@ -200,7 +200,7 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -256,11 +256,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
@@ -271,11 +271,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j'
               }
@@ -295,11 +295,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly group: 'mysql', name: 'mysql-connector-java'
               }
@@ -310,11 +310,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
               }
@@ -334,11 +334,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
@@ -349,11 +349,11 @@ class ChangeDependencyTest implements RewriteTest {
                 id 'org.springframework.boot' version '2.6.1'
                 id 'io.spring.dependency-management' version '1.0.11.RELEASE'
               }
-              
+
               repositories {
                  mavenCentral()
               }
-              
+
               dependencies {
                   runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
               }
@@ -371,11 +371,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "war"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   providedCompile "commons-lang:commons-lang:2.6"
                   providedRuntime "commons-lang:commons-lang:2.6"
@@ -386,11 +386,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   id "war"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   providedCompile "org.apache.commons:commons-lang3:3.11"
                   providedRuntime "org.apache.commons:commons-lang3:3.11"
@@ -411,11 +411,11 @@ class ChangeDependencyTest implements RewriteTest {
                       id "java-library"
                       id 'jvm-test-suite'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
@@ -431,11 +431,11 @@ class ChangeDependencyTest implements RewriteTest {
                       id "java-library"
                       id 'jvm-test-suite'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   testing {
                       suites {
                           test {
@@ -459,11 +459,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("commons-lang:commons-lang:2.6")
                   implementation(group = "commons-lang", name = "commons-lang", version = "2.6")
@@ -473,11 +473,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.apache.commons:commons-lang3:3.11")
                   implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
@@ -496,11 +496,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val commonsLangVersion = "2.6"
                   implementation("commons-lang:commons-lang:${commonsLangVersion}")
@@ -510,11 +510,11 @@ class ChangeDependencyTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val commonsLangVersion = "2.6"
                   implementation("org.apache.commons:commons-lang3:3.11")
@@ -535,15 +535,15 @@ class ChangeDependencyTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("javax.validation:validation-api")
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'javax.validation:validation-api:2.0.1.Final'
@@ -563,15 +563,15 @@ class ChangeDependencyTest implements RewriteTest {
                   id 'org.springframework.boot' version '3.5.0'
                   id 'io.spring.dependency-management' version '1.1.7'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("jakarta.validation:jakarta.validation-api")
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency 'jakarta.validation:jakarta.validation-api:3.0.2'
@@ -603,11 +603,11 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("javax.validation:validation-api")
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("javax.validation:validation-api:2.0.1.Final")
@@ -630,11 +630,11 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("jakarta.validation:jakarta.validation-api")
               }
-              
+
               dependencyManagement {
                   dependencies {
                       dependency("jakarta.validation:jakarta.validation-api:3.0.2")
@@ -665,7 +665,7 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation platform("io.moderne.recipe:rewrite-spring")
               }
@@ -683,7 +683,7 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation platform("org.openrewrite:rewrite-core")
               }
@@ -711,7 +711,7 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("io.moderne.recipe:rewrite-spring"))
               }
@@ -730,7 +730,7 @@ class ChangeDependencyTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.openrewrite:rewrite-core"))
               }

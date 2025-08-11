@@ -54,13 +54,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
@@ -77,7 +76,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private final static int SURR_FIRST = 0xD800;
     private final static int SURR_LAST = 0xDFFF;
     private static final Map<String, Modifier> MODIFIER_BY_KEYWORD =
-            Stream.of(Modifier.values()).collect(Collectors.toUnmodifiableMap(Modifier::toString, Function.identity()));
+            Stream.of(Modifier.values()).collect(toUnmodifiableMap(Modifier::toString, Function.identity()));
 
 
     private final Path sourcePath;
@@ -2195,7 +2194,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         throw new RuntimeException(e);
                     }
                 })
-                .collect(Collectors.toMap(Field::getName, field -> {
+                .collect(toMap(Field::getName, field -> {
                     try {
                         return (Long) field.get(null);
                     } catch (IllegalAccessException e) {

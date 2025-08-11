@@ -555,7 +555,7 @@ public abstract class OperatingSystemProvenance implements Marker {
         @Override
         protected String getArch() {
             String arch = System.getProperty("os.arch");
-            if (arch.equals("i386") || arch.equals("x86")) {
+            if ("i386".equals(arch) || "x86".equals(arch)) {
                 return "x86";
             }
             return super.getArch();
