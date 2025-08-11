@@ -56,7 +56,7 @@ class PrintMavenAsDotTest implements RewriteTest {
               </project>
               """,
             """
-              <!--~~(digraph main {
+                <!--~~(digraph main {
                 0 [label="com.mycompany.app:my-app:1"];
                 1 [label="org.yaml:snakeyaml:1.27"];
                 2 [label="org.junit.jupiter:junit-jupiter:5.7.0"];
@@ -96,7 +96,7 @@ class PrintMavenAsDotTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </project>
-              """
+                """
           )
         );
     }
