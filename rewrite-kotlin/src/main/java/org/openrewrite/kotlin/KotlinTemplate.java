@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
@@ -24,14 +23,18 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.kotlin.internal.template.KotlinSubstitutions;
 import org.openrewrite.kotlin.internal.template.KotlinTemplateParser;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
 
 public class KotlinTemplate extends JavaTemplate {
-    private KotlinTemplate(boolean contextSensitive, KotlinParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+    private KotlinTemplate(boolean contextSensitive,
+                           KotlinParser.Builder parser,
+                           String code,
+                           Set<String> imports,
+                           Consumer<String> onAfterVariableSubstitution,
+                           Consumer<String> onBeforeParseTemplate) {
         super(
                 code,
                 emptySet(),
@@ -70,19 +73,10 @@ public class KotlinTemplate extends JavaTemplate {
     @SuppressWarnings("unused")
     public static class Builder extends JavaTemplate.Builder {
 
-        private final String code;
-        private final Set<String> imports = new HashSet<>();
-
         private KotlinParser.Builder parser = KotlinParser.builder();
-
-        private Consumer<String> onAfterVariableSubstitution = s -> {
-        };
-        private Consumer<String> onBeforeParseTemplate = s -> {
-        };
 
         Builder(String code) {
             super(code);
-            this.code = code;
         }
 
         @Override
@@ -99,37 +93,19 @@ public class KotlinTemplate extends JavaTemplate {
             return this;
         }
 
-        private void validateImport(String typeName) {
-            if (StringUtils.isBlank(typeName)) {
-                throw new IllegalArgumentException("Imports must not be blank");
-            } else if (typeName.startsWith("import ")) {
-                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" prefix");
-            } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
-                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
-            }
+        @Override
+        public JavaTemplate.Builder staticImports(String... fullyQualifiedMemberTypeNames) {
+            return imports(fullyQualifiedMemberTypeNames);
         }
 
-        Builder parser(KotlinParser.Builder parser) {
+        public Builder parser(KotlinParser.Builder parser) {
             this.parser = parser;
             return this;
         }
 
         @Override
-        public Builder doAfterVariableSubstitution(Consumer<String> afterVariableSubstitution) {
-            this.onAfterVariableSubstitution = afterVariableSubstitution;
-            return this;
-        }
-
-        @Override
-        public Builder doBeforeParseTemplate(Consumer<String> beforeParseTemplate) {
-            this.onBeforeParseTemplate = beforeParseTemplate;
-            return this;
-        }
-
-        @Override
         public KotlinTemplate build() {
-            return new KotlinTemplate(false, parser.clone(), code, imports,
-                    onAfterVariableSubstitution, onBeforeParseTemplate);
+            return new KotlinTemplate(false, parser.clone(), code, imports, onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
 }
