@@ -407,7 +407,6 @@ class DependencyInsightTest implements RewriteTest {
         /**
          * Gradle supports defining constraints on the framework side.
          * f.i. `org.springframework:spring-aop:6.2.2` enforces version 6.2.2 on every other dependency causing `org.springframework:spring-core:6.1.5` to be `org.springframework:spring-core:6.2.2` in fact.
-         * This infers with the naively expected behavior when coming from Maven.
          */
         @ParameterizedTest
         @ValueSource(strings = {
@@ -416,7 +415,7 @@ class DependencyInsightTest implements RewriteTest {
           "6.1.X", // X range
           "~6.1.0", "~6.1", // tilde range
         })
-        void withConstraintsInvolved(String versionPattern) {
+        void withConstraintsEnforced(String versionPattern) {
             rewriteRun(
               recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", versionPattern, null)),
               //language=groovy
@@ -430,18 +429,6 @@ class DependencyInsightTest implements RewriteTest {
                   }
                   dependencies {
                       implementation 'org.springframework:spring-core:6.1.5'
-                      implementation 'org.springframework:spring-aop:6.2.2'
-                  }
-                  """,
-                """
-                  plugins {
-                      id 'java-library'
-                  }
-                  repositories {
-                      mavenCentral()
-                  }
-                  dependencies {
-                      /*~~(org.springframework:spring-core:6.1.5)~~>*/implementation 'org.springframework:spring-core:6.1.5'
                       implementation 'org.springframework:spring-aop:6.2.2'
                   }
                   """
