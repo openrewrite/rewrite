@@ -181,7 +181,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                             return module;
                         }
                     }))
-                    .resolveDependencies(downloader, ctx);
+                    .resolveDependencies(downloader, ResolutionStrategy.NEAREST_WINS, ctx);
             if (exceptions.get() != null) {
                 throw exceptions.get();
             }

@@ -21,10 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.Parent;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
@@ -118,7 +115,7 @@ public class MavenParser implements Parser {
                         effectivelyActiveProfiles,
                         properties);
                 if (!skipDependencyResolution) {
-                    model = model.resolveDependencies(downloader, ctx);
+                    model = model.resolveDependencies(downloader, ResolutionStrategy.NEAREST_WINS, ctx);
                 }
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
