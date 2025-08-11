@@ -19,8 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import java.net.URISyntaxException;
-
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class FindPluginTest implements RewriteTest {
@@ -86,7 +84,7 @@ class FindPluginTest implements RewriteTest {
     }
 
     @Test
-    void multiModulePrecondition() throws URISyntaxException {
+    void multiModulePrecondition() throws Exception {
         rewriteRun(
           spec ->  spec.recipeFromYaml("""
             ---

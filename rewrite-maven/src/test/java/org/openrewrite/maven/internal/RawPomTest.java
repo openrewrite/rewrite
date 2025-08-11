@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.tree.Plugin;
@@ -226,7 +225,7 @@ class RawPomTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePom() throws JsonProcessingException {
+    void deserializePom() throws Exception {
         //language=xml
         String pomString = """
               <project>
@@ -550,7 +549,7 @@ class RawPomTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePluginConfiguration() throws JsonProcessingException {
+    void deserializePluginConfiguration() throws Exception {
         @Language("xml") String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
