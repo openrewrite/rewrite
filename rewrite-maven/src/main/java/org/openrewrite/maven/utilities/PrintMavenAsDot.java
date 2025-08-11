@@ -71,8 +71,13 @@ public class PrintMavenAsDot extends Recipe {
                 dotLabel(dot, 0, root);
                 index.put(root, 0);
 
-                for (List<ResolvedDependency> deps : mrr.getDependencies().values()) {
-                    for (ResolvedDependency dep : deps) {
+                // Build up index of all dependencies, so we can reference them by index in the DOT output
+                for (Scope scope : Scope.values()) {
+                    List<ResolvedDependency> resolvedDependencies = mrr.getDependencies().get(scope);
+                    if (resolvedDependencies == null) {
+                        continue;
+                    }
+                    for (ResolvedDependency dep : resolvedDependencies) {
                         if (!index.containsKey(dep.getGav())) {
                             dotLabel(dot, index.size(), dep.getGav());
                             index.put(dep.getGav(), index.size());
