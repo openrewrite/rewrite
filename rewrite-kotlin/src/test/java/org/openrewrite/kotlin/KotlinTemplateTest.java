@@ -73,7 +73,7 @@ class KotlinTemplateTest implements RewriteTest {
                   var path = Paths.get(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().getPath());
                   return KotlinTemplate.builder("val mapper = ObjectMapper()")
                                        .parser(KotlinParser.builder()
-                                                                  .classpath(List.of(path)))
+                                                           .classpath(List.of(path)))
                                        .imports(ObjectMapper.class.getName())
                                        .build()
                                        .apply(getCursor(), multiVariable.getCoordinates().replace());

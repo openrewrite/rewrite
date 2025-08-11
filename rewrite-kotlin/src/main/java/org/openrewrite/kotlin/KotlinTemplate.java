@@ -29,19 +29,24 @@ import java.util.function.Consumer;
 import static java.util.Collections.emptySet;
 
 public class KotlinTemplate extends JavaTemplate {
-    private KotlinTemplate(boolean contextSensitive, KotlinParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+    private KotlinTemplate(boolean contextSensitive,
+                           KotlinParser.Builder parser,
+                           String code,
+                           Set<String> imports,
+                           Consumer<String> onAfterVariableSubstitution,
+                           Consumer<String> onBeforeParseTemplate) {
         super(
-                code,
-                emptySet(),
+            code,
+            emptySet(),
+            onAfterVariableSubstitution,
+            new KotlinTemplateParser(
+                contextSensitive,
+                augmentClasspath(parser),
                 onAfterVariableSubstitution,
-                new KotlinTemplateParser(
-                        contextSensitive,
-                        augmentClasspath(parser),
-                        onAfterVariableSubstitution,
-                        onBeforeParseTemplate,
-                        imports
-                )
-        );
+                onBeforeParseTemplate,
+                imports
+            )
+             );
     }
 
     private static KotlinParser.Builder augmentClasspath(KotlinParser.Builder parserBuilder) {
