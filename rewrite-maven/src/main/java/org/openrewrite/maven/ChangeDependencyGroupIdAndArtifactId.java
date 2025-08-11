@@ -151,8 +151,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new MavenVisitor<ExecutionContext>() {
-            @Nullable
-            final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
+            final @Nullable VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
             private boolean isNewDependencyPresent;
 
             @Override
@@ -193,7 +192,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     if (newVersion != null) {
                         try {
                             Optional<String> currentVersion = t.getChildValue("version");
-                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion.orElse(newVersion));
+                            String resolvedNewVersion = resolveSemverVersion(groupId, artifactId, currentVersion.orElse(newVersion), ctx);
                             Scope scope = t.getChild("scope").map(xml -> Scope.fromName(xml.getValue().orElse(null))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
@@ -246,7 +245,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, String version) throws MavenDownloadingException {
+            private String resolveSemverVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
                 List<String> availableVersions = new ArrayList<>();
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
@@ -259,7 +258,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             private void storeParentPomProperty(@Nullable String currentValue, String newValue) {
                 if (isProperty(currentValue)) {
-                    String name = currentValue.substring(2, currentValue.length() - 1);
+                    String name = currentValue.substring(2, currentValue.length() - 1).trim();
                     if (!getResolutionResult().getPom().getRequested().getProperties().containsKey(name)) {
                         storeParentPomProperty(getResolutionResult(), name, newValue);
                     }
@@ -308,7 +307,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
                 if (isOldDependencyTag && acc.isNewDependencyPresent) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                    doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                     maybeUpdateModel();
                     return t;
                 }

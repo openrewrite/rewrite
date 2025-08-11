@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -313,6 +314,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return tag;
     }
 
+    @Contract("null -> false")
     protected boolean isProperty(@Nullable String value) {
         return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
     }
