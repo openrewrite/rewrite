@@ -1701,7 +1701,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void addDependencyWithBroaderScopeChangesExistingScopeImplicit() {
+    void addDependencyWithImplicitCompileScopeDoesNotChangeRuntimeScope() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
           pomXml(
@@ -1719,28 +1719,13 @@ class AddDependencyTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>jakarta.annotation</groupId>
-                          <artifactId>jakarta.annotation-api</artifactId>
-                          <version>2.1.1</version>
-                      </dependency>
-                  </dependencies>
-              </project>
               """
           )
         );
     }
 
-    @ExpectedToFail("Currently any direct dependency's scope is broadened, even when consciously overridden in a child")
     @Test
-    void addDependencyWithBroaderScopeDoesNotChangeTransitiveOverride() {
+    void addDependencyWithBroaderScopeDoesNotChangeTransitiveProvidedOverride() {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
           mavenProject("root",
