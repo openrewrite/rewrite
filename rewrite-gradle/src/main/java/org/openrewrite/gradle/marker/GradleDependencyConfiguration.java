@@ -108,8 +108,23 @@ public class GradleDependencyConfiguration implements Serializable {
 
     /**
      * Lists the constraints applied to manage the versions of transitive dependencies.
+     * Produces a list of _only_ those constraints applied directly to this configuration.
+     * But configurations inherit the constraints of the configurations they extend, so to get all the constraints
+     * actually in effect for a given configuration call getAllConstraints()
      */
     List<GradleDependencyConstraint> constraints;
+
+    /**
+     * Lists all the constraints in effect for the current configuration, including those constraints inherited from
+     * parent configurations.
+     */
+    List<GradleDependencyConstraint> getAllConstraints() {
+        Set<GradleDependencyConstraint> constraintSet = new LinkedHashSet<>(constraints);
+        for (GradleDependencyConfiguration parentConfiguration : allExtendsFrom()) {
+            constraintSet.addAll(parentConfiguration.getConstraints());
+        }
+        return new ArrayList<>(constraintSet);
+    }
 
     @Deprecated
     public GradleDependencyConfiguration(
@@ -157,7 +172,7 @@ public class GradleDependencyConfiguration implements Serializable {
         this.directResolved = directResolved;
         this.exceptionType = exceptionType;
         this.message = message;
-        this.constraints = Collections.emptyList();
+        this.constraints = emptyList();
     }
 
     /**

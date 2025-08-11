@@ -17,6 +17,7 @@ package org.openrewrite.gradle.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -24,11 +25,15 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class TaskTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.afterTypeValidationOptions(TypeValidation.none());
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
     void declareTaskOldStyle() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           buildGradle(
             """
               task(testWithCloud, type: Test) {
@@ -44,7 +49,6 @@ class TaskTest implements RewriteTest {
     @Test
     void dsl() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           buildGradle(
             """
               plugins {

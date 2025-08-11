@@ -40,6 +40,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.Dependency;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -257,8 +258,12 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
 
                 GradleDependencyConfiguration newGdc = gdc;
-                org.openrewrite.maven.tree.Dependency newRequested = new org.openrewrite.maven.tree.Dependency(
-                        gav, classifier, "jar", gdc.getName(), emptyList(), null);
+                org.openrewrite.maven.tree.Dependency newRequested = Dependency.builder()
+                                .gav(gav)
+                                .classifier(classifier)
+                                .type("jar")
+                                .scope(gdc.getName())
+                                .build();
                 newGdc = newGdc.withRequested(ListUtils.concat(
                         ListUtils.map(gdc.getRequested(), requested -> {
                             // Remove any existing dependency with the same group and artifact id

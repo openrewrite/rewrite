@@ -17,21 +17,26 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddAnnotationProcessorTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new AddAnnotationProcessor(
+          "org.projectlombok",
+          "lombok-mapstruct-binding",
+          "0.2.0"
+        ));
+    }
+
     @DocumentExample
     @Test
     void addAnnotationProcessor() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
           pomXml(
             """
               <project>
@@ -101,11 +106,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
     @Test
     void shouldUpdateProcessorVersionAlreadyPresent() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
           pomXml(
             """
               <project>
@@ -182,11 +182,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
     @Test
     void addAnnotationWithOlderVersionAsMavenProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
           pomXml(
             """
               <project>
@@ -249,11 +244,6 @@ class AddAnnotationProcessorTest implements RewriteTest {
     @Test
     void addAnnotationWithSameVersionAsMavenProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
           pomXml(
             """
               <project>

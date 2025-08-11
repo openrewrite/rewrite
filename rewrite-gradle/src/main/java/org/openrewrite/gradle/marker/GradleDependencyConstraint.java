@@ -15,12 +15,15 @@
  */
 package org.openrewrite.gradle.marker;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
+import java.io.Serializable;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Models a dependency constraint in Gradle. These are typically used to manage the versions of transitive dependencies.
@@ -36,7 +39,8 @@ import java.util.List;
  */
 @Value
 @Builder
-public class GradleDependencyConstraint {
+@AllArgsConstructor
+public class GradleDependencyConstraint implements Serializable {
     String groupId;
     String artifactId;
     @Nullable
@@ -50,5 +54,5 @@ public class GradleDependencyConstraint {
     @Nullable
     String reason;
     @Builder.Default
-    List<String> rejectedVersions = Collections.emptyList();
+    List<String> rejectedVersions = emptyList();
 }

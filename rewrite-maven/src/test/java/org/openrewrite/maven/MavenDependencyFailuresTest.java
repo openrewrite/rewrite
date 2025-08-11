@@ -28,7 +28,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -126,7 +125,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws IOException {
+    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws Exception {
         // it's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
