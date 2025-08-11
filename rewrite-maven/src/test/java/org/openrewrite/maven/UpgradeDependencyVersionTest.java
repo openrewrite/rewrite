@@ -1085,12 +1085,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Disabled("Anti-pattern not yet supported")
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
           pomXml(
             """
               <project>
