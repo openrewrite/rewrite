@@ -178,7 +178,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     }
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
-                    if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx)) {
+                    if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx) && isNotExcepted(managed)) {
                         if (tag.getChild("exclusions").isPresent()) {
                             return tag;
                         }
@@ -341,6 +341,22 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean isNotExcepted(ResolvedDependency d) {
+                if (except == null) {
+                    return true;
+                }
+                for (final String gav : except) {
+                    final String[] split = gav.split(":");
+                    final String exceptedGroupId = split[0];
+                    final String exceptedArtifactId = split[1];
+                    if (matchesGlob(d.getGroupId(), exceptedGroupId) &&
+                        matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            private boolean isNotExcepted(ResolvedManagedDependency d) {
                 if (except == null) {
                     return true;
                 }
