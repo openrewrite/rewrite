@@ -984,20 +984,14 @@ public class ResolvedPom {
             //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
             switch (scope) {
                 case Compile:
-                    if (dScope == scope || dScope.transitiveOf(scope) == scope || dScope == Scope.Provided) {
-                        rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
-                    }
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, s -> s == Scope.Provided);
                     break;
                 case Runtime:
                 case Provided:
-                    if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                        rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
-                    }
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d);
                     break;
                 case Test:
-                    if (dScope == scope || dScope.transitiveOf(scope) == scope || dScope == Scope.Provided || dScope == Scope.Runtime) {
-                        rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
-                    }
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, s -> s == Scope.Provided || s == Scope.Runtime);
                     break;
             }
         }
@@ -1153,6 +1147,16 @@ public class ResolvedPom {
         }
 
         return dependencies;
+    }
+
+    private void maybePutRootDependency(Scope scope, Dependency requestedDependency, Scope dScope, Map<GroupArtifact, DependencyAndDependent> rootDependencies, Dependency d) {
+        maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, null);
+    }
+
+    private void maybePutRootDependency(Scope scope, Dependency requestedDependency, Scope dScope, Map<GroupArtifact, DependencyAndDependent> rootDependencies, Dependency d, @Nullable Predicate<Scope> additionalCheck) {
+        if (dScope == scope || dScope.transitiveOf(scope) == scope || (additionalCheck != null && additionalCheck.test(dScope))) {
+            rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+        }
     }
 
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
