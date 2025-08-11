@@ -87,7 +87,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       https://jitpack.io/, https://jitpack.io/
       """)
     @ParameterizedTest
-    void normalizeRepository(String originalUrl, String expectedUrl) throws Exception {
+    void normalizeRepository(String originalUrl, String expectedUrl) throws Throwable {
         MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
         MavenRepository repository = new MavenRepository("id", originalUrl, null, null, null, null, null);
         MavenRepository normalized = downloader.normalizeRepository(repository);
