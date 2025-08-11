@@ -38,8 +38,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   return KotlinTemplate.builder("println(\"foo\")")
-                                       .build()
-                                       .apply(getCursor(), multiVariable.getCoordinates().replace());
+                    .build()
+                    .apply(getCursor(), multiVariable.getCoordinates().replace());
               }
           })),
           kotlin(
@@ -57,7 +57,7 @@ class KotlinTemplateTest implements RewriteTest {
                   }
               }
               """
-                ));
+          ));
     }
 
     @Test
@@ -72,11 +72,10 @@ class KotlinTemplateTest implements RewriteTest {
                   maybeAddImport(ObjectMapper.class.getName(), false);
                   var path = Paths.get(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().getPath());
                   return KotlinTemplate.builder("val mapper = ObjectMapper()")
-                                       .parser(KotlinParser.builder()
-                                                           .classpath(List.of(path)))
-                                       .imports(ObjectMapper.class.getName())
-                                       .build()
-                                       .apply(getCursor(), multiVariable.getCoordinates().replace());
+                    .parser(KotlinParser.builder().classpath(List.of(path)))
+                    .imports(ObjectMapper.class.getName())
+                    .build()
+                    .apply(getCursor(), multiVariable.getCoordinates().replace());
               }
           })),
           kotlin(
@@ -96,6 +95,6 @@ class KotlinTemplateTest implements RewriteTest {
                   }
               }
               """
-                ));
+          ));
     }
 }

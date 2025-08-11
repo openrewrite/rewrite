@@ -36,17 +36,17 @@ public class KotlinTemplate extends JavaTemplate {
                            Consumer<String> onAfterVariableSubstitution,
                            Consumer<String> onBeforeParseTemplate) {
         super(
-            code,
-            emptySet(),
-            onAfterVariableSubstitution,
-            new KotlinTemplateParser(
-                contextSensitive,
-                augmentClasspath(parser),
+                code,
+                emptySet(),
                 onAfterVariableSubstitution,
-                onBeforeParseTemplate,
-                imports
-            )
-             );
+                new KotlinTemplateParser(
+                        contextSensitive,
+                        augmentClasspath(parser),
+                        onAfterVariableSubstitution,
+                        onBeforeParseTemplate,
+                        imports
+                )
+        );
     }
 
     private static KotlinParser.Builder augmentClasspath(KotlinParser.Builder parserBuilder) {
