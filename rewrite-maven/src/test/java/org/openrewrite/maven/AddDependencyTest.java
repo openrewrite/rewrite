@@ -25,6 +25,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -1700,10 +1701,11 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void addDependencyWithImplicitCompileScopeDoesNotChangeRuntimeScope() {
+    @ParameterizedTest
+    @ValueSource(strings = { "", "compile"})
+    void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeProvidedScope(String scope) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
           pomXml(
             """
               <project>
@@ -1724,10 +1726,11 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void addDependencyWithBroaderScopeDoesNotChangeTransitiveProvidedOverride() {
+    @ParameterizedTest
+    @ValueSource(strings = { "", "compile"})
+    void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeTransitiveProvidedScopeOverride(String scope) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
           mavenProject("root",
             pomXml(
               """
@@ -1775,11 +1778,12 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("With duplicate direct dependencies last declaration wins, however this is not taken into account")
-    @Test
-    void addDependencyWithDuplicateDependencyWithBroaderScopeChangesExistingScopeImplicit() {
+    @ExpectedToFail("Currently version 3.0.0 is considered present in compile/provided/runtime scope therefore the recipe will not make any changes.")
+    @ParameterizedTest
+    @ValueSource(strings = { "", "compile"})
+    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(String scope) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
           pomXml(
             """
               <project>
@@ -1796,7 +1800,7 @@ class AddDependencyTest implements RewriteTest {
                           <groupId>jakarta.annotation</groupId>
                           <artifactId>jakarta.annotation-api</artifactId>
                           <version>2.1.1</version>
-                          <scope>provided</scope>
+                          <scope>test</scope>
                       </dependency>
                   </dependencies>
               </project>
@@ -1812,6 +1816,44 @@ class AddDependencyTest implements RewriteTest {
                           <artifactId>jakarta.annotation-api</artifactId>
                           <version>3.0.0</version>
                       </dependency>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithBroaderScopeChangesExistingScopeImplicit() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
                       <dependency>
                           <groupId>jakarta.annotation</groupId>
                           <artifactId>jakarta.annotation-api</artifactId>
