@@ -177,8 +177,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     @SuppressWarnings("unused")
     public static class Builder {
 
-        private final String code;
-        private final Set<String> imports = new HashSet<>();
+        protected final String code;
+        protected final Set<String> imports = new HashSet<>();
         private final Set<String> genericTypes = new HashSet<>();
 
         private boolean contextSensitive;
@@ -186,9 +186,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
-        private Consumer<String> onAfterVariableSubstitution = s -> {
+        protected Consumer<String> onAfterVariableSubstitution = s -> {
         };
-        private Consumer<String> onBeforeParseTemplate = s -> {
+        protected Consumer<String> onBeforeParseTemplate = s -> {
         };
 
         protected Builder(String code) {
@@ -254,7 +254,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return this;
         }
 
-        private void validateImport(String typeName) {
+        protected void validateImport(String typeName) {
             if (StringUtils.isBlank(typeName)) {
                 throw new IllegalArgumentException("Imports must not be blank");
             } else if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
