@@ -379,6 +379,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "Hello ${a}",
+      "Hello ${a}; remove `<b>` when using `$${b}`",
+      "Hello ${a}; remove `<b>` when using `\\${b}`",
       "Hello @a@"
     })
     void keepsPropertyUsedByFilteredResource(String text) {
