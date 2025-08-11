@@ -25,6 +25,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
