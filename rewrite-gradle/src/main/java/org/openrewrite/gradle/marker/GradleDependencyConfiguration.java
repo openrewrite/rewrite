@@ -17,13 +17,11 @@ package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.maven.attributes.Attribute;
 import org.openrewrite.maven.attributes.Attributed;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -118,7 +116,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      */
     List<GradleDependencyConstraint> constraints;
 
-    Map<String, Attribute> attributes;
+    Map<String, String> attributes;
 
     /**
      * Lists all the constraints in effect for the current configuration, including those constraints inherited from

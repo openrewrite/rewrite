@@ -17,13 +17,11 @@ package org.openrewrite.maven.tree;
 
 import lombok.*;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.maven.attributes.Attribute;
 import org.openrewrite.maven.attributes.Attributed;
 
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.Collections.*;
 
@@ -52,7 +50,7 @@ public class Dependency implements Serializable, Attributed {
     String optional;
 
     @Builder.Default
-    Map<String, Attribute> attributes = emptyMap();
+    Map<String, String> attributes = emptyMap();
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();

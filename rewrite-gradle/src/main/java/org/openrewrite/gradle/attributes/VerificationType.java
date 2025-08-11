@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -38,21 +36,15 @@ public enum VerificationType implements Attribute {
      */
     TEST_RESULTS;
 
-    public static @Nullable VerificationType from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.VerificationType"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.verificationtype";
     }
 
-    public static @Nullable VerificationType from(@Nullable Named verificationType) {
+    public static @Nullable VerificationType from(@Nullable String verificationType) {
         if (verificationType == null) {
             return null;
         }
-        switch (verificationType.getName()) {
+        switch (verificationType) {
             case "jacoco-coverage":
                 return VerificationType.JACOCO_RESULTS;
             case "main-sources":

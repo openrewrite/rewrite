@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes.java;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -36,21 +34,15 @@ public enum TargetJvmEnvironment implements Attribute {
      */
     STANDARD_JVM;
 
-    public static @Nullable TargetJvmEnvironment from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.java.TargetJvmEnvironment"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.jvm.environment";
     }
 
-    public static @Nullable TargetJvmEnvironment from(@Nullable Named targetJvmEnvironment) {
+    public static @Nullable TargetJvmEnvironment from(@Nullable String targetJvmEnvironment) {
         if (targetJvmEnvironment == null) {
             return null;
         }
-        switch (targetJvmEnvironment.getName()) {
+        switch (targetJvmEnvironment) {
             case "android":
                 return TargetJvmEnvironment.ANDROID;
             case "standard-jvm":

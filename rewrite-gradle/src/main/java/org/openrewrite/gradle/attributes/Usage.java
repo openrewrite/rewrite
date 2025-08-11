@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -61,21 +59,15 @@ public enum Usage implements Attribute {
      */
     VERSION_CATALOG;
 
-    public static @Nullable Usage from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.Usage"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.usage";
     }
 
-    public static @Nullable Usage from(@Nullable Named usage) {
+    public static @Nullable Usage from(@Nullable String usage) {
         if (usage == null) {
             return null;
         }
-        switch (usage.getName()) {
+        switch (usage) {
             case "java-api":
                 return Usage.JAVA_API;
             case "java-runtime":

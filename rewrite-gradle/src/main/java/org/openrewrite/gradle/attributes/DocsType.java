@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -46,21 +44,15 @@ public enum DocsType implements Attribute {
      */
     DOXYGEN;
 
-    public static @Nullable DocsType from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.DocsType"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.docstype";
     }
 
-    public static @Nullable DocsType from(org.gradle.api.Named category) {
-        if (category == null) {
+    public static @Nullable DocsType from(@Nullable String docsType) {
+        if (docsType == null) {
             return null;
         }
-        switch (category.getName()) {
+        switch (docsType) {
             case "javadoc":
                 return DocsType.JAVADOC;
             case "sources":

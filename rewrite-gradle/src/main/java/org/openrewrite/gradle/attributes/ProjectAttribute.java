@@ -16,9 +16,6 @@
 package org.openrewrite.gradle.attributes;
 
 import lombok.Value;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ProjectDependency;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
 /**
@@ -34,16 +31,11 @@ public class ProjectAttribute implements Attribute {
      */
     String path;
 
-    public static @Nullable ProjectAttribute from(Object maybeDependency) {
-        if(!(maybeDependency instanceof ProjectDependency)) {
-            return null;
-        }
-        return new ProjectAttribute(((ProjectDependency)maybeDependency).getPath());
+    public static String key() {
+        return "org.gradle.api.artifacts.ProjectDependency";
     }
-    public static @Nullable ProjectAttribute from(Dependency dependency) {
-        if(!(dependency instanceof ProjectDependency)) {
-            return null;
-        }
-        return new ProjectAttribute(((ProjectDependency)dependency).getPath());
+
+    public static ProjectAttribute from(String path) {
+        return new ProjectAttribute(path);
     }
 }

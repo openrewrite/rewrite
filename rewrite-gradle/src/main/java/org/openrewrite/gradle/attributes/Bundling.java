@@ -15,9 +15,7 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.artifacts.ModuleDependency;
-import org.gradle.api.attributes.HasAttributes;
+
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -40,21 +38,15 @@ public enum Bundling implements Attribute {
      */
     SHADOWED;
 
-    public static @Nullable Bundling from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.Bundling"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.dependency.bundling";
     }
 
-    public static @Nullable Bundling from(@Nullable Named bundling) {
+    public static @Nullable Bundling from(@Nullable String bundling) {
         if (bundling == null) {
             return null;
         }
-        switch (bundling.getName()) {
+        switch (bundling) {
             case "external":
                 return Bundling.EXTERNAL;
             case "embedded":

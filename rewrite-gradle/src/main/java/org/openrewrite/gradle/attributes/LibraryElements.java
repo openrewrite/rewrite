@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -63,21 +61,15 @@ public enum LibraryElements implements Attribute {
      */
     RESOURCES;
 
-    public static @Nullable LibraryElements from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.LibraryElements"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.libraryelements";
     }
 
-    public static @Nullable LibraryElements from(@Nullable Named libraryElements) {
+    public static @Nullable LibraryElements from(@Nullable String libraryElements) {
         if (libraryElements == null) {
             return null;
         }
-        switch (libraryElements.getName()) {
+        switch (libraryElements) {
             case "classes":
                 return LibraryElements.CLASSES;
             case "classes+resources":

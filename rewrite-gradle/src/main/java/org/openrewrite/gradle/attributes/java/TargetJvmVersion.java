@@ -16,9 +16,10 @@
 package org.openrewrite.gradle.attributes.java;
 
 import lombok.Value;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
+
+import static java.lang.Integer.parseInt;
 
 /**
  * Represents the <a href="https://docs.gradle.org/current/javadoc/org/gradle/api/attributes/java/TargetJvmVersion.html">target version</a>
@@ -32,12 +33,14 @@ public class TargetJvmVersion implements Attribute {
      */
     int version;
 
-    public static @Nullable TargetJvmVersion from(HasAttributes hasAttributes) {
-        Integer version = hasAttributes.getAttributes()
-                .getAttribute(org.gradle.api.attributes.Attribute.of("org.gradle.jvm.version", Integer.class));
-        if (version == null) {
+    public static String key() {
+        return "org.gradle.jvm.version";
+    }
+
+    public static @Nullable TargetJvmVersion from(@Nullable String value) {
+        if (value == null) {
             return null;
         }
-        return new TargetJvmVersion(version);
+        return new TargetJvmVersion(parseInt(value));
     }
 }

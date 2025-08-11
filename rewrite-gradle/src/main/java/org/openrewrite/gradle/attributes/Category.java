@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle.attributes;
 
-import org.gradle.api.Named;
-import org.gradle.api.attributes.HasAttributes;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.attributes.Attribute;
 
@@ -50,21 +48,15 @@ public enum Category implements Attribute {
      */
     VERIFICATION;
 
-    public static @Nullable Category from(HasAttributes hasAttributes) {
-        try {
-            return from((Named) hasAttributes.getAttributes()
-                    .getAttribute(org.gradle.api.attributes.Attribute.of(
-                            Class.forName("org.gradle.api.attributes.Category"))));
-        } catch (ClassCastException | ClassNotFoundException e) {
-            return null;
-        }
+    public static String key() {
+        return "org.gradle.category";
     }
 
-    public static @Nullable Category from(org.gradle.api.Named category) {
+    public static @Nullable Category from(@Nullable String category) {
         if (category == null) {
             return null;
         }
-        switch (category.getName()) {
+        switch (category) {
             case "documentation":
                 return Category.DOCUMENTATION;
             case "enforced-platform":
