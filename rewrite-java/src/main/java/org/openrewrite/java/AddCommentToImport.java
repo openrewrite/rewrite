@@ -65,7 +65,7 @@ public class AddCommentToImport extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TypeMatcher typeMatcher = new TypeMatcher(typePattern, false);
+        TypeMatcher typeMatcher = new TypeMatcher(typePattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Import visitImport(J.Import anImport, ExecutionContext ctx) {

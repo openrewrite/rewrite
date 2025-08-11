@@ -37,11 +37,48 @@ class AddCommentToImportTest implements RewriteTest {
           """
             package foo;
             public class Bar extends Foo {}
+            """,
+          """
+            package foo.bar;
+            public class Baz {
+                public static void someStaticMethod() {}
+            }
             """
         ));
     }
 
     @DocumentExample
+    @Test
+    void wildcardAndStaticImportsRecognized() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToImport(SHORT_COMMENT, "foo.bar.Baz")),
+          //language=java
+          java(
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
+              import foo.bar.*;
+              import foo.bar.Baz;
+              import static foo.bar.Baz.someStaticMethod;
+              class Other {}
+              """,
+            """
+              package blah;
+              // Will not match direct package
+              import foo.*;
+              /* Short comment to add */
+              import foo.bar.*;
+              /* Short comment to add */
+              import foo.bar.Baz;
+              /* Short comment to add */
+              import static foo.bar.Baz.someStaticMethod;
+              class Other {}
+              """
+          )
+        );
+    }
+
     @Test
     void addSingleLineComment() {
         rewriteRun(
