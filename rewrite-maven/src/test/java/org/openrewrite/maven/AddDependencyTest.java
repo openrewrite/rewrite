@@ -1778,11 +1778,12 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ExpectedToFail("Currently version 3.0.0 is considered present in compile/provided/runtime scope therefore the recipe will not make any changes.")
-    @ParameterizedTest
-    @ValueSource(strings = { "", "compile"})
-    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(String scope) {
+    @Test
+//    @ParameterizedTest
+//    @ValueSource(strings = { "", "compile"})
+    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(/*String scope*/) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, /*scope*/ null, null, null, null, null, null, null, null)),
           pomXml(
             """
               <project>
