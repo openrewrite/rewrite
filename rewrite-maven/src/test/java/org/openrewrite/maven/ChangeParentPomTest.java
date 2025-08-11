@@ -1783,4 +1783,77 @@ class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeParentWithExceptDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.springframework.boot",
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "spring-boot-starter-parent",
+            "2.7.18",
+            null,
+            null,
+            null,
+            false,
+            List.of("com.fasterxml.jackson.core:jackson-annotations")
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.17</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!-- This dependency is in except list and should keep its version -->
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                    <version>2.13.5</version>
+                  </dependency>
+                  <!-- This dependency is not in except list and should have version removed -->
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-context</artifactId>
+                    <version>5.3.23</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.18</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1.0.0</version>
+                <dependencies>
+                  <!-- This dependency is in except list and should keep its version -->
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                    <version>2.13.5</version>
+                  </dependency>
+                  <!-- This dependency is not in except list and should have version removed -->
+                  <dependency>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-context</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
