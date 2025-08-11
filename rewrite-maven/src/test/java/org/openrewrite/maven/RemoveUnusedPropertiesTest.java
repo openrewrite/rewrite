@@ -378,10 +378,10 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "Hello ${a}",
-      "Hello ${a}; remove `<b>` when using `$${b}`",
-      "Hello ${a}; remove `<b>` when using `\\${b}`",
-      "Hello @a@"
+      "Keep `<a>` because of `@a@`;  remove `<b>`",
+      "Keep `<a>` because of `${a}`; remove `<b>`",
+      "Keep `<a>` because of `${a}`; remove `<b>` despite `$${b}`",
+      "Keep `<a>` because of `${a}`; remove `<b>` despite `\\${b}`",
     })
     void keepsPropertyUsedByFilteredResource(String text) {
         rewriteRun(
