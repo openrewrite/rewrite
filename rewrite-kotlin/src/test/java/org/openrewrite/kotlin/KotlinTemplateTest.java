@@ -15,11 +15,15 @@
  */
 package org.openrewrite.kotlin;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+
+import java.nio.file.Paths;
+import java.util.List;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -34,8 +38,8 @@ class KotlinTemplateTest implements RewriteTest {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   return KotlinTemplate.builder("println(\"foo\")")
-                    .build()
-                    .apply(getCursor(), multiVariable.getCoordinates().replace());
+                                       .build()
+                                       .apply(getCursor(), multiVariable.getCoordinates().replace());
               }
           })),
           kotlin(
@@ -53,6 +57,46 @@ class KotlinTemplateTest implements RewriteTest {
                   }
               }
               """
-          ));
+                ));
+    }
+
+    @Test
+    void parserClasspath() {
+        var mapper = new ObjectMapper();
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.toString().contains("ObjectMapper")) {
+                      return multiVariable;
+                  }
+                  maybeAddImport(ObjectMapper.class.getName(), false);
+                  var path = Paths.get(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+                  return KotlinTemplate.builder("val mapper = ObjectMapper()")
+                                       .parser(KotlinParser.builder()
+                                                                  .classpath(List.of(path)))
+                                       .imports(ObjectMapper.class.getName())
+                                       .build()
+                                       .apply(getCursor(), multiVariable.getCoordinates().replace());
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                      val b1 = 1 == 2
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.databind.ObjectMapper
+              
+              class Test {
+                  fun foo() {
+                      val mapper = ObjectMapper()
+                  }
+              }
+              """
+                ));
     }
 }
