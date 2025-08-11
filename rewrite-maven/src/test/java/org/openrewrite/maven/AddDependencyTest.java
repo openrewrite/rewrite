@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
@@ -1701,7 +1702,8 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "", "compile"})
+    @NullSource
+    @ValueSource(strings = { "compile"})
     void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeProvidedScope(String scope) {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
@@ -1726,7 +1728,8 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = { "", "compile"})
+    @NullSource
+    @ValueSource(strings = { "compile"})
     void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeTransitiveProvidedScopeOverride(String scope) {
         rewriteRun(
           spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
@@ -1777,13 +1780,12 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Currently version 3.0.0 is considered present in compile/provided/runtime scope therefore the recipe will not make any changes.")
-    @Test
-//    @ParameterizedTest
-//    @ValueSource(strings = { "", "compile"})
-    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(/*String scope*/) {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = { "compile"})
+    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(String scope) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, /*scope*/ null, null, null, null, null, null, null, null)),
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
           pomXml(
             """
               <project>
