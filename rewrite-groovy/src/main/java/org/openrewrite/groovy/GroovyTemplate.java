@@ -18,13 +18,11 @@ package org.openrewrite.groovy;
 import org.openrewrite.Cursor;
 import org.openrewrite.groovy.internal.template.GroovySubstitutions;
 import org.openrewrite.groovy.internal.template.GroovyTemplateParser;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
