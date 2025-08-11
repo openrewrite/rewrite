@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
@@ -25,7 +24,6 @@ import org.openrewrite.config.DeclarativeNamedStyles;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
@@ -39,7 +37,7 @@ class ImportLayoutStyleTest {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @Test
-    void roundTripSerialize() throws JsonProcessingException {
+    void roundTripSerialize() throws Exception {
         var style = mapper.writeValueAsString(ImportLayoutStyle
                 .builder()
                 .packageToFold("java.awt.*")
@@ -57,7 +55,7 @@ class ImportLayoutStyleTest {
     }
 
     @Test
-    void deserializeInDeclarativeNamedStyles() throws IOException {
+    void deserializeInDeclarativeNamedStyles() throws Exception {
         var style = new DeclarativeNamedStyles(
                 randomId(),
                 "name",
