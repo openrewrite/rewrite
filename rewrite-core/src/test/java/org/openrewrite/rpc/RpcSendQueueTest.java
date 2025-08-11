@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class RpcSendQueueTest {
 
     @Test
-    void sendList() throws InterruptedException {
+    void sendList() throws Exception {
         List<String> before = List.of("A", "B", "C", "D");
         List<String> after = List.of("A", "E", "F", "C");
 
@@ -53,7 +53,7 @@ public class RpcSendQueueTest {
     }
 
     @Test
-    void sendEnum() throws InterruptedException {
+    void sendEnum() throws Exception {
         List<AccessMode> before = List.of(AccessMode.READ);
         List<AccessMode> after = List.of(AccessMode.READ, AccessMode.WRITE);
 
@@ -75,7 +75,7 @@ public class RpcSendQueueTest {
     }
 
     @Test
-    void emptyList() throws InterruptedException {
+    void emptyList() throws Exception {
         List<String> after = List.of();
 
         CountDownLatch latch = new CountDownLatch(1);
