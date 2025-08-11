@@ -121,7 +121,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
     }
 
     private static Pattern dollarPropertyMatcher(String patternOrDefault) {
-        return Pattern.compile("[^$]*\\$\\{(" + patternOrDefault + ")}[^$]*");
+        return Pattern.compile("(?<![$\\\\])\\$\\{(" + patternOrDefault + ")}");
     }
 
     private static Pattern atPropertyMatcher(String patternOrDefault) {
