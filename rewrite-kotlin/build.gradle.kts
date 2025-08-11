@@ -21,6 +21,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")

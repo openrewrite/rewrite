@@ -957,6 +957,30 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5843")
+    @Test
+    void doNotRenameClassLiterals() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
+          java(
+            """
+              class FooBarBaz {}
+              class A {
+                FooBarBaz FooBarBaz = new FooBarBaz();
+                Class<?> clazz = FooBarBaz.class;
+              }
+              """,
+            """
+              class FooBarBaz {}
+              class A {
+                FooBarBaz fooBarBaz = new FooBarBaz();
+                Class<?> clazz = FooBarBaz.class;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4059")
     @Test
     void renameTypeCastedField() {
