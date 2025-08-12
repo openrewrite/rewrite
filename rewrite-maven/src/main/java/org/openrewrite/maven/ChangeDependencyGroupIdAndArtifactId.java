@@ -16,7 +16,8 @@
 package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -29,10 +30,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Stream;
 
 import static java.util.Collections.max;
-import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -147,7 +146,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
-        ctx.computeMessageIfAbsent(CHANGED_DEPENDENCIES, key -> new HashMap<Dependency, Dependency>());
+        ctx.computeMessageIfAbsent(CHANGED_DEPENDENCIES, key -> new HashMap<GroupArtifactVersion, GroupArtifactVersion>());
         return new Accumulator();
     }
 
@@ -167,33 +166,34 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
 
-                Map<Dependency, Dependency> changedDependencies = ctx.getMessage(CHANGED_DEPENDENCIES);
+                Map<GroupArtifactVersion, GroupArtifactVersion> changedDependencies = ctx.getMessage(CHANGED_DEPENDENCIES);
 
-                Dependency oldDependency = new Dependency(oldGroupId, oldArtifactId);
-                for (Map.Entry<Dependency, Dependency> entry : changedDependencies.entrySet()) {
-                    if (entry.getValue().equals(oldDependency)) {
+                GroupArtifactVersion oldDependency = new GroupArtifactVersion(oldGroupId, oldArtifactId, null);
+                for (Map.Entry<GroupArtifactVersion, GroupArtifactVersion> entry : changedDependencies.entrySet()) {
+                    if (entry.getValue().asGroupArtifact().equals(oldDependency.asGroupArtifact())) {
                         oldDependency = entry.getKey();
                         break;
                     }
                 }
 
-                boolean isOldDependencyTag = isDependencyTag(oldDependency.groupId, oldDependency.artifactId);
+                boolean isOldDependencyTag = isDependencyTag(oldDependency.getGroupId(), oldDependency.getArtifactId());
                 if (isOldDependencyTag && isNewDependencyPresent) {
                     acc.isNewDependencyPresent = true;
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldDependency.groupId, oldDependency.artifactId)) {
+                if (isOldDependencyTag || isPluginDependencyTag(oldDependency.getGroupId(), oldDependency.getArtifactId())) {
                     Optional<String> groupIdFromTag = t.getChildValue("groupId");
                     Optional<String> artifactIdFromTag = t.getChildValue("artifactId");
+                    Optional<String> currentVersion = t.getChildValue("version");
                     if (!groupIdFromTag.isPresent() || !artifactIdFromTag.isPresent()) {
                         return t;
                     }
 
-                    Dependency existingDependency = new Dependency(groupIdFromTag.get(), artifactIdFromTag.get());
+                    GroupArtifactVersion existingDependency = new GroupArtifactVersion(groupIdFromTag.get(), artifactIdFromTag.get(), currentVersion.orElse(null));
                     if (changedDependencies.containsKey(existingDependency)) {
                         existingDependency = changedDependencies.get(existingDependency);
                     }
-                    Dependency changedDependency = existingDependency;
+                    GroupArtifactVersion changedDependency = existingDependency;
 
                     if (newGroupId != null) {
                         storeParentPomProperty(existingDependency.getGroupId(), newGroupId);
@@ -206,7 +206,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
                     if (newVersion != null) {
                         try {
-                            Optional<String> currentVersion = t.getChildValue("version");
                             String resolvedNewVersion = resolveSemverVersion(changedDependency.getGroupId(), changedDependency.getArtifactId(), currentVersion.orElse(newVersion), ctx);
                             Scope scope = t.getChild("scope").map(xml -> Scope.fromName(xml.getValue().orElse(null))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -331,7 +330,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     return t;
                 }
                 if (acc.changeTo != null && (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId))) {
-                    Dependency changeTo = acc.changeTo;
+                    GroupArtifactVersion changeTo = acc.changeTo;
                     t = changeChildTagValue(t, "groupId", changeTo.getGroupId(), ctx);
                     t = changeChildTagValue(t, "artifactId", changeTo.getArtifactId(), ctx);
 
@@ -361,7 +360,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         boolean isNewDependencyPresent;
 
         @Nullable
-        Dependency changeTo;
+        GroupArtifactVersion changeTo;
 
         boolean removeVersionTag;
 
@@ -373,32 +372,5 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         Path filePath;
         String name;
         String value;
-    }
-
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    @NoArgsConstructor(access = AccessLevel.PRIVATE)
-    @Getter
-    @With
-    @EqualsAndHashCode
-    private static class Dependency {
-        @Nullable
-        private String groupId;
-
-        @Nullable
-        private String artifactId;
-
-        @Nullable
-        @EqualsAndHashCode.Exclude
-        private String version;
-
-        private Dependency(String groupId, String artifactId) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-        }
-
-        @Override
-        public String toString() {
-            return Stream.of(groupId, artifactId, version).filter(Objects::nonNull).collect(joining(":"));
-        }
     }
 }
