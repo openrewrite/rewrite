@@ -50,75 +50,18 @@ class AnnotationApplier {
      * @param visitAnnotation A function that creates an AnnotationVisitor
      */
     public static void applyAnnotations(String annotationsStr, AnnotationVisitorCreator visitAnnotation) {
-        if (annotationsStr == null || annotationsStr.isEmpty()) {
+        if (annotationsStr.isEmpty()) {
             return;
         }
-        
-        // Check if we have pipe delimiters (for backward compatibility)
-        if (annotationsStr.contains("|") && !annotationsStr.contains("\\|")) {
-            // Has unescaped pipes - split on them
-            String[] annotations = annotationsStr.split("\\|");
-            for (String annotation : annotations) {
-                applyAnnotation(annotation, visitAnnotation);
-            }
-        } else {
-            // No delimiters or only escaped pipes - parse sequentially
-            // Each annotation starts with @ and is self-delimiting
-            int pos = 0;
-            while (pos < annotationsStr.length()) {
-                if (annotationsStr.charAt(pos) != '@') {
-                    break; // Invalid format
-                }
-                
-                // Find end of this annotation
-                int start = pos;
-                pos++; // skip @
-                
-                // Parse descriptor (Ltype;)
-                if (pos < annotationsStr.length() && annotationsStr.charAt(pos) == 'L') {
-                    pos++; // skip L
-                    while (pos < annotationsStr.length() && annotationsStr.charAt(pos) != ';') {
-                        pos++;
-                    }
-                    if (pos < annotationsStr.length()) {
-                        pos++; // skip ;
-                    }
-                }
-                
-                // Check for attributes in parentheses
-                if (pos < annotationsStr.length() && annotationsStr.charAt(pos) == '(') {
-                    int depth = 1;
-                    pos++; // skip opening (
-                    boolean inString = false;
-                    boolean escaped = false;
-                    
-                    while (pos < annotationsStr.length() && depth > 0) {
-                        char c = annotationsStr.charAt(pos);
-                        
-                        if (escaped) {
-                            escaped = false;
-                        } else if (c == '\\') {
-                            escaped = true;
-                        } else if (c == '"' && !escaped) {
-                            inString = !inString;
-                        } else if (!inString) {
-                            if (c == '(') {
-                                depth++;
-                            } else if (c == ')') {
-                                depth--;
-                            }
-                        }
-                        pos++;
-                    }
-                }
-                
-                applyAnnotation(annotationsStr.substring(start, pos), visitAnnotation);
-            }
+
+        List<AnnotationDeserializer.AnnotationInfo> annotations = AnnotationDeserializer.parseAnnotations(annotationsStr);
+        for (AnnotationDeserializer.AnnotationInfo annotationInfo : annotations) {
+            applyAnnotation(annotationInfo, visitAnnotation);
         }
     }
-    
+
     /**
-     * Applies a single annotation to a class, method, or field.
+     * Applies a single annotation string to a class, method, or field.
      *
      * @param annotationStr   The serialized annotation string
      * @param visitAnnotation A function that creates an AnnotationVisitor
@@ -129,8 +72,14 @@ class AnnotationApplier {
         }
 
         AnnotationDeserializer.AnnotationInfo annotationInfo = AnnotationDeserializer.parseAnnotation(annotationStr);
-        AnnotationVisitor av = visitAnnotation.create(annotationInfo.getDescriptor(), true);
+        applyAnnotation(annotationInfo, visitAnnotation);
+    }
 
+    /**
+     * Applies a parsed annotation info to a class, method, or field.
+     */
+    private static void applyAnnotation(AnnotationDeserializer.AnnotationInfo annotationInfo, AnnotationVisitorCreator visitAnnotation) {
+        AnnotationVisitor av = visitAnnotation.create(annotationInfo.getDescriptor(), true);
         if (av != null) {
             AnnotationAttributeApplier.applyAttributes(av, annotationInfo.getAttributes());
             av.visitEnd();
@@ -222,9 +171,9 @@ class AnnotationCollectorHelper {
      */
     static AnnotationVisitor createCollector(String annotationDescriptor, List<String> collectedAnnotations) {
         return new AnnotationValueCollector(result -> {
-            String serializedAnnotation = result.isEmpty()
-                    ? AnnotationSerializer.serializeSimpleAnnotation(annotationDescriptor)
-                    : AnnotationSerializer.serializeAnnotationWithAttributes(annotationDescriptor, result.toArray(new String[0]));
+            String serializedAnnotation = result.isEmpty() ?
+                    AnnotationSerializer.serializeSimpleAnnotation(annotationDescriptor) :
+                    AnnotationSerializer.serializeAnnotationWithAttributes(annotationDescriptor, result.toArray(new String[0]));
             collectedAnnotations.add(serializedAnnotation);
         });
     }
@@ -256,9 +205,9 @@ class AnnotationCollectorHelper {
         @Override
         public AnnotationVisitor visitAnnotation(@Nullable String name, String nestedAnnotationDescriptor) {
             return new AnnotationValueCollector(result -> {
-                String nestedAnnotation = result.isEmpty()
-                        ? AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationDescriptor)
-                        : AnnotationSerializer.serializeAnnotationWithAttributes(nestedAnnotationDescriptor, result.toArray(new String[0]));
+                String nestedAnnotation = result.isEmpty() ?
+                        AnnotationSerializer.serializeSimpleAnnotation(nestedAnnotationDescriptor) :
+                        AnnotationSerializer.serializeAnnotationWithAttributes(nestedAnnotationDescriptor, result.toArray(new String[0]));
                 addCollectedValue(name, nestedAnnotation);
             });
         }
@@ -310,9 +259,9 @@ class AnnotationCollectorHelper {
         @Override
         public AnnotationVisitor visitAnnotation(@Nullable String name, String descriptor) {
             return new AnnotationValueCollector(result -> {
-                String annotation = result.isEmpty()
-                        ? AnnotationSerializer.serializeSimpleAnnotation(descriptor)
-                        : AnnotationSerializer.serializeAnnotationWithAttributes(descriptor, result.toArray(new String[0]));
+                String annotation = result.isEmpty() ?
+                        AnnotationSerializer.serializeSimpleAnnotation(descriptor) :
+                        AnnotationSerializer.serializeAnnotationWithAttributes(descriptor, result.toArray(new String[0]));
                 arrayValues.add(annotation);
             });
         }
@@ -404,19 +353,19 @@ class AnnotationDeserializer {
 
         private List<AttributeInfo> parseAttributes() {
             List<AttributeInfo> attributes = new ArrayList<>();
-            
+
             while (pos < input.length()) {
 
                 // Parse attribute name (identifier)
                 String attributeName = parseIdentifier();
                 if (attributeName.isEmpty()) break;
-                
+
                 // Check for '=' - if not found, this is a value-only attribute
                 expect('=');
                 Object attributeValue = parseValue(0);
 
                 attributes.add(new AttributeInfo(attributeName, attributeValue));
-                
+
                 // Check for comma separator
                 if (peek() == ',') {
                     consume(); // consume ','
@@ -428,10 +377,10 @@ class AnnotationDeserializer {
 
             return attributes;
         }
-        
+
         private String parseIdentifier() {
             int start = pos;
-            
+
             // Parse a simple identifier (letters, digits, underscores)
             if (!Character.isJavaIdentifierStart(peek())) {
                 throw new IllegalArgumentException("Expected identifier at position " + pos + " but found '" + peek() + "'" + inputWithErrorIndicator(pos));
@@ -444,16 +393,16 @@ class AnnotationDeserializer {
                     break;
                 }
             }
-            
+
             return input.substring(start, pos);
         }
-        
+
         private Object[] parseArrayValue(int depth) {
             // Parse array elements directly without creating new parser instances
             List<Object> elements = new ArrayList<>();
-            
+
             expect('[');
-            
+
             while (pos < input.length() && peek() != ']') {
                 // Parse the next array element value directly
                 Object element = parseValue(depth);
@@ -470,24 +419,27 @@ class AnnotationDeserializer {
             expect(']');
             return elements.toArray();
         }
-        
+
         private AnnotationInfo parseNestedAnnotationValue(int depth) {
             if (depth > MAX_NESTING_DEPTH) {
                 throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing nested annotation: " + input);
             }
-            
+            return parseSingleAnnotation();
+        }
+
+        private AnnotationInfo parseSingleAnnotation() {
             expect('@');
             ClassConstant annotationName = parseClassConstantValue();
             if (peek() != '(') {
                 // No attributes
                 return new AnnotationInfo(annotationName.getDescriptor(), null);
             }
-            
+
             expect('(');
             // Parse attributes directly without extracting substring first
             List<AttributeInfo> attributes = parseAttributes();
             expect(')');
-            
+
             return new AnnotationInfo(annotationName.getDescriptor(), attributes);
         }
 
@@ -543,7 +495,7 @@ class AnnotationDeserializer {
             // If no type prefix matched, this is an error
             throw new IllegalArgumentException("Unknown value format at position " + pos + ": " + peek() + inputWithErrorIndicator(pos));
         }
-        
+
         private Object parseBooleanValue() {
             if (matchesAtPosition("true")) {
                 pos += 4; // consume "true"
@@ -554,7 +506,7 @@ class AnnotationDeserializer {
             }
             throw new IllegalArgumentException("Expected boolean value at position " + pos);
         }
-        
+
         private Object parseCharValue() {
             expect('\'');
             char result;
@@ -567,12 +519,12 @@ class AnnotationDeserializer {
             expect('\'');
             return result;
         }
-        
+
         private Object parseStringValue() {
             expect('"');
             StringBuilder sb = new StringBuilder();
             boolean escaped = false;
-            
+
             while (pos < input.length()) {
                 char c = peek();
                 if (escaped) {
@@ -610,10 +562,10 @@ class AnnotationDeserializer {
                 }
                 consume();
             }
-            
+
             throw new IllegalArgumentException("Unterminated string at position " + (pos - sb.length()));
         }
-        
+
         private ClassConstant parseClassConstantValue() {
             int start = pos;
             // Parse class descriptor: L...;, [L...;, [I, etc.
@@ -634,7 +586,7 @@ class AnnotationDeserializer {
             } else if (isPrimitiveTypeDescriptor()) {
                 consume(); // consume primitive type character
             }
-            
+
             String descriptor = input.substring(start, pos);
             return new ClassConstant(descriptor);
         }
@@ -649,7 +601,7 @@ class AnnotationDeserializer {
             expect(';');
             int semicolonPos = pos - 1;
             expect('.');
-            
+
             return new EnumConstant(input.substring(start, semicolonPos + 1), parseIdentifier());
         }
 
@@ -720,19 +672,34 @@ class AnnotationDeserializer {
         }
 
         Parser parser = new Parser(annotationStr);
-        parser.expect('@');
+        return parser.parseSingleAnnotation();
+    }
 
-        ClassConstant annotationName = parser.parseClassConstantValue();
-        if (parser.peek() != '(') {
-            // No attributes
-            return new AnnotationInfo(annotationName.getDescriptor(), null);
+    /**
+     * Parses multiple annotations from a string that may contain:
+     * - Multiple annotations separated by pipes (backward compatibility)
+     * - Multiple annotations concatenated without delimiters (new format)
+     * - Single annotation
+     *
+     * @param annotationsStr The serialized annotations string
+     * @return List of parsed annotation info objects
+     */
+    public static List<AnnotationInfo> parseAnnotations(String annotationsStr) {
+        if (annotationsStr.isEmpty()) {
+            return new ArrayList<>();
         }
-        
-        parser.expect('(');
-        // Parse attributes directly without extracting substring first
-        List<AttributeInfo> attributes = parser.parseAttributes();
-        parser.expect(')');
-        return new AnnotationInfo(annotationName.getDescriptor(), attributes);
+
+        List<AnnotationInfo> annotations = new ArrayList<>();
+
+        Parser parser = new Parser(annotationsStr);
+        while (parser.pos < parser.input.length()) {
+            if (parser.peek() != '@') {
+                break; // No more annotations
+            }
+            annotations.add(parser.parseSingleAnnotation());
+        }
+
+        return annotations;
     }
 
 
@@ -864,7 +831,7 @@ class TsvEscapeUtils {
                     current = new StringBuilder();
                     current.append(input, segmentStart, i - 1); // Exclude the backslash from previous content
                 }
-                
+
                 if (c == '|') {
                     // Unescape \| to just |
                     current.append('|');
@@ -1215,7 +1182,7 @@ class AnnotationSerializer {
  * Uses abbreviated codes for compact representation while maintaining javap compatibility.
  */
 class TypeAnnotationSupport {
-    
+
     /**
      * Format a complete type annotation for TSV.
      * Format: TARGET:indexHex:pathHex:annotation
@@ -1227,27 +1194,49 @@ class TypeAnnotationSupport {
      */
     public static String formatTypeAnnotation(int typeRef, @Nullable TypePath typePath, String annotation) {
         int targetType = typeRef >>> 24;
-        
+
         // Get symbolic target name or fall back to hex
         String target;
         switch (targetType) {
-            case 0x13: target = "FIELD"; break;
-            case 0x14: target = "METHOD_RETURN"; break;
-            case 0x15: target = "METHOD_RECEIVER"; break;
-            case 0x16: target = "METHOD_PARAM"; break;
-            case 0x17: target = "THROWS"; break;
-            case 0x10: target = "CLASS_EXTENDS"; break;
-            case 0x00: target = "CLASS_TYPE_PARAM"; break;
-            case 0x01: target = "METHOD_TYPE_PARAM"; break;
-            case 0x11: target = "CLASS_TYPE_PARAM_BOUND"; break;
-            case 0x12: target = "METHOD_TYPE_PARAM_BOUND"; break;
-            default: target = "HEX_" + String.format("%02X", targetType); break;
+            case 0x13:
+                target = "FIELD";
+                break;
+            case 0x14:
+                target = "METHOD_RETURN";
+                break;
+            case 0x15:
+                target = "METHOD_RECEIVER";
+                break;
+            case 0x16:
+                target = "METHOD_PARAM";
+                break;
+            case 0x17:
+                target = "THROWS";
+                break;
+            case 0x10:
+                target = "CLASS_EXTENDS";
+                break;
+            case 0x00:
+                target = "CLASS_TYPE_PARAM";
+                break;
+            case 0x01:
+                target = "METHOD_TYPE_PARAM";
+                break;
+            case 0x11:
+                target = "CLASS_TYPE_PARAM_BOUND";
+                break;
+            case 0x12:
+                target = "METHOD_TYPE_PARAM_BOUND";
+                break;
+            default:
+                target = "HEX_" + String.format("%02X", targetType);
+                break;
         }
-        
+
         // Extract the index portion (lower 3 bytes) - omit if all zeros
         int indexValue = typeRef & 0xFFFFFF;
         String indexHex = indexValue == 0 ? "" : String.format("%06X", indexValue);
-        
+
         // Serialize TypePath to hex if present
         String pathHex = "";
         if (typePath != null && typePath.getLength() > 0) {
@@ -1258,10 +1247,10 @@ class TypeAnnotationSupport {
             }
             pathHex = hex.toString();
         }
-        
+
         return target + ":" + indexHex + ":" + pathHex + ":" + annotation;
     }
-    
+
     /**
      * Parse and reconstruct a type annotation from TSV format.
      */
@@ -1269,48 +1258,69 @@ class TypeAnnotationSupport {
         public final int typeRef;
         public final @Nullable TypePath typePath;
         public final String annotation;
-        
+
         private TypeAnnotationInfo(int typeRef, @Nullable TypePath typePath, String annotation) {
             this.typeRef = typeRef;
             this.typePath = typePath;
             this.annotation = annotation;
         }
-        
+
         public static TypeAnnotationInfo parse(String serialized) {
             String[] parts = serialized.split(":", 4);
             if (parts.length != 4) {
                 throw new IllegalArgumentException("Invalid type annotation format: " + serialized);
             }
-            
+
             String target = parts[0];
             String indexHex = parts[1];
             String pathHex = parts[2];
             String annotation = parts[3];
-            
+
             // Reconstruct typeRef
             int targetType;
             if (target.startsWith("HEX_")) {
                 targetType = Integer.parseInt(target.substring(4), 16);
             } else {
                 switch (target) {
-                    case "FIELD": targetType = 0x13; break;
-                    case "METHOD_RETURN": targetType = 0x14; break;
-                    case "METHOD_RECEIVER": targetType = 0x15; break;
-                    case "METHOD_PARAM": targetType = 0x16; break;
-                    case "THROWS": targetType = 0x17; break;
-                    case "CLASS_EXTENDS": targetType = 0x10; break;
-                    case "CLASS_TYPE_PARAM": targetType = 0x00; break;
-                    case "METHOD_TYPE_PARAM": targetType = 0x01; break;
-                    case "CLASS_TYPE_PARAM_BOUND": targetType = 0x11; break;
-                    case "METHOD_TYPE_PARAM_BOUND": targetType = 0x12; break;
-                    default: throw new IllegalArgumentException("Unknown target type: " + target);
+                    case "FIELD":
+                        targetType = 0x13;
+                        break;
+                    case "METHOD_RETURN":
+                        targetType = 0x14;
+                        break;
+                    case "METHOD_RECEIVER":
+                        targetType = 0x15;
+                        break;
+                    case "METHOD_PARAM":
+                        targetType = 0x16;
+                        break;
+                    case "THROWS":
+                        targetType = 0x17;
+                        break;
+                    case "CLASS_EXTENDS":
+                        targetType = 0x10;
+                        break;
+                    case "CLASS_TYPE_PARAM":
+                        targetType = 0x00;
+                        break;
+                    case "METHOD_TYPE_PARAM":
+                        targetType = 0x01;
+                        break;
+                    case "CLASS_TYPE_PARAM_BOUND":
+                        targetType = 0x11;
+                        break;
+                    case "METHOD_TYPE_PARAM_BOUND":
+                        targetType = 0x12;
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unknown target type: " + target);
                 }
             }
-            
+
             // Parse index - default to 0 if empty
             int indexValue = indexHex.isEmpty() ? 0 : Integer.parseInt(indexHex, 16);
             int typeRef = (targetType << 24) | indexValue;
-            
+
             // Reconstruct TypePath if present
             TypePath typePath = null;
             if (!pathHex.isEmpty()) {
@@ -1320,7 +1330,7 @@ class TypeAnnotationSupport {
                 for (int i = 0; i < pathLength; i++) {
                     int typePathKind = Integer.parseInt(pathHex.substring(i * 4, i * 4 + 2), 16);
                     int typeArgumentIndex = Integer.parseInt(pathHex.substring(i * 4 + 2, i * 4 + 4), 16);
-                    
+
                     switch (typePathKind) {
                         case TypePath.ARRAY_ELEMENT:
                             pathBuilder.append('[');
@@ -1338,26 +1348,26 @@ class TypeAnnotationSupport {
                 }
                 typePath = pathBuilder.length() > 0 ? TypePath.fromString(pathBuilder.toString()) : null;
             }
-            
+
             return new TypeAnnotationInfo(typeRef, typePath, annotation);
         }
     }
-    
+
     /**
      * Helper class to collect parameter annotations by parameter index.
      */
     public static class ParameterAnnotationCollector {
         private final Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
-        
+
         public void addAnnotation(int paramIndex, String annotation) {
             annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
         }
-        
+
         public String serialize() {
             if (annotationsByParam.isEmpty()) {
                 return "";
             }
-            
+
             StringBuilder result = new StringBuilder();
             boolean first = true;
             for (Map.Entry<Integer, List<String>> entry : annotationsByParam.entrySet()) {
@@ -1365,7 +1375,7 @@ class TypeAnnotationSupport {
                     result.append("|");
                 }
                 first = false;
-                
+
                 result.append(entry.getKey()).append(":[");
                 // No delimiters needed between annotations - they're self-delimiting
                 for (String annotation : entry.getValue()) {

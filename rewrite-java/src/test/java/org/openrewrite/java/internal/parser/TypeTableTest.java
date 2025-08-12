@@ -583,7 +583,7 @@ class TypeTableTest implements RewriteTest {
 
                     // Verify all default values are preserved through the TypeTable roundtrip
                     assertThat(annotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("message"))
+                      .filter(m -> "message".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
@@ -592,7 +592,7 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     assertThat(annotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("values"))
+                      .filter(m -> "values".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
@@ -601,7 +601,7 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     assertThat(annotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("specialChars"))
+                      .filter(m -> "specialChars".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
@@ -610,7 +610,7 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     assertThat(annotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("priority"))
+                      .filter(m -> "priority".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
@@ -619,7 +619,7 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     assertThat(annotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("enabled"))
+                      .filter(m -> "enabled".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
@@ -638,7 +638,7 @@ class TypeTableTest implements RewriteTest {
                     // Field annotation should have the same type information (including default values)
                     // even when explicitly overriding some attributes
                     assertThat(fieldAnnotationType.getMethods().stream()
-                      .filter(m -> m.getName().equals("message"))
+                      .filter(m -> "message".equals(m.getName()))
                       .findFirst())
                       .isPresent()
                       .get()
