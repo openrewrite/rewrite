@@ -81,7 +81,7 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  * the disk impact of that and the value is an overall single table representation.
  * <p>
  * To read a compressed type table file (which is compressed with gzip), the following command can be used:
- * <code>gzcat types.tsv.zip</code>.
+ * <code>gzcat types.tsv.gz</code>.
  */
 @Incubating(since = "8.44.0")
 @Value
@@ -548,7 +548,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                     @Override
                                     public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                        if (visible && classDefinition != null) {
+                                        if (classDefinition != null) {
                                             return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
                                         }
                                         return null;
@@ -567,11 +567,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
-                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    if (visible) {
-                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
-                                                    }
-                                                    return null;
+                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
                                                 }
 
                                                 @Override
@@ -600,11 +597,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 }
 
                                                 @Override
-                                                public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    if (visible) {
-                                                        return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
-                                                    }
-                                                    return null;
+                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
                                                 }
 
                                                 @Override

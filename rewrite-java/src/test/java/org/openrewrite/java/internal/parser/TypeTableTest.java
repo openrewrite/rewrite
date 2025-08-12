@@ -72,7 +72,7 @@ class TypeTableTest implements RewriteTest {
         ctx.putMessage(VERIFY_CLASS_WRITING, true);
         JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(tempDir.toFile());
         compiler = ToolProvider.getSystemJavaCompiler();
-        tsv = tempDir.resolve("types.tsv.zip");
+        tsv = tempDir.resolve("types.tsv.gz");
     }
 
     /**
