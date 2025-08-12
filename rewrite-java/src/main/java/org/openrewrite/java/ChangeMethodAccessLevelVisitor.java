@@ -104,16 +104,46 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             }
 
             // If target access level is package-private (no modifier), remove the current access level modifier
-            // and copy any associated comments
+            // and copy any associated comments and space
             else if (newAccessLevel == null) {
                 final List<Comment> modifierComments = new ArrayList<>();
+                final List<Space> removedModifierPrefix = new ArrayList<>();
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
                         modifierComments.addAll(mod.getComments());
+                        removedModifierPrefix.add(mod.getPrefix());
                         return null;
                     }
 
-                    // copy access level modifier comment to next modifier if it exists
+                    if (!removedModifierPrefix.isEmpty()) {
+                        // Merge the removed modifier's prefix with the current modifier's prefix
+                        // Preserve the whitespace structure while moving comments
+                        Space removedPrefix = removedModifierPrefix.get(0);
+                        final List<Comment> allComments = ListUtils.concatAll(removedPrefix.getComments(), mod.getPrefix().getComments());
+
+                        // Use the removed modifier's whitespace if it has meaningful content, otherwise use current
+                        String currentWhitespace = mod.getPrefix().getWhitespace();
+                        if (currentWhitespace.isEmpty()) {
+                            String removedWhitespace = removedPrefix.getWhitespace();
+                            if (!removedWhitespace.isEmpty()) {
+                                currentWhitespace = removedWhitespace;
+                            }
+                        }
+
+                        Space mergedPrefix = Space.build(currentWhitespace, allComments);
+                        J.Modifier nextModifier = mod.withPrefix(mergedPrefix);
+                        removedModifierPrefix.clear();
+
+                        // Also handle modifier's own comments if any
+                        if (!modifierComments.isEmpty()) {
+                            nextModifier = nextModifier.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
+                            modifierComments.clear();
+                        }
+
+                        return nextModifier;
+                    }
+
+                    // copy access level modifier comment to next modifier if it exists (fallback)
                     if (!modifierComments.isEmpty()) {
                         J.Modifier nextModifier = mod.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
                         modifierComments.clear();
