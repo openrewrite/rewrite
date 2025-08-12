@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.parser;
 
 import lombok.SneakyThrows;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
@@ -65,6 +66,8 @@ class TypeTableTest implements RewriteTest {
     ExecutionContext ctx;
     JavaCompiler compiler;
     Path tsv;
+
+    void foo(List<@Nullable ? extends @Nullable Number> l) {}
 
     @BeforeEach
     void setUp() {
@@ -284,13 +287,13 @@ class TypeTableTest implements RewriteTest {
             Path jarFile = createJarFromClasses("test.jar", classFile);
             String tsvContent = processJarThroughTypeTable(jarFile, "com.example", "test", "1.0");
 
-            // Verify enum constants don't have constant values (empty last column)
-            assertThat(tsvContent).contains("VALUE1\tLcom/example/TestEnum;\t\t\t\t\t");
-            assertThat(tsvContent).contains("VALUE2\tLcom/example/TestEnum;\t\t\t\t\t");
+            // Verify enum constants don't have constant values (empty last column, now position 17)
+            assertThat(tsvContent).contains("VALUE1\tLcom/example/TestEnum;\t\t\t\t\t\t\t");
+            assertThat(tsvContent).contains("VALUE2\tLcom/example/TestEnum;\t\t\t\t\t\t\t");
 
-            // Verify regular constants do have values
-            assertThat(tsvContent).contains("CONSTANT\tLjava/lang/String;\t\t\t\t\ts\"test\"");
-            assertThat(tsvContent).contains("NUMBER\tI\t\t\t\t\tI42");
+            // Verify regular constants do have values (constantValue now at position 17)
+            assertThat(tsvContent).contains("CONSTANT\tLjava/lang/String;\t\t\t\t\t\t\ts\"test\"");
+            assertThat(tsvContent).contains("NUMBER\tI\t\t\t\t\t\t\tI42");
         }
 
         @Test
@@ -371,20 +374,20 @@ class TypeTableTest implements RewriteTest {
             Path jarFile = createJarFromClasses("test.jar", classFile);
             String tsvContent = processJarThroughTypeTable(jarFile, "com.example", "test", "1.0");
 
-            // Verify primitive constants have values
-            assertThat(tsvContent).contains("INT_CONST\tI\t\t\t\t\tI42");
-            assertThat(tsvContent).contains("LONG_CONST\tJ\t\t\t\t\tJ123");
-            assertThat(tsvContent).contains("FLOAT_CONST\tF\t\t\t\t\tF3.14");
-            assertThat(tsvContent).contains("DOUBLE_CONST\tD\t\t\t\t\tD2.718");
-            assertThat(tsvContent).contains("BOOL_CONST\tZ\t\t\t\t\tZtrue");
-            assertThat(tsvContent).contains("CHAR_CONST\tC\t\t\t\t\tC65");
-            assertThat(tsvContent).contains("BYTE_CONST\tB\t\t\t\t\tB1");
-            assertThat(tsvContent).contains("SHORT_CONST\tS\t\t\t\t\tS100");
-            assertThat(tsvContent).contains("STRING_CONST\tLjava/lang/String;\t\t\t\t\ts\"Hello\"");
+            // Verify primitive constants have values (constantValue is now at column 17, with two new columns before it)
+            assertThat(tsvContent).contains("INT_CONST\tI\t\t\t\t\t\t\tI42");
+            assertThat(tsvContent).contains("LONG_CONST\tJ\t\t\t\t\t\t\tJ123");
+            assertThat(tsvContent).contains("FLOAT_CONST\tF\t\t\t\t\t\t\tF3.14");
+            assertThat(tsvContent).contains("DOUBLE_CONST\tD\t\t\t\t\t\t\tD2.718");
+            assertThat(tsvContent).contains("BOOL_CONST\tZ\t\t\t\t\t\t\tZtrue");
+            assertThat(tsvContent).contains("CHAR_CONST\tC\t\t\t\t\t\t\tC65");
+            assertThat(tsvContent).contains("BYTE_CONST\tB\t\t\t\t\t\t\tB1");
+            assertThat(tsvContent).contains("SHORT_CONST\tS\t\t\t\t\t\t\tS100");
+            assertThat(tsvContent).contains("STRING_CONST\tLjava/lang/String;\t\t\t\t\t\t\ts\"Hello\"");
 
             // Verify non-constant fields don't have values
-            assertThat(tsvContent).contains("OBJECT_CONST\tLjava/lang/Object;\t\t\t\t\t");
-            assertThat(tsvContent).contains("ARRAY_CONST\t[I\t\t\t\t\t");
+            assertThat(tsvContent).contains("OBJECT_CONST\tLjava/lang/Object;\t\t\t\t\t\t\t");
+            assertThat(tsvContent).contains("ARRAY_CONST\t[I\t\t\t\t\t\t\t");
         }
     }
 

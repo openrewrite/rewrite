@@ -21,6 +21,7 @@ import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.*;
+import org.objectweb.asm.TypePath;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
@@ -223,8 +224,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,
-                                        fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
+                                        fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,  // elementAnnotations
+                                        fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null  // constantValue moved to column 17
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
                         if (lastIndexOf$ != -1) {
@@ -242,8 +243,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,
-                                    fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null
+                                    fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,  // elementAnnotations
+                                    fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null  // constantValue moved to column 17
                             ));
                         }
                     }
@@ -497,7 +498,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\tannotations\tconstantValue");
+            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue");
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -555,6 +556,26 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     }
 
                                     @Override
+                                    public @Nullable AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                                        if (classDefinition != null) {
+                                            List<String> tempCollector = new ArrayList<>();
+                                            AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                            return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                                @Override
+                                                public void visitEnd() {
+                                                    super.visitEnd();
+                                                    if (!tempCollector.isEmpty()) {
+                                                        String annotation = tempCollector.get(0);
+                                                        String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                                        classDefinition.classTypeAnnotations.add(formatted);
+                                                    }
+                                                }
+                                            };
+                                        }
+                                        return null;
+                                    }
+
+                                    @Override
                                     public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
@@ -568,7 +589,24 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             return new FieldVisitor(Opcodes.ASM9) {
                                                 @Override
                                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
+                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
+                                                }
+
+                                                @Override
+                                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                                                    List<String> tempCollector = new ArrayList<>();
+                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                                        @Override
+                                                        public void visitEnd() {
+                                                            super.visitEnd();
+                                                            if (!tempCollector.isEmpty()) {
+                                                                String annotation = tempCollector.get(0);
+                                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                                                member.typeAnnotations.add(formatted);
+                                                            }
+                                                        }
+                                                    };
                                                 }
 
                                                 @Override
@@ -598,7 +636,40 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                                 @Override
                                                 public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.annotations);
+                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
+                                                }
+
+                                                @Override
+                                                public AnnotationVisitor visitParameterAnnotation(int parameter, String descriptor, boolean visible) {
+                                                    List<String> tempCollector = new ArrayList<>();
+                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                                    // After collection, add to parameter annotations
+                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                                        @Override
+                                                        public void visitEnd() {
+                                                            super.visitEnd();
+                                                            if (!tempCollector.isEmpty()) {
+                                                                member.parameterAnnotations.addAnnotation(parameter, tempCollector.get(0));
+                                                            }
+                                                        }
+                                                    };
+                                                }
+
+                                                @Override
+                                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                                                    List<String> tempCollector = new ArrayList<>();
+                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                                        @Override
+                                                        public void visitEnd() {
+                                                            super.visitEnd();
+                                                            if (!tempCollector.isEmpty()) {
+                                                                String annotation = tempCollector.get(0);
+                                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                                                member.typeAnnotations.add(formatted);
+                                                            }
+                                                        }
+                                                    };
                                                 }
 
                                                 @Override
@@ -688,12 +759,13 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] classSuperinterfaceSignatures;
 
             List<String> classAnnotations = new ArrayList<>(4);
+            List<String> classTypeAnnotations = new ArrayList<>(4);
             List<Writer.Member> members = new ArrayList<>();
 
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
                             classSignature == null ? "" : classSignature,
@@ -701,7 +773,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
                             classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
-                            ""); // Empty constant values for class row
+                            "", // Empty parameter annotations for class row
+                            classTypeAnnotations.isEmpty() ? "" : String.join("|", classTypeAnnotations),
+                            ""); // Empty constant value for class row
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -729,7 +803,9 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             String @Nullable [] exceptions;
             List<String> parameterNames = new ArrayList<>(4);
-            List<String> annotations = new ArrayList<>(4);
+            List<String> elementAnnotations = new ArrayList<>(4);
+            TypeAnnotationSupport.ParameterAnnotationCollector parameterAnnotations = new TypeAnnotationSupport.ParameterAnnotationCollector();
+            List<String> typeAnnotations = new ArrayList<>(4);
 
             @Nullable
             @NonFinal
@@ -738,7 +814,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classDefinition.classAccess, classDefinition.className,
                             classDefinition.classSignature == null ? "" : classDefinition.classSignature,
@@ -748,7 +824,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            annotations.isEmpty() ? "" : String.join("|", annotations),
+                            elementAnnotations.isEmpty() ? "" : String.join("|", elementAnnotations),
+                            parameterAnnotations.serialize(),
+                            typeAnnotations.isEmpty() ? "" : String.join("|", typeAnnotations),
                             constantValue == null ? "" : constantValue
                     );
                 }

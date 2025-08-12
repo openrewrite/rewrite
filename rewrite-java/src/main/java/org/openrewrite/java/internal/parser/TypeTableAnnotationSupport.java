@@ -20,9 +20,14 @@ import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.TypePath;
+import org.objectweb.asm.TypeReference;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Functional interface for creating an AnnotationVisitor.
@@ -1080,12 +1085,12 @@ class AnnotationSerializer {
                 elements.append(serializeValueInternal(array[i]));
             }
         } else {
-            int length = java.lang.reflect.Array.getLength(value);
+            int length = Array.getLength(value);
             for (int i = 0; i < length; i++) {
                 if (i > 0) {
                     elements.append(',');
                 }
-                elements.append(serializeValueInternal(java.lang.reflect.Array.get(value, i)));
+                elements.append(serializeValueInternal(Array.get(value, i)));
             }
         }
 
@@ -1127,6 +1132,213 @@ class AnnotationSerializer {
             nestedVisitor.visitEnd();
         } else {
             annotationDefaultVisitor.visit(null, value);
+        }
+    }
+}
+
+/**
+ * Support for type annotations and parameter annotations in TypeTable TSV format.
+ * Uses abbreviated codes for compact representation while maintaining javap compatibility.
+ */
+class TypeAnnotationSupport {
+    
+    // Type annotation target type abbreviations
+    private static final String FIELD = "F";
+    private static final String METHOD_RETURN = "MR";
+    private static final String METHOD_PARAMETER = "MP";
+    private static final String METHOD_TYPE_PARAMETER = "MTP";
+    private static final String METHOD_TYPE_PARAMETER_BOUND = "MTPB";
+    private static final String CLASS_TYPE_PARAMETER = "CTP";
+    private static final String CLASS_TYPE_PARAMETER_BOUND = "CTPB";
+    private static final String CLASS_EXTENDS = "CE"; // Also used for implements (same JVM target type 0x10)
+    private static final String METHOD_RECEIVER = "MREC";
+    private static final String THROWS = "TH";
+    
+    // Type path step abbreviations
+    private static final String ARRAY = "A";
+    private static final String NESTED = "N";
+    private static final String WILDCARD = "W";
+    private static final String TYPE_ARGUMENT = "TA";
+    
+    /**
+     * Convert ASM TypeReference to our abbreviated format.
+     */
+    private static String getTargetTypeCode(int typeRef) {
+        int targetType = typeRef >>> 24;
+        switch (targetType) {
+            case 0x00: // CLASS_TYPE_PARAMETER
+                return CLASS_TYPE_PARAMETER;
+            case 0x01: // METHOD_TYPE_PARAMETER
+                return METHOD_TYPE_PARAMETER;
+            case 0x10: // CLASS_EXTENDS (also covers implements - same JVM target type)
+                // Note: Could differentiate based on getSuperTypeIndex():
+                // -1 (65535) = extends, 0+ = implements
+                // But for ABI purposes, using one code is simpler
+                return CLASS_EXTENDS;
+            case 0x11: // CLASS_TYPE_PARAMETER_BOUND
+                return CLASS_TYPE_PARAMETER_BOUND;
+            case 0x12: // METHOD_TYPE_PARAMETER_BOUND
+                return METHOD_TYPE_PARAMETER_BOUND;
+            case 0x13: // FIELD
+                return FIELD;
+            case 0x14: // METHOD_RETURN
+                return METHOD_RETURN;
+            case 0x15: // METHOD_RECEIVER
+                return METHOD_RECEIVER;
+            case 0x16: // METHOD_FORMAL_PARAMETER
+                return METHOD_PARAMETER;
+            case 0x17: // THROWS
+                return THROWS;
+            default:
+                // Local variable and other targets not needed for ABI
+                return "UNK" + targetType;
+        }
+    }
+    
+    /**
+     * Get parameter index from TypeReference for METHOD_FORMAL_PARAMETER.
+     */
+    private static int getParameterIndex(int typeRef) {
+        return new TypeReference(typeRef).getFormalParameterIndex();
+    }
+    
+    /**
+     * Get exception index from TypeReference for THROWS.
+     */
+    private static int getExceptionIndex(int typeRef) {
+        return new TypeReference(typeRef).getExceptionIndex();
+    }
+    
+    /**
+     * Get type parameter index from TypeReference.
+     */
+    private static int getTypeParameterIndex(int typeRef) {
+        return new TypeReference(typeRef).getTypeParameterIndex();
+    }
+    
+    /**
+     * Get type parameter bound index from TypeReference.
+     */
+    private static int getTypeParameterBoundIndex(int typeRef) {
+        return new TypeReference(typeRef).getTypeParameterBoundIndex();
+    }
+    
+    /**
+     * Get supertype index from TypeReference for CLASS_EXTENDS/IMPLEMENTS.
+     */
+    private static int getSuperTypeIndex(int typeRef) {
+        return new TypeReference(typeRef).getSuperTypeIndex();
+    }
+    
+    /**
+     * Convert ASM TypePath to our abbreviated format.
+     */
+    private static String formatTypePath(@Nullable TypePath typePath) {
+        if (typePath == null) {
+            return "";
+        }
+        
+        StringBuilder path = new StringBuilder("[");
+        int length = typePath.getLength();
+        for (int i = 0; i < length; i++) {
+            if (i > 0) {
+                path.append(",");
+            }
+            int step = typePath.getStep(i);
+            int arg = typePath.getStepArgument(i);
+            
+            switch (step) {
+                case TypePath.ARRAY_ELEMENT:
+                    path.append(ARRAY);
+                    break;
+                case TypePath.INNER_TYPE:
+                    path.append(NESTED);
+                    break;
+                case TypePath.WILDCARD_BOUND:
+                    path.append(WILDCARD);
+                    break;
+                case TypePath.TYPE_ARGUMENT:
+                    path.append(TYPE_ARGUMENT).append("(").append(arg).append(")");
+                    break;
+            }
+        }
+        path.append("]");
+        return path.toString();
+    }
+    
+    /**
+     * Format a complete type annotation for TSV.
+     * Format: targetType:index:path:annotation
+     */
+    public static String formatTypeAnnotation(int typeRef, @Nullable TypePath typePath, String annotation) {
+        String targetType = getTargetTypeCode(typeRef);
+        StringBuilder result = new StringBuilder(targetType);
+        
+        // Add index for targets that have one
+        switch (typeRef >>> 24) {
+            case 0x00: // CLASS_TYPE_PARAMETER
+            case 0x01: // METHOD_TYPE_PARAMETER
+                result.append(":").append(getTypeParameterIndex(typeRef));
+                break;
+            case 0x10: // CLASS_EXTENDS
+                int superTypeIndex = getSuperTypeIndex(typeRef);
+                if (superTypeIndex >= 0) {
+                    result.append(":").append(superTypeIndex);
+                }
+                break;
+            case 0x11: // CLASS_TYPE_PARAMETER_BOUND
+            case 0x12: // METHOD_TYPE_PARAMETER_BOUND
+                result.append(":").append(getTypeParameterIndex(typeRef))
+                      .append(",").append(getTypeParameterBoundIndex(typeRef));
+                break;
+            case 0x16: // METHOD_FORMAL_PARAMETER
+                result.append(":").append(getParameterIndex(typeRef));
+                break;
+            case 0x17: // THROWS
+                result.append(":").append(getExceptionIndex(typeRef));
+                break;
+        }
+        
+        // Add type path if present
+        String path = formatTypePath(typePath);
+        if (!path.isEmpty() && !"[]".equals(path)) {
+            result.append(":").append(path);
+        }
+        
+        // Add the annotation
+        result.append(":").append(annotation);
+        
+        return result.toString();
+    }
+    
+    /**
+     * Helper class to collect parameter annotations by parameter index.
+     */
+    public static class ParameterAnnotationCollector {
+        private final Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
+        
+        public void addAnnotation(int paramIndex, String annotation) {
+            annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
+        }
+        
+        public String serialize() {
+            if (annotationsByParam.isEmpty()) {
+                return "";
+            }
+            
+            StringBuilder result = new StringBuilder();
+            boolean first = true;
+            for (Map.Entry<Integer, List<String>> entry : annotationsByParam.entrySet()) {
+                if (!first) {
+                    result.append("|");
+                }
+                first = false;
+                
+                result.append(entry.getKey()).append(":[");
+                result.append(String.join(",", entry.getValue()));
+                result.append("]");
+            }
+            return result.toString();
         }
     }
 }
