@@ -26,6 +26,7 @@ import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParserExecutionContextView;
 import org.openrewrite.java.tree.J;
@@ -36,7 +37,6 @@ import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -390,7 +390,7 @@ class TypeTableTest implements RewriteTest {
          * requires no native libraries or JNI.
          */
         @Test
-        void writeAllRuntimeClasspathJars() throws IOException {
+        void writeAllRuntimeClasspathJars() throws Exception {
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 long jarsSize = 0;
                 for (Path classpath : JavaParser.runtimeClasspath()) {
@@ -403,7 +403,7 @@ class TypeTableTest implements RewriteTest {
 
         @Disabled
         @Test
-        void writeAllMavenLocal() throws IOException {
+        void writeAllMavenLocal() throws Exception {
             Path m2Repo = Paths.get(System.getProperty("user.home"), ".m2", "repository");
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 AtomicLong jarsSize = new AtomicLong();
@@ -427,7 +427,7 @@ class TypeTableTest implements RewriteTest {
         }
 
         @Test
-        void writeReadJunitJupiterApi() throws IOException {
+        void writeReadJunitJupiterApi() throws Exception {
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 for (Path classpath : JavaParser.runtimeClasspath()) {
                     if (classpath.toFile().getName().contains("junit-jupiter-api")) {
@@ -546,7 +546,7 @@ class TypeTableTest implements RewriteTest {
             // Test that JavaParser can parse code using the annotation
             // This validates that TypeTable preserved the annotation structure correctly
             rewriteRun(
-              spec -> spec.parser(JavaParser.fromJavaVersion()
+              spec -> spec.parser((Parser.Builder) JavaParser.fromJavaVersion()
                 .classpath(List.of(classesDir)).logCompilationWarningsAndErrors(true)),
               java(
                 """
@@ -644,7 +644,7 @@ class TypeTableTest implements RewriteTest {
     }
 
     // Helper methods for integration tests
-    private static long writeJar(Path classpath, TypeTable.Writer writer) throws IOException {
+    private static long writeJar(Path classpath, TypeTable.Writer writer) throws Exception {
         String fileName = classpath.toFile().getName();
         if (fileName.endsWith(".jar")) {
             String[] artifactVersion = fileName.replaceAll(".jar$", "")

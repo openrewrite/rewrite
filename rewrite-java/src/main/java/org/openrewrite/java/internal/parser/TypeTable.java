@@ -45,10 +45,11 @@ import java.util.zip.ZipException;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
-import static org.objectweb.asm.ClassReader.SKIP_CODE;
+import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
-import static org.openrewrite.java.internal.parser.AnnotationSerializer.*;
+import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
+import static org.openrewrite.java.internal.parser.AnnotationSerializer.serializeArray;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
 /**
