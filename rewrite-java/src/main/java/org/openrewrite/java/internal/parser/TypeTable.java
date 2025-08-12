@@ -51,6 +51,7 @@ import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.serializeArray;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
+import static org.openrewrite.java.internal.parser.TypeTable.PipeDelimitedJoiner.joinWithPipes;
 
 /**
  * Type tables are written as a TSV file with the following columns:
@@ -681,13 +682,14 @@ public class TypeTable implements JavaParserClasspathLoader {
                                                 public AnnotationVisitor visitParameterAnnotation(int parameter, String descriptor, boolean visible) {
                                                     List<String> tempCollector = new ArrayList<>();
                                                     AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
-                                                    // After collection, add to parameter annotations
+                                                    // After collection, add to parameter annotations with parameter index
                                                     return new AnnotationVisitor(Opcodes.ASM9, collector) {
                                                         @Override
                                                         public void visitEnd() {
                                                             super.visitEnd();
                                                             if (!tempCollector.isEmpty()) {
-                                                                member.parameterAnnotations.addAnnotation(parameter, tempCollector.get(0));
+                                                                // Format: "paramIndex:annotation"
+                                                                member.parameterAnnotations.add(parameter + ":" + tempCollector.get(0));
                                                             }
                                                         }
                                                     };
@@ -812,7 +814,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             -1, "", "", "", "", "",
                             classAnnotations.isEmpty() ? "" : String.join("", classAnnotations),
                             "", // Empty parameter annotations for class row
-                            classTypeAnnotations.isEmpty() ? "" : String.join("|", classTypeAnnotations),
+                            classTypeAnnotations.isEmpty() ? "" : joinWithPipes(classTypeAnnotations),
                             ""); // Empty constant value for class row
 
                     for (Writer.Member member : members) {
@@ -842,7 +844,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             String @Nullable [] exceptions;
             List<String> parameterNames = new ArrayList<>(4);
             List<String> elementAnnotations = new ArrayList<>(4);
-            TypeAnnotationSupport.ParameterAnnotationCollector parameterAnnotations = new TypeAnnotationSupport.ParameterAnnotationCollector();
+            List<String> parameterAnnotations = new ArrayList<>(4);
             List<String> typeAnnotations = new ArrayList<>(4);
 
             @Nullable
@@ -863,8 +865,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
                             elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
-                            parameterAnnotations.serialize(),
-                            typeAnnotations.isEmpty() ? "" : String.join("|", typeAnnotations),
+                            serializeParameterAnnotations(parameterAnnotations),
+                            typeAnnotations.isEmpty() ? "" : joinWithPipes(typeAnnotations),
                             constantValue == null ? "" : constantValue
                     );
                 }
@@ -939,5 +941,70 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         @Nullable
         String constantValue;
+    }
+
+    /**
+     * Helper class for joining strings with pipe delimiters while escaping any pipes in the strings.
+     */
+    private static String serializeParameterAnnotations(List<String> parameterAnnotations) {
+        if (parameterAnnotations.isEmpty()) {
+            return "";
+        }
+        
+        // Group annotations by parameter index
+        Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
+        for (String paramAnnotation : parameterAnnotations) {
+            int colonIdx = paramAnnotation.indexOf(':');
+            if (colonIdx > 0) {
+                int paramIndex = Integer.parseInt(paramAnnotation.substring(0, colonIdx));
+                String annotation = paramAnnotation.substring(colonIdx + 1);
+                annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
+            }
+        }
+        
+        // Build the result string
+        StringBuilder result = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<Integer, List<String>> entry : annotationsByParam.entrySet()) {
+            if (!first) {
+                result.append('|');
+            }
+            first = false;
+            
+            result.append(entry.getKey()).append(":[");
+            // No delimiters needed between annotations - they're self-delimiting
+            // But we need to escape pipes in annotation values since we use pipes to separate parameters
+            for (String annotation : entry.getValue()) {
+                result.append(PipeDelimitedJoiner.escapePipes(annotation));
+            }
+            result.append("]");
+        }
+        return result.toString();
+    }
+    
+    static class PipeDelimitedJoiner {
+        static String joinWithPipes(List<String> items) {
+            if (items.isEmpty()) {
+                return "";
+            }
+            StringBuilder result = new StringBuilder();
+            boolean first = true;
+            for (String item : items) {
+                if (!first) {
+                    result.append('|');
+                }
+                first = false;
+                // Escape any pipes in the item
+                result.append(escapePipes(item));
+            }
+            return result.toString();
+        }
+
+        private static String escapePipes(String str) {
+            if (!str.contains("|")) {
+                return str;
+            }
+            return str.replace("|", "\\|");
+        }
     }
 }

@@ -25,8 +25,6 @@ import org.objectweb.asm.TypePath;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Functional interface for creating an AnnotationVisitor.
@@ -1056,10 +1054,10 @@ class AnnotationSerializer {
     }
 
     /**
-     * Escapes string content for TSV storage. Unlike escapeDelimiters(), this method
-     * does NOT escape quotes since they're part of the string structure in TypeTable format.
-     * It escapes backslashes, pipe characters (TSV delimiters), and control characters
-     * using Java source code escape sequences.
+     * Escapes string content for TSV storage.
+     * It escapes backslashes, control characters, and quotes using Java source code escape sequences.
+     * Note: Pipe characters are NOT escaped here. Escaping pipes is only needed when the string
+     * will be part of a pipe-delimited list, and that escaping is done at the point of joining.
      */
     private static String escapeStringContentForTsv(String content) {
         StringBuilder sb = null; // Lazy allocation
@@ -1073,9 +1071,7 @@ class AnnotationSerializer {
                 case '\\':
                     replacement = "\\\\";
                     break;
-                case '|':
-                    replacement = "\\|";
-                    break;
+                // Pipes are NOT escaped here - only when joining with pipes as delimiters
                 case '\n':
                     replacement = "\\n";
                     break;
@@ -1353,37 +1349,4 @@ class TypeAnnotationSupport {
         }
     }
 
-    /**
-     * Helper class to collect parameter annotations by parameter index.
-     */
-    public static class ParameterAnnotationCollector {
-        private final Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
-
-        public void addAnnotation(int paramIndex, String annotation) {
-            annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
-        }
-
-        public String serialize() {
-            if (annotationsByParam.isEmpty()) {
-                return "";
-            }
-
-            StringBuilder result = new StringBuilder();
-            boolean first = true;
-            for (Map.Entry<Integer, List<String>> entry : annotationsByParam.entrySet()) {
-                if (!first) {
-                    result.append("|");
-                }
-                first = false;
-
-                result.append(entry.getKey()).append(":[");
-                // No delimiters needed between annotations - they're self-delimiting
-                for (String annotation : entry.getValue()) {
-                    result.append(annotation);
-                }
-                result.append("]");
-            }
-            return result.toString();
-        }
-    }
 }

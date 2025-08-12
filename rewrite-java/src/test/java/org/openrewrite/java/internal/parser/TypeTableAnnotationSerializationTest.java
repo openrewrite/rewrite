@@ -260,8 +260,8 @@ class TypeTableAnnotationSerializationTest {
               new String[]{attribute}
             );
 
-            // The pipe character should be escaped
-            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=s\"Hello\\|World\")");
+            // The pipe character is not escaped in elementAnnotations (only in pipe-delimited fields)
+            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=s\"Hello|World\")");
 
             // Test deserialization
             AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
