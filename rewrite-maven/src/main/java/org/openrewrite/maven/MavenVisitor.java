@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.groupingBy;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
@@ -173,7 +174,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
-        Map<Scope, List<Dependency>> dependencies = getResolutionResult().getPom().getRequestedDependencies().stream().collect(Collectors.groupingBy(dep -> Scope.fromName(dep.getScope())));
+        Map<Scope, List<Dependency>> dependencies = getResolutionResult().getPom().getRequestedDependencies().stream().collect(groupingBy(dep -> Scope.fromName(dep.getScope())));
         for (Scope scope : Scope.values()) {
             if (dependencies.containsKey(scope)) {
                 for (Dependency dep : dependencies.get(scope)) {
@@ -447,7 +448,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
         }
-        for (Map.Entry<Scope, List<Dependency>> scope : getResolutionResult().getPom().getRequestedDependencies().stream().collect(Collectors.groupingBy(dep -> Scope.fromName(dep.getScope()))).entrySet()) {
+        for (Map.Entry<Scope, List<Dependency>> scope : getResolutionResult().getPom().getRequestedDependencies().stream().collect(groupingBy(dep -> Scope.fromName(dep.getScope()))).entrySet()) {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (Dependency d : scope.getValue()) {
                     if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
