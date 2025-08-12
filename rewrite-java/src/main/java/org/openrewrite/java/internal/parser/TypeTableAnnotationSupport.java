@@ -503,16 +503,9 @@ class AnnotationDeserializer {
         }
 
         private Object parseCharValue() {
-            expect('\'');
-            char result;
-            if (peek() == '\\') {
-                consume(); // consume backslash
-                result = parseCharEscapeSequence(consume());
-            } else {
-                result = consume();
-            }
-            expect('\'');
-            return result;
+            // Parse numeric value and cast to char
+            String numStr = parseNumericValue();
+            return (char) Integer.parseInt(numStr);
         }
 
         private Object parseStringValue() {
@@ -637,25 +630,6 @@ class AnnotationDeserializer {
             }
             return input.startsWith(text, pos);
         }
-
-        private static char parseCharEscapeSequence(char escapeChar) {
-            switch (escapeChar) {
-                case '\'':
-                    return '\'';
-                case '\\':
-                    return '\\';
-                case 'n':
-                    return '\n';
-                case 'r':
-                    return '\r';
-                case 't':
-                    return '\t';
-                default:
-                    // Allow other escape sequences to pass through (like unicode escapes)
-                    return escapeChar;
-            }
-        }
-
     }
 
     /**
@@ -890,29 +864,8 @@ class AnnotationSerializer {
     }
 
     public static String serializeChar(char value) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("C'");
-        switch (value) {
-            case '\'':
-                sb.append("\\'");
-                break;
-            case '\\':
-                sb.append("\\\\");
-                break;
-            case '\n':
-                sb.append("\\n");
-                break;
-            case '\r':
-                sb.append("\\r");
-                break;
-            case '\t':
-                sb.append("\\t");
-                break;
-            default:
-                sb.append(value);
-        }
-        sb.append('\'');
-        return sb.toString();
+        // Use numeric format for consistency with convertConstantValueWithType
+        return "C" + (int) value;
     }
 
     public static String serializeNumber(Number value) {

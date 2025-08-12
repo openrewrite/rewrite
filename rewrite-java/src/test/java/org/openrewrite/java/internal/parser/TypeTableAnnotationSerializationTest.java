@@ -76,7 +76,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/CharAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/CharAnnotation;(value=C'c')");
+        assertThat(serialized).isEqualTo("@Lorg/example/CharAnnotation;(value=C99)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -84,6 +84,23 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
         assertThat(info.getAttributes().getFirst().getValue()).isEqualTo('c');
+    }
+    
+    @Test
+    void annotationWithCharConstant38() {
+        // Test the specific case that was failing: C38 which is '&'
+        String serialized = "@Lorg/example/CharAnnotation;(value=C38)";
+        
+        // Test deserialization
+        AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
+        assertThat(info.getDescriptor()).isEqualTo("Lorg/example/CharAnnotation;");
+        assertThat(info.getAttributes()).hasSize(1);
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo('&');
+        
+        // Verify serialization produces the same format
+        char ampersand = '&';
+        assertThat(AnnotationSerializer.serializeChar(ampersand)).isEqualTo("C38");
     }
 
     @Test
