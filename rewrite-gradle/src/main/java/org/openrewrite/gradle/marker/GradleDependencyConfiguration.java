@@ -22,6 +22,10 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.gradle.attributes.Category;
+import org.openrewrite.gradle.attributes.ProjectAttribute;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.attributes.Attributed;
 import org.openrewrite.maven.tree.Dependency;
@@ -39,6 +43,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -354,18 +359,8 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             List<MavenRepository> repositories,
             ExecutionContext ctx
     ) throws MavenDownloadingException {
-        List<Dependency> newRequested = new ArrayList<>(requested.size());
-        Map<GroupArtifact, @Nullable Dependency> updated = new HashMap<>(requested.size());
-        for (Dependency dependency : requested) {
-            Dependency maybeUpdated = mapping.apply(dependency);
-            if (maybeUpdated != null) {
-                newRequested.add(maybeUpdated);
-            }
-            if (maybeUpdated != dependency) {
-                updated.put(dependency.getGav().asGroupArtifact(), maybeUpdated);
-            }
-        }
-        if(updated.isEmpty()) {
+        List<Dependency> newRequested = ListUtils.map(requested, mapping::apply);
+        if(requested == newRequested) {
             return this;
         }
 
@@ -373,18 +368,21 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         if (isCanBeResolved) {
             try {
                 MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                List<ResolvedDependency> newResolved = new ArrayList<>(directResolved.size());
-                for (ResolvedDependency oldResolved : directResolved) {
-                    GroupArtifact ga = oldResolved.getGav().asGroupArtifact();
-                    if (updated.containsKey(ga)) {
-                        Dependency updatedRequest = updated.get(ga);
-                        if (updatedRequest != null) {
-                            newResolved.add(mpd.download(updatedRequest.getGav(), null, null, repositories)
-                                    .resolve(emptyList(), mpd, ctx)
-                                    .asResolvedDependency(Scope.Runtime, mpd, ctx));
-                        }
+                List<ResolvedDependency> newResolved = new ArrayList<>(newRequested.size());
+                for(Dependency dep : newRequested) {
+                    if(dep.findAttribute(ProjectAttribute.class).isPresent()) {
+                        // Dependencies representing another project in the same multi-project build can't be resolved by mav be trivially resolvable
+                        ResolvedDependency resolved = ResolvedDependency.builder()
+                                .gav(dep.getGav().asResolved())
+                                .requested(dep)
+                                .classifier(dep.getClassifier())
+                                .build();
+                        newResolved.add(resolved);
                     } else {
-                        newResolved.add(oldResolved);
+                        Pom singlePom = singleDependencyPom(dep, newRequested, repositories, ctx);
+                        ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
+                        ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
+                        newResolved.add(resolved);
                     }
                 }
                 result = result.withDirectResolved(newResolved);
@@ -394,5 +392,72 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         }
 
         return result;
+    }
+
+    /**
+     * Combines the constraints applicable to this configuration with any BOMs found in the provided list of dependencies
+     * to produce a list of managed dependencies which approximately represents all the relevant versions.
+     *
+     * @param maybeContainsBoms a list of dependencies. Those that are marked with an org.gradle.category indicating
+     *                          they are to be treated as BOMs are considered and the rest ignored.
+     */
+    private List<ManagedDependency> managedFrom(List<Dependency> maybeContainsBoms) {
+        List<GradleDependencyConstraint> allConstraints = getAllConstraints();
+        List<ManagedDependency> managed = new ArrayList<>(allConstraints.size() + maybeContainsBoms.size());
+        for (Dependency maybeBom : maybeContainsBoms) {
+            maybeBom.findAttribute(Category.class).ifPresent(category -> {
+                if(category == Category.REGULAR_PLATFORM || category == Category.ENFORCED_PLATFORM ) {
+                    managed.add(new ManagedDependency.Imported(maybeBom.getGav()));
+                }
+            });
+        }
+
+        for (GradleDependencyConstraint constraint : allConstraints) {
+            String version = null;
+            if (StringUtils.isNotEmpty(constraint.getStrictVersion())) {
+                version = constraint.getStrictVersion();
+            } else if(StringUtils.isNotEmpty(constraint.getRequiredVersion())) {
+                version = constraint.getRequiredVersion();
+            } else if(StringUtils.isNotEmpty(constraint.getPreferredVersion())) {
+                version = constraint.getPreferredVersion();
+            }
+            if(version == null) {
+                continue;
+            }
+            managed.add(new ManagedDependency.Defined(
+                    new GroupArtifactVersion(constraint.getGroupId(), constraint.getArtifactId(), version),
+                    null,
+                    null,
+                    null,
+                    null
+            ));
+        }
+
+        return managed;
+    }
+
+    /**
+     * Produce a
+     */
+    private Pom singleDependencyPom(Dependency requested, List<Dependency> maybeContainsBoms, List<MavenRepository> repositories, ExecutionContext ctx) {
+        // Gradle Dependency tend to list their "scope" as the name of the gradle configuration they are listed in
+        Dependency mavenCompatibleRequested = requested.withScope("compile");
+        if (requested.findAttribute(Category.class).isPresent()) {
+            mavenCompatibleRequested = mavenCompatibleRequested.withType("pom");
+        }
+        GroupArtifactVersion requestedGav = requested.getGav();
+        List<Dependency> bomsOnly = ListUtils.filter(maybeContainsBoms, it -> it.findAttribute(Category.class).isPresent());
+        return Pom.builder()
+                .gav(requestedGav.asResolved()
+                        .withGroupId("sdp-" + requestedGav.getGroupId())
+                        .withArtifactId("sdp-" + requestedGav.getArtifactId())
+                        // Only if all of these things are identical should this be retrieved from a cache
+                        .withVersion(String.valueOf(Objects.hash(requested, getAllConstraints(), bomsOnly, repositories)))
+                )
+                .repositories(repositories)
+                .dependencyManagement(managedFrom(bomsOnly))
+                .dependencies(Collections.singletonList(mavenCompatibleRequested))
+                .sourcePath(Paths.get("pom.xml"))
+                .build();
     }
 }

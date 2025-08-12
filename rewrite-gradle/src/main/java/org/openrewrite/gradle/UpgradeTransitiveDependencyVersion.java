@@ -488,8 +488,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                gp = gp.upgradeTransitiveDependencyVersions(gavs, ctx);
-                return gp;
+                throw new IllegalStateException("implement me");
             }
         };
     }

@@ -16,6 +16,7 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
 import java.util.function.BiConsumer;
@@ -23,7 +24,9 @@ import java.util.function.BiConsumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Fail.fail;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.mavenProject;
 
 public class GradleProjectTest implements RewriteTest {
 
@@ -40,6 +43,93 @@ public class GradleProjectTest implements RewriteTest {
             new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
             "implementation",
             (original, updated) -> assertThat(updated).isSameAs(original)
+          )),
+          buildGradle("""
+            plugins {
+                id("java")
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                implementation("org.openrewrite:rewrite-java:8.56.0")
+            }
+            """)
+        );
+    }
+
+    @Test
+    void multiProject() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
+            "implementation",
+            (original, updated) -> {
+                // mostly interested that a ProjectDependency does not cause an exception
+            }
+          )),
+          mavenProject("root",
+            settingsGradle("""
+              include("a")
+              include("b")
+              """, SourceSpec::skip),
+            mavenProject("a",
+              buildGradle("""
+                plugins {
+                    id("java")
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation("org.openrewrite:rewrite-java:8.56.0")
+                }
+                """, SourceSpec::skip)
+            ),
+            mavenProject("b",
+              buildGradle("""
+                plugins {
+                    id("java")
+                }
+                repositories {
+                    mavenCentral()
+                }
+                dependencies {
+                    implementation(project(":a"))
+                    implementation("org.openrewrite:rewrite-java:8.56.0")
+                }
+                """)
+            )
+          )
+        );
+    }
+
+    @Test
+    void plusVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.+"),
+            "implementation",
+            (original, updated) -> {
+                GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
+                assertThat(implementation).isNotNull();
+                List<GradleDependencyConfiguration> updatedConfigurations = ListUtils.concat(implementation, updated.configurationsExtendingFrom(implementation, true));
+                for (GradleDependencyConfiguration updatedConfiguration : updatedConfigurations) {
+                    Dependency requested = updatedConfiguration.findRequestedDependency("org.openrewrite", "rewrite-java");
+                    assertThat(requested).isNotNull()
+                      .extracting(Dependency::getVersion)
+                      .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
+                      .isEqualTo("8.56.+");
+                    if(updatedConfiguration.isCanBeResolved()) {
+                        ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
+                        assertThat(resolved).isNotNull()
+                          .extracting(ResolvedDependency::getVersion)
+                          .as(updatedConfiguration.getName() + " expected to have resolved version upgrade")
+                          .isEqualTo("8.56.1");
+                    }
+                }
+
+            }
           )),
           buildGradle("""
             plugins {
@@ -91,6 +181,48 @@ public class GradleProjectTest implements RewriteTest {
             }
             dependencies {
                 implementation("org.openrewrite:rewrite-java:8.56.0")
+            }
+            """)
+        );
+    }
+
+    @Test
+    void bomUpgrade() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-bom", "8.57.0"),
+            "implementation",
+            (original, updated) -> {
+                GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
+                assertThat(implementation).isNotNull();
+                List<GradleDependencyConfiguration> updatedConfigurations = ListUtils.concat(implementation, updated.configurationsExtendingFrom(implementation, true));
+                for (GradleDependencyConfiguration updatedConfiguration : updatedConfigurations) {
+                    Dependency requested = updatedConfiguration.findRequestedDependency("org.openrewrite", "rewrite-java");
+                    assertThat(requested).isNotNull()
+                      .extracting(Dependency::getVersion)
+                      .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
+                      .isNull();
+                    if(updatedConfiguration.isCanBeResolved()) {
+                        ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
+                        assertThat(resolved).isNotNull()
+                          .extracting(ResolvedDependency::getVersion)
+                          .as(updatedConfiguration.getName() + " expected to have resolved version upgrade")
+                          .isEqualTo("8.57.0");
+                    }
+                }
+
+            }
+          )),
+          buildGradle("""
+            plugins {
+                id("java")
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                implementation(platform("org.openrewrite:rewrite-bom:8.56.0"))
+                implementation("org.openrewrite:rewrite-java")
             }
             """)
         );

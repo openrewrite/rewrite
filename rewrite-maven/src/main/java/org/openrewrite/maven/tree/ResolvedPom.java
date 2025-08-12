@@ -1138,24 +1138,6 @@ public class ResolvedPom {
         return dependencies;
     }
 
-    /**
-     * Represent this ResolvedPom in ResolvedDependency form.
-     * Potentially convenient when using MavenPomDownloader directly.
-     */
-    public ResolvedDependency asResolvedDependency(Scope scope, MavenPomDownloader mpd, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return new ResolvedDependency(
-                requested.getRepository(),
-                getGav(),
-                requested.asDependency(),
-                resolveDependencies(scope, mpd, ctx),
-                requested.getLicenses(),
-                requested.getPackaging(),
-                null,
-                null,
-                0,
-                emptyList());
-    }
-
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
