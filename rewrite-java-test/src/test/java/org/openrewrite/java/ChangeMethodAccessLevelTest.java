@@ -427,7 +427,6 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           )
         );
     }
-  
     @Test
     void publicToPackagePrivateMovesLineComment() {
         rewriteRun(
