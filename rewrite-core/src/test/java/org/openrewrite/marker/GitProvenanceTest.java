@@ -15,7 +15,6 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Disabled;
@@ -120,7 +119,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void localBranchPresent(@TempDir Path projectDir) throws GitAPIException {
+    void localBranchPresent(@TempDir Path projectDir) throws Exception {
         try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
             GitProvenance git = GitProvenance.fromProjectDirectory(projectDir, null);
             assertThat(git).isNotNull();
@@ -142,7 +141,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void detachedHead(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+    void detachedHead(@TempDir Path projectDir) throws Exception {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(GitProvenance.fromProjectDirectory(projectDir, null).getBranch())
@@ -151,7 +150,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void detachedHeadJenkinsLocalBranch(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+    void detachedHeadJenkinsLocalBranch(@TempDir Path projectDir) throws Exception {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(
@@ -167,7 +166,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void detachedHeadJenkinsNoLocalBranch(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+    void detachedHeadJenkinsNoLocalBranch(@TempDir Path projectDir) throws Exception {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(
@@ -197,7 +196,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void detachedHeadBehindBranchHead(@TempDir Path projectDir) throws GitAPIException {
+    void detachedHeadBehindBranchHead(@TempDir Path projectDir) throws Exception {
         try (Git git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
             Files.writeString(projectDir.resolve("test.txt"), "hi");
             git.add().addFilepattern("*").call();
@@ -246,7 +245,7 @@ class GitProvenanceTest {
 
     @Disabled("Does not work the same way in CI")
     @Test
-    void shallowCloneDetachedHead(@TempDir Path projectDir) throws IOException, GitAPIException {
+    void shallowCloneDetachedHead(@TempDir Path projectDir) throws Exception {
         var remoteDir = projectDir.resolve("remote");
         var fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED);
         // push an initial commit to the remote
@@ -278,7 +277,7 @@ class GitProvenanceTest {
 
     @Disabled("Does not work the same way in CI")
     @Test
-    void noLocalBranchDeriveFromRemote(@TempDir Path projectDir) throws IOException, GitAPIException, URISyntaxException {
+    void noLocalBranchDeriveFromRemote(@TempDir Path projectDir) throws Exception {
         var remoteDir = projectDir.resolve("remote");
         var fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED);
         try (var remoteRepo = fileKey.open(false)) {
@@ -325,7 +324,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void ignoresBuildEnvironmentIfThereIsGitConfig(@TempDir Path projectDir) throws GitAPIException {
+    void ignoresBuildEnvironmentIfThereIsGitConfig(@TempDir Path projectDir) throws Exception {
         Map<String, String> envVars = new HashMap<>();
         envVars.put("GITHUB_API_URL", "https://api.github.com");
         envVars.put("GITHUB_REPOSITORY", "octocat/Hello-World");
@@ -402,7 +401,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void serialization() throws JsonProcessingException {
+    void serialization() throws Exception {
         GitProvenance gitProvenance = new GitProvenance(randomId(), "https://github.com/octocat/Hello-World.git", "main", "123", null, null, List.of());
         ObjectMapper mapper = new ObjectMapper()
           .findAndRegisterModules()

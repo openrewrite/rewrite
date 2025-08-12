@@ -100,6 +100,62 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recurringDependenciesGetUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.google.guava",
+            "guava",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>25.0-jre</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>23.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4514")
     @Test
     void shouldNotAddNewIfDependencyAlreadyExists() {
@@ -1627,55 +1683,53 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>com.mycompany.myplugin</groupId>
-                            <artifactId>my-plugin</artifactId>
-                            <version>1.0.0</version>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>javax.activation</groupId>
-                                    <artifactId>javax.activation-api</artifactId>
-                                    <version>1.2.0</version>
-                                </dependency>
-                            </dependencies>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
-            """,
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>com.mycompany.myplugin</groupId>
+                              <artifactId>my-plugin</artifactId>
+                              <version>1.0.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>javax.activation</groupId>
+                                      <artifactId>javax.activation-api</artifactId>
+                                      <version>1.2.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
             """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>com.mycompany.myplugin</groupId>
-                            <artifactId>my-plugin</artifactId>
-                            <version>1.0.0</version>
-                            <dependencies>
-                                <dependency>
-                                    <groupId>jakarta.activation</groupId>
-                                    <artifactId>jakarta.activation-api</artifactId>
-                                    <version>1.2.0</version>
-                                </dependency>
-                            </dependencies>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
-            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>com.mycompany.myplugin</groupId>
+                              <artifactId>my-plugin</artifactId>
+                              <version>1.0.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>jakarta.activation</groupId>
+                                      <artifactId>jakarta.activation-api</artifactId>
+                                      <version>1.2.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
           )
         );
     }
@@ -1728,6 +1782,77 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void changeVersionPropertyInParentPom() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.x",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1</version>
+                <properties>
+                  <activation.api.groupId>javax.activation</activation.api.groupId>
+                  <activation.api.artifact>javax.activation-api</activation.api.artifact>
+                  <activation.api.version>1.2.0</activation.api.version>
+                </properties>
+                <modules>
+                  <module>sub-project</module>
+                </modules>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent-project</artifactId>
+                <version>1</version>
+                <properties>
+                  <activation.api.groupId>jakarta.activation</activation.api.groupId>
+                  <activation.api.artifact>jakarta.activation-api</activation.api.artifact>
+                  <activation.api.version>1.2.2</activation.api.version>
+                </properties>
+                <modules>
+                  <module>sub-project</module>
+                </modules>
+              </project>
+              """
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>sub-project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent-project</artifactId>
+                  <version>1</version>
+                  <relatiavePath>../pom.xml</relatiavePath>
+                </parent>
+                <dependencies>
+                  <dependency>
+                    <groupId>${activation.api.groupId}</groupId>
+                    <artifactId>${activation.api.artifact}</artifactId>
+                    <version>${activation.api.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.path("sub-project/pom.xml")
           )
         );
     }

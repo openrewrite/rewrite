@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.UUID;
@@ -27,11 +28,15 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpdateScmFromGitOriginTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new UpdateScmFromGitOrigin(null));
+    }
+
     @DocumentExample
     @Test
     void updatesScmFromGitOriginUsingHttps() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -67,7 +72,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitOriginUsingHttp() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -103,7 +107,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitOriginUsingSsh() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -139,7 +142,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitOriginApache() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -175,7 +177,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitlab() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -213,7 +214,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitOriginWithScm() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -247,7 +247,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void updatesScmFromGitOriginWithUser() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>
@@ -283,7 +282,6 @@ class UpdateScmFromGitOriginTest implements RewriteTest {
     @Test
     void retainUrlSuffix() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateScmFromGitOrigin(null)),
           pomXml(
             """
               <project>

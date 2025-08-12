@@ -75,18 +75,19 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
             List<Dependency> requestedDependencies = new ArrayList<>(eachDependency.size());
             for (Xml.Tag dependency : eachDependency) {
-                requestedDependencies.add(new Dependency(
-                        new GroupArtifactVersion(
+                requestedDependencies.add(Dependency.builder()
+                        .gav(new GroupArtifactVersion(
                                 dependency.getChildValue("groupId").orElse(null),
                                 dependency.getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("Dependency must have artifactId")),
                                 dependency.getChildValue("version").orElse(null)
-                        ),
-                        dependency.getChildValue("classifier").orElse(null),
-                        dependency.getChildValue("type").orElse(null),
-                        dependency.getChildValue("scope").orElse("compile"),
-                        mapExclusions(dependency),
-                        dependency.getChildValue("optional").orElse(null)
-                ));
+                        ))
+                        .classifier(dependency.getChildValue("classifier").orElse(null))
+                        .type(dependency.getChildValue("type").orElse(null))
+                        .scope(dependency.getChildValue("scope").orElse("compile"))
+                        .exclusions(mapExclusions(dependency))
+                        .optional(dependency.getChildValue("optional").orElse(null))
+                        .build()
+                );
             }
             requested = requested.withDependencies(requestedDependencies);
         } else if (!requested.getDependencies().isEmpty()) {
