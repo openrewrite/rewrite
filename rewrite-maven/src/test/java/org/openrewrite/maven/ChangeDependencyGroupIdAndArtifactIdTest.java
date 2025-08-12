@@ -1801,4 +1801,68 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void canChangeSameDependencyMultipleTimesInASingleRecipeRun() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
+                    oldGroupId: org.bouncycastle
+                    oldArtifactId: bcprov-jdk15on
+                    newArtifactId: bcprov-jdk15to18
+                    newVersion: latest.release
+                - org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId:
+                    oldGroupId: org.bouncycastle
+                    oldArtifactId: bcprov-jdk15to18
+                    newArtifactId: bcprov-jdk18on
+                    newVersion: latest.release
+              """,
+            "test.recipe"
+          ),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.bouncycastle</groupId>
+                      <artifactId>bcprov-jdk15on</artifactId>
+                      <version>1.70</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.bouncycastle</groupId>
+                      <artifactId>bcprov-jdk18on</artifactId>
+                      <version>1.81</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
 }
