@@ -28,7 +28,7 @@ class TypeTableKotlinMetadataTest {
     @Test
     void simpleKotlinMetadataAnnotation() {
         // Create a simplified Kotlin metadata annotation similar to what we might find
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d1={\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\"},d2={\"Lkotlin/Metadata\",\"kotlin-stdlib\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\"],d2=[s\"Lkotlin/Metadata\",s\"kotlin-stdlib\"])";
         
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
@@ -39,7 +39,7 @@ class TypeTableKotlinMetadataTest {
     @Test
     void kotlinMetadataWithComplexBinaryData() {
         // Create a more complex case with longer binary-like strings
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d1={\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\\n\\u0002\\u0010\\u000e\\n\\u0002\\b\\u0002\\n\\u0002\\u0010\\u0002\"},d2={\"Collection\",\"ExecutableStream\",\"kotlin-stdlib\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\\n\\u0002\\u0010\\u000e\\n\\u0002\\b\\u0002\\n\\u0002\\u0010\\u0002\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
         
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
@@ -65,7 +65,7 @@ class TypeTableKotlinMetadataTest {
     @Test
     void kotlinMetadataArrayParsingWithSpace() {
         // Test the specific case where we have space before closing paren (from the error message)
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d2={\"Collection\",\"ExecutableStream\",\"kotlin-stdlib\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
         
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
@@ -81,7 +81,7 @@ class TypeTableKotlinMetadataTest {
             longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
         }
         
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d1={\"" + longBinaryData + "\"},d2={\"Collection\",\"ExecutableStream\",\"kotlin-stdlib\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
         
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
@@ -98,7 +98,7 @@ class TypeTableKotlinMetadataTest {
             longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
         }
         
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d1={\"" + longBinaryData + "\"},d2={\"Collection\",\"ExecutableStream\",\"kotlin-stdlib\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
         
         System.out.println("Annotation length: " + metadataAnnotation.length());
         
@@ -112,7 +112,7 @@ class TypeTableKotlinMetadataTest {
     void kotlinMetadataWithSpecialSequences() {
         // Test with some specific sequences that might cause parsing issues
         String problematicData = "\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\\n\\u0002\\u0010\\u000e\\n\\u0002\\b\\u0002\\n\\u0002\\u0010\\u0002";
-        String metadataAnnotation = "@Lkotlin/Metadata;(k=1,d1={\"" + problematicData + "\"},d2={\"Collection\",\"ExecutableStream\",\"junit-jupiter-api\"})";
+        String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + problematicData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"junit-jupiter-api\"])";
         
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);

@@ -372,8 +372,10 @@ class AnnotationDeserializer {
         private Object[] parseArrayValue(int depth) {
             // Parse array elements directly without creating new parser instances
             List<Object> elements = new ArrayList<>();
-            expect('{');
-            while (pos < input.length() && peek() != '}') {
+            
+            expect('[');
+            
+            while (pos < input.length() && peek() != ']') {
                 // Parse the next array element value directly
                 Object element = parseValue(depth);
                 elements.add(element);
@@ -386,7 +388,7 @@ class AnnotationDeserializer {
                     break;
                 }
             }
-            expect('}');
+            expect(']');
             return elements.toArray();
         }
         
@@ -415,29 +417,52 @@ class AnnotationDeserializer {
                 throw new IllegalArgumentException("Maximum nesting depth of " + MAX_NESTING_DEPTH + " exceeded while parsing: " + input);
             }
 
-            // Handle different value types using cursor-based parsing
-            if (isBoolean()) {
-                return parseBooleanValue();
-            } else if (isCharLiteral()) {
-                return parseCharValue();
-            } else if (isStringLiteral()) {
-                return parseStringValue();
-            } else if (isArrayLiteral()) {
-                return parseArrayValue(depth);
-            } else if (isAnnotation()) {
-                return parseNestedAnnotationValue(depth + 1);
-            } else if (isEnumConstant()) {
-                return parseEnumConstantValue();
-            } else if (isClassConstant()) {
-                return parseClassConstantValue();
-            } else if (isPrimitiveTypeDescriptor()) {
-                return parseClassConstantValue(); // Primitive type descriptors are also class constants
-            } else if (isArrayTypeDescriptor()) {
-                return parseClassConstantValue(); // Array type descriptors are also class constants
+            // Check for type-prefixed values (javap style)
+            char typePrefix = peek();
+
+            // Handle javap-style type prefixes
+            switch (typePrefix) {
+                case 'Z': // boolean
+                    consume();
+                    return parseBooleanValue();
+                case 'B': // byte
+                    consume();
+                    return Byte.parseByte(parseNumericValue());
+                case 'C': // char
+                    consume();
+                    return parseCharValue();
+                case 'S': // short
+                    consume();
+                    return Short.parseShort(parseNumericValue());
+                case 'I': // int
+                    consume();
+                    return Integer.parseInt(parseNumericValue());
+                case 'J': // long
+                    consume();
+                    return Long.parseLong(parseNumericValue());
+                case 'F': // float
+                    consume();
+                    return Float.parseFloat(parseNumericValue());
+                case 'D': // double
+                    consume();
+                    return Double.parseDouble(parseNumericValue());
+                case 's': // string
+                    consume();
+                    return parseStringValue();
+                case 'c': // class
+                    consume();
+                    return parseClassConstantValue();
+                case 'e': // enum
+                    consume();
+                    return parseEnumConstantValue();
+                case '[': // array
+                    return parseArrayValue(depth);
+                case '@': // annotation
+                    return parseNestedAnnotationValue(depth + 1);
             }
 
-            // Try parsing as numeric, fallback to string
-            return parseNumericValue();
+            // If no type prefix matched, this is an error
+            throw new IllegalArgumentException("Unknown value format at position " + pos + ": " + peek() + inputWithErrorIndicator(pos));
         }
         
         private Object parseBooleanValue() {
@@ -534,104 +559,45 @@ class AnnotationDeserializer {
             String descriptor = input.substring(start, pos);
             return new ClassConstant(descriptor);
         }
-        
+
         private Object parseEnumConstantValue() {
+            // Parse enum constant with dot notation: L...;.CONSTANT_NAME
             int start = pos;
-            // Parse enum constant: L...;CONSTANT_NAME
             expect('L');
             while (pos < input.length() && peek() != ';') {
                 consume();
             }
             expect(';');
             int semicolonPos = pos - 1;
+            expect('.');
             
             return new EnumConstant(input.substring(start, semicolonPos + 1), parseIdentifier());
         }
-        
-        private Object parseNumericValue() {
+
+        private String parseNumericValue() {
             int start = pos;
-            
-            // Parse until we hit a delimiter
+            boolean hasSign = false;
+
+            // Check for sign
+            if (peek() == '-' || peek() == '+') {
+                consume();
+                hasSign = true;
+            }
+
+            // Parse digits and decimal point
             while (pos < input.length()) {
                 char c = peek();
-                if (!Character.isDigit(c) && c != '.' && c != 'L' && c != 'F' && c != 'E' && c != '-') {
+                if (!Character.isDigit(c) && c != '.') {
                     break;
                 }
                 consume();
             }
-            
-            String value = input.substring(start, pos);
-            if (value.isEmpty()) {
-                throw new IllegalArgumentException("Expected numeric value." + inputWithErrorIndicator(pos));
+
+            if (pos == start || (hasSign && pos == start + 1)) {
+                throw new IllegalArgumentException("Expected numeric value at position " + start + inputWithErrorIndicator(start));
             }
-            
-            try {
-                if (value.endsWith("L")) {
-                    return Long.parseLong(value.substring(0, value.length() - 1));
-                }
-                if (value.endsWith("F")) {
-                    return Float.parseFloat(value.substring(0, value.length() - 1));
-                }
-                if (value.endsWith("D") || value.endsWith("d") || value.contains(".")) {
-                    return Double.parseDouble(value);
-                }
-                return Integer.parseInt(value);
-            } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Illegal numeric value: " + value + "." + inputWithErrorIndicator(pos), e);
-            }
-        }
 
-        // Type checking helper methods that use the current cursor position
-        private boolean isBoolean() {
-            return matchesAtPosition("true") || matchesAtPosition("false");
-        }
-
-        private boolean isCharLiteral() {
-            return peek() == '\'';
-        }
-
-        private boolean isStringLiteral() {
-            return peek() == '"';
-        }
-
-        private boolean isArrayLiteral() {
-            return peek() == '{';
-        }
-
-        private boolean isClassConstant() {
-            return peek() == 'L';
-        }
-
-        private boolean isEnumConstant() {
-            // This requires looking ahead to see if we have L...;IDENTIFIER
-            if (peek() != 'L') return false;
-            int savedPos = pos;
-            try {
-                consume(); // consume 'L'
-                // Look for semicolon followed by valid identifier
-                while (pos < input.length() && peek() != ';') {
-                    consume();
-                }
-                if (pos >= input.length() || peek() != ';') return false;
-                consume(); // consume ';'
-                
-                // Check if what follows is a valid identifier (enum constant name)
-                if (pos >= input.length()) return false;
-                char first = peek();
-                if (!Character.isJavaIdentifierStart(first)) return false;
-                
-                // Check that we have a complete identifier
-                int identifierStart = pos;
-                while (pos < input.length() && Character.isJavaIdentifierPart(peek())) {
-                    consume();
-                }
-                
-                // Must have consumed at least one character and stopped at a delimiter
-                return pos > identifierStart && 
-                       (pos >= input.length() || peek() == ',' || peek() == ')' || peek() == '}');
-            } finally {
-                pos = savedPos; // restore position
-            }
+            return input.substring(start, pos);
         }
 
         private boolean isPrimitiveTypeDescriptor() {
@@ -639,14 +605,6 @@ class AnnotationDeserializer {
             return JVM_PRIMITIVE_DESCRIPTORS.indexOf(c) != -1;
         }
 
-        private boolean isArrayTypeDescriptor() {
-            return peek() == '[';
-        }
-
-        private boolean isAnnotation() {
-            return peek() == '@';
-        }
-        
         private boolean matchesAtPosition(String text) {
             if (pos + text.length() > input.length()) {
                 return false;
@@ -887,12 +845,12 @@ class AnnotationSerializer {
     }
 
     public static String serializeBoolean(boolean value) {
-        return Boolean.toString(value);
+        return "Z" + value;
     }
 
     public static String serializeChar(char value) {
         StringBuilder sb = new StringBuilder();
-        sb.append('\'');
+        sb.append("C'");
         switch (value) {
             case '\'':
                 sb.append("\\'");
@@ -917,42 +875,55 @@ class AnnotationSerializer {
     }
 
     public static String serializeNumber(Number value) {
-        return value.toString();
+        if (value instanceof Byte) {
+            return "B" + value;
+        } else if (value instanceof Short) {
+            return "S" + value;
+        } else if (value instanceof Integer) {
+            return "I" + value;
+        } else if (value instanceof Long) {
+            return "J" + value;
+        } else if (value instanceof Float) {
+            return "F" + value;
+        } else if (value instanceof Double) {
+            return "D" + value;
+        }
+        return "I" + value; // Default to integer
     }
 
     public static String serializeLong(long value) {
-        return value + "L";
+        return "J" + value;
     }
 
     public static String serializeFloat(float value) {
-        return value + "F";
+        return "F" + value;
     }
 
     public static String serializeDouble(double value) {
-        return Double.toString(value);
+        return "D" + value;
     }
 
     public static String serializeClassConstant(Type type) {
-        return type.getDescriptor();
+        return "c" + type.getDescriptor();
     }
 
     public static String serializeEnumConstant(String enumDescriptor, String enumConstant) {
-        return enumDescriptor + enumConstant;
+        return "e" + enumDescriptor + "." + enumConstant;
     }
 
     public static String serializeArray(String[] values) {
         if (values.length == 0) {
-            return "{}";
+            return "[]";
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("{");
+        sb.append("[");
         for (int i = 0; i < values.length; i++) {
             if (i > 0) {
                 sb.append(",");
             }
             sb.append(values[i]);
         }
-        sb.append("}");
+        sb.append("]");
         return sb.toString();
     }
 
@@ -984,11 +955,45 @@ class AnnotationSerializer {
         return serializeValueInternal(value);
     }
 
+    /**
+     * Converts a constant value to its string representation with type prefix,
+     * specifically handling primitive types that are stored as integers in the JVM.
+     * This is used for field constants in TypeTable serialization.
+     *
+     * @param value the constant value from the bytecode
+     * @param descriptor the JVM type descriptor for the field (e.g., "Z" for boolean, "C" for char)
+     * @return the serialized string with appropriate type prefix
+     */
+    public static String convertConstantValueWithType(Object value, String descriptor) {
+        // For primitive types that are stored as integers in the constant pool,
+        // use the descriptor to determine the correct type prefix
+        if (value instanceof Integer) {
+            int intValue = (Integer) value;
+            switch (descriptor) {
+                case "Z": // boolean
+                    return "Z" + (intValue != 0 ? "true" : "false");
+                case "C": // char
+                    return "C" + intValue; // Could format as C'A' but numeric is simpler
+                case "B": // byte
+                    return "B" + intValue;
+                case "S": // short
+                    return "S" + intValue;
+                case "I": // int
+                    return "I" + intValue;
+                default:
+                    // Shouldn't happen, but fall back to regular formatting
+                    return convertAnnotationValueToString(value);
+            }
+        }
+        // For other types, use the regular conversion
+        return convertAnnotationValueToString(value);
+    }
+
     private static String serializeValueInternal(@Nullable Object value) {
         if (value == null) {
             return "null";
         } else if (value instanceof String) {
-            return "\"" + escapeStringContentForTsv((String) value) + "\"";
+            return "s\"" + escapeStringContentForTsv((String) value) + "\"";
         } else if (value instanceof Type) {
             return serializeClassConstant((Type) value);
         } else if (value.getClass().isArray()) {
@@ -1064,7 +1069,7 @@ class AnnotationSerializer {
 
     private static String serializeArrayValue(Object value) {
         StringBuilder elements = new StringBuilder();
-        elements.append('{');
+        elements.append('[');
 
         if (value instanceof Object[]) {
             Object[] array = (Object[]) value;
@@ -1084,7 +1089,7 @@ class AnnotationSerializer {
             }
         }
 
-        elements.append('}');
+        elements.append(']');
         return elements.toString();
     }
 

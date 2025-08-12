@@ -57,7 +57,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/BooleanAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/BooleanAnnotation;(value=true)");
+        assertThat(serialized).isEqualTo("@Lorg/example/BooleanAnnotation;(value=Ztrue)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -76,7 +76,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/CharAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/CharAnnotation;(value='c')");
+        assertThat(serialized).isEqualTo("@Lorg/example/CharAnnotation;(value=C'c')");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -95,7 +95,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/StringAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/StringAnnotation;(value=\"Hello, World!\")");
+        assertThat(serialized).isEqualTo("@Lorg/example/StringAnnotation;(value=s\"Hello, World!\")");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -114,7 +114,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/ClassAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/ClassAnnotation;(value=Ljava/lang/String;)");
+        assertThat(serialized).isEqualTo("@Lorg/example/ClassAnnotation;(value=cLjava/lang/String;)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -138,7 +138,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/EnumAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/EnumAnnotation;(value=Ljava/time/DayOfWeek;MONDAY)");
+        assertThat(serialized).isEqualTo("@Lorg/example/EnumAnnotation;(value=eLjava/time/DayOfWeek;.MONDAY)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -167,7 +167,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/ArrayAnnotation;",
           new String[]{attribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/ArrayAnnotation;(value={1,2,3})");
+        assertThat(serialized).isEqualTo("@Lorg/example/ArrayAnnotation;(value=[I1,I2,I3])");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -195,7 +195,7 @@ class TypeTableAnnotationSerializationTest {
           "Lorg/example/MultiAttributeAnnotation;",
           new String[]{nameAttribute, valueAttribute}
         );
-        assertThat(serialized).isEqualTo("@Lorg/example/MultiAttributeAnnotation;(name=\"test\",value=42)");
+        assertThat(serialized).isEqualTo("@Lorg/example/MultiAttributeAnnotation;(name=s\"test\",value=I42)");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -229,7 +229,7 @@ class TypeTableAnnotationSerializationTest {
           new String[]{outerAttribute}
         );
 
-        assertThat(serialized).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=42))");
+        assertThat(serialized).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=I42))");
 
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -261,7 +261,7 @@ class TypeTableAnnotationSerializationTest {
             );
 
             // The pipe character should be escaped
-            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=\"Hello\\|World\")");
+            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=s\"Hello\\|World\")");
 
             // Test deserialization
             AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -286,7 +286,7 @@ class TypeTableAnnotationSerializationTest {
             );
 
             // The pipe character should be escaped
-            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=\"Hello\\tWorld\")");
+            assertThat(serialized).isEqualTo("@Lorg/example/SpecialCharAnnotation;(value=s\"Hello\\tWorld\")");
 
             // Test deserialization
             AnnotationInfo info = AnnotationDeserializer.parseAnnotation(serialized);
@@ -367,7 +367,7 @@ class TypeTableAnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/junit/jupiter/api/Test;(timeout=1000L)");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/junit/jupiter/api/Test;(timeout=J1000)");
 
         // Note: The actual output is "@org/junit/jupiter/api/Test(1000L)" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.
@@ -411,7 +411,7 @@ class TypeTableAnnotationSerializationTest {
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
         // With our test setup, the actual output is:
-        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=42))");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/OuterAnnotation;(nested=@Lorg/example/InnerAnnotation;(value=I42))");
 
         // Note: The actual output is missing the attribute name "nested=" because the name parameter
         // is only used if attributeName is not null, and we're creating the collector with attributeName=null.
@@ -454,7 +454,7 @@ class TypeTableAnnotationSerializationTest {
 
         // Verify that the annotation was collected correctly
         assertThat(collectedAnnotations).hasSize(1);
-        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/ArrayAnnotation;(value={1,2,3})");
+        assertThat(collectedAnnotations.getFirst()).isEqualTo("@Lorg/example/ArrayAnnotation;(value=[I1,I2,I3])");
     }
 
     @Test
@@ -466,18 +466,18 @@ class TypeTableAnnotationSerializationTest {
             .hasMessageContaining("Input string: @Lorg/springframework/retry/annotation/Backoff;(")
             .hasMessageContaining("Position indicator:                                           ^");
 
-        // Test malformed annotation - invalid character at specific position
-        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=123$)"))
+        // Test malformed annotation - invalid character at specific position  
+        assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=I123$)"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("at position 29")
+            .hasMessageContaining("at position 30")
             .hasMessageContaining("but found '$'")
-            .hasMessageContaining("Input string: @Lorg/example/Test;(value=123$)")
-            .hasMessageContaining("Position indicator:                        ^");
+            .hasMessageContaining("Input string: @Lorg/example/Test;(value=I123$)")
+            .hasMessageContaining("Position indicator:                         ^");
 
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(name=)"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Expected numeric value")
+            .hasMessageContaining("Unknown value format at position 25")
             .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
             .hasMessageContaining("Position indicator:                    ^");
 

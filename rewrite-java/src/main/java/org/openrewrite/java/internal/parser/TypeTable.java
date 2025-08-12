@@ -448,6 +448,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                 value instanceof Byte || value instanceof Short;
     }
 
+
     private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
         Path jarsFolder = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget().toPath().resolve(".tt");
@@ -561,7 +562,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             // Only store constant values that can be ConstantValue attributes in bytecode
                                             if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)
                                                     && isValidConstantValueType(value)) {
-                                                member.constantValue = convertAnnotationValueToString(value);
+                                                member.constantValue = AnnotationSerializer.convertConstantValueWithType(value, descriptor);
                                             }
 
                                             return new FieldVisitor(Opcodes.ASM9) {
@@ -628,14 +629,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                                                 @Override
                                                                 public void visitEnd() {
-                                                                    member.constantValue = "{" + String.join(",", arrayValues) + "}";
+                                                                    member.constantValue = "[" + String.join(",", arrayValues) + "]";
                                                                 }
                                                             };
                                                         }
 
                                                         @Override
                                                         public void visitEnum(String name, String descriptor, String value) {
-                                                            member.constantValue = descriptor + "." + value;
+                                                            member.constantValue = "e" + descriptor + "." + value;
                                                         }
 
                                                         @Override
