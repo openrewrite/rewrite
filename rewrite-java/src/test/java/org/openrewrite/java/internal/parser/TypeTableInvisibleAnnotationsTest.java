@@ -65,43 +65,44 @@ class TypeTableInvisibleAnnotationsTest {
         // Create test sources with RUNTIME retention (visible annotations)
         @Language("java")
         String annotationSource = """
-            package test.annotations;
-            
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.RUNTIME)
-            @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
-            public @interface RuntimeAnnotation {
-                String value() default "runtime";
-            }
-            """;
+          package test.annotations;
+          
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.RUNTIME)
+          @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
+          public @interface RuntimeAnnotation {
+              String value() default "runtime";
+          }
+          """;
 
         @Language("java")
         String classSource = """
-            package test;
-            
-            import test.annotations.RuntimeAnnotation;
-            
-            @RuntimeAnnotation("class-level")
-            public class TestClass {
-            
-                @RuntimeAnnotation("field-level")
-                public String field;
-            
-                @RuntimeAnnotation("method-level")
-                public void method() {}
-            }
-            """;
+          package test;
+          
+          import test.annotations.RuntimeAnnotation;
+          
+          @RuntimeAnnotation("class-level")
+          public class TestClass {
+          
+              @RuntimeAnnotation("field-level")
+              public String field;
+          
+              @RuntimeAnnotation("method-level")
+              public void method() {}
+          }
+          """;
 
         Path jarFile = compileAndPackage(annotationSource, "test.annotations.RuntimeAnnotation",
-                                        classSource, "test.TestClass");
-        
+          classSource, "test.TestClass");
+
         String tsvContent = processJarThroughTypeTable(jarFile);
-        
+
         // Verify runtime annotations are collected
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"class-level\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"field-level\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"method-level\")");
+        assertThat(tsvContent)
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"class-level\")")
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"field-level\")")
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"method-level\")");
     }
 
     @Test
@@ -109,43 +110,44 @@ class TypeTableInvisibleAnnotationsTest {
         // Create test sources with CLASS retention (invisible annotations)
         @Language("java")
         String annotationSource = """
-            package test.annotations;
-            
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.CLASS)
-            @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
-            public @interface ClassAnnotation {
-                String value() default "class";
-            }
-            """;
+          package test.annotations;
+          
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.CLASS)
+          @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
+          public @interface ClassAnnotation {
+              String value() default "class";
+          }
+          """;
 
         @Language("java")
         String classSource = """
-            package test;
-            
-            import test.annotations.ClassAnnotation;
-            
-            @ClassAnnotation("class-level")
-            public class TestClass {
-            
-                @ClassAnnotation("field-level")
-                public String field;
-            
-                @ClassAnnotation("method-level")
-                public void method() {}
-            }
-            """;
+          package test;
+          
+          import test.annotations.ClassAnnotation;
+          
+          @ClassAnnotation("class-level")
+          public class TestClass {
+          
+              @ClassAnnotation("field-level")
+              public String field;
+          
+              @ClassAnnotation("method-level")
+              public void method() {}
+          }
+          """;
 
         Path jarFile = compileAndPackage(annotationSource, "test.annotations.ClassAnnotation",
-                                        classSource, "test.TestClass");
-        
+          classSource, "test.TestClass");
+
         String tsvContent = processJarThroughTypeTable(jarFile);
-        
+
         // Verify CLASS retention annotations are now collected (these are invisible annotations)
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-level\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"field-level\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"method-level\")");
+        assertThat(tsvContent)
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-level\")")
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"field-level\")")
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"method-level\")");
     }
 
     @Test
@@ -153,70 +155,69 @@ class TypeTableInvisibleAnnotationsTest {
         // Create test with both runtime and class retained annotations
         @Language("java")
         String runtimeAnnotation = """
-            package test.annotations;
-            
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.RUNTIME)
-            @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
-            public @interface RuntimeAnnotation {
-                String value();
-            }
-            """;
+          package test.annotations;
+          
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.RUNTIME)
+          @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
+          public @interface RuntimeAnnotation {
+              String value();
+          }
+          """;
 
         @Language("java")
         String classAnnotation = """
-            package test.annotations;
-            
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.CLASS)
-            @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
-            public @interface ClassAnnotation {
-                String value();
-            }
-            """;
+          package test.annotations;
+          
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.CLASS)
+          @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
+          public @interface ClassAnnotation {
+              String value();
+          }
+          """;
 
         @Language("java")
         String testClass = """
-            package test;
-            
-            import test.annotations.*;
-            
-            @RuntimeAnnotation("runtime-class")
-            @ClassAnnotation("class-class")
-            public class TestClass {
-            
-                @RuntimeAnnotation("runtime-field")
-                @ClassAnnotation("class-field")
-                public String field;
-            
-                @RuntimeAnnotation("runtime-method")
-                @ClassAnnotation("class-method")
-                public void method() {}
-            }
-            """;
+          package test;
+          
+          import test.annotations.*;
+          
+          @RuntimeAnnotation("runtime-class")
+          @ClassAnnotation("class-class")
+          public class TestClass {
+          
+              @RuntimeAnnotation("runtime-field")
+              @ClassAnnotation("class-field")
+              public String field;
+          
+              @RuntimeAnnotation("runtime-method")
+              @ClassAnnotation("class-method")
+              public void method() {}
+          }
+          """;
 
         Path jarFile = compileAndPackage(
-            runtimeAnnotation, "test.annotations.RuntimeAnnotation",
-            classAnnotation, "test.annotations.ClassAnnotation",
-            testClass, "test.TestClass"
+          runtimeAnnotation, "test.annotations.RuntimeAnnotation",
+          classAnnotation, "test.annotations.ClassAnnotation",
+          testClass, "test.TestClass"
         );
-        
+
         String tsvContent = processJarThroughTypeTable(jarFile);
-        
+
         // Verify both visible (runtime) and invisible (class) annotations are collected
-        // Class-level annotations
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-class\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-class\")");
-        
-        // Field-level annotations
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-field\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-field\")");
-        
-        // Method-level annotations
-        assertThat(tsvContent).contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-method\")");
-        assertThat(tsvContent).contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-method\")");
+        assertThat(tsvContent)
+          // Class-level annotations
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-class\")")
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-class\")")
+          // Field-level annotations
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-field\")")
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-field\")")
+          // Method-level annotations
+          .contains("@Ltest/annotations/RuntimeAnnotation;(value=s\"runtime-method\")")
+          .contains("@Ltest/annotations/ClassAnnotation;(value=s\"class-method\")");
     }
 
     @Test
@@ -224,62 +225,62 @@ class TypeTableInvisibleAnnotationsTest {
         // Test that multiple annotations on the same element are preserved in order
         @Language("java")
         String ann1 = """
-            package test.annotations;
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.CLASS)
-            @Target(ElementType.TYPE)
-            public @interface First {
-                String value();
-            }
-            """;
+          package test.annotations;
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.CLASS)
+          @Target(ElementType.TYPE)
+          public @interface First {
+              String value();
+          }
+          """;
 
         @Language("java")
         String ann2 = """
-            package test.annotations;
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.RUNTIME)
-            @Target(ElementType.TYPE)
-            public @interface Second {
-                int value();
-            }
-            """;
+          package test.annotations;
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.RUNTIME)
+          @Target(ElementType.TYPE)
+          public @interface Second {
+              int value();
+          }
+          """;
 
         @Language("java")
         String ann3 = """
-            package test.annotations;
-            import java.lang.annotation.*;
-            
-            @Retention(RetentionPolicy.CLASS)
-            @Target(ElementType.TYPE)
-            public @interface Third {
-                boolean value();
-            }
-            """;
+          package test.annotations;
+          import java.lang.annotation.*;
+          
+          @Retention(RetentionPolicy.CLASS)
+          @Target(ElementType.TYPE)
+          public @interface Third {
+              boolean value();
+          }
+          """;
 
         @Language("java")
         String testClass = """
-            package test;
-            
-            import test.annotations.*;
-            
-            @First("first")
-            @Second(42)
-            @Third(true)
-            public class TestClass {
-            }
-            """;
+          package test;
+          
+          import test.annotations.*;
+          
+          @First("first")
+          @Second(42)
+          @Third(true)
+          public class TestClass {
+          }
+          """;
 
         Path jarFile = compileAndPackage(
-            ann1, "test.annotations.First",
-            ann2, "test.annotations.Second",
-            ann3, "test.annotations.Third",
-            testClass, "test.TestClass"
+          ann1, "test.annotations.First",
+          ann2, "test.annotations.Second",
+          ann3, "test.annotations.Third",
+          testClass, "test.TestClass"
         );
-        
+
         String tsvContent = processJarThroughTypeTable(jarFile);
-        
+
         // Find the line with TestClass annotations
         String[] lines = tsvContent.split("\n");
         String classLine = null;
@@ -289,22 +290,20 @@ class TypeTableInvisibleAnnotationsTest {
                 break;
             }
         }
-        
+
         assertThat(classLine).isNotNull();
-        
+
         // Extract the annotations column (15th column, 0-indexed as 14)
         String[] columns = classLine.split("\t");
         assertThat(columns.length).isGreaterThanOrEqualTo(15);
         String annotationsColumn = columns[14];
-        
-        // Verify all three annotations are present, separated by pipes
-        String[] annotations = annotationsColumn.split("\\|");
-        assertThat(annotations).hasSize(3);
-        assertThat(annotations).containsExactlyInAnyOrder(
-            "@Ltest/annotations/First;(value=s\"first\")",
-            "@Ltest/annotations/Second;(value=I42)",
-            "@Ltest/annotations/Third;(value=Ztrue)"
-        );
+
+        // Verify all three annotations are present, concatenated without delimiters
+        // The annotations are self-delimiting (each starts with @ and has clear boundaries)
+        assertThat(annotationsColumn)
+          .contains("@Ltest/annotations/First;(value=s\"first\")")
+          .contains("@Ltest/annotations/Second;(value=I42)")
+          .contains("@Ltest/annotations/Third;(value=Ztrue)");
     }
 
     /**
@@ -322,12 +321,12 @@ class TypeTableInvisibleAnnotationsTest {
         for (int i = 0; i < sourceAndClassPairs.length; i += 2) {
             String source = sourceAndClassPairs[i];
             String className = sourceAndClassPairs[i + 1];
-            
+
             // Create package directories
             String packagePath = className.substring(0, className.lastIndexOf('.')).replace('.', '/');
             Path packageDir = srcDir.resolve(packagePath);
             Files.createDirectories(packageDir);
-            
+
             String simpleClassName = className.substring(className.lastIndexOf('.') + 1);
             Path sourceFile = packageDir.resolve(simpleClassName + ".java");
             Files.writeString(sourceFile, source);
@@ -335,9 +334,9 @@ class TypeTableInvisibleAnnotationsTest {
 
         // Compile all sources
         List<Path> allSources = Files.walk(srcDir)
-            .filter(p -> p.toString().endsWith(".java"))
-            .toList();
-        
+          .filter(p -> p.toString().endsWith(".java"))
+          .toList();
+
         String[] compilerArgs = new String[allSources.size() + 2];
         compilerArgs[0] = "-d";
         compilerArgs[1] = tempDir.toString();
@@ -352,20 +351,20 @@ class TypeTableInvisibleAnnotationsTest {
         Path jarFile = tempDir.resolve("test.jar");
         try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jarFile))) {
             Files.walk(tempDir)
-                .filter(p -> p.toString().endsWith(".class"))
-                .forEach(classFile -> {
-                    try {
-                        String entryName = tempDir.relativize(classFile).toString();
-                        JarEntry entry = new JarEntry(entryName);
-                        jos.putNextEntry(entry);
-                        jos.write(Files.readAllBytes(classFile));
-                        jos.closeEntry();
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                });
+              .filter(p -> p.toString().endsWith(".class"))
+              .forEach(classFile -> {
+                  try {
+                      String entryName = tempDir.relativize(classFile).toString();
+                      JarEntry entry = new JarEntry(entryName);
+                      jos.putNextEntry(entry);
+                      jos.write(Files.readAllBytes(classFile));
+                      jos.closeEntry();
+                  } catch (Exception e) {
+                      throw new RuntimeException(e);
+                  }
+              });
         }
-        
+
         return jarFile;
     }
 

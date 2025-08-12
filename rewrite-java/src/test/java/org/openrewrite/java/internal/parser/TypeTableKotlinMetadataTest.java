@@ -29,7 +29,7 @@ class TypeTableKotlinMetadataTest {
     void simpleKotlinMetadataAnnotation() {
         // Create a simplified Kotlin metadata annotation similar to what we might find
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\"],d2=[s\"Lkotlin/Metadata\",s\"kotlin-stdlib\"])";
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");
@@ -40,20 +40,20 @@ class TypeTableKotlinMetadataTest {
     void kotlinMetadataWithComplexBinaryData() {
         // Create a more complex case with longer binary-like strings
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\\n\\u0002\\u0010\\u000e\\n\\u0002\\b\\u0002\\n\\u0002\\u0010\\u0002\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");
         assertThat(info.getAttributes()).hasSize(3);
-        
+
         // Verify attribute parsing
         assertThat(info.getAttributes().get(0).getName()).isEqualTo("k");
         assertThat(info.getAttributes().get(0).getValue()).isEqualTo(1);
-        
+
         assertThat(info.getAttributes().get(1).getName()).isEqualTo("d1");
         Object[] d1Array = (Object[]) info.getAttributes().get(1).getValue();
         assertThat(d1Array).isNotEmpty();
-        
+
         assertThat(info.getAttributes().get(2).getName()).isEqualTo("d2");
         Object[] d2Array = (Object[]) info.getAttributes().get(2).getValue();
         assertThat(d2Array).hasSize(3);
@@ -66,7 +66,7 @@ class TypeTableKotlinMetadataTest {
     void kotlinMetadataArrayParsingWithSpace() {
         // Test the specific case where we have space before closing paren (from the error message)
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");
@@ -80,9 +80,9 @@ class TypeTableKotlinMetadataTest {
         for (int i = 0; i < 100; i++) {
             longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
         }
-        
+
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");
@@ -97,23 +97,23 @@ class TypeTableKotlinMetadataTest {
         for (int i = 0; i < 600; i++) {
             longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
         }
-        
+
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
-        
+
         System.out.println("Annotation length: " + metadataAnnotation.length());
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");
         assertThat(info.getAttributes()).hasSize(3);
     }
 
-    @Test 
+    @Test
     void kotlinMetadataWithSpecialSequences() {
         // Test with some specific sequences that might cause parsing issues
         String problematicData = "\\u0000\\u001e\\n\\u0002\\u0018\\u0002\\n\\u0000\\n\\u0002\\u0010\\u000e\\n\\u0002\\b\\u0002\\n\\u0002\\u0010\\u0002";
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + problematicData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"junit-jupiter-api\"])";
-        
+
         // Test deserialization
         AnnotationInfo info = AnnotationDeserializer.parseAnnotation(metadataAnnotation);
         assertThat(info.getDescriptor()).isEqualTo("Lkotlin/Metadata;");

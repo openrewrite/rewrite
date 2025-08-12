@@ -21,7 +21,6 @@ import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.*;
-import org.objectweb.asm.TypePath;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
@@ -70,7 +69,9 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  *     <li>signature</li>
  *     <li>parameterNames</li>
  *     <li>exceptions[]</li>
- *     <li>annotations[]</li>
+ *     <li>elementAnnotations</li>
+ *     <li>parameterAnnotations[]</li>
+ *     <li>typeAnnotations[]</li>
  *     <li>constantValue</li>
  * </ul>
  * <p>
@@ -334,7 +335,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         }
                                         // Parse and apply the annotation sequence (no delimiters needed within)
                                         AnnotationApplier.applyAnnotations(annotationsPart,
-                                            (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
+                                                (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
                                     }
                                 }
                             }
@@ -343,9 +344,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                             if (member.getTypeAnnotations() != null) {
                                 for (String typeAnnotation : member.getTypeAnnotations()) {
                                     TypeAnnotationSupport.TypeAnnotationInfo info =
-                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
-                                    AnnotationApplier.applyAnnotation(info.annotation, 
-                                        (descriptor, visible) -> mv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
+                                            TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                    AnnotationApplier.applyAnnotation(info.annotation,
+                                            (descriptor, visible) -> mv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
                                 }
                             }
 
@@ -371,8 +372,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             // Determine the constant value for static final fields
                             // Only set constantValue for bytecode if it's a valid ConstantValue attribute type
                             Object constantValue = null;
-                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)
-                                    && member.getConstantValue() != null) {
+                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
+                                    member.getConstantValue() != null) {
                                 Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
                                 // Only primitive types and strings can be ConstantValue attributes
                                 if (isValidConstantValueType(parsedValue)) {
@@ -398,9 +399,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                             if (member.getTypeAnnotations() != null) {
                                 for (String typeAnnotation : member.getTypeAnnotations()) {
                                     TypeAnnotationSupport.TypeAnnotationInfo info =
-                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
-                                    AnnotationApplier.applyAnnotation(info.annotation, 
-                                        (descriptor, visible) -> fv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
+                                            TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                    AnnotationApplier.applyAnnotation(info.annotation,
+                                            (descriptor, visible) -> fv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
                                 }
                             }
 
@@ -618,8 +619,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
 
                                             // Only store constant values that can be ConstantValue attributes in bytecode
-                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)
-                                                    && isValidConstantValueType(value)) {
+                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
+                                                    isValidConstantValueType(value)) {
                                                 member.constantValue = AnnotationSerializer.convertConstantValueWithType(value, descriptor);
                                             }
 
@@ -809,7 +810,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
                             -1, "", "", "", "", "",
-                            classAnnotations.isEmpty() ? "" : String.join("|", classAnnotations),
+                            classAnnotations.isEmpty() ? "" : String.join("", classAnnotations),
                             "", // Empty parameter annotations for class row
                             classTypeAnnotations.isEmpty() ? "" : String.join("|", classTypeAnnotations),
                             ""); // Empty constant value for class row
@@ -861,7 +862,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             signature == null ? "" : signature,
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
-                            elementAnnotations.isEmpty() ? "" : String.join("|", elementAnnotations),
+                            elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
                             parameterAnnotations.serialize(),
                             typeAnnotations.isEmpty() ? "" : String.join("|", typeAnnotations),
                             constantValue == null ? "" : constantValue
@@ -893,7 +894,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         String @Nullable [] superinterfaceSignatures;
 
         @Nullable
-        String annotations;  // Raw annotation string, no delimiters needed
+        String annotations;
 
         @Nullable
         String constantValue;
@@ -927,8 +928,9 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
+
         @Nullable
-        String annotations;  // Raw annotation string, no delimiters needed
+        String annotations;
 
         @Nullable
         String parameterAnnotations;

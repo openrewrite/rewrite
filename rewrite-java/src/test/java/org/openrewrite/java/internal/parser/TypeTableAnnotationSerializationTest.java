@@ -174,7 +174,7 @@ class TypeTableAnnotationSerializationTest {
         assertThat(info.getDescriptor()).isEqualTo("Lorg/example/ArrayAnnotation;");
         assertThat(info.getAttributes()).hasSize(1);
         assertThat(info.getAttributes().getFirst().getName()).isEqualTo("value");
-        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo(new Object[] {1,2,3});
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo(new Object[]{1, 2, 3});
 
         // Parse the value
         Object value = info.getAttributes().getFirst().getValue();
@@ -461,31 +461,31 @@ class TypeTableAnnotationSerializationTest {
     void testParserErrorPositioning() {
         // Test malformed annotation - missing closing parenthesis
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/springframework/retry/annotation/Backoff;("))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("at position 48, but reached end of input")
-            .hasMessageContaining("Input string: @Lorg/springframework/retry/annotation/Backoff;(")
-            .hasMessageContaining("Position indicator:                                           ^");
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("at position 48, but reached end of input")
+          .hasMessageContaining("Input string: @Lorg/springframework/retry/annotation/Backoff;(")
+          .hasMessageContaining("Position indicator:                                           ^");
 
         // Test malformed annotation - invalid character at specific position  
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(value=I123$)"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("at position 30")
-            .hasMessageContaining("but found '$'")
-            .hasMessageContaining("Input string: @Lorg/example/Test;(value=I123$)")
-            .hasMessageContaining("Position indicator:                         ^");
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("at position 30")
+          .hasMessageContaining("but found '$'")
+          .hasMessageContaining("Input string: @Lorg/example/Test;(value=I123$)")
+          .hasMessageContaining("Position indicator:                         ^");
 
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(name=)"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Unknown value format at position 25")
-            .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
-            .hasMessageContaining("Position indicator:                    ^");
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Unknown value format at position 25")
+          .hasMessageContaining("Input string: @Lorg/example/Test;(name=)")
+          .hasMessageContaining("Position indicator:                    ^");
 
         // Test missing attribute value
         assertThatThrownBy(() -> AnnotationDeserializer.parseAnnotation("@Lorg/example/Test;(0name=)"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Expected identifier at position 20 but found '0'")
-            .hasMessageContaining("Input string: @Lorg/example/Test;(0name=)")
-            .hasMessageContaining("Position indicator:               ^");
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("Expected identifier at position 20 but found '0'")
+          .hasMessageContaining("Input string: @Lorg/example/Test;(0name=)")
+          .hasMessageContaining("Position indicator:               ^");
     }
 }

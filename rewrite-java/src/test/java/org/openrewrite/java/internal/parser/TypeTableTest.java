@@ -67,7 +67,8 @@ class TypeTableTest implements RewriteTest {
     JavaCompiler compiler;
     Path tsv;
 
-    void foo(List<@Nullable ? extends @Nullable Number> l) {}
+    void foo(List<@Nullable ? extends @Nullable Number> l) {
+    }
 
     @BeforeEach
     void setUp() {
@@ -187,26 +188,26 @@ class TypeTableTest implements RewriteTest {
         void annotationArraysAreNotDoubleEscaped() throws Exception {
             //language=java
             String annotationSource = """
-                package com.example;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @interface TestAnnotation {
-                    String[] values();
-                }
-                """;
+              package com.example;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface TestAnnotation {
+                  String[] values();
+              }
+              """;
 
             //language=java
             String classSource = """
-                package com.example;
-                
-                @TestAnnotation(values = {"text/plain;charset=UTF-8", "application/json"})
-                public class AnnotatedClass {
-                    @TestAnnotation(values = {"field", "annotation"})
-                    public String field = "test";
-                }
-                """;
+              package com.example;
+              
+              @TestAnnotation(values = {"text/plain;charset=UTF-8", "application/json"})
+              public class AnnotatedClass {
+                  @TestAnnotation(values = {"field", "annotation"})
+                  public String field = "test";
+              }
+              """;
 
             Path[] classFiles = compileToClassFiles(
               annotationSource, "com.example.TestAnnotation",
@@ -224,23 +225,23 @@ class TypeTableTest implements RewriteTest {
         void controlCharactersAreEscapedInAnnotations() throws Exception {
             //language=java
             String annotationSource = """
-                package com.example;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @interface TestAnnotation {
-                    String value();
-                }
-                """;
+              package com.example;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface TestAnnotation {
+                  String value();
+              }
+              """;
 
             //language=java
             String classSource = """
-                package com.example;
-                
-                @TestAnnotation("line1\\nline2\\ttab\\rcarriage")
-                public class ControlCharsClass {}
-                """;
+              package com.example;
+              
+              @TestAnnotation("line1\\nline2\\ttab\\rcarriage")
+              public class ControlCharsClass {}
+              """;
 
             Path[] classFiles = compileToClassFiles(
               annotationSource, "com.example.TestAnnotation",
@@ -261,27 +262,27 @@ class TypeTableTest implements RewriteTest {
         void enumConstantsHaveNoConstantValues() throws Exception {
             //language=java
             String enumSource = """
-                package com.example;
-                
-                public enum TestEnum {
-                    VALUE1("First"),
-                    VALUE2("Second");
-                
-                    private final String description;
-                
-                    TestEnum(String description) {
-                        this.description = description;
-                    }
-                
-                    public String getDescription() {
-                        return description;
-                    }
-                
-                    // Regular constants should still have values
-                    public static final String CONSTANT = "test";
-                    public static final int NUMBER = 42;
-                }
-                """;
+              package com.example;
+              
+              public enum TestEnum {
+                  VALUE1("First"),
+                  VALUE2("Second");
+              
+                  private final String description;
+              
+                  TestEnum(String description) {
+                      this.description = description;
+                  }
+              
+                  public String getDescription() {
+                      return description;
+                  }
+              
+                  // Regular constants should still have values
+                  public static final String CONSTANT = "test";
+                  public static final int NUMBER = 42;
+              }
+              """;
 
             Path classFile = compileToClassFile(enumSource, "com.example.TestEnum");
             Path jarFile = createJarFromClasses("test.jar", classFile);
@@ -321,14 +322,14 @@ class TypeTableTest implements RewriteTest {
             // Test compilation against this enum
             //language=java
             String testCode = """
-                public class TestUseEnum {
-                    public void test() {
-                        TestEnum e = TestEnum.VALUE1;
-                        String constant = TestEnum.CONSTANT;
-                        System.out.println(e + " " + constant);
-                    }
-                }
-                """;
+              public class TestUseEnum {
+                  public void test() {
+                      TestEnum e = TestEnum.VALUE1;
+                      String constant = TestEnum.CONSTANT;
+                      System.out.println(e + " " + constant);
+                  }
+              }
+              """;
 
             Path testFile = tempDir.resolve("TestUseEnum.java");
             Files.writeString(testFile, testCode);
@@ -351,24 +352,24 @@ class TypeTableTest implements RewriteTest {
         void primitiveConstantsAreStored() throws Exception {
             //language=java
             String source = """
-                package com.example;
-                
-                public class Constants {
-                    public static final int INT_CONST = 42;
-                    public static final long LONG_CONST = 123L;
-                    public static final float FLOAT_CONST = 3.14f;
-                    public static final double DOUBLE_CONST = 2.718;
-                    public static final boolean BOOL_CONST = true;
-                    public static final char CHAR_CONST = 'A';
-                    public static final byte BYTE_CONST = 1;
-                    public static final short SHORT_CONST = 100;
-                    public static final String STRING_CONST = "Hello";
-                
-                    // Non-constant static final fields should not have values
-                    public static final Object OBJECT_CONST = new Object();
-                    public static final int[] ARRAY_CONST = {1, 2, 3};
-                }
-                """;
+              package com.example;
+              
+              public class Constants {
+                  public static final int INT_CONST = 42;
+                  public static final long LONG_CONST = 123L;
+                  public static final float FLOAT_CONST = 3.14f;
+                  public static final double DOUBLE_CONST = 2.718;
+                  public static final boolean BOOL_CONST = true;
+                  public static final char CHAR_CONST = 'A';
+                  public static final byte BYTE_CONST = 1;
+                  public static final short SHORT_CONST = 100;
+                  public static final String STRING_CONST = "Hello";
+              
+                  // Non-constant static final fields should not have values
+                  public static final Object OBJECT_CONST = new Object();
+                  public static final int[] ARRAY_CONST = {1, 2, 3};
+              }
+              """;
 
             Path classFile = compileToClassFile(source, "com.example.Constants");
             Path jarFile = createJarFromClasses("test.jar", classFile);
@@ -487,17 +488,17 @@ class TypeTableTest implements RewriteTest {
             // Create our own test annotation JAR
             //language=java
             String annotationSource = """
-                package test.validation;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target(ElementType.FIELD)
-                @interface TestValidation {
-                    String message() default "{test.validation.TestValidation.message}";
-                    String[] groups() default {};
-                }
-                """;
+              package test.validation;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.FIELD)
+              @interface TestValidation {
+                  String message() default "{test.validation.TestValidation.message}";
+                  String[] groups() default {};
+              }
+              """;
 
             Path[] classFiles = compileToClassFiles(
               annotationSource, "test.validation.TestValidation"
@@ -522,20 +523,20 @@ class TypeTableTest implements RewriteTest {
             // Create annotation with various default values to test escaping and preservation
             //language=java
             String annotationSource = """
-                package test.annotations;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target({ElementType.TYPE, ElementType.FIELD})
-                public @interface ValidationRule {
-                    String message() default "{validation.rule.message}";
-                    String[] values() default {"text/plain;charset=UTF-8", "application/json"};
-                    String specialChars() default "line1\\nline2\\ttab\\rcarriage";
-                    int priority() default 100;
-                    boolean enabled() default true;
-                }
-                """;
+              package test.annotations;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.TYPE, ElementType.FIELD})
+              public @interface ValidationRule {
+                  String message() default "{validation.rule.message}";
+                  String[] values() default {"text/plain;charset=UTF-8", "application/json"};
+                  String specialChars() default "line1\\nline2\\ttab\\rcarriage";
+                  int priority() default 100;
+                  boolean enabled() default true;
+              }
+              """;
 
             Path[] classFiles = compileToClassFiles(
               annotationSource, "test.annotations.ValidationRule"
@@ -655,90 +656,90 @@ class TypeTableTest implements RewriteTest {
             // Create a comprehensive set of annotations to test all three annotation types
             //language=java
             String methodAnnotation = """
-                package test.annotations;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target(ElementType.METHOD)
-                public @interface Transactional {
-                    boolean readOnly() default false;
-                }
-                """;
+              package test.annotations;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.METHOD)
+              public @interface Transactional {
+                  boolean readOnly() default false;
+              }
+              """;
 
             //language=java
             String paramAnnotation = """
-                package test.annotations;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target(ElementType.PARAMETER)
-                public @interface NotNull {
-                    String message() default "must not be null";
-                }
-                """;
+              package test.annotations;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.PARAMETER)
+              public @interface NotNull {
+                  String message() default "must not be null";
+              }
+              """;
 
             //language=java
             String typeUseAnnotation = """
-                package test.annotations;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target({ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
-                public @interface Nullable {}
-                """;
+              package test.annotations;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
+              public @interface Nullable {}
+              """;
 
             //language=java
             String anotherTypeUseAnnotation = """
-                package test.annotations;
-                
-                import java.lang.annotation.*;
-                
-                @Retention(RetentionPolicy.RUNTIME)
-                @Target(ElementType.TYPE_USE)
-                public @interface NonNull {}
-                """;
+              package test.annotations;
+              
+              import java.lang.annotation.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE_USE)
+              public @interface NonNull {}
+              """;
 
             //language=java
             String libraryClass = """
-                package test.library;
-                
-                import test.annotations.*;
-                import java.util.List;
-                
-                public class AnnotatedLibrary {
-                    // Field with type annotation
-                    private @Nullable String nullableField;
-                    
-                    // Array field with type annotation
-                    private String @NonNull [] nonNullArray;
-                
-                    // Method with all three annotation types
-                    @Transactional(readOnly = true)
-                    public @Nullable String processData(
-                        @NotNull @NonNull String required,
-                        @Nullable List<@NonNull String> items) {
-                        return nullableField;
-                    }
-                    
-                    // Method with type annotation on generic return type
-                    public List<@Nullable String> getNullableStrings() {
-                        return null;
-                    }
-                    
-                    // Method with complex nested type annotations
-                    public void processWildcard(List<? extends @NonNull Number> numbers) {}
-                }
-                """;
+              package test.library;
+              
+              import test.annotations.*;
+              import java.util.List;
+              
+              public class AnnotatedLibrary {
+                  // Field with type annotation
+                  private @Nullable String nullableField;
+              
+                  // Array field with type annotation
+                  private String @NonNull [] nonNullArray;
+              
+                  // Method with all three annotation types
+                  @Transactional(readOnly = true)
+                  public @Nullable String processData(
+                      @NotNull @NonNull String required,
+                      @Nullable List<@NonNull String> items) {
+                      return nullableField;
+                  }
+              
+                  // Method with type annotation on generic return type
+                  public List<@Nullable String> getNullableStrings() {
+                      return null;
+                  }
+              
+                  // Method with complex nested type annotations
+                  public void processWildcard(List<? extends @NonNull Number> numbers) {}
+              }
+              """;
 
             Path[] classFiles = compileToClassFiles(
-                methodAnnotation, "test.annotations.Transactional",
-                paramAnnotation, "test.annotations.NotNull",
-                typeUseAnnotation, "test.annotations.Nullable",
-                anotherTypeUseAnnotation, "test.annotations.NonNull",
-                libraryClass, "test.library.AnnotatedLibrary"
+              methodAnnotation, "test.annotations.Transactional",
+              paramAnnotation, "test.annotations.NotNull",
+              typeUseAnnotation, "test.annotations.Nullable",
+              anotherTypeUseAnnotation, "test.annotations.NonNull",
+              libraryClass, "test.library.AnnotatedLibrary"
             );
             Path testJar = createJarFromClasses("annotated-library.jar", classFiles);
 
@@ -751,14 +752,14 @@ class TypeTableTest implements RewriteTest {
             TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("annotated-library"));
             Path classesDir = table.load("annotated-library");
             assertThat(classesDir).isNotNull();
-            
+
             // Verify the generated classes exist
             assertThat(classesDir)
-                .isDirectoryRecursivelyContaining("glob:**/Transactional.class")
-                .isDirectoryRecursivelyContaining("glob:**/NotNull.class")
-                .isDirectoryRecursivelyContaining("glob:**/Nullable.class")
-                .isDirectoryRecursivelyContaining("glob:**/NonNull.class")
-                .isDirectoryRecursivelyContaining("glob:**/AnnotatedLibrary.class");
+              .isDirectoryRecursivelyContaining("glob:**/Transactional.class")
+              .isDirectoryRecursivelyContaining("glob:**/NotNull.class")
+              .isDirectoryRecursivelyContaining("glob:**/Nullable.class")
+              .isDirectoryRecursivelyContaining("glob:**/NonNull.class")
+              .isDirectoryRecursivelyContaining("glob:**/AnnotatedLibrary.class");
 
             // Test that JavaParser can parse code using the library with all annotation types
             // This validates that TypeTable preserved all annotation information correctly
@@ -775,24 +776,24 @@ class TypeTableTest implements RewriteTest {
                   class TestClient {
                       void useLibrary() {
                           AnnotatedLibrary lib = new AnnotatedLibrary();
-                          
+                  
                           // Call method with all three annotation types
                           String result = lib.processData("required", new ArrayList<>());
-                          
+                  
                           // Call method with type annotations on return type
                           List<String> nullables = lib.getNullableStrings();
-                          
+                  
                           // Call method with complex type annotations
                           List<Integer> numbers = new ArrayList<>();
                           lib.processWildcard(numbers);
                       }
-                      
+                  
                       // Use the annotations in our own code to verify they work
                       @Transactional
                       public void transactionalMethod(@NotNull String param) {}
-                      
+                  
                       private @Nullable String nullableField;
-                      
+                  
                       public List<@NonNull String> getRequiredStrings() {
                           return new ArrayList<>();
                       }
@@ -802,25 +803,25 @@ class TypeTableTest implements RewriteTest {
                     // Basic verification that the compilation succeeded
                     J.ClassDeclaration clazz = cu.getClasses().getFirst();
                     assertThat(clazz.getSimpleName()).isEqualTo("TestClient");
-                    
+
                     // Find the transactionalMethod
                     J.MethodDeclaration transactionalMethod = clazz.getBody().getStatements().stream()
-                        .filter(J.MethodDeclaration.class::isInstance)
-                        .map(J.MethodDeclaration.class::cast)
-                        .filter(m -> "transactionalMethod".equals(m.getSimpleName()))
-                        .findFirst()
-                        .orElseThrow();
-                    
+                      .filter(J.MethodDeclaration.class::isInstance)
+                      .map(J.MethodDeclaration.class::cast)
+                      .filter(m -> "transactionalMethod".equals(m.getSimpleName()))
+                      .findFirst()
+                      .orElseThrow();
+
                     // Verify the method has the @Transactional annotation
                     assertThat(transactionalMethod.getLeadingAnnotations()).hasSize(1);
                     J.Annotation transactionalAnn = transactionalMethod.getLeadingAnnotations().getFirst();
                     assertThat(transactionalAnn.getSimpleName()).isEqualTo("Transactional");
-                    
+
                     // Verify the annotation type is resolved
                     JavaType.Class annotationType = (JavaType.Class) transactionalAnn.getType();
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.Transactional");
-                    
+
                     // Note: As you mentioned, JavaType model might not yet fully support
                     // parameter annotations and type annotations, so we can't verify those
                     // in detail. But the fact that compilation succeeds proves that
