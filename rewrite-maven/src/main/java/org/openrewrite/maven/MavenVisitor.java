@@ -331,21 +331,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
 
-    /**
-     * Updates the value of a given child tag within an XML tag, if the new value differs from the current one.
-     * <p>
-     * If the current value of the tag is a property (e.g. {@code ${some.property}}), and the property is defined
-     * in the same POM, the method updates the property instead of directly modifying the tag value.
-     * This method does not update properties defined in a parent POM.
-     *
-     * @param tag          The XML tag that contains the child tag.
-     * @param childTagName The name of the child tag whose value should be changed.
-     * @param newValue     The new value to assign to the child tag. If {@code null} or equal to the current value,
-     *                     no change is made.
-     * @param p            The visitor context.
-     * @return The potentially updated tag.
-     */
     protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
+        return changeChildTagValue(tag, childTagName, newValue, false, p);
+    }
+
+    protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, @Nullable Boolean addPropertyIfMissing, P p) {
         Optional<Xml.Tag> childTag = tag.getChild(childTagName);
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
@@ -353,7 +343,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 if (isProperty(oldValue)) {
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
-                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, false, false).getVisitor());
+                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);

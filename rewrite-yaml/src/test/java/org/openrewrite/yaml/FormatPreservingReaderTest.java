@@ -17,15 +17,13 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
 class FormatPreservingReaderTest {
 
     @Test
-    void readWithOffset() throws IOException {
+    void readWithOffset() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 3, 5);
@@ -34,7 +32,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void allInCurrentBuffer() throws IOException {
+    void allInCurrentBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 10);
@@ -43,7 +41,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void stringAllInCurrentBuffer() throws IOException {
+    void stringAllInCurrentBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 10);
@@ -52,7 +50,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void stringAtEndOfCurrentBuffer() throws IOException {
+    void stringAtEndOfCurrentBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 10);
@@ -61,7 +59,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void allInPreviousBuffer() throws IOException {
+    void allInPreviousBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 5);
@@ -71,7 +69,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void stringAllInPreviousBuffer() throws IOException {
+    void stringAllInPreviousBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 5);
@@ -81,7 +79,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void splitBetweenPrevAndCurrentBuffer() throws IOException {
+    void splitBetweenPrevAndCurrentBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 1);
@@ -91,7 +89,7 @@ class FormatPreservingReaderTest {
     }
 
     @Test
-    void stringSplitBetweenPrevAndCurrentBuffer() throws IOException {
+    void stringSplitBetweenPrevAndCurrentBuffer() throws Exception {
         try (FormatPreservingReader formatPreservingReader = new FormatPreservingReader("0123456789")) {
             char[] charArray = new char[10];
             formatPreservingReader.read(charArray, 0, 1);
