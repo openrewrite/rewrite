@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -76,9 +77,9 @@ public class RemoveDependency extends Recipe {
     private class RemoveDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(groupId, artifactId)) {
+            if (isRequestedDependencyTag(groupId, artifactId)) {
                 Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                ResolvedDependency dependency = findDependency(tag, checkScope);
+                Dependency dependency = findRequestedDependency(tag, checkScope);
                 if (dependency != null) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();

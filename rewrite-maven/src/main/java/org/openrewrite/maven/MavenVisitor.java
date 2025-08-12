@@ -28,7 +28,9 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -144,6 +146,54 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         String reqGroup = req.getGroupId();
                         if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
                             req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                            scope == tagScope) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Is a tag a dependency that matches the group and artifact?
+     *
+     * @param groupId    The group ID glob expression to compare the tag against.
+     * @param artifactId The artifact ID glob expression to compare the tag against.
+     * @return true if the tag matches.
+     */
+    public boolean isRequestedDependencyTag(String groupId, String artifactId) {
+        if (!isDependencyTag()) {
+            if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+            }
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        Map<Scope, List<Dependency>> dependencies = getResolutionResult().getPom().getRequestedDependencies().stream().collect(Collectors.groupingBy(dep -> Scope.fromName(dep.getScope())));
+        for (Scope scope : Scope.values()) {
+            if (dependencies.containsKey(scope)) {
+                for (Dependency dep : dependencies.get(scope)) {
+                    if (matchesGlob(dep.getGroupId(), groupId) && matchesGlob(dep.getArtifactId(), artifactId)) {
+                        String scopeName = tag.getChildValue("scope").orElse(null);
+                        Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
+                        if (tagScope == null) {
+                            tagScope = getResolutionResult().getPom().getManagedScope(
+                                    groupId,
+                                    artifactId,
+                                    tag.getChildValue("type").orElse(null),
+                                    tag.getChildValue("classifier").orElse(null)
+                            );
+                            if (tagScope == null) {
+                                tagScope = Scope.Compile;
+                            }
+                        }
+                        String reqGroup = dep.getGroupId();
+                        if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                            dep.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
                             scope == tagScope) {
                             return true;
                         }
@@ -382,6 +432,24 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         for (Map.Entry<Scope, List<ResolvedDependency>> scope : getResolutionResult().getDependencies().entrySet()) {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
+                    if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
+                        tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                        return d;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public @Nullable Dependency findRequestedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
+        Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+        if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
+            return null;
+        }
+        for (Map.Entry<Scope, List<Dependency>> scope : getResolutionResult().getPom().getRequestedDependencies().stream().collect(Collectors.groupingBy(dep -> Scope.fromName(dep.getScope()))).entrySet()) {
+            if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
+                for (Dependency d : scope.getValue()) {
                     if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
                         tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
                         return d;
