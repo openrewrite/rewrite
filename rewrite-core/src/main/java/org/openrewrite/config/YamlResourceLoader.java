@@ -41,8 +41,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 import static org.openrewrite.Tree.randomId;
@@ -243,7 +242,7 @@ public class YamlResourceLoader implements ResourceLoader {
         @Language("markdown")
         String description = (String) yaml.get("description");
 
-        Set<String> tags = Collections.emptySet();
+        Set<String> tags = emptySet();
         List<String> rawTags = (List<String>) yaml.get("tags");
         if (rawTags != null) {
             tags = new HashSet<>(rawTags);
@@ -273,7 +272,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
         } else {
-            maintainers = Collections.emptyList();
+            maintainers = emptyList();
         }
 
         DeclarativeRecipe recipe = new DeclarativeRecipe(
@@ -437,7 +436,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         displayName = name;
                     }
                     String description = (String) s.get("description");
-                    Set<String> tags = Collections.emptySet();
+                    Set<String> tags = emptySet();
                     List<String> rawTags = (List<String>) s.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
@@ -519,7 +518,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     @Language("markdown")
                     String description = (String) c.get("description");
 
-                    Set<String> tags = Collections.emptySet();
+                    Set<String> tags = emptySet();
                     @SuppressWarnings("unchecked")
                     List<String> rawTags = (List<String>) c.get("tags");
                     if (rawTags != null) {
@@ -595,7 +594,7 @@ public class YamlResourceLoader implements ResourceLoader {
         if (contributors == null) {
             Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Attribution);
             if (rawAttribution.isEmpty()) {
-                contributors = Collections.emptyMap();
+                contributors = emptyMap();
             } else {
                 Map<String, List<Contributor>> result = new HashMap<>(rawAttribution.size());
                 for (Map<String, Object> attribution : rawAttribution) {

@@ -46,7 +46,7 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
             return space.withLastWhitespace("\n");
         }
 
-        if (loc == Space.Location.BLOCK_OPEN && !space.getWhitespace().equals(" ")) {
+        if (loc == Space.Location.BLOCK_OPEN && !" ".equals(space.getWhitespace())) {
             return space.withWhitespace(" ");
         }
 

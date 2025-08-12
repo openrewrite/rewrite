@@ -37,13 +37,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toSet;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
@@ -170,7 +170,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             Set<Pattern> artifactNamePatterns = artifactNames.stream()
                     .map(name -> Pattern.compile(name + ".*"))
-                    .collect(Collectors.toSet());
+                    .collect(toSet());
 
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
@@ -546,7 +546,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                        @Nullable String signature,
                                        @Nullable List<String> parameterNames,
                                        String @Nullable [] exceptions) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !"<clinit>".equals(name)) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,

@@ -55,7 +55,7 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
                   void a() {
                   }
-                            
+
                   void b() {
                   }
               }
@@ -87,7 +87,7 @@ class BlankLinesTest implements RewriteTest {
             """
               public class A {
                   private Long id; // this comment will move to wrong place
-                            
+
                   public Long id() {
                       return id;
                   }
@@ -120,30 +120,30 @@ class BlankLinesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
-                            
+
+
               public class Test {
-                            
-                            
+
+
                   private int field1;
                   private int field2;
-                            
+
                   {
                       field1 = 2;
                   }
-                            
+
                   public void test1() {
                       new Runnable() {
                           public void run() {
                           }
                       };
                   }
-                            
+
                   public class InnerClass {
                   }
-              
+
                   public enum InnerEnum {
-              
+
                       FIRST,
                       SECOND
                   }
@@ -151,25 +151,25 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                            
+
               public class Test {
                   private int field1;
                   private int field2;
-                            
+
                   {
                       field1 = 2;
                   }
-                            
+
                   public void test1() {
                       new Runnable() {
                           public void run() {
                           }
                       };
                   }
-                            
+
                   public class InnerClass {
                   }
-              
+
                   public enum InnerEnum {
                       FIRST,
                       SECOND
@@ -188,10 +188,10 @@ class BlankLinesTest implements RewriteTest {
             """
               public class Test {
                   private int field1;
-                            
+
                   {
-              
-              
+
+
                       field1 = 2;
                   }
               }
@@ -199,7 +199,7 @@ class BlankLinesTest implements RewriteTest {
             """
               public class Test {
                   private int field1;
-                            
+
                   {
                       field1 = 2;
                   }
@@ -217,28 +217,28 @@ class BlankLinesTest implements RewriteTest {
             """
               public class Test {
                   private int field1;
-                            
+
                   {
                       field1 = 2;
-              
-              
+
+
                   }
-              
+
                   enum Test {
                       FIRST,
                       SECOND
-              
+
                   }
               }
               """,
             """
               public class Test {
                   private int field1;
-                            
+
                   {
                       field1 = 2;
                   }
-              
+
                   enum Test {
                       FIRST,
                       SECOND
@@ -258,9 +258,9 @@ class BlankLinesTest implements RewriteTest {
               /*
                * This is a sample file.
                */
-              
+
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """,
@@ -269,7 +269,7 @@ class BlankLinesTest implements RewriteTest {
                * This is a sample file.
                */
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """
@@ -289,7 +289,7 @@ class BlankLinesTest implements RewriteTest {
                * This is a sample file.
                */
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """,
@@ -297,9 +297,9 @@ class BlankLinesTest implements RewriteTest {
               /*
                * This is a sample file.
                */
-              
+
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """
@@ -313,15 +313,15 @@ class BlankLinesTest implements RewriteTest {
           blankLines(style -> style.withMinimum(style.getMinimum().withBeforePackage(1))),
           java(
             """
-              
+
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """,
             """
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """,
@@ -340,15 +340,15 @@ class BlankLinesTest implements RewriteTest {
             """
               /* Comment */
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """,
             """
               /* Comment */
-              
+
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """
@@ -365,15 +365,15 @@ class BlankLinesTest implements RewriteTest {
             """
               package com.intellij.samples;
               import java.util.Vector;
-              
+
               public class Test {
               }
               """,
             """
               package com.intellij.samples;
-              
+
               import java.util.Vector;
-              
+
               public class Test {
               }
               """
@@ -388,15 +388,15 @@ class BlankLinesTest implements RewriteTest {
           blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
           java(
             """
-              
+
               import java.util.Vector;
-              
+
               public class Test {
               }
               """,
             """
               import java.util.Vector;
-              
+
               public class Test {
               }
               """,
@@ -416,7 +416,7 @@ class BlankLinesTest implements RewriteTest {
                * This is a sample file.
                */
               import java.util.Vector;
-              
+
               public class Test {
               }
               """,
@@ -424,9 +424,9 @@ class BlankLinesTest implements RewriteTest {
               /*
                * This is a sample file.
                */
-              
+
               import java.util.Vector;
-              
+
               public class Test {
               }
               """
@@ -444,15 +444,15 @@ class BlankLinesTest implements RewriteTest {
             """
               package com.intellij.samples;
               import java.util.Vector;
-              
+
               public class Test {
               }
               """,
             """
               package com.intellij.samples;
-              
+
               import java.util.Vector;
-              
+
               public class Test {
               }
               """
@@ -472,7 +472,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """
@@ -492,7 +492,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               import java.util.Vector;
-              
+
               public class Test {
               }
               """
@@ -521,10 +521,10 @@ class BlankLinesTest implements RewriteTest {
           java(
             """
               import java.util.Vector;
-              
+
               public class Test {
               }
-              
+
               class Test2 {
                   class InnerClass0 {
                   }
@@ -534,16 +534,16 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               import java.util.Vector;
-              
+
               public class Test {
               }
-              
-              
+
+
               class Test2 {
                   class InnerClass0 {
                   }
-              
-              
+
+
                   class InnerClass1 {
                   }
               }
@@ -563,7 +563,7 @@ class BlankLinesTest implements RewriteTest {
                   FIRST,
                   SECOND
               }
-              
+
               class OuterClass {
                   enum InnerEnum0 {
                       FIRST,
@@ -580,15 +580,15 @@ class BlankLinesTest implements RewriteTest {
                   FIRST,
                   SECOND
               }
-              
-              
+
+
               class OuterClass {
                   enum InnerEnum0 {
                       FIRST,
                       SECOND
                   }
-              
-              
+
+
                   enum InnerEnum1 {
                       FIRST,
                       SECOND
@@ -611,7 +611,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               public class Test {
-              
+
                   private int field1;
               }
               """
@@ -630,7 +630,7 @@ class BlankLinesTest implements RewriteTest {
                   class InnerClass0 {
                       private int unused = 0;
                   }
-              
+
                   class InnerClass1 {
                       private int unused = 0;
                   }
@@ -638,14 +638,14 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               class OuterClass {
-              
+
                   class InnerClass0 {
-              
+
                       private int unused = 0;
                   }
-              
+
                   class InnerClass1 {
-              
+
                       private int unused = 0;
                   }
               }
@@ -670,7 +670,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               class OuterClass {
-              
+
                   enum InnerEnum0 {
                       FIRST,
                       SECOND
@@ -692,7 +692,7 @@ class BlankLinesTest implements RewriteTest {
               """,
             """
               public class Test {
-              
+
               }
               """
           )
@@ -718,7 +718,7 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
                   public void test1() {
                       new Runnable() {
-              
+
                           public void run() {
                           }
                       };
@@ -743,7 +743,7 @@ class BlankLinesTest implements RewriteTest {
             """
               interface TestInterface {
                   int MAX = 10;
-              
+
                   int MIN = 1;
               }
               """
@@ -765,7 +765,7 @@ class BlankLinesTest implements RewriteTest {
             """
               class Test {
                   int max = 10;
-              
+
                   int min = 1;
               }
               """
@@ -787,7 +787,7 @@ class BlankLinesTest implements RewriteTest {
             """
               interface TestInterface {
                   void method1();
-              
+
                   void method2();
               }
               """
@@ -809,7 +809,7 @@ class BlankLinesTest implements RewriteTest {
             """
               class Test {
                   void method1() {}
-              
+
                   void method2() {}
               }
               """
@@ -825,7 +825,7 @@ class BlankLinesTest implements RewriteTest {
             """
               class Test {
                   void method1() {}
-              
+
                   void method2() {
                       int n = 0;
                   }
@@ -834,11 +834,11 @@ class BlankLinesTest implements RewriteTest {
             """
               class Test {
                   void method1() {
-              
+
                   }
-              
+
                   void method2() {
-              
+
                       int n = 0;
                   }
               }
@@ -864,7 +864,7 @@ class BlankLinesTest implements RewriteTest {
               public enum Enum {
                   A, B;
                   {
-              
+
                   }
                   private int field;
               }
@@ -872,21 +872,21 @@ class BlankLinesTest implements RewriteTest {
             """
               public class Test {
                   private int field1;
-              
+
                   {
                       field1 = 2;
                   }
-              
+
                   private int field2;
               }
-                            
+
               public enum Enum {
                   A, B;
-              
+
                   {
-              
+
                   }
-              
+
                   private int field;
               }
               """
@@ -901,7 +901,7 @@ class BlankLinesTest implements RewriteTest {
           java(
             """
               package com.intellij.samples;
-              
+
               public class Test {
               }
               """
@@ -941,10 +941,10 @@ class BlankLinesTest implements RewriteTest {
                           }
                           void c() {
                           }
-                            
+
                           public void run() {
                           }
-            
+
                           public void d() {
                           }
                       };
@@ -959,18 +959,18 @@ class BlankLinesTest implements RewriteTest {
                       new Runnable() {
                           void b() {
                           }
-                              
+
                           void c() {
                           }
-                              
+
                           public void run() {
                           }
-            
+
                           public void d() {
                           }
                       };
                   }
-    
+
                   void e() {
                   }
               }

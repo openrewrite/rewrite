@@ -216,7 +216,7 @@ public class AddMethodParameter extends Recipe {
                         type
                 );
             }
-            if (typeName.equals("?")) {
+            if ("?".equals(typeName)) {
                 return new J.Wildcard(
                         randomId(),
                         Space.EMPTY,

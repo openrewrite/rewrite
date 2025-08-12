@@ -127,7 +127,7 @@ class EnumTest implements RewriteTest {
               public enum A {
                   ONE(1),
                   TWO(2);
-              
+
                   A(int n) {}
               }
               """
@@ -205,13 +205,13 @@ class EnumTest implements RewriteTest {
     void enumConstantTypeIsFlagged() {
         rewriteRun(
           java(
-            """    
+            """
               enum Color {
                   RED,
                   BLUE;
                   public static final Color GREEN = RED;
               }
-              
+
               class Test {
                   Color run() {
                       return null;
@@ -235,7 +235,7 @@ class EnumTest implements RewriteTest {
     void enumClassHasJavaTypeClassEnumFlagEnabled() {
         rewriteRun(
           java(
-            """    
+            """
               enum Color {}
               """,
             spec -> spec.afterRecipe(cu -> {

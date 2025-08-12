@@ -29,9 +29,10 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -102,7 +103,7 @@ public class AddProperty extends Recipe {
 
                 List<Properties.Content> newContents;
                 if(StringUtils.isBlank(comment)) {
-                    newContents = Collections.singletonList(entry);
+                    newContents = singletonList(entry);
                 } else {
                     newContents = Arrays.asList(
                             new Properties.Comment(
@@ -145,7 +146,7 @@ public class AddProperty extends Recipe {
                                         .filter(Properties.Entry.class::isInstance)
                                         .map(Properties.Entry.class::cast))
                         .sorted(Comparator.comparing(Properties.Entry::getKey))
-                        .collect(Collectors.toList());
+                        .collect(toList());
         int indexInSorted = sorted.indexOf(entry);
         if (indexInSorted == 0) {
             return 0;

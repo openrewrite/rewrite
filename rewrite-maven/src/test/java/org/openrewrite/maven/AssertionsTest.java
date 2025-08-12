@@ -22,14 +22,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.*;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -37,6 +38,12 @@ import static org.openrewrite.xml.Assertions.xml;
 
 @Execution(ExecutionMode.SAME_THREAD)
 class AssertionsTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new MavenOnlyRecipe());
+    }
+
     private static final AtomicInteger xmlCount = new AtomicInteger();
 
     @BeforeEach
@@ -47,7 +54,6 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsFirst() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
           pomXml(
             """
               <project>
@@ -76,7 +82,6 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsLast() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
           xml("""
               <?xml version="1.0" encoding="UTF-8" ?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -117,7 +122,7 @@ class AssertionsTest implements RewriteTest {
 
         @Override
         public List<Recipe> getRecipeList() {
-            return Collections.singletonList(new NonMavenRecipe());
+            return singletonList(new NonMavenRecipe());
         }
 
         @Override

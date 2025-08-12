@@ -75,7 +75,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import java.io.File;
-              
+
               @SuppressWarnings(File.pathSeparator)
               class Test {
                   @SuppressWarnings(value = File.pathSeparator)
@@ -86,7 +86,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import com.constant.B;
-              
+
               @SuppressWarnings(B.PATH_SEPARATOR)
               class Test {
                   @SuppressWarnings(value = B.PATH_SEPARATOR)
@@ -108,7 +108,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import java.io.File;
-              
+
               class Test {
                   @SuppressWarnings({File.pathSeparator})
                   private String bar;
@@ -116,7 +116,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import java.io.File;
-              
+
               class Test {
                   @SuppressWarnings({File.separator})
                   private String bar;
@@ -168,7 +168,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import java.io.File;
-              
+
               class Test {
                   void foo(@SuppressWarnings(value = File.pathSeparator) String param) {
                       System.out.println(param);
@@ -177,7 +177,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import java.io.File;
-              
+
               class Test {
                   void foo(@SuppressWarnings(value = File.separator) String param) {
                       System.out.println(param);
@@ -246,7 +246,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import foo.Bar;
-              
+
               import static foo.Bar.QUX2;
 
               class Test {
@@ -260,7 +260,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import foo.Bar;
-              
+
               import static foo.Bar.QUX2;
 
               class Test {

@@ -130,7 +130,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
          * The value is either a String representing the resolved version
          * or a MavenDownloadingException representing an error during resolution.
          */
-        Map<GroupArtifact, Object> gaToNewVersion = new HashMap<>();
+        Map<GroupArtifact, @Nullable Object> gaToNewVersion = new HashMap<>();
 
         Map<String, Map<GroupArtifact, Set<String>>> configurationPerGAPerModule = new HashMap<>();
     }
@@ -172,8 +172,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                         gatherVariables(m);
                     } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                            ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                                    "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                         gatherVariables((J.MethodInvocation) depArgs.get(0));
                     }
 
@@ -248,7 +248,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     .computeIfAbsent(ga, k -> new HashSet<>())
                                     .add(m.getSimpleName());
                             // It is fine for this value to be null, record it in the map to avoid future lookups
-                            //noinspection DataFlowIssue
                             acc.gaToNewVersion.put(ga, resolvedVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
@@ -260,7 +259,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         String declaredVersion = null;
 
                         for (Expression e : m.getArguments()) {
-                            if (!(e instanceof G.MapEntry)) {
+                            if (!(e instanceof J.Assignment)) {
                                 continue;
                             }
                             J.Assignment assignment = (J.Assignment) e;
@@ -321,7 +320,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     .computeIfAbsent(ga, k -> new HashSet<>())
                                     .add(m.getSimpleName());
                             // It is fine for this value to be null, record it in the map to avoid future lookups
-                            //noinspection DataFlowIssue
                             acc.gaToNewVersion.put(ga, resolvedVersion);
                         } catch (MavenDownloadingException e) {
                             acc.gaToNewVersion.put(ga, e);
@@ -390,13 +388,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             try {
                                 String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                                         .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                if (resolvedVersion != null) {
-                                    acc.versionPropNameToGA
-                                            .computeIfAbsent(versionVariableName, k -> new HashMap<>())
-                                            .computeIfAbsent(ga, k -> new HashSet<>())
-                                            .add(m.getSimpleName());
-                                    acc.gaToNewVersion.put(ga, resolvedVersion);
-                                }
+                                acc.versionPropNameToGA
+                                        .computeIfAbsent(versionVariableName, k -> new HashMap<>())
+                                        .computeIfAbsent(ga, k -> new HashSet<>())
+                                        .add(m.getSimpleName());
+                                // It is fine for this value to be null, record it in the map to avoid future lookups
+                                acc.gaToNewVersion.put(ga, resolvedVersion);
                             } catch (MavenDownloadingException e) {
                                 acc.gaToNewVersion.put(ga, e);
                             }
@@ -497,7 +494,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (tree != t && projectMarker.isPresent()) {
                         GradleProject gradleProject = projectMarker.get();
                         Map<GroupArtifact, Set<String>> configurationsPerGa = acc.getConfigurationPerGAPerModule().getOrDefault(getGradleProjectKey(gradleProject), emptyMap());
-                        if (acc.getGaToNewVersion().isEmpty()) {
+                        if (acc.gaToNewVersion.isEmpty()) {
                             DependencyMatcher matcher = new DependencyMatcher(groupId, artifactId, null);
                             DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                             for (GroupArtifact groupArtifact : configurationsPerGa.keySet()) {
@@ -513,7 +510,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             }
 
                         } else {
-                            for (Map.Entry<GroupArtifact, Object> newVersion : acc.getGaToNewVersion().entrySet()) {
+                            for (Map.Entry<GroupArtifact, @Nullable Object> newVersion : acc.gaToNewVersion.entrySet()) {
                                 if (newVersion.getValue() instanceof String) {
                                     GroupArtifactVersion gav = new GroupArtifactVersion(newVersion.getKey().getGroupId(), newVersion.getKey().getArtifactId(), (String) newVersion.getValue());
                                     gradleProject = replaceVersion(gradleProject, ctx, gav, configurationsPerGa.getOrDefault(gav.asGroupArtifact(), emptySet()));
@@ -613,8 +610,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                           ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
             } else if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
@@ -646,7 +643,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
                 }.visitNonNull(m, ctx, getCursor().getParentTreeCursor());
-            } else if (m.getSimpleName().equals("ext")) {
+            } else if ("ext".equals(m.getSimpleName())) {
                 return m.withArguments(ListUtils.map(m.getArguments(), arg -> (Expression) new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
@@ -1233,7 +1230,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep) {
-        return withTransitives(dep, Collections.singleton(dep.getGav().asGroupArtifact()));
+        return withTransitives(dep, singleton(dep.getGav().asGroupArtifact()));
     }
 
     private static Set<GroupArtifact> withTransitives(ResolvedDependency dep, Set<GroupArtifact> gas) {

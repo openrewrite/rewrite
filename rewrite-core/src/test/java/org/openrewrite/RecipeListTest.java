@@ -26,9 +26,9 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -47,7 +47,7 @@ class RecipeListTest implements RewriteTest {
                 Optional<Stream<String>> recipeNames = txt.getMarkers().findFirst(RecipesThatMadeChanges.class)
                   .map(recipes -> recipes.getRecipes().stream()
                     .map(stack -> stack.stream().map(Recipe::getDescriptor).map(RecipeDescriptor::getName)
-                      .collect(Collectors.joining("->")))
+                      .collect(joining("->")))
                   );
 
                 assertThat(recipeNames).isPresent();

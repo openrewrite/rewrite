@@ -41,11 +41,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
@@ -55,11 +55,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
@@ -77,11 +77,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation(group: "org.apache.commons", name: "commons-lang3", version: "3.14.0")
@@ -91,11 +91,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation(group: "org.apache.commons", name: "commons-lang3")
@@ -113,11 +113,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation([group: "org.apache.commons", name: "commons-lang3", version: "3.14.0"])
@@ -127,11 +127,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation([group: "org.apache.commons", name: "commons-lang3"])
@@ -149,11 +149,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
@@ -163,11 +163,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(enforcedPlatform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
@@ -185,11 +185,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(enforcedPlatform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
@@ -199,11 +199,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(enforcedPlatform(group: "org.springframework.boot", name: "spring-boot-dependencies", version: "3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
@@ -221,7 +221,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
@@ -231,7 +231,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
@@ -244,7 +244,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id("java")
               }
-              
+
               apply from: 'dependencies.gradle'
               """
           )
@@ -319,11 +319,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -335,11 +335,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -358,11 +358,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -374,11 +374,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // BOM `spring-boot-dependencies:3.3.3` describes `spring-webmvc:6.1.12`
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -397,11 +397,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // Without explicit spring-webmvc:6.2.8 gradle would resolve 6.2.7
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -413,11 +413,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // Without explicit spring-webmvc:6.2.8 gradle would resolve 6.2.7
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
@@ -438,11 +438,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                    implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
@@ -460,11 +460,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                    implementation(platform("org.springframework.cloud:spring-cloud-dependencies:2024.0.0"))
@@ -488,11 +488,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3:3.14.0")
@@ -502,11 +502,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java-library"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
                   implementation("org.apache.commons:commons-lang3")
@@ -524,14 +524,14 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
-              
+
                   testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
               }
               """
@@ -547,11 +547,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation('org.flywaydb:flyway-sqlserver:10.10.0')
                   runtimeOnly('org.flywaydb:flyway-core:10.10.0')
@@ -561,11 +561,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation('org.flywaydb:flyway-sqlserver:10.10.0')
               }
@@ -582,11 +582,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation('org.flywaydb:flyway-sqlserver:10.10.0')
                   runtimeOnly('org.flywaydb:flyway-core:10.11.0')
@@ -604,11 +604,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation('org.flywaydb:flyway-sqlserver')
                   runtimeOnly('org.flywaydb:flyway-core')
@@ -626,11 +626,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   constraints {
                       implementation("org.springframework:spring-core:6.2.1") {
@@ -645,11 +645,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(platform("org.springframework.boot:spring-boot-dependencies:3.4.2"))
                   implementation("org.springframework.boot:spring-boot")
@@ -667,11 +667,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   constraints {
                       testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0") {
@@ -686,11 +686,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation(platform("org.junit:junit-bom:5.10.1"))
                   testImplementation("org.junit.jupiter:junit-jupiter")
@@ -708,11 +708,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
                   implementation("org.openrewrite:rewrite-core:8.55.0")
@@ -723,11 +723,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("org.openrewrite:rewrite-core:8.56.0")
               }
@@ -745,11 +745,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // spring-cloud-starter-gateway-server-webflux:4.30 depends on reactor-netty-http:1.2.6
                   implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux:4.3.0")
@@ -760,11 +760,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   // spring-cloud-starter-gateway-server-webflux:4.30 depends on reactor-netty-http:1.2.6
                   implementation("org.springframework.cloud:spring-cloud-starter-gateway-server-webflux:4.3.0")

@@ -41,6 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.newSetFromMap;
 import static java.util.Collections.unmodifiableList;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
@@ -72,7 +73,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
     @Getter
-    Set<Recipe> madeChangesInThisCycle = Collections.newSetFromMap(new IdentityHashMap<>());
+    Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();

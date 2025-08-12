@@ -1085,7 +1085,7 @@ class JavaTemplateMatchTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test(String::valueOf);
@@ -1099,7 +1099,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-              
+
               class Foo {
                   void test() {
                       test((e) -> e.toString());

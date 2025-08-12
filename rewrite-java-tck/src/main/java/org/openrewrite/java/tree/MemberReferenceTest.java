@@ -45,7 +45,7 @@ class MemberReferenceTest implements RewriteTest {
                   CompletableFuture.supplyAsync(
                       () -> {
                         return Stream.empty()
-                            .map(UnknownClass::valueOf) 
+                            .map(UnknownClass::valueOf)
                             .collect(Collectors.toList());
                       });
                 }
@@ -67,9 +67,9 @@ class MemberReferenceTest implements RewriteTest {
               import java.util.function.Function;
               import java.util.stream.Collector;
               import java.util.stream.Collectors;
-                            
+
               public class Sample {
-                            
+
                   private void foo(List<Criteria> request) {
                       Set<Id<Criteria>> allCriteria = request.stream()
                               .map(Id::<Criteria>of)
@@ -77,12 +77,12 @@ class MemberReferenceTest implements RewriteTest {
                       allCriteria = request.stream()
                               .map(Id/**yo**/::/**hola**/<Criteria>/**hello**/of)
                               .collect(Collectors.toSet());
-                              
+
                       List<String> result = allCriteria.stream()
                               .map(Sample::idToString)
                               .collect(Collectors.toList());
                   }
-                            
+
                   public static <T, K, V> Collector<T, ?, Map<K, V>> toImmutableMap(
                           Function<? super T, ? extends K> keyFunction,
                           Function<? super T, ? extends V> valueFunction) {
@@ -96,7 +96,7 @@ class MemberReferenceTest implements RewriteTest {
                           return null;
                       }
                   }
-                            
+
                   private class Criteria {
                       Long getId() {
                           return null;
@@ -138,7 +138,7 @@ class MemberReferenceTest implements RewriteTest {
               import java.util.HashSet;
               import java.util.Set;
               import java.util.stream.Stream;
-              
+
               class Test {
                   Stream<Integer> n = Stream.of(1, 2);
                   Set<Integer> n2 = n.collect(HashSet < Integer > :: new, HashSet :: add);

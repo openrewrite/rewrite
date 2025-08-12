@@ -111,7 +111,7 @@ class SpacesTest implements RewriteTest {
             rewriteRun(
               kotlin(
                 """
-                  fun method 
+                  fun method
                   () {
                   }
                   """
@@ -2609,7 +2609,7 @@ class SpacesTest implements RewriteTest {
                   kotlin(
                     """
                       import java.util.ArrayList
-                       
+
                       class Test< T, U > {
                           fun < T2 : T > foo(): T2? {
                               val myList: List<T2> = ArrayList()

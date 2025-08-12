@@ -44,6 +44,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
@@ -106,7 +107,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parseWithEncryption()  throws IOException{
+    void parseWithEncryption()  throws Exception{
         createSettingsSecurityFile();
 
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -127,14 +128,14 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parsePlainTextWithEncryption()  throws IOException{
+    void parsePlainTextWithEncryption()  throws Exception{
         createSettingsSecurityFile();
         String plainTextPassword = "password";
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -155,8 +156,8 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
           .matches(repo -> repo.getPassword().equals(plainTextPassword));
     }
 
@@ -379,11 +380,11 @@ class MavenSettingsTest {
           .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
           .hasSize(2)
           .haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://internalartifactrepository.yourorg.com"),
+            new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
               "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"
             )
           ).haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://externalrepository.com") &&
+            new Condition<>(repo -> "https://externalrepository.com".equals(repo.getUri()) &&
                                     "should-not-be-mirrored".equals(repo.getId()),
               "Repository should-not-be-mirrored should have had its URL left unchanged"
             )
@@ -412,14 +413,14 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("my_password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "my_password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsWithEncryption() throws IOException {
+    void serverCredentialsWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -440,14 +441,14 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsPlainTextWithEncryption() throws IOException {
+    void serverCredentialsPlainTextWithEncryption() throws Exception {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
 
@@ -469,8 +470,8 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
           .matches(repo -> repo.getPassword().equals(plainTextPassword));
     }
 
@@ -499,7 +500,7 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
+          .matches(repo -> "server001".equals(repo.getId()))
           .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
 
@@ -956,7 +957,7 @@ class MavenSettingsTest {
     }
 
     @Test
-    void canDeserializeSettingsCorrectly() throws IOException {
+    void canDeserializeSettingsCorrectly() throws Exception {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
             <settings>
               <servers>
@@ -977,9 +978,9 @@ class MavenSettingsTest {
             """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(singletonList(httpHeader), 10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
-        MavenSettings.Servers servers = new MavenSettings.Servers(java.util.Collections.singletonList(server));
+        MavenSettings.Servers servers = new MavenSettings.Servers(singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
