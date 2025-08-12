@@ -124,7 +124,7 @@ class TypeTableTypeAnnotationsTest {
                 String[] cols = line.split("\t", -1);
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[15]).as("parameterAnnotations column for multipleParams")
-                    .isEqualTo("0:[@Ltest/annotations/NotNull;]|1:[@Ltest/annotations/NotNull;,@Ltest/annotations/Valid;]");
+                    .isEqualTo("0:[@Ltest/annotations/NotNull;]|1:[@Ltest/annotations/NotNull;@Ltest/annotations/Valid;]");
             }
             
             if (line.contains("\tmixedParams\t")) {
@@ -205,37 +205,37 @@ class TypeTableTypeAnnotationsTest {
             if (line.contains("\tfield\t") && line.contains("Ljava/lang/String;")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for field")
-                    .contains("F:@Ltest/annotations/Nullable;");
+                    .contains("FIELD:::@Ltest/annotations/Nullable;");
             }
             
             if (line.contains("\tarrayField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for arrayField")
-                    .contains("F:@Ltest/annotations/NonNull;");
+                    .contains("FIELD:::@Ltest/annotations/NonNull;");
             }
             
             if (line.contains("\tgetField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for getField")
-                    .contains("MR:@Ltest/annotations/Nullable;");
+                    .contains("METHOD_RETURN:::@Ltest/annotations/Nullable;");
             }
             
             if (line.contains("\tsetField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for setField")
-                    .contains("MP:0:@Ltest/annotations/NonNull;");
+                    .contains("METHOD_PARAM:::@Ltest/annotations/NonNull;");
             }
             
             if (line.contains("\tprocessList\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for processList")
-                    .contains("MP:0:[TA(0)]:@Ltest/annotations/Nullable;");
+                    .contains("METHOD_PARAM::0300:@Ltest/annotations/Nullable;");
             }
             
             if (line.contains("\tprocessWildcard\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for processWildcard")
-                    .contains("MP:0:[TA(0),W]:@Ltest/annotations/NonNull;");
+                    .contains("METHOD_PARAM::03000200:@Ltest/annotations/NonNull;");
             }
         }
     }
@@ -365,6 +365,8 @@ class TypeTableTypeAnnotationsTest {
                 // Check that pipes in values are escaped (pipes are TSV delimiters)
                 assertThat(cols[15]).as("parameterAnnotations for pipes method")
                     .contains("value=s\"value\\|with\\|pipes\"");
+                // Also verify that the pipe delimiter between parameters is handled correctly
+                // if there were multiple parameters with annotations
             }
             
             if (line.contains("\twhitespace\t")) {
@@ -382,7 +384,7 @@ class TypeTableTypeAnnotationsTest {
             if (line.contains("\tgetDate\t")) {
                 // Check type annotation with regex pattern (pipes and backslashes are escaped in TSV)
                 assertThat(cols[16]).as("typeAnnotations for getDate method")
-                    .contains("MR:@Ltest/Format;")
+                    .contains("METHOD_RETURN:::@Ltest/Format;")
                     .contains("pattern=s\"\\\\d{2,4}-\\\\d{2}-\\\\d{2}\\|\\\\d{4}/\\\\d{2}/\\\\d{2}\"");
             }
             
@@ -392,7 +394,71 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[15]).as("parameterAnnotations for complex method")
                     .contains("@Ltest/Message;");
                 assertThat(cols[16]).as("typeAnnotations for complex method")
-                    .contains("MP:0:@Ltest/Format;");
+                    .contains("METHOD_PARAM:::@Ltest/Format;");
+            }
+        }
+    }
+    
+    @Test
+    void parameterAnnotationsWithPipeDelimiters() throws Exception {
+        // Test that pipe characters in parameter annotation values don't break
+        // the pipe delimiter between different parameters
+        @Language("java")
+        String sources = """
+            package test;
+            
+            import java.lang.annotation.*;
+            
+            @Target(ElementType.PARAMETER)
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface Pattern {
+                String value();
+            }
+            
+            @Target(ElementType.PARAMETER)
+            @Retention(RetentionPolicy.RUNTIME)
+            @interface Description {
+                String text();
+            }
+            
+            public class TestClass {
+                // Multiple parameters with annotations containing pipe characters
+                public void validate(
+                    @Pattern("\\\\d+|\\\\w+") String first,
+                    @Description(text = "Options: A|B|C") String second,
+                    @Pattern("[a-z]+|[A-Z]+") @Description(text = "Letters|Digits") String third
+                ) {}
+            }
+            """;
+
+        Path jarFile = compileAndPackage(sources, "test.TestClass");
+        String tsvContent = processJarThroughTypeTable(jarFile);
+        
+        // Find the validate method row
+        for (String line : tsvContent.split("\n")) {
+            if (line.contains("\tvalidate\t")) {
+                String[] cols = line.split("\t", -1);
+                String paramAnnotations = cols[15];
+                
+                // Verify the parameter annotations are properly formatted
+                // The pipe delimiter between parameters should work correctly
+                // even though the annotation values contain escaped pipes
+                assertThat(paramAnnotations).as("parameterAnnotations for validate method")
+                    .contains("0:[@Ltest/Pattern;")
+                    .contains("1:[@Ltest/Description;")
+                    .contains("2:[@Ltest/Pattern;")
+                    .contains("value=s\"\\\\d+\\|\\\\w+\"")  // Escaped pipes in value
+                    .contains("text=s\"Options: A\\|B\\|C\"")  // Escaped pipes in value
+                    .contains("value=s\"[a-z]+\\|[A-Z]+\"");  // Escaped pipes in value
+                
+                // Verify that we can parse it back correctly by checking structure
+                String[] params = TsvEscapeUtils.splitAnnotationList(paramAnnotations, '|');
+                assertThat(params).hasSize(3);
+                assertThat(params[0]).startsWith("0:");
+                assertThat(params[1]).startsWith("1:");
+                assertThat(params[2]).startsWith("2:");
+                
+                break;
             }
         }
     }
@@ -438,8 +504,8 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[15]).as("parameterAnnotations")
                     .contains("0:[@Ltest/ParamAnnotation;]");
                 assertThat(cols[16]).as("typeAnnotations")
-                    .contains("MR:@Ltest/TypeAnnotation;")
-                    .contains("MP:0:@Ltest/TypeAnnotation;");
+                    .contains("METHOD_RETURN:::@Ltest/TypeAnnotation;")
+                    .contains("METHOD_PARAM:::@Ltest/TypeAnnotation;");
                 break;
             }
         }

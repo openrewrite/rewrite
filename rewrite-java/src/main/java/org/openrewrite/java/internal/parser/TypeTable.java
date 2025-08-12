@@ -224,7 +224,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
-                                        fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,  // elementAnnotations
+                                        fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string (may have | delimiters)
                                         fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null  // constantValue moved to column 17
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
@@ -243,8 +243,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[11].isEmpty() ? null : fields[11],
                                     fields[12].isEmpty() ? null : fields[12].split("\\|"),
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
-                                    fields.length > 14 && !fields[14].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[14], '|') : null,  // elementAnnotations
-                                    fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null  // constantValue moved to column 17
+                                    fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string
+                                    fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null,
+                                    fields.length > 16 && !fields[16].isEmpty() ? fields[16].split("\\|") : null,  // typeAnnotations - keep | delimiter between different type contexts
+                                    fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null
                             ));
                         }
                     }
@@ -288,9 +290,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                     // Apply annotations to the class
                     if (classDef.getAnnotations() != null) {
-                        for (String annotation : classDef.getAnnotations()) {
-                            AnnotationApplier.applyAnnotation(annotation, classWriter::visitAnnotation);
-                        }
+                        AnnotationApplier.applyAnnotations(classDef.getAnnotations(), classWriter::visitAnnotation);
                     }
 
                     for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
@@ -313,10 +313,39 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             member.getExceptions()
                                     );
 
-                            // Apply annotations to the method
+                            // Apply element annotations to the method
                             if (member.getAnnotations() != null) {
-                                for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(annotation, mv::visitAnnotation);
+                                AnnotationApplier.applyAnnotations(member.getAnnotations(), mv::visitAnnotation);
+                            }
+
+                            // Apply parameter annotations
+                            if (member.getParameterAnnotations() != null) {
+                                // Parse format: 0:[@NotNull@Valid]|1:[@Required]
+                                // Split on | to separate different parameters, but annotations within each parameter don't need delimiters
+                                String[] paramAnnotations = TsvEscapeUtils.splitAnnotationList(member.getParameterAnnotations(), '|');
+                                for (String paramAnnotation : paramAnnotations) {
+                                    int colonIdx = paramAnnotation.indexOf(':');
+                                    if (colonIdx > 0) {
+                                        int paramIndex = Integer.parseInt(paramAnnotation.substring(0, colonIdx));
+                                        String annotationsPart = paramAnnotation.substring(colonIdx + 1);
+                                        // Remove brackets: [@Ann1@Ann2] -> @Ann1@Ann2
+                                        if (annotationsPart.startsWith("[") && annotationsPart.endsWith("]")) {
+                                            annotationsPart = annotationsPart.substring(1, annotationsPart.length() - 1);
+                                        }
+                                        // Parse and apply the annotation sequence (no delimiters needed within)
+                                        AnnotationApplier.applyAnnotations(annotationsPart,
+                                            (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
+                                    }
+                                }
+                            }
+
+                            // Apply type annotations
+                            if (member.getTypeAnnotations() != null) {
+                                for (String typeAnnotation : member.getTypeAnnotations()) {
+                                    TypeAnnotationSupport.TypeAnnotationInfo info =
+                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                    AnnotationApplier.applyAnnotation(info.annotation, 
+                                        (descriptor, visible) -> mv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
                                 }
                             }
 
@@ -360,10 +389,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                                             constantValue
                                     );
 
-                            // Apply annotations to the field
+                            // Apply element annotations to the field
                             if (member.getAnnotations() != null) {
-                                for (String annotation : member.getAnnotations()) {
-                                    AnnotationApplier.applyAnnotation(annotation, fv::visitAnnotation);
+                                AnnotationApplier.applyAnnotations(member.getAnnotations(), fv::visitAnnotation);
+                            }
+
+                            // Apply type annotations for fields
+                            if (member.getTypeAnnotations() != null) {
+                                for (String typeAnnotation : member.getTypeAnnotations()) {
+                                    TypeAnnotationSupport.TypeAnnotationInfo info =
+                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                    AnnotationApplier.applyAnnotation(info.annotation, 
+                                        (descriptor, visible) -> fv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
                                 }
                             }
 
@@ -855,7 +892,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         String @Nullable [] superinterfaceSignatures;
 
-        String @Nullable [] annotations;
+        @Nullable
+        String annotations;  // Raw annotation string, no delimiters needed
 
         @Nullable
         String constantValue;
@@ -889,7 +927,13 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
-        String @Nullable [] annotations;
+        @Nullable
+        String annotations;  // Raw annotation string, no delimiters needed
+
+        @Nullable
+        String parameterAnnotations;
+
+        String @Nullable [] typeAnnotations;
 
         @Nullable
         String constantValue;
