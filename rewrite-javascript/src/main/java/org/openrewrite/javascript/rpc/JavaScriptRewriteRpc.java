@@ -41,7 +41,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -209,9 +212,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }, marketplace, timeout);
             } else {
                 // Use default installation directory if none provided (lazy-loaded)
-                Path effectiveInstallationDirectory = installationDirectory != null
-                        ? installationDirectory
-                        : getBundledInstallationDirectory();
+                Path effectiveInstallationDirectory = installationDirectory != null ?
+                        installationDirectory :
+                        getBundledInstallationDirectory();
 
                 List<String> command = new ArrayList<>(Arrays.asList(
                         nodePath.toString(),
@@ -232,7 +235,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                     @Override
                     public JsonRpc get() {
-                        process = new JavaScriptRewriteRpcProcess(trace, command.toArray(new String[0]));
+                        process = new JavaScriptRewriteRpcProcess(logFile, trace, command.toArray(new String[0]));
                         process.start();
                         return requireNonNull(process.rpcClient);
                     }
@@ -352,6 +355,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
     }
 
     private static class JavaScriptRewriteRpcProcess extends Thread {
+        private final @Nullable Path logFile;
         private final boolean trace;
         private final String[] command;
 
@@ -361,7 +365,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         @Getter
         private @Nullable JsonRpc rpcClient;
 
-        public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
+        public JavaScriptRewriteRpcProcess(@Nullable Path logFile, boolean trace, String... command) {
+            this.logFile = logFile;
             this.trace = trace;
             this.command = command;
             this.setDaemon(false);
@@ -371,6 +376,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         public void run() {
             try {
                 ProcessBuilder pb = new ProcessBuilder(command);
+                pb.redirectError(logFile != null ? ProcessBuilder.Redirect.appendTo(logFile.toFile()) :
+                        ProcessBuilder.Redirect.INHERIT);
                 process = pb.start();
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

@@ -66,8 +66,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    @Test
     void listsAndListsOfLists() {
         rewriteRun(
           yaml(
@@ -105,8 +105,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ValueSource(strings = {
       "b",
       " 🛠",
@@ -450,8 +450,8 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5553")
+    @Test
     void withAnchorSequenceOnRootLevel() {
         rewriteRun(
           yaml(

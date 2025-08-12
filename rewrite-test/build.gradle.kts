@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:5.+"))
+    api(platform("org.junit:junit-bom:5.13.3"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
@@ -17,4 +17,5 @@ dependencies {
 
     testImplementation(project(":rewrite-groovy"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+    testRuntimeOnly(project(":rewrite-java-21"))
 }

@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Instructions
+
+When you need to know something about OpenRewrite, refer to the rewrite-docs folder.
+
 ## Project Overview
 
 OpenRewrite is an automated refactoring ecosystem for source code that eliminates technical debt through AST-based transformations. The project uses a visitor pattern architecture where **Recipes** define transformations and **TreeVisitors** traverse and modify Abstract Syntax Trees (ASTs).
@@ -99,6 +103,12 @@ Recipes extend `org.openrewrite.Recipe` and typically contain one or more `TreeV
 - Use language-specific visitors (e.g., `JavaIsoVisitor`) for language transformations
 - Always return modified trees; don't mutate in place
 - Return `null` from a visitor method to delete an element
+- **IMPORTANT**: Never typecast LST elements without an `instanceof` check first. The typical pattern when an LST element is not of the expected type is to return early, making no changes. For example:
+  ```java
+  if (!(arg instanceof J.Lambda) || !(((J.Lambda) arg).getBody() instanceof J.Block)) {
+      return m;  // Return unchanged if not the expected type
+  }
+  ```
 
 ### Testing Recipes
 Use `RewriteTest` interface with `@Test` methods that call `rewriteRun()`:

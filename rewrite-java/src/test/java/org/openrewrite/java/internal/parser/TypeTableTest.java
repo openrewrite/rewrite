@@ -61,7 +61,7 @@ class TypeTableTest implements RewriteTest {
 
     @TempDir
     Path tempDir;
-    
+
     ExecutionContext ctx;
     JavaCompiler compiler;
     Path tsv;
@@ -81,16 +81,16 @@ class TypeTableTest implements RewriteTest {
     Path compileToClassFile(String source, String className) throws Exception {
         Path srcDir = tempDir.resolve("src");
         Files.createDirectories(srcDir);
-        
+
         // Extract simple class name for file
-        String simpleClassName = className.contains(".") ? 
-            className.substring(className.lastIndexOf('.') + 1) : className;
+        String simpleClassName = className.contains(".") ?
+          className.substring(className.lastIndexOf('.') + 1) : className;
         Path sourceFile = srcDir.resolve(simpleClassName + ".java");
         Files.writeString(sourceFile, source);
-        
+
         int result = compiler.run(null, null, null, "-d", tempDir.toString(), sourceFile.toString());
         assertThat(result).isEqualTo(0);
-        
+
         return tempDir.resolve(className.replace('.', '/') + ".class");
     }
 
@@ -101,39 +101,39 @@ class TypeTableTest implements RewriteTest {
         if (sourceAndClassPairs.length % 2 != 0) {
             throw new IllegalArgumentException("Must provide source,className pairs");
         }
-        
+
         Path srcDir = tempDir.resolve("src");
         Files.createDirectories(srcDir);
-        
+
         // Write all source files first
         for (int i = 0; i < sourceAndClassPairs.length; i += 2) {
             String source = sourceAndClassPairs[i];
             String className = sourceAndClassPairs[i + 1];
-            String simpleClassName = className.contains(".") ? 
-                className.substring(className.lastIndexOf('.') + 1) : className;
+            String simpleClassName = className.contains(".") ?
+              className.substring(className.lastIndexOf('.') + 1) : className;
             Path sourceFile = srcDir.resolve(simpleClassName + ".java");
             Files.writeString(sourceFile, source);
         }
-        
+
         // Compile all sources together so they can reference each other
         Path[] sourceFiles = new Path[sourceAndClassPairs.length / 2];
         for (int i = 0; i < sourceAndClassPairs.length; i += 2) {
             String className = sourceAndClassPairs[i + 1];
-            String simpleClassName = className.contains(".") ? 
-                className.substring(className.lastIndexOf('.') + 1) : className;
+            String simpleClassName = className.contains(".") ?
+              className.substring(className.lastIndexOf('.') + 1) : className;
             sourceFiles[i / 2] = srcDir.resolve(simpleClassName + ".java");
         }
-        
+
         String[] compilerArgs = new String[sourceFiles.length + 2];
         compilerArgs[0] = "-d";
         compilerArgs[1] = tempDir.toString();
         for (int i = 0; i < sourceFiles.length; i++) {
             compilerArgs[i + 2] = sourceFiles[i].toString();
         }
-        
+
         int result = compiler.run(null, null, null, compilerArgs);
         assertThat(result).isEqualTo(0);
-        
+
         // Return paths to the compiled class files
         Path[] classFiles = new Path[sourceAndClassPairs.length / 2];
         for (int i = 0; i < sourceAndClassPairs.length; i += 2) {
@@ -168,7 +168,7 @@ class TypeTableTest implements RewriteTest {
         try (TypeTable.Writer writer = TypeTable.newWriter(baos)) {
             writer.jar(groupId, artifactId, version).write(jarFile);
         }
-        
+
         // Decompress and return TSV content
         try (InputStream is = new ByteArrayInputStream(baos.toByteArray());
              InputStream gzis = new GZIPInputStream(is);
@@ -206,8 +206,8 @@ class TypeTableTest implements RewriteTest {
                 """;
 
             Path[] classFiles = compileToClassFiles(
-                annotationSource, "com.example.TestAnnotation",
-                classSource, "com.example.AnnotatedClass"
+              annotationSource, "com.example.TestAnnotation",
+              classSource, "com.example.AnnotatedClass"
             );
             Path jarFile = createJarFromClasses("test.jar", classFiles);
             String tsvContent = processJarThroughTypeTable(jarFile, "com.example", "test", "1.0");
@@ -240,8 +240,8 @@ class TypeTableTest implements RewriteTest {
                 """;
 
             Path[] classFiles = compileToClassFiles(
-                annotationSource, "com.example.TestAnnotation",
-                classSource, "com.example.ControlCharsClass"
+              annotationSource, "com.example.TestAnnotation",
+              classSource, "com.example.ControlCharsClass"
             );
             Path jarFile = createJarFromClasses("test.jar", classFiles);
             String tsvContent = processJarThroughTypeTable(jarFile, "com.example", "test", "1.0");
@@ -287,7 +287,7 @@ class TypeTableTest implements RewriteTest {
             // Verify enum constants don't have constant values (empty last column)
             assertThat(tsvContent).contains("VALUE1\tLcom/example/TestEnum;\t\t\t\t\t");
             assertThat(tsvContent).contains("VALUE2\tLcom/example/TestEnum;\t\t\t\t\t");
-            
+
             // Verify regular constants do have values
             assertThat(tsvContent).contains("CONSTANT\tLjava/lang/String;\t\t\t\t\t\"test\"");
             assertThat(tsvContent).contains("NUMBER\tI\t\t\t\t\t42");
@@ -298,23 +298,23 @@ class TypeTableTest implements RewriteTest {
             // Create a simple enum that can be compiled against
             ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
             cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_ENUM,
-                    "TestEnum", "Ljava/lang/Enum<LTestEnum;>;", "java/lang/Enum", null);
-            
+              "TestEnum", "Ljava/lang/Enum<LTestEnum;>;", "java/lang/Enum", null);
+
             // Enum constant without ConstantValue (this is the fix!)
             FieldVisitor fv = cw.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_ENUM,
-                    "VALUE1", "LTestEnum;", null, null);
+              "VALUE1", "LTestEnum;", null, null);
             fv.visitEnd();
-            
+
             // Regular static final field with ConstantValue
             fv = cw.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL,
-                    "CONSTANT", "Ljava/lang/String;", null, "test");
+              "CONSTANT", "Ljava/lang/String;", null, "test");
             fv.visitEnd();
-            
+
             cw.visitEnd();
-            
+
             Path enumClassFile = tempDir.resolve("TestEnum.class");
             Files.write(enumClassFile, cw.toByteArray());
-            
+
             // Test compilation against this enum
             //language=java
             String testCode = """
@@ -326,18 +326,18 @@ class TypeTableTest implements RewriteTest {
                     }
                 }
                 """;
-                
+
             Path testFile = tempDir.resolve("TestUseEnum.java");
             Files.writeString(testFile, testCode);
-            
+
             // This should compile successfully without "cannot have a constant value" errors
-            int compileResult = compiler.run(null, null, null, 
-                "-cp", tempDir.toString(), 
-                testFile.toString());
-                
+            int compileResult = compiler.run(null, null, null,
+              "-cp", tempDir.toString(),
+              testFile.toString());
+
             assertThat(compileResult)
-                .as("Compilation against properly generated enum should succeed")
-                .isEqualTo(0);
+              .as("Compilation against properly generated enum should succeed")
+              .isEqualTo(0);
         }
     }
 
@@ -375,7 +375,7 @@ class TypeTableTest implements RewriteTest {
             assertThat(tsvContent).contains("INT_CONST\tI\t\t\t\t\t42");
             assertThat(tsvContent).contains("LONG_CONST\tJ\t\t\t\t\t123");
             assertThat(tsvContent).contains("STRING_CONST\tLjava/lang/String;\t\t\t\t\t\"Hello\"");
-            
+
             // Verify non-constant fields don't have values
             assertThat(tsvContent).contains("OBJECT_CONST\tLjava/lang/Object;\t\t\t\t\t");
             assertThat(tsvContent).contains("ARRAY_CONST\t[I\t\t\t\t\t");
@@ -491,21 +491,21 @@ class TypeTableTest implements RewriteTest {
                 """;
 
             Path[] classFiles = compileToClassFiles(
-                annotationSource, "test.validation.TestValidation"
+              annotationSource, "test.validation.TestValidation"
             );
             Path testJar = createJarFromClasses("test-validation.jar", classFiles);
-            
+
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 writer.jar("test.group", "test-validation", "1.0").write(testJar);
             }
 
             TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("test-validation"));
             Path classesDir = table.load("test-validation");
-            
+
             // Verify that TypeTable can successfully load classes from our JAR
             assertThat(classesDir).isNotNull();
             assertThat(classesDir)
-                .isDirectoryRecursivelyContaining("glob:**/TestValidation.class");
+              .isDirectoryRecursivelyContaining("glob:**/TestValidation.class");
         }
 
         @Test
@@ -529,10 +529,10 @@ class TypeTableTest implements RewriteTest {
                 """;
 
             Path[] classFiles = compileToClassFiles(
-                annotationSource, "test.annotations.ValidationRule"
+              annotationSource, "test.annotations.ValidationRule"
             );
             Path testJar = createJarFromClasses("validation-rules.jar", classFiles);
-            
+
             // Write through TypeTable
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 writer.jar("test.group", "validation-rules", "1.0").write(testJar);
@@ -543,7 +543,7 @@ class TypeTableTest implements RewriteTest {
             Path classesDir = table.load("validation-rules");
             assertThat(classesDir).isNotNull();
 
-            // Test that JavaParser can parse code using the annotation 
+            // Test that JavaParser can parse code using the annotation
             // This validates that TypeTable preserved the annotation structure correctly
             rewriteRun(
               spec -> spec.parser(JavaParser.fromJavaVersion()
@@ -563,58 +563,58 @@ class TypeTableTest implements RewriteTest {
                     J.ClassDeclaration clazz = cu.getClasses().getFirst();
                     J.Annotation classAnnotation = clazz.getLeadingAnnotations().getFirst();
                     JavaType.Class annotationType = (JavaType.Class) classAnnotation.getType();
-                    
+
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
-                    
+
                     // Verify the annotation has the expected methods (proving structure is preserved)
                     assertThat(annotationType.getMethods()).hasSize(5);
                     assertThat(annotationType.getMethods().stream().map(m -> m.getName()))
                       .containsExactlyInAnyOrder("message", "values", "specialChars", "priority", "enabled");
-                      
+
                     // Verify all default values are preserved through the TypeTable roundtrip
                     assertThat(annotationType.getMethods().stream()
                       .filter(m -> m.getName().equals("message"))
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("{validation.rule.message}")
                       );
-                    
+
                     assertThat(annotationType.getMethods().stream()
                       .filter(m -> m.getName().equals("values"))
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("text/plain;charset=UTF-8", "application/json")
                       );
-                      
+
                     assertThat(annotationType.getMethods().stream()
                       .filter(m -> m.getName().equals("specialChars"))
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("line1\nline2\ttab\rcarriage")
                       );
-                      
+
                     assertThat(annotationType.getMethods().stream()
                       .filter(m -> m.getName().equals("priority"))
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("100")
                       );
-                      
+
                     assertThat(annotationType.getMethods().stream()
                       .filter(m -> m.getName().equals("enabled"))
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("true")
                       );
 
@@ -622,10 +622,10 @@ class TypeTableTest implements RewriteTest {
                     J.VariableDeclarations field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
                     J.Annotation fieldAnnotation = field.getLeadingAnnotations().getFirst();
                     JavaType.Class fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
-                    
+
                     assertThat(fieldAnnotationType).isNotNull();
                     assertThat(fieldAnnotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
-                    
+
                     // Field annotation should have the same type information (including default values)
                     // even when explicitly overriding some attributes
                     assertThat(fieldAnnotationType.getMethods().stream()
@@ -633,7 +633,7 @@ class TypeTableTest implements RewriteTest {
                       .findFirst())
                       .isPresent()
                       .get()
-                      .satisfies(method -> 
+                      .satisfies(method ->
                         assertThat(method.getDefaultValue()).containsExactly("{validation.rule.message}")
                       );
                 })

@@ -200,6 +200,12 @@ async function main() {
             });
         });
     }
+
+    // log uncaught exceptions
+    process.on('uncaughtException', (error) => {
+        logger.error('Fatal error:' + error.message);
+        process.exit(1);
+    });
 }
 
 main().catch(console.error);

@@ -30,7 +30,8 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.openrewrite.rpc.RpcObjectData.State.*;
+import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
+import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 @Value
 public class GetObject implements RpcRequest {
@@ -67,7 +68,7 @@ public class GetObject implements RpcRequest {
 
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
-                
+
                 // Determine what the remote has cached
                 Object before = null;
                 if (request.getLastKnownId() != null) {

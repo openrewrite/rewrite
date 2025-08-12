@@ -41,12 +41,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 /**
@@ -87,7 +87,7 @@ public class RewriteRpc implements AutoCloseable {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream logFile;
+    private @Nullable PrintStream traceFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -125,7 +125,6 @@ public class RewriteRpc implements AutoCloseable {
         Map<String, Recipe> preparedRecipes = new HashMap<>();
         Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
 
-        jsonRpc.rpc("GetRef", new GetRef.Handler(remoteRefs, localRefs, batchSize, traceSendPackets));
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
@@ -161,7 +160,7 @@ public class RewriteRpc implements AutoCloseable {
     }
 
     public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.logFile = log;
+        this.traceFile = log;
         return this;
     }
 
@@ -207,7 +206,7 @@ public class RewriteRpc implements AutoCloseable {
         if (!generated.isEmpty()) {
             return generated.stream()
                     .map(this::<SourceFile>getObject)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -271,32 +270,16 @@ public class RewriteRpc implements AutoCloseable {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputList.size()));
 
-        String parseId = SnowflakeId.generateId();
-
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
-            private @Nullable List<String> currentBatch;
-            private int batchIndex = 0;
-            private boolean isFirstCall = true;
+            private @Nullable List<String> ids;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                // Get next batch if needed
-                if (currentBatch == null || batchIndex >= currentBatch.size()) {
+                if (ids == null) {
                     // FIXME handle `TimeoutException` gracefully
-                    if (isFirstCall) {
-                        // First call with actual inputs
-                        currentBatch = send("Parse", new Parse(parseId, mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
-                        isFirstCall = false;
-                    } else {
-                        currentBatch = send("Parse", new Parse(parseId, emptyList(), null), ParseResponse.class);
-                    }
-                    batchIndex = 0;
-
-                    // If batch is empty, we're done
-                    if (currentBatch.isEmpty()) {
-                        return false;
-                    }
+                    ids = send("Parse", new Parse(mappedInputs, relativeTo != null ? relativeTo.toString() : null), ParseResponse.class);
+                    assert ids.size() == inputList.size();
                 }
 
                 // Process current item in batch
@@ -305,9 +288,8 @@ public class RewriteRpc implements AutoCloseable {
                 }
 
                 Parser.Input input = inputList.get(index);
-                String id = currentBatch.get(batchIndex);
+                String id = ids.get(index);
                 index++;
-                batchIndex++;
 
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
@@ -365,7 +347,7 @@ public class RewriteRpc implements AutoCloseable {
                         localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
-            }).collect(Collectors.toList());
+            }).collect(toList());
         }
         return cursorIds;
     }
@@ -375,9 +357,9 @@ public class RewriteRpc implements AutoCloseable {
         // Check if we have a cached version of this object
         Object localObject = localObjects.get(id);
         String lastKnownId = localObject != null ? id : null;
-        
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class), this::getRef);
+
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
+                new GetObject(id, lastKnownId), GetObjectResponse.class));
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -388,27 +370,6 @@ public class RewriteRpc implements AutoCloseable {
 
         //noinspection unchecked
         return (T) remoteObject;
-    }
-    
-    private Object getRef(Integer refId) {
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, logFile, () -> send("GetRef",
-                new GetRef(refId), GetRefResponse.class), nestedRefId -> {
-            throw new IllegalStateException("Nested ref calls not supported in GetRef: " + nestedRefId);
-        });
-
-        Object ref = q.receive(null, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
-        }
-        
-        if (ref == null) {
-            throw new IllegalStateException("Reference " + refId + " not found on remote");
-        }
-        
-        remoteRefs.put(refId, ref);
-        localRefs.put(ref, refId);
-
-        return ref;
     }
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {

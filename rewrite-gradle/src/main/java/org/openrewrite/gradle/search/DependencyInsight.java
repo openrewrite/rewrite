@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.Traits;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
@@ -41,9 +41,9 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -205,7 +205,7 @@ public class DependencyInsight extends Recipe {
                         .flatMap(Set::stream)
                         .distinct()
                         .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
-                        .collect(Collectors.joining(","));
+                        .collect(joining(","));
                 if (!resultText.isEmpty()) {
                     return SearchResult.found(after, resultText);
                 }
@@ -223,7 +223,7 @@ public class DependencyInsight extends Recipe {
                         .flatMap(Set::stream)
                         .distinct()
                         .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
-                        .collect(Collectors.joining(","));
+                        .collect(joining(","));
                 if (!resultText.isEmpty()) {
                     directDependencyToTargetDependency.clear();
                     return SearchResult.found(m, resultText);
@@ -231,7 +231,7 @@ public class DependencyInsight extends Recipe {
             }
 
             if (configurationToDirectDependency.containsKey(m.getSimpleName())) {
-                return Traits.gradleDependency().get(getCursor()).map(dependency -> {
+                return new GradleDependency.Matcher().get(getCursor()).map(dependency -> {
                     ResolvedGroupArtifactVersion gav = dependency.getResolvedDependency().getGav();
                     Optional<GroupArtifactVersion> configurationGav = configurationToDirectDependency.get(m.getSimpleName()).stream()
                             .filter(dep -> dep.asGroupArtifact().equals(gav.asGroupArtifact()))
@@ -245,7 +245,7 @@ public class DependencyInsight extends Recipe {
                         individuallyMarkedDependencies.add(configurationGav.get());
                         String resultText = mark.stream()
                                 .map(target -> target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion())
-                                .collect(Collectors.joining(","));
+                                .collect(joining(","));
                         if (!resultText.isEmpty()) {
                             return SearchResult.found(m, resultText);
                         }

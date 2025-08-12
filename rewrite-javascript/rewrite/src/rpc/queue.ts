@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Marker, Markers} from "../markers";
+import {emptyMarkers, Marker, Markers, MarkersKind} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
 import {asRef, isRef, Reference, ReferenceMap} from "./reference";
@@ -90,7 +90,12 @@ export class RpcSendQueue {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
-        await this.send(after, before);
+        if (after.kind === MarkersKind.Markers) {
+            // FIXME check if we can solve this via RpcCodec
+            await this.sendMarkers(undefined!, _ => after);
+        } else {
+            await this.send(after, before);
+        }
 
         const result = this.q;
         result.push({state: RpcObjectState.END_OF_OBJECT});
@@ -247,10 +252,7 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: Writable,
-                private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
-                    throw new Error(`Reference ${refId} not found and no getRef function provided`);
-                }) {
+                private readonly logFile?: Writable) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -294,10 +296,7 @@ export class RpcReceiveQueue {
                         if (this.refs.has(ref)) {
                             return this.refs.get(ref);
                         } else {
-                            // Ref was evicted from cache, fetch it
-                            const refObject = await this.getRef(ref);
-                            this.refs.set(ref, refObject);
-                            return refObject;
+                            throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
                         }
                     } else {
                         // This is either a new object or a forward declaration with ref

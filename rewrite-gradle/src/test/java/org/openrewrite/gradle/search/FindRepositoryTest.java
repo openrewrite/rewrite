@@ -27,40 +27,40 @@ class FindRepositoryTest implements RewriteTest {
     @Test
     void repositoryByUrl() {
         rewriteRun(
-          spec -> spec.recipe(new FindRepository(null, "https://oss.sonatype.org/content/repositories/snapshots", null)),
+          spec -> spec.recipe(new FindRepository(null, "https://central.sonatype.com/repository/maven-snapshots", null)),
           buildGradle(
             """
               buildscript {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                  maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                  maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                  maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                  maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                  maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                  maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
                 }
               }
-                            
+
               repositories {
-                maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
               }
               """,
             """
               buildscript {
                 repositories {
-                  /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                  /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                  /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                  /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                  /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                  /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                  /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
                 }
               }
-                            
+
               repositories {
-                /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
               }
               """
           ),
@@ -68,20 +68,20 @@ class FindRepositoryTest implements RewriteTest {
             """
               pluginManagement {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                  maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                  maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                  maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                  maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                  maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                  maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
                 }
               }
               """,
             """
               pluginManagement {
                 repositories {
-                  /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
-                  /*~~>*/maven { url = uri("https://oss.sonatype.org/content/repositories/snapshots") }
-                  /*~~>*/maven { setUrl("https://oss.sonatype.org/content/repositories/snapshots") }
-                  /*~~>*/maven { setUrl(uri("https://oss.sonatype.org/content/repositories/snapshots")) }
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                  /*~~>*/maven { url = uri("https://central.sonatype.com/repository/maven-snapshots") }
+                  /*~~>*/maven { setUrl("https://central.sonatype.com/repository/maven-snapshots") }
+                  /*~~>*/maven { setUrl(uri("https://central.sonatype.com/repository/maven-snapshots")) }
                 }
               }
               """
@@ -92,28 +92,28 @@ class FindRepositoryTest implements RewriteTest {
     @Test
     void repositoryByUrlAndPurposeProject() {
         rewriteRun(
-          spec -> spec.recipe(new FindRepository(null, "https://oss.sonatype.org/content/repositories/snapshots", FindRepository.Purpose.Project)),
+          spec -> spec.recipe(new FindRepository(null, "https://central.sonatype.com/repository/maven-snapshots", FindRepository.Purpose.Project)),
           buildGradle(
             """
               buildscript {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
 
               repositories {
-                maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
               }
               """,
             """
               buildscript {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
 
               repositories {
-                /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
               }
               """
           )
@@ -123,28 +123,28 @@ class FindRepositoryTest implements RewriteTest {
     @Test
     void repositoryByUrlAndPurposePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new FindRepository(null, "https://oss.sonatype.org/content/repositories/snapshots", FindRepository.Purpose.Plugin)),
+          spec -> spec.recipe(new FindRepository(null, "https://central.sonatype.com/repository/maven-snapshots", FindRepository.Purpose.Plugin)),
           buildGradle(
             """
               buildscript {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
 
               repositories {
-                maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
               }
               """,
             """
               buildscript {
                 repositories {
-                  /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
 
               repositories {
-                maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
               }
               """
           ),
@@ -152,14 +152,14 @@ class FindRepositoryTest implements RewriteTest {
             """
               pluginManagement {
                 repositories {
-                  maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
               """,
             """
               pluginManagement {
                 repositories {
-                  /*~~>*/maven { url = "https://oss.sonatype.org/content/repositories/snapshots" }
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
                 }
               }
               """

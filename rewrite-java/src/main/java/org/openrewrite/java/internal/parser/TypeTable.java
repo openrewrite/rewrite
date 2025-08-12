@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
@@ -45,7 +44,8 @@ import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
+import static java.util.stream.Collectors.toSet;
+import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.*;
@@ -175,7 +175,6 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         private final ExecutionContext ctx;
 
-
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
                 // could be empty due to the filtering in `artifactsNotYetWritten()`
@@ -184,7 +183,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             Set<Pattern> artifactNamePatterns = artifactNames.stream()
                     .map(name -> Pattern.compile(name + ".*"))
-                    .collect(Collectors.toSet());
+                    .collect(toSet());
 
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
@@ -435,7 +434,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                 mv.visitMaxs(0, 0);
             }
         }
-
     }
 
     private static boolean isValidConstantValueType(@Nullable Object value) {
@@ -509,7 +507,6 @@ public class TypeTable implements JavaParserClasspathLoader {
             deflater.flush();
             out.close();
         }
-
 
         @Value
         public class Jar {

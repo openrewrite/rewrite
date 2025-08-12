@@ -33,7 +33,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -94,7 +93,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     }
 
     private static List<NamedStyles> noWhitespaceBeforeStyle(UnaryOperator<NoWhitespaceBeforeStyle> with) {
-        return Collections.singletonList(
+        return singletonList(
           new NamedStyles(
             Tree.randomId(), "test", "test", "test", emptySet(),
             singletonList(with.apply(Checkstyle.noWhitespaceBeforeStyle()))
@@ -102,8 +101,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
+    @Test
     void packages() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -118,8 +117,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
+    @Test
     void imports() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -167,8 +166,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void methodDeclarationParametersDoNotAllowLineBreaks() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
@@ -178,7 +177,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String ...params) {
                   }
               }
@@ -187,7 +186,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               class Test {
                   static void method0(String...params) {
                   }
-                  
+
                   static void method1(String...params) {
                   }
               }
@@ -197,8 +196,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void methodDeclarationParametersAllowLineBreaks() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
@@ -209,7 +208,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String ...params) {
                   }
               }
@@ -219,7 +218,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   static void method0(String
                                              ...params) {
                   }
-                  
+
                   static void method1(String...params) {
                   }
               }
@@ -756,8 +755,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/233")
+    @Test
     void jenkinsLibrary() {
         rewriteRun(groovy("library 'someLibrary@version'"));
     }

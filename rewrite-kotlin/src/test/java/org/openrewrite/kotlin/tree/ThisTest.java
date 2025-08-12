@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ThisTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/302")
+    @Test
     void qualifiedThis() {
         rewriteRun(
           kotlin(
@@ -33,11 +33,11 @@ class ThisTest implements RewriteTest {
 
               abstract class LinkedHashTreeMap<K, V> : AbstractMutableMap<K, V>() {
                 override var size = 0
-              
+
                 abstract inner class EntrySet : AbstractMutableSet<MutableEntry<K, V>>() {
                   override val size: Int
                    /*C1*/ get() = this@LinkedHashTreeMap.size
-              
+
                   override fun iterator(): MutableIterator<MutableEntry<K, V>> {
                     return null!!
                   }

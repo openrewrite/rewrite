@@ -30,7 +30,6 @@ import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -75,9 +74,8 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(javascript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(javascript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -106,9 +104,8 @@ class JavaScriptParserTest {
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.ts"), helloWorld);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Paths.get("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -116,7 +113,7 @@ class JavaScriptParserTest {
         @Language("tsx")
         String script = """
           import React from 'react';
-          
+
           const JSXConstructsExample = () => {
             // Props object for spread attribute demonstration
             const buttonProps = {
@@ -124,29 +121,29 @@ class JavaScriptParserTest {
               disabled: false,
               'data-testid': 'spread-button'
             };
-          
+
             const linkProps = {
               href: 'https://example.com',
               target: '_blank',
               rel: 'noopener noreferrer'
             };
-          
+
             return (
               <React.Fragment>
                 {/* Fragment - wrapping multiple elements without extra DOM node */}
-          
+
                 {/* Basic JSX Element with attributes */}
                 <div className="container" id="main-container" data-test="element-example">
                   <h1 title="Main heading">JSX Constructs Test</h1>
-          
+
                   {/* Element with spread attributes */}
                   <button {...buttonProps} onClick={() => alert('Spread attributes work!')}>
                     Button with Spread Props
                   </button>
-          
+
                   {/* Another spread attribute example */}
                   <a {...linkProps}>Link with Spread Props</a>
-          
+
                   {/* Namespace example (commonly used with SVG) */}
                   <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
                     <circle
@@ -158,7 +155,7 @@ class JavaScriptParserTest {
                       custom:attribute="namespace-example"
                     />
                   </svg>
-          
+
                   {/* Mixed attributes: regular, spread, and namespaced */}
                   <div
                     className="mixed-example"
@@ -168,8 +165,15 @@ class JavaScriptParserTest {
                   >
                     <p>This div uses regular attributes, spread attributes, and namespaced attributes</p>
                   </div>
+
+                  {/* JSX elements with generics */}
+                  <DataTable<User> data={[]} />
+                  <Component<string, number> prop="value" />
+                  <Form<FormData> onSubmit={() => {}}>
+                    <Input name="username" />
+                  </Form>
                 </div>
-          
+
                 {/* Short fragment syntax */}
                 <>
                   <p>This paragraph is in a short fragment syntax</p>
@@ -178,20 +182,19 @@ class JavaScriptParserTest {
               </React.Fragment>
             );
           };
-          
+
           export default JSXConstructsExample;
           """;
         Parser.Input input = Parser.Input.fromString(Paths.get("helloworld.tsx"), script);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
-        assertThat(typescript.get()).satisfies(cu -> {
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath());
-        });
+        assertThat(typescript.get()).satisfies(cu ->
+            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
     @Disabled
-    void complexTypeScript() throws MalformedURLException {
+    void complexTypeScript() throws Exception {
         URL url = URI.create("https://raw.githubusercontent.com/sinclairzx81/typebox/f958156785350aa052c5f822bc2970d0945d887b/src/syntax/parser.ts").toURL();
         Parser.Input input = new Parser.Input(Paths.get("parser.ts"), null, () -> {
             try {

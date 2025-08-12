@@ -24,6 +24,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Collections.singleton;
 import static org.openrewrite.maven.MavenTagInsertionComparator.canonicalOrdering;
 
 public class OrderPomElements extends Recipe {
@@ -39,7 +40,7 @@ public class OrderPomElements extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S3423");
+        return singleton("RSPEC-S3423");
     }
 
     @Override

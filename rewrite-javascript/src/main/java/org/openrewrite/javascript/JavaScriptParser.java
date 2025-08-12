@@ -26,10 +26,14 @@ import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 public class JavaScriptParser implements Parser {
@@ -66,13 +70,13 @@ public class JavaScriptParser implements Parser {
         }
     }
 
-    private final static List<String> EXTENSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
             ".js", ".jsx", ".mjs", ".cjs",
             ".ts", ".tsx", ".mts", ".cts"
     ));
 
     // Exclude Yarn's Plug'n'Play loader files (https://yarnpkg.com/features/pnp)
-    private final static List<String> EXCLUSIONS = Collections.unmodifiableList(Arrays.asList(
+    private final static List<String> EXCLUSIONS = unmodifiableList(Arrays.asList(
             ".pnp.cjs", ".pnp.loader.mjs"
     ));
 

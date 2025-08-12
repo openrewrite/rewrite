@@ -40,7 +40,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -57,7 +57,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -89,7 +89,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -118,7 +118,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -155,7 +155,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -179,7 +179,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -213,7 +213,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -237,7 +237,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>

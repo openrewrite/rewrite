@@ -56,6 +56,7 @@ public class JavaToJavaScriptRpcTest {
                   JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
                     .nodePath(Path.of("node"))
                     .installationDirectory(Path.of("./rewrite/dist"))
+//                    .inspectAndBreak()
 //                    .socket(12345)
                     .timeout(Duration.ofMinutes(10))
                     .build();

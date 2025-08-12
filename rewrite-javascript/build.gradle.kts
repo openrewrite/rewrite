@@ -1,15 +1,14 @@
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import org.eclipse.jgit.api.Git
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.moderne-source-available-license")
-    id("com.netflix.nebula.integtest-standalone")
     id("com.github.node-gradle.node") version "latest.release"
+    id("jvm-test-suite")
     id("publishing")
 }
 
@@ -28,11 +27,6 @@ dependencies {
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
-
-    integTestImplementation(project(":rewrite-json"))
-    integTestImplementation(project(":rewrite-java-tck"))
-    integTestImplementation("org.junit.platform:junit-platform-suite-api:latest.release")
-    integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -157,6 +151,7 @@ val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
     val tempInstallDir = layout.buildDirectory.file("tmp/npmInstall")
     inputs.files(npmPack)
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(tempInstallDir)
     dependsOn(npmInitTemp)
 
     // Use a provider to defer evaluation until execution time
@@ -168,9 +163,12 @@ val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
 val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
     // Configure the tar output
     archiveFileName.set("production-package.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    destinationDirectory.set(layout.buildDirectory.dir("generated/resources/distributions/"))
 
-    from(npmInstallTemp)
+    from(npmInstallTemp) {
+        // Optionally exclude unnecessary files like package-lock.json, etc.
+        // exclude("package-lock.json", ".npmrc")
+    }
 }
 
 // Include production-ready package into jar
@@ -178,8 +176,45 @@ tasks.named<Jar>("jar") {
     from(createProductionPackage)
 }
 
-tasks.named("integrationTest") {
-    dependsOn(npmRunBuild)
+var npmTestBuild = tasks.register<NpmTask>("npmTestBuild") {
+    inputs.files(npmInstall)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(file("rewrite/package.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(npmRunBuild)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/test"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(file("rewrite/dist/test/"))
+
+    args = listOf("run", "build:test")
+}
+
+testing {
+    suites {
+        register<JvmTestSuite>("integTest") {
+            useJUnitJupiter()
+
+            targets {
+                all {
+                    testTask.configure {
+                        dependsOn(npmTestBuild)
+                    }
+                }
+            }
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-json"))
+                implementation(project(":rewrite-java-tck"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("org.junit.platform:junit-platform-suite-api:latest.release")
+                runtimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
+            }
+        }
+    }
 }
 
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
@@ -199,7 +234,7 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     dependsOn(setupNpmrc)
 
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath, "--dry-run") }
+    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
     if (!project.hasProperty("releasing")) {
         args.addAll("--tag", "next")
     }
