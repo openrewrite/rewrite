@@ -59,7 +59,7 @@ class TypeTableTest implements RewriteTest {
      * @throws IOException If unable to write.
      */
     @Test
-    void writeAllRuntimeClasspathJars() throws IOException {
+    void writeAllRuntimeClasspathJars() throws Exception {
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             long jarsSize = 0;
             for (Path classpath : JavaParser.runtimeClasspath()) {
@@ -72,7 +72,7 @@ class TypeTableTest implements RewriteTest {
 
     @Disabled
     @Test
-    void writeAllMavenLocal() throws IOException {
+    void writeAllMavenLocal() throws Exception {
         Path m2Repo = Paths.get(System.getProperty("user.home"), ".m2", "repository");
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             AtomicLong jarsSize = new AtomicLong();
@@ -96,7 +96,7 @@ class TypeTableTest implements RewriteTest {
     }
 
     @Test
-    void writeReadJunitJupiterApi() throws IOException {
+    void writeReadJunitJupiterApi() throws Exception {
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             for (Path classpath : JavaParser.runtimeClasspath()) {
                 if (classpath.toFile().getName().contains("junit-jupiter-api")) {
