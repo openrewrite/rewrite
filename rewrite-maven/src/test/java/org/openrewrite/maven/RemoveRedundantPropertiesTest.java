@@ -491,7 +491,6 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                 <groupId>com.example</groupId>
                 <artifactId>standalone</artifactId>
                 <version>1.0.0</version>
-              
                 <properties>
                   <junit.version>5.9.1</junit.version>
                 </properties>
@@ -649,6 +648,80 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                   """
               )
             )
+          )
+        );
+    }
+
+    @Test
+    void removeOverrideWithSpringBootDependencies() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-dependencies</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <junit.version>4.13.2</junit.version>
+                  <custom.property>value</custom.property>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-dependencies</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <custom.property>value</custom.property>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOverrideWithSpringBootStarterParent() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <junit.version>4.13.2</junit.version>
+                  <custom.property>value</custom.property>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.5.4</version>
+                  <relativePath/>
+                </parent>
+                <artifactId>child</artifactId>
+                <properties>
+                  <custom.property>value</custom.property>
+                </properties>
+              </project>
+              """
           )
         );
     }
