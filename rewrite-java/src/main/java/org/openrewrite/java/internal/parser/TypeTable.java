@@ -51,7 +51,6 @@ import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.serializeArray;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
-import static org.openrewrite.java.internal.parser.TypeTable.PipeDelimitedJoiner.joinWithPipes;
 
 /**
  * Type tables are written as a TSV file with the following columns:
@@ -814,7 +813,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             -1, "", "", "", "", "",
                             classAnnotations.isEmpty() ? "" : String.join("", classAnnotations),
                             "", // Empty parameter annotations for class row
-                            classTypeAnnotations.isEmpty() ? "" : joinWithPipes(classTypeAnnotations),
+                            classTypeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(classTypeAnnotations),
                             ""); // Empty constant value for class row
 
                     for (Writer.Member member : members) {
@@ -866,7 +865,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             exceptions == null ? "" : String.join("|", exceptions),
                             elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
                             serializeParameterAnnotations(parameterAnnotations),
-                            typeAnnotations.isEmpty() ? "" : joinWithPipes(typeAnnotations),
+                            typeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(typeAnnotations),
                             constantValue == null ? "" : constantValue
                     );
                 }
@@ -944,7 +943,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     /**
-     * Helper class for joining strings with pipe delimiters while escaping any pipes in the strings.
+     * Serializes parameter annotations from a list of "paramIndex:annotation" strings
+     * into the TSV format: "0:[annotations]|1:[annotations]".
+     * Escapes any pipe characters in annotation values to prevent delimiter conflicts.
      */
     private static String serializeParameterAnnotations(List<String> parameterAnnotations) {
         if (parameterAnnotations.isEmpty()) {
@@ -982,7 +983,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         return result.toString();
     }
     
-    static class PipeDelimitedJoiner {
+    private static class PipeDelimitedJoiner {
         static String joinWithPipes(List<String> items) {
             if (items.isEmpty()) {
                 return "";

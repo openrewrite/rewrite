@@ -17,10 +17,7 @@ package org.openrewrite.java.internal.parser;
 
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.TypePath;
+import org.objectweb.asm.*;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -1194,34 +1191,34 @@ class TypeAnnotationSupport {
         // Get symbolic target name or fall back to hex
         String target;
         switch (targetType) {
-            case 0x13:
+            case TypeReference.FIELD:
                 target = "FIELD";
                 break;
-            case 0x14:
+            case TypeReference.METHOD_RETURN:
                 target = "METHOD_RETURN";
                 break;
-            case 0x15:
+            case TypeReference.METHOD_RECEIVER:
                 target = "METHOD_RECEIVER";
                 break;
-            case 0x16:
+            case TypeReference.METHOD_FORMAL_PARAMETER:
                 target = "METHOD_PARAM";
                 break;
-            case 0x17:
+            case TypeReference.THROWS:
                 target = "THROWS";
                 break;
-            case 0x10:
+            case TypeReference.CLASS_EXTENDS:
                 target = "CLASS_EXTENDS";
                 break;
-            case 0x00:
+            case TypeReference.CLASS_TYPE_PARAMETER:
                 target = "CLASS_TYPE_PARAM";
                 break;
-            case 0x01:
+            case TypeReference.METHOD_TYPE_PARAMETER:
                 target = "METHOD_TYPE_PARAM";
                 break;
-            case 0x11:
+            case TypeReference.CLASS_TYPE_PARAMETER_BOUND:
                 target = "CLASS_TYPE_PARAM_BOUND";
                 break;
-            case 0x12:
+            case TypeReference.METHOD_TYPE_PARAMETER_BOUND:
                 target = "METHOD_TYPE_PARAM_BOUND";
                 break;
             default:
@@ -1262,8 +1259,10 @@ class TypeAnnotationSupport {
         }
 
         public static TypeAnnotationInfo parse(String serialized) {
-            String[] parts = serialized.split(":", 4);
-            if (parts.length != 4) {
+            // Type annotation format: "target:index:path:annotation"
+            final int EXPECTED_PARTS = 4;
+            String[] parts = serialized.split(":", EXPECTED_PARTS);
+            if (parts.length != EXPECTED_PARTS) {
                 throw new IllegalArgumentException("Invalid type annotation format: " + serialized);
             }
 
@@ -1279,34 +1278,34 @@ class TypeAnnotationSupport {
             } else {
                 switch (target) {
                     case "FIELD":
-                        targetType = 0x13;
+                        targetType = TypeReference.FIELD;
                         break;
                     case "METHOD_RETURN":
-                        targetType = 0x14;
+                        targetType = TypeReference.METHOD_RETURN;
                         break;
                     case "METHOD_RECEIVER":
-                        targetType = 0x15;
+                        targetType = TypeReference.METHOD_RECEIVER;
                         break;
                     case "METHOD_PARAM":
-                        targetType = 0x16;
+                        targetType = TypeReference.METHOD_FORMAL_PARAMETER;
                         break;
                     case "THROWS":
-                        targetType = 0x17;
+                        targetType = TypeReference.THROWS;
                         break;
                     case "CLASS_EXTENDS":
-                        targetType = 0x10;
+                        targetType = TypeReference.CLASS_EXTENDS;
                         break;
                     case "CLASS_TYPE_PARAM":
-                        targetType = 0x00;
+                        targetType = TypeReference.CLASS_TYPE_PARAMETER;
                         break;
                     case "METHOD_TYPE_PARAM":
-                        targetType = 0x01;
+                        targetType = TypeReference.METHOD_TYPE_PARAMETER;
                         break;
                     case "CLASS_TYPE_PARAM_BOUND":
-                        targetType = 0x11;
+                        targetType = TypeReference.CLASS_TYPE_PARAMETER_BOUND;
                         break;
                     case "METHOD_TYPE_PARAM_BOUND":
-                        targetType = 0x12;
+                        targetType = TypeReference.METHOD_TYPE_PARAMETER_BOUND;
                         break;
                     default:
                         throw new IllegalArgumentException("Unknown target type: " + target);
