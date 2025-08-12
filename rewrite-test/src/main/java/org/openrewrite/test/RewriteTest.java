@@ -300,6 +300,10 @@ public interface RewriteTest extends SourceSpecs {
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
+                // Call user hook to inspect source file before validation and recipe execution
+                //noinspection unchecked
+                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
+
                 // Validate before source
                 TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
                 nextSpec.validateSource.accept(sourceFile, beforeValidations);
@@ -334,8 +338,6 @@ public interface RewriteTest extends SourceSpecs {
                     }
                 }
 
-                //noinspection unchecked
-                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
                 specBySourceFile.put(mapped, nextSpec);
             }
         }
