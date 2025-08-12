@@ -29,10 +29,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.max;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -398,7 +398,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
         @Override
         public String toString() {
-            return Stream.of(groupId, artifactId, version).filter(Objects::nonNull).collect(Collectors.joining(":"));
+            return Stream.of(groupId, artifactId, version).filter(Objects::nonNull).collect(joining(":"));
         }
     }
 }
