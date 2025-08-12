@@ -653,7 +653,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void removeOverrideWithSpringBootDependencies() {
+    void externalSpringBootDependenciesParent() {
         rewriteRun(
           pomXml(
             """
@@ -690,7 +690,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void removeOverrideWithSpringBootStarterParent() {
+    void externalSpringBootStarterParent() {
         rewriteRun(
           pomXml(
             """

@@ -22,10 +22,17 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Map;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.isNullOrEmpty;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -63,7 +70,7 @@ public class RemoveRedundantProperties extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (isMatchingPropertyTag(tag) && hasMatchingValue(tag)) {
+                if (isMatchingPropertyTag(tag) && hasMatchingValue(tag, ctx)) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                 }
@@ -75,12 +82,34 @@ public class RemoveRedundantProperties extends Recipe {
                 return isPropertyTag() && (isNullOrEmpty(namePattern) || matchesGlob(tag.getName(), namePattern));
             }
 
-            private boolean hasMatchingValue(Xml.Tag tag) {
-                MavenResolutionResult parent = getResolutionResult().getParent();
-                if (parent == null) {
-                    return false;
+            private boolean hasMatchingValue(Xml.Tag tag, ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                Map<String, String> parentProperties;
+                if (mrr.getParent() == null) {
+                    MavenPomDownloader downloader = new MavenPomDownloader(
+                            mrr.getProjectPoms(),
+                            ctx,
+                            mrr.getMavenSettings(),
+                            mrr.getActiveProfiles());
+                    try {
+                        // Resolve the external parent POM properties
+                        parentProperties = mrr
+                                .getPom()
+                                .getRequested()
+                                .withProperties(emptyMap())
+                                .withDependencies(emptyList())
+                                .withDependencyManagement(emptyList())
+                                .withPlugins(emptyList())
+                                .withPluginManagement(emptyList())
+                                .resolve(mrr.getActiveProfiles(), downloader, ctx)
+                                .getProperties();
+                    } catch (MavenDownloadingException e) {
+                        return false;
+                    }
+                } else {
+                    parentProperties = mrr.getParent().getPom().getProperties();
                 }
-                String parentPropertyValue = parent.getPom().getProperties().get(tag.getName());
+                String parentPropertyValue = parentProperties.get(tag.getName());
                 if (parentPropertyValue == null) {
                     return false;
                 }
