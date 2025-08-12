@@ -32,6 +32,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -200,10 +201,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 Xml.Tag t = super.visitTag(tag, ctx);
                 try {
                     if (isPropertyTag()) {
-                        Path sourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
-                        for (PomProperty prop : accumulator.pomProperties) {
-                            if (prop.filePath.equals(sourcePath)) {
-                                doAfterVisit(new ChangePropertyValue(prop.name, prop.value, false, false).getVisitor());
+                        Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
+                        for (PomProperty pomProperty : accumulator.pomProperties) {
+                            if (pomProperty.pomFilePath.equals(pomSourcePath) &&
+                                pomProperty.propertyName.equals(tag.getName())) {
+                                Optional<String> value = tag.getValue();
+                                if (!value.isPresent() || !value.get().equals(pomProperty.propertyValue)) {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(tag, pomProperty.propertyValue));
+                                    maybeUpdateModel();
+                                }
+                                break;
                             }
                         }
                     } else if (isDependencyTag(groupId, artifactId)) {
@@ -241,7 +248,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (isManagedDependencyImportTag(groupId, artifactId)) {
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
-                                RetainVersions.plan(this, retainVersions).forEach(this::doAfterVisit);
+                                retainVersions();
                                 doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
@@ -253,6 +260,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                     return t;
                 }
+
+                private void retainVersions() {
+                    RetainVersions.plan(this, retainVersions == null ? emptyList() : retainVersions)
+                            .forEach(it -> doAfterVisit(it.getVisitor()));
+                }
             }
 
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
@@ -263,7 +275,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
                         if (t.getChild("version").isPresent()) {
-                            t = changeChildTagValue(t, "version", newerVersion, ctx);
+                            t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
@@ -324,7 +336,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (groupId != null && artifactId != null && version != null) {
                     String newerVersion = findNewerVersion(groupId, artifactId, resolveVersion(version), ctx);
                     if (newerVersion != null) {
-                        t = changeChildTagValue(t, "version", newerVersion, ctx);
+                        t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                     }
                 }
                 return t;
@@ -372,8 +384,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Value
     public static class PomProperty {
-        Path filePath;
-        String name;
-        String value;
+        Path pomFilePath;
+        String propertyName;
+        String propertyValue;
     }
 }
