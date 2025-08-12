@@ -40,6 +40,7 @@ import static org.openrewrite.internal.StringUtils.isBlank;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeDependencyGroupIdAndArtifactId.Accumulator> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    private static final String CHANGED_DEPENDENCIES = "ChangeDependencyGroupIdAndArtifactId.ScanningMap";
 
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob expressions.",
@@ -145,6 +146,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
+        ctx.computeMessageIfAbsent(CHANGED_DEPENDENCIES, key -> new HashMap<GroupArtifactVersion, GroupArtifactVersion>());
         return new Accumulator();
     }
 
@@ -163,44 +165,56 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
-                boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
+
+                Map<GroupArtifactVersion, GroupArtifactVersion> changedDependencies = ctx.getMessage(CHANGED_DEPENDENCIES);
+
+                GroupArtifactVersion oldDependency = new GroupArtifactVersion(oldGroupId, oldArtifactId, null);
+                for (Map.Entry<GroupArtifactVersion, GroupArtifactVersion> entry : changedDependencies.entrySet()) {
+                    if (entry.getValue().asGroupArtifact().equals(oldDependency.asGroupArtifact())) {
+                        oldDependency = entry.getKey();
+                        break;
+                    }
+                }
+
+                boolean isOldDependencyTag = isDependencyTag(oldDependency.getGroupId(), oldDependency.getArtifactId());
                 if (isOldDependencyTag && isNewDependencyPresent) {
                     acc.isNewDependencyPresent = true;
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
+                if (isOldDependencyTag || isPluginDependencyTag(oldDependency.getGroupId(), oldDependency.getArtifactId())) {
                     Optional<String> groupIdFromTag = t.getChildValue("groupId");
                     Optional<String> artifactIdFromTag = t.getChildValue("artifactId");
+                    Optional<String> currentVersion = t.getChildValue("version");
                     if (!groupIdFromTag.isPresent() || !artifactIdFromTag.isPresent()) {
                         return t;
                     }
 
-                    String groupId = groupIdFromTag.get();
-                    if (newGroupId != null) {
-                        storeParentPomProperty(groupId, newGroupId);
-                        groupId = newGroupId;
-                        acc.changeGroupId = groupId;
+                    GroupArtifactVersion existingDependency = new GroupArtifactVersion(groupIdFromTag.get(), artifactIdFromTag.get(), currentVersion.orElse(null));
+                    if (changedDependencies.containsKey(existingDependency)) {
+                        existingDependency = changedDependencies.get(existingDependency);
                     }
+                    GroupArtifactVersion changedDependency = existingDependency;
 
-                    String artifactId = artifactIdFromTag.get();
+                    if (newGroupId != null) {
+                        storeParentPomProperty(existingDependency.getGroupId(), newGroupId);
+                        changedDependency = changedDependency.withGroupId(newGroupId);
+                    }
                     if (newArtifactId != null) {
-                        storeParentPomProperty(artifactId, newArtifactId);
-                        artifactId = newArtifactId;
-                        acc.changeArtifactId = artifactId;
+                        storeParentPomProperty(existingDependency.getArtifactId(), newArtifactId);
+                        changedDependency = changedDependency.withArtifactId(newArtifactId);
                     }
 
                     if (newVersion != null) {
                         try {
-                            Optional<String> currentVersion = t.getChildValue("version");
-                            String resolvedNewVersion = resolveSemverVersion(groupId, artifactId, currentVersion.orElse(newVersion), ctx);
+                            String resolvedNewVersion = resolveSemverVersion(changedDependency.getGroupId(), changedDependency.getArtifactId(), currentVersion.orElse(newVersion), ctx);
                             Scope scope = t.getChild("scope").map(xml -> Scope.fromName(xml.getValue().orElse(null))).orElse(Scope.Compile);
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             boolean configuredToOverrideManageVersion = overrideManagedVersion != null && overrideManagedVersion; // False by default
                             boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency; // True by default
 
-                            boolean oldDependencyManaged = isDependencyManaged(scope, oldGroupId, oldArtifactId);
-                            boolean newDependencyManaged = isDependencyManaged(scope, groupId, artifactId);
+                            boolean oldDependencyManaged = isDependencyManaged(scope, oldDependency.getGroupId(), oldDependency.getArtifactId());
+                            boolean newDependencyManaged = isDependencyManaged(scope, changedDependency.getGroupId(), changedDependency.getArtifactId());
                             if (versionTag.isPresent()) {
                                 // If the previous dependency had a version but the new artifact is managed, removed the version tag.
                                 if (!configuredToOverrideManageVersion && newDependencyManaged || (oldDependencyManaged && configuredToChangeManagedDependency)) {
@@ -208,18 +222,22 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 } else {
                                     // Otherwise, change the version to the new value.
                                     storeParentPomProperty(currentVersion.orElse(null), resolvedNewVersion);
-                                    acc.changeVersion = resolvedNewVersion;
                                 }
                             } else if (configuredToOverrideManageVersion || !newDependencyManaged) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
-                                acc.createVersion = resolvedNewVersion;
+                                acc.createVersion = true;
                             }
+                            changedDependency = changedDependency.withVersion(resolvedNewVersion);
                         } catch (MavenDownloadingException e) {
-                            return e.warn(tag);
+                            throw new RuntimeException("Failed to resolve version for " + changedDependency, e);
                         }
                     }
-                }
 
+                    if (!existingDependency.equals(changedDependency)) {
+                        changedDependencies.put(existingDependency, changedDependency);
+                        acc.changeTo = changedDependency;
+                    }
+                }
                 //noinspection ConstantConditions
                 return t;
             }
@@ -245,11 +263,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
+            private String resolveSemverVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
                 List<String> availableVersions = new ArrayList<>();
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
-                    if (versionComparator.isValid(version, v)) {
+                    if (versionComparator.isValid(currentVersion, v)) {
                         availableVersions.add(v);
                     }
                 }
@@ -289,6 +307,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                             Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
                             newVersion, versionPattern).getVisitor());
                 }
+                ctx.pollMessage(CHANGED_DEPENDENCIES);
                 return super.visitDocument(document, ctx);
             }
 
@@ -304,28 +323,26 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                     }
                     return t;
                 }
-
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
                 if (isOldDependencyTag && acc.isNewDependencyPresent) {
                     doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                     maybeUpdateModel();
                     return t;
                 }
-                if (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId)) {
-                    if (acc.changeGroupId != null) {
-                        t = changeChildTagValue(t, "groupId", newGroupId, ctx);
-                    }
-                    if (acc.changeArtifactId != null) {
-                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
-                    }
+                if (acc.changeTo != null && (isOldDependencyTag || isPluginDependencyTag(oldGroupId, oldArtifactId))) {
+                    GroupArtifactVersion changeTo = acc.changeTo;
+                    t = changeChildTagValue(t, "groupId", changeTo.getGroupId(), ctx);
+                    t = changeChildTagValue(t, "artifactId", changeTo.getArtifactId(), ctx);
 
-                    if (acc.createVersion != null) {
-                        Xml.Tag newVersionTag = Xml.Tag.build("<version>" + acc.createVersion + "</version>");
-                        t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
-                    } else if (acc.changeVersion != null) {
-                        t = changeChildTagValue(t, "version", acc.changeVersion, ctx);
-                    } else if (acc.removeVersionTag) {
+                    if (acc.removeVersionTag) {
                         t = (Xml.Tag) new RemoveContentVisitor<>(t.getChild("version").get(), false, true).visitNonNull(t, ctx);
+                    } else if (changeTo.getVersion() != null) {
+                        if (acc.createVersion) {
+                            Xml.Tag newVersionTag = Xml.Tag.build("<version>" + changeTo.getVersion() + "</version>");
+                            t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                        } else {
+                            t = changeChildTagValue(t, "version", changeTo.getVersion(), ctx);
+                        }
                     }
 
                     if (t != tag) {
@@ -343,18 +360,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         boolean isNewDependencyPresent;
 
         @Nullable
-        String changeGroupId;
-
-        @Nullable
-        String changeArtifactId;
+        GroupArtifactVersion changeTo;
 
         boolean removeVersionTag;
 
-        @Nullable
-        String createVersion;
-
-        @Nullable
-        String changeVersion;
+        boolean createVersion;
     }
 
     @Value
