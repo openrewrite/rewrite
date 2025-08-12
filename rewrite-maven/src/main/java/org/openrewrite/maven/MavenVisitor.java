@@ -28,9 +28,7 @@ import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -340,12 +338,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
      * in the same POM, the method updates the property instead of directly modifying the tag value.
      * This method does not update properties defined in a parent POM.
      *
-     * @param tag           The XML tag that contains the child tag.
-     * @param childTagName  The name of the child tag whose value should be changed.
-     * @param newValue      The new value to assign to the child tag. If {@code null} or equal to the current value,
-     *                      no change is made.
-     * @param p             The visitor context.
-     * @return              The potentially updated tag.
+     * @param tag          The XML tag that contains the child tag.
+     * @param childTagName The name of the child tag whose value should be changed.
+     * @param newValue     The new value to assign to the child tag. If {@code null} or equal to the current value,
+     *                     no change is made.
+     * @param p            The visitor context.
+     * @return The potentially updated tag.
      */
     protected Xml.Tag changeChildTagValue(Xml.Tag tag, String childTagName, @Nullable String newValue, P p) {
         Optional<Xml.Tag> childTag = tag.getChild(childTagName);
