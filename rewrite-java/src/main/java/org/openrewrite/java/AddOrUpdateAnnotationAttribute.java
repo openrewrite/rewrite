@@ -34,6 +34,7 @@ import static java.lang.Boolean.TRUE;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 import static org.openrewrite.marker.Markers.EMPTY;
@@ -172,6 +173,16 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
                         return as;
                     }
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        List<Expression> updatedList = updateInitializer(annotation, singletonList(as.getAssignment()), getAttributeValues());
+                        Expression flattenedList = createAnnotationLiteralFromString(
+                                annotation,
+                                wrapValues(updatedList.stream()
+                                        .map(e -> ((J.Literal) e).getValueSource())
+                                        .collect(toList()), true)
+                        );
+                        return as.withAssignment(flattenedList);
+                    }
                     return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
                 }
                 if (exp instanceof J.FieldAccess) {
@@ -244,6 +255,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString() : newAttributeValue;
                 //noinspection ConstantConditions
                 return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                        .getArguments().get(0);
+            }
+
+            private Expression createAnnotationLiteralFromString(J.Annotation annotation, String updatedAttributeValue) {
+                //noinspection ConstantConditions
+                return JavaTemplate.<J.Annotation>apply("#{}", getCursor(), annotation.getCoordinates().replaceArguments(), updatedAttributeValue)
                         .getArguments().get(0);
             }
 
@@ -325,7 +342,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private String getAttributeValuesAsString() {
-        return getAttributeValues().stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
+        return wrapValues(getAttributeValues(), false);
+    }
+
+    private String wrapValues(List<@Nullable String> values, boolean quoteless) {
+        if (quoteless) {
+            return values.stream().map(String::valueOf).collect(joining(", ", "{", "}"));
+        }
+        return values.stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
     }
 
     private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
