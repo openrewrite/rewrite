@@ -26,6 +26,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Position;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -424,16 +425,27 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<Statement> primaryConstructor = null;
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
+            Space prefix = sourceBefore("(");
+            Map<Integer, JCAnnotation> recordAnnotationPosTable = new HashMap<>();
             List<Tree> stateVector = new ArrayList<>();
             for (Tree member : node.getMembers()) {
+                if (member instanceof JCMethodDecl md) {
+                    if (hasFlag(md.getModifiers(), Flags.RECORD) && md.getName().toString().equals("<init>")) {
+                        for (JCVariableDecl var : md.getParameters()) {
+                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable);
+                        }
+                    }
+                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        stateVector.add(vt);
+                        mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable);
                     }
                 }
             }
+            List<J.Annotation> recordAnnotations = collectAnnotations(recordAnnotationPosTable);
+
             primaryConstructor = JContainer.build(
-                    sourceBefore("("),
+                    prefix,
                     stateVector.isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
@@ -877,9 +889,17 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
-        cursor(endPos(node));
+        int endPos = endPos(node);
         Object value = node.getValue();
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+
+        if (endPos == Position.NOPOS) {
+            String str = value + "";
+            int delimLength = source.substring(cursor).indexOf(str);
+            endPos = cursor + delimLength + str.length() + delimLength;
+        }
+
+        cursor(endPos);
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
