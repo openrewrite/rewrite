@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 
@@ -107,32 +108,18 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             // and copy any associated comments and space
             else if (newAccessLevel == null) {
                 final List<Comment> modifierComments = new ArrayList<>();
-                final List<Space> removedModifierPrefix = new ArrayList<>();
+                final AtomicReference<@Nullable Space> removedModifierPrefix = new AtomicReference<>(null);
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
                         modifierComments.addAll(mod.getComments());
-                        removedModifierPrefix.add(mod.getPrefix());
+                        removedModifierPrefix.set(mod.getPrefix());
                         return null;
                     }
 
-                    if (!removedModifierPrefix.isEmpty()) {
-                        // Merge the removed modifier's prefix with the current modifier's prefix
-                        // Preserve the whitespace structure while moving comments
-                        Space removedPrefix = removedModifierPrefix.get(0);
-                        final List<Comment> allComments = ListUtils.concatAll(removedPrefix.getComments(), mod.getPrefix().getComments());
-
-                        // Use the removed modifier's whitespace if it has meaningful content, otherwise use current
-                        String currentWhitespace = mod.getPrefix().getWhitespace();
-                        if (currentWhitespace.isEmpty()) {
-                            String removedWhitespace = removedPrefix.getWhitespace();
-                            if (!removedWhitespace.isEmpty()) {
-                                currentWhitespace = removedWhitespace;
-                            }
-                        }
-
-                        Space mergedPrefix = Space.build(currentWhitespace, allComments);
-                        J.Modifier nextModifier = mod.withPrefix(mergedPrefix);
-                        removedModifierPrefix.clear();
+                    Space removedSpace = removedModifierPrefix.getAndSet(null);
+                    if (removedSpace != null) {
+                        J.Modifier nextModifier = mod.withPrefix(mod.getPrefix().withComments(
+                                ListUtils.concatAll(removedSpace.getComments(), mod.getComments())));
 
                         // Also handle modifier's own comments if any
                         if (!modifierComments.isEmpty()) {
