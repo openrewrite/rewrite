@@ -107,7 +107,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     /**
-     * Is a tag a dependency that matches the group and artifact?
+     * Determines whether the current XML tag represents a dependency matching the given
+     * groupId and artifactId patterns, based on the project's resolved dependencies.
      *
      * @param groupId    The group ID glob expression to compare the tag against.
      * @param artifactId The artifact ID glob expression to compare the tag against.
@@ -156,7 +157,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     /**
-     * Is a tag a dependency that matches the group and artifact?
+     * Determines whether the current XML tag represents a dependency matching the given
+     * groupId and artifactId patterns, based on the project's requested dependencies
+     * (as declared in the POM before resolution).
      *
      * @param groupId    The group ID glob expression to compare the tag against.
      * @param artifactId The artifact ID glob expression to compare the tag against.
