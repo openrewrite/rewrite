@@ -292,13 +292,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
                 if (isProperty(oldValue)) {
+                    MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
-                    ResolvedPom pom = getResolutionResult().getPom();
+                    ResolvedPom pom = resolutionResult.getPom();
                     //If the current requested pom has the property defined, or if the pom has the property defined and it is inherited from a parent pom that is not in the same source tree
-                    if (pom.getRequested().getProperties().containsKey(propertyName) ||
-                            (pom.getProperties().containsKey(propertyName) && (pom.getRequested().getParent() == null || pom.getRequested().getParent().getRelativePath() == null))) {
-                        boolean addIfMissing = pom.getRequested().getParent() != null && pom.getRequested().getParent().getRelativePath() == null;
-                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing || addIfMissing, false).getVisitor());
+                    if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
+                    } else if (resolutionResult.getParent() == null && pom.getProperties().containsKey(propertyName)) {
+                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
