@@ -61,6 +61,37 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void literalToListFromSingleValueUsingAppendArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "bars", "xyz", null, null, true)),
+          //language=java
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String[] bars() default {};
+              }
+              """
+          ),
+          //language=java
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo(bars = "abc")
+              public class A {}
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(bars = {"abc", "xyz"})
+              public class A {}
+              """
+          )
+        );
+    }
+
+    @Test
     void addValueAttributeClass() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", null, null, null)),
@@ -748,7 +779,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Foo;
 
-              @Foo(array = {"newTest1", "newTest2"})
+              @Foo(array = {"oldTest", "newTest1", "newTest2"})
               public class A {
               }
               """
