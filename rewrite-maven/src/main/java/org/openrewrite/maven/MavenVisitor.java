@@ -298,8 +298,18 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     //If the current requested pom has the property defined, or if the pom has the property defined and it is inherited from a parent pom that is not in the same source tree
                     if (pom.getRequested().getProperties().containsKey(propertyName)) {
                         doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
-                    } else if (resolutionResult.getParent() == null && pom.getProperties().containsKey(propertyName)) {
-                        doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
+                    } else if (pom.getProperties().containsKey(propertyName)) {
+                        boolean inheritsPropertyFromExternalParent = true;
+                        while (resolutionResult.getParent() != null) {
+                            resolutionResult = resolutionResult.getParent();
+                            if (resolutionResult.getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                inheritsPropertyFromExternalParent = false;
+                                break;
+                            }
+                        }
+                        if (inheritsPropertyFromExternalParent) {
+                            doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
+                        }
                     }
                 } else {
                     tag = (Xml.Tag) new ChangeTagValueVisitor<>(childTag.get(), newValue).visitNonNull(tag, p);
