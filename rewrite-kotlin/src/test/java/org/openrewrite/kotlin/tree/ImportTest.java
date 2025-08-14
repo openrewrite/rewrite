@@ -206,10 +206,13 @@ class ImportTest implements RewriteTest {
               import org.example.A.Companion.one
               """,
             spec -> spec.afterRecipe(cu -> {
+                JavaType firstImportType = cu.getImports().getFirst().getQualid().getType();
+                JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(firstImportType);
                 //noinspection DataFlowIssue
-                List<JavaType.FullyQualified> interfaces = TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getOwningClass().getInterfaces();
-                assertThat(interfaces).hasSize(1);
-                assertThat(interfaces.getFirst().getFullyQualifiedName()).isEqualTo("org.example.Shared");
+                assertThat(fullyQualified.getOwningClass().getInterfaces())
+                  .singleElement()
+                  .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                  .isEqualTo("org.example.Shared");
               }
             )
           )
