@@ -2034,7 +2034,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void doesNotDowngradeVersionInSettingsGradleExt() {
+    void doesNotDowngradeRegularDependencyVersionInSettingsGradleExt() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
           settingsGradle(
@@ -2056,6 +2056,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+                  }
               }
               """
           )
