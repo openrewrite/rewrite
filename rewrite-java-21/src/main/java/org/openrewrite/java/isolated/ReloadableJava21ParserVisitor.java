@@ -464,6 +464,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
             primaryConstructor = JContainer.build(
                     prefix,
+                    // We have to determine which annotations to add to the constructor parameters here.
                     ListUtils.map(varDecs, elem -> {
                         if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
                             RecordParam param = recordParams.get(vd.getVariables().getFirst().getSimpleName());
@@ -588,13 +589,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         List<JRightPadded<Statement>> members = new ArrayList<>(
                 membersMultiVariablesSeparated.size() + (enumSet == null ? 0 : 1));
-        if (kind.getType() != J.ClassDeclaration.Kind.Type.Record) {
-            if (enumSet != null) {
-                members.add(enumSet);
-            }
-            members.addAll(convertStatements(membersMultiVariablesSeparated));
-            addPossibleEmptyStatementsBeforeClosingBrace(members);
-        } else {
+        if (enumSet != null) {
+            members.add(enumSet);
+        }
+        // We have to determine which annotations to add to the field declarations here.
+        if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             for (Tree tree : membersMultiVariablesSeparated) {
                 if (tree instanceof VariableTree vt) {
                     RecordParam param = recordParams.get(vt.getName().toString());
@@ -617,7 +616,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     }));
                 }
             }
+        } else {
+            members.addAll(convertStatements(membersMultiVariablesSeparated));
         }
+        addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
