@@ -46,27 +46,27 @@ public class ChangeTaskToTasksRegister extends Recipe {
     @Override
     public String getDescription() {
         return "Changes eager task creation `task exampleName(type: ExampleType)` to lazy registration `tasks.register(\"exampleName\", ExampleType)`. " +
-          "Also supports Kotlin DSL: `task<ExampleType>(\"exampleName\")` to `tasks.register<ExampleType>(\"exampleName\")`.";
+                "Also supports Kotlin DSL: `task<ExampleType>(\"exampleName\")` to `tasks.register<ExampleType>(\"exampleName\")`.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new TreeVisitor<Tree, ExecutionContext>() {
 
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  if (tree == null) {
-                      return null;
-                  }
-                  if (tree instanceof G.CompilationUnit) {
-                      return new GroovyVisitor().visit(tree, ctx);
-                  }
-                  if (tree instanceof K.CompilationUnit) {
-                      return new KotlinVisitor().visit(tree, ctx);
-                  }
-                  return tree;
-              }
-          }
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree == null) {
+                            return null;
+                        }
+                        if (tree instanceof G.CompilationUnit) {
+                            return new GroovyVisitor().visit(tree, ctx);
+                        }
+                        if (tree instanceof K.CompilationUnit) {
+                            return new KotlinVisitor().visit(tree, ctx);
+                        }
+                        return tree;
+                    }
+                }
         );
     }
 
@@ -86,7 +86,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
             J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
             List<Expression> innerArgs = inner.getArguments();
-            if(innerArgs.isEmpty()) {
+            if (innerArgs.isEmpty()) {
                 return m;
             }
 
@@ -156,7 +156,7 @@ public class ChangeTaskToTasksRegister extends Recipe {
                         if (param instanceof J.VariableDeclarations) {
                             J.VariableDeclarations varDecls = (J.VariableDeclarations) param;
                             if (!varDecls.getVariables().isEmpty() &&
-                              varDecls.getVariables().get(0).getName().getSimpleName().equals(selectName)) {
+                                    varDecls.getVariables().get(0).getName().getSimpleName().equals(selectName)) {
                                 return true;
                             }
                         }
@@ -204,8 +204,8 @@ public class ChangeTaskToTasksRegister extends Recipe {
             J.MethodInvocation taskRegistration = KotlinTemplate.apply(template.toString(), getCursor(), m.getCoordinates().replace(), parameters.toArray());
 
             return m.withSelect(taskRegistration.getSelect())
-              .withName(taskRegistration.getName())
-              .withArguments(ListUtils.concat((taskRegistration).getArguments(), taskLambda));
+                    .withName(taskRegistration.getName())
+                    .withArguments(ListUtils.concat((taskRegistration).getArguments(), taskLambda));
         }
 
         private boolean isTaskDeclaration(J.MethodInvocation method) {
