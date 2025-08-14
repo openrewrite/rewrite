@@ -23,7 +23,10 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.attributes.Attributed;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
 import java.util.*;
@@ -54,8 +57,8 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     boolean isCanBeResolved;
 
     /**
-     *  Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
-     *  See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     * Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
      */
     boolean isCanBeConsumed;
 
@@ -205,7 +208,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     public @Nullable Dependency findRequestedDependency(String groupId, String artifactId) {
         for (Dependency d : requested) {
             if (StringUtils.matchesGlob(d.getGav().getGroupId(), groupId) &&
-                StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
+                    StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
                 return d;
             }
         }
