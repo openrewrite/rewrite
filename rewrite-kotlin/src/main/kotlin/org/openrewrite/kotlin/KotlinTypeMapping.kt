@@ -117,35 +117,104 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     fun type(type: Any?, parent: Any?, signature: String): JavaType? {
         return when (type) {
-            is ConeClassLikeType, is FirClass, is FirResolvedQualifier -> classType(type, parent, signature)
-            is ConeFlexibleType -> type(type.lowerBound, signature)
-            is ConeTypeProjection -> coneTypeProjectionType(type, signature)
-            is FirAnonymousFunctionExpression -> type(type.anonymousFunction, parent, signature)
-            is FirBlock ->
+            is ConeClassLikeType, is FirClass, is FirResolvedQualifier -> {
+                classType(type, parent, signature)
+            }
+
+            is ConeFlexibleType -> {
+                type(type.lowerBound, signature)
+            }
+
+            is ConeTypeProjection -> {
+                coneTypeProjectionType(type, signature)
+            }
+
+            is FirAnonymousFunctionExpression -> {
+                type(type.anonymousFunction, parent, signature)
+            }
+
+            is FirBlock -> {
                 // There is an issue in the KotlinTreeParserVisitor, PsiElementVisitor,
                 // or no FIR element associated to the Kt that requested a type.
                 // Example: AssignmentOperationTest#augmentedAssignmentAnnotation
                 Unknown.getInstance()
+            }
 
-            is FirErrorNamedReference -> Unknown.getInstance()
-            is FirSuperReference -> type(type.superTypeRef, signature)
-            is FirFile -> fileType(signature)
-            is FirFunction -> methodDeclarationType(type, parent, signature)
-            is FirFunctionCall -> methodInvocationType(type, signature)
-            is FirImport -> resolveImport(type, signature)
-            is FirJavaTypeRef -> type(type.type, parent, signature)
-            is FirOuterClassTypeParameterRef -> type(type.symbol.fir, parent, signature)
-            is FirPackageDirective -> packageDirective(signature)
-            is FirPropertyAccessExpression -> type(type.calleeReference, signature)
-            is FirResolvedNamedReference -> resolvedNameReferenceType(type, parent, signature)
-            is FirResolvedTypeRef -> type(type.coneType, parent, signature)
-            is FirSafeCallExpression -> type(type.selector, parent, signature)
-            is FirTypeParameter -> typeParameterType(type, signature)
-            is FirVariable -> variableType(type, parent, signature)
-            is FirVariableAssignment -> type(type.lValue.typeRef, parent, signature)
-            is FirExpression -> type(type.typeRef, parent, signature)
-            is JavaElement -> javaElement(type, signature)
-            else -> Unknown.getInstance()
+            is FirErrorNamedReference -> {
+                Unknown.getInstance()
+            }
+
+            is FirSuperReference -> {
+                type(type.superTypeRef, signature)
+            }
+
+            is FirFile -> {
+                fileType(signature)
+            }
+
+            is FirFunction -> {
+                methodDeclarationType(type, parent, signature)
+            }
+
+            is FirFunctionCall -> {
+                methodInvocationType(type, signature)
+            }
+
+            is FirImport -> {
+                resolveImport(type, signature)
+            }
+
+            is FirJavaTypeRef -> {
+                type(type.type, parent, signature)
+            }
+
+            is FirOuterClassTypeParameterRef -> {
+                type(type.symbol.fir, parent, signature)
+            }
+
+            is FirPackageDirective -> {
+                packageDirective(signature)
+            }
+
+            is FirPropertyAccessExpression -> {
+                type(type.calleeReference, signature)
+            }
+
+            is FirResolvedNamedReference -> {
+                resolvedNameReferenceType(type, parent, signature)
+            }
+
+            is FirResolvedTypeRef -> {
+                type(type.coneType, parent, signature)
+            }
+
+            is FirSafeCallExpression -> {
+                type(type.selector, parent, signature)
+            }
+
+            is FirTypeParameter -> {
+                typeParameterType(type, signature)
+            }
+
+            is FirVariable -> {
+                variableType(type, parent, signature)
+            }
+
+            is FirVariableAssignment -> {
+                type(type.lValue.typeRef, parent, signature)
+            }
+
+            is FirExpression -> {
+                type(type.typeRef, parent, signature)
+            }
+
+            is JavaElement -> {
+                javaElement(type, signature)
+            }
+
+            else -> {
+                Unknown.getInstance()
+            }
         }
     }
 
@@ -155,6 +224,7 @@ class KotlinTypeMapping(
             return null
         }
 
+        // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
         return type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession)
             ?.let { type(it.fir, signature) }
             ?: ShallowClass.build(signature)
@@ -181,9 +251,17 @@ class KotlinTypeMapping(
         var variance: GenericTypeVariable.Variance = JavaType.GenericTypeVariable.Variance.INVARIANT
         var bounds: MutableList<JavaType>? = null
         val name: String = when (type) {
-            is ConeKotlinTypeProjectionIn, is ConeKotlinTypeProjectionOut, is ConeStarProjection, is ConeCapturedType -> "?"
-            is ConeIntersectionType -> ""
-            else -> type.toString()
+            is ConeKotlinTypeProjectionIn, is ConeKotlinTypeProjectionOut, is ConeStarProjection, is ConeCapturedType -> {
+                "?"
+            }
+
+            is ConeIntersectionType -> {
+                ""
+            }
+
+            else -> {
+                type.toString()
+            }
         }
         val gtv = GenericTypeVariable(null, name, JavaType.GenericTypeVariable.Variance.INVARIANT, null)
         typeCache.put(signature, gtv)
@@ -694,7 +772,7 @@ class KotlinTypeMapping(
                     declaringType = createShallowClass("kotlin.Library")
                 }
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.SamConstructor) {
-                declaringType = when (val type = type(function.typeRef)) {
+                declaringType = when(val type = type(function.typeRef)) {
                     is Class -> type
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
@@ -982,7 +1060,7 @@ class KotlinTypeMapping(
     }
 
     private fun javaClassType(type: JavaClassifierType, signature: String): JavaType? {
-        var clazz: FullyQualified?
+        var clazz : FullyQualified?
         clazz = if (type.classifier != null) {
             TypeUtils.asFullyQualified(type(type.classifier!!))
         } else {
