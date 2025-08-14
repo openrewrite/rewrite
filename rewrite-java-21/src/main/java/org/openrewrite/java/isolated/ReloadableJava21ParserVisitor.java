@@ -599,19 +599,19 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 if (tree instanceof VariableTree vt) {
                     RecordParam param = recordParams.get(vt.getName().toString());
                     members.add(param.lstElem().map(elem -> {
-                        if (elem  instanceof J.VariableDeclarations vd) {
+                        if (elem instanceof J.VariableDeclarations vd) {
                             return vd.withModifiers(List.of(
-                                    new J.Modifier(randomId(), vt.getModifiers().getAnnotations().isEmpty() ? EMPTY : SINGLE_SPACE, Markers.EMPTY, "private", J.Modifier.Type.Private, emptyList()),
-                                    new J.Modifier(randomId(), SINGLE_SPACE, Markers.EMPTY, "final", J.Modifier.Type.Final, emptyList())
+                                            new J.Modifier(randomId(), vt.getModifiers().getAnnotations().isEmpty() ? EMPTY : SINGLE_SPACE, Markers.EMPTY, "private", J.Modifier.Type.Private, emptyList()),
+                                            new J.Modifier(randomId(), SINGLE_SPACE, Markers.EMPTY, "final", J.Modifier.Type.Final, emptyList())
                                     ))
                                     .withLeadingAnnotations(param.annotations().stream().filter(ann -> {
-                                for (AnnotationTree anno : param.varDecl().getModifiers().getAnnotations()) {
-                                    if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            }).collect(toList()));
+                                        for (AnnotationTree anno : param.varDecl().getModifiers().getAnnotations()) {
+                                            if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    }).collect(toList()));
                         }
                         return elem;
                     }));
@@ -2534,5 +2534,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 }
 
-record RecordParam(VariableTree varDecl, JCVariableDecl consParam, List<J.Annotation> annotations, JRightPadded<Statement> lstElem) {
+record RecordParam(VariableTree varDecl,
+                   JCVariableDecl consParam,
+                   List<J.Annotation> annotations,
+                   JRightPadded<Statement> lstElem) {
 }
