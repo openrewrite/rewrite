@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java.internal.parser;
 
-import lombok.RequiredArgsConstructor;
-import lombok.ToString;
-import lombok.Value;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.*;
@@ -138,12 +136,13 @@ public class TypeTable implements JavaParserClasspathLoader {
             return;
         }
 
+        Reader.Options options = Reader.Options.builder().artifactPrefixes(artifactNames).build();
         try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
-            new Reader(ctx).read(inflate, missingArtifacts);
+            new Reader(ctx).read(inflate, options);
         } catch (ZipException e) {
             // Fallback to `InflaterInputStream` for older files created as raw zlib data using DeflaterOutputStream
             try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
-                new Reader(ctx).read(inflate, missingArtifacts);
+                new Reader(ctx).read(inflate, options);
             } catch (IOException e1) {
                 throw new UncheckedIOException(e1);
             }
@@ -171,7 +170,48 @@ public class TypeTable implements JavaParserClasspathLoader {
      * Reads a type table from the classpath, and writes classes directories to disk for matching artifact names.
      */
     @RequiredArgsConstructor
-    static class Reader {
+    public static class Reader {
+
+        /**
+         * Options for controlling how type tables are read.
+         * This allows for flexible filtering and processing of type table entries.
+         * <p>
+         * Uses a builder pattern for future extensibility without breaking changes.
+         */
+        @lombok.Builder(builderClassName = "Builder")
+        @lombok.AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
+        public static class Options {
+            @lombok.Builder.Default
+            @Getter(AccessLevel.PACKAGE)
+            private final Predicate<String> artifactMatcher = gav -> true;
+
+            /**
+             * Creates options that match all artifacts.
+             */
+            public static Options matchAll() {
+                return builder().build();
+            }
+
+            /**
+             * Enhanced builder with convenience methods.
+             */
+            public static class Builder {
+
+                /**
+                 * Matches artifacts whose names start with any of the given prefixes.
+                 * @param artifactPrefixes Collection of artifact name prefixes to match
+                 */
+                public Builder artifactPrefixes(Collection<String> artifactPrefixes) {
+                    Set<Pattern> patterns = artifactPrefixes.stream()
+                            .map(prefix -> Pattern.compile(prefix + ".*"))
+                            .collect(toSet());
+                    this.artifactMatcher(artifactVersion -> patterns.stream()
+                            .anyMatch(pattern -> pattern.matcher(artifactVersion).matches()));
+                    return this;
+                }
+            }
+        }
+
         private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
                 Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
                 Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
@@ -179,28 +219,19 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         private final ExecutionContext ctx;
 
-        public void read(InputStream is, Collection<String> artifactNames) throws IOException {
-            if (artifactNames.isEmpty()) {
-                // could be empty due to the filtering in `artifactsNotYetWritten()`
-                return;
-            }
-
-            parseTsvAndProcess(is, createArtifactMatcher(artifactNames), this::writeClassesDir);
+        public void read(InputStream is, Options options) throws IOException {
+            parseTsvAndProcess(is, options, this::writeClassesDir);
         }
 
         /**
          * Read a type table and process classes with custom ClassVisitors instead of writing to disk.
          *
          * @param is The input stream containing the TSV data
-         * @param artifactNames Collection of artifact names to process (empty means process all)
+         * @param options Options controlling how the type table is read
          * @param visitorSupplier Supplier to create a ClassVisitor for each class
          */
-        public void read(InputStream is, Collection<String> artifactNames,
-                         Supplier<ClassVisitor> visitorSupplier) throws IOException {
-            Predicate<String> artifactMatcher = artifactNames.isEmpty() ?
-                    gav -> true : createArtifactMatcher(artifactNames);
-
-            parseTsvAndProcess(is, artifactMatcher,
+        public void read(InputStream is, Options options, Supplier<ClassVisitor> visitorSupplier) throws IOException {
+            parseTsvAndProcess(is, options,
                     (gav, classes, nestedTypes) -> {
                         for (ClassDefinition classDef : classes.values()) {
                             processClass(classDef, nestedTypes.getOrDefault(classDef.getName(), emptyList()), visitorSupplier.get());
@@ -209,25 +240,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         /**
-         * Creates a predicate to match artifact names.
-         * @param artifactNames Collection of artifact name prefixes to match
-         * @return A predicate that returns true if the artifact version matches any of the patterns,
-         *         or always returns true if artifactNames is empty
-         */
-        private Predicate<String> createArtifactMatcher(Collection<String> artifactNames) {
-            Set<Pattern> patterns = artifactNames.stream()
-                    .map(name -> Pattern.compile(name + ".*"))
-                    .collect(toSet());
-
-            return artifactVersion -> patterns.stream()
-                    .anyMatch(pattern -> pattern.matcher(artifactVersion).matches());
-        }
-
-        /**
          * Common TSV parsing logic used by both read() and readWithVisitors().
          * Parses the TSV and calls the processor for each GAV's classes.
          */
-        private void parseTsvAndProcess(InputStream is, Predicate<String> artifactMatcher,
+        private void parseTsvAndProcess(InputStream is, Options options,
                                         ClassesProcessor processor) throws IOException {
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
@@ -251,7 +267,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                         String artifactVersion = fields[1] + "-" + fields[2];
 
                         // Check if this artifact matches our predicate
-                        if (artifactMatcher.test(artifactVersion)) {
+                        if (options.getArtifactMatcher().test(artifactVersion)) {
                             matchedGav.set(rowGav);
                         }
                     }
@@ -390,19 +406,14 @@ public class TypeTable implements JavaParserClasspathLoader {
                         }
 
                         // Apply parameter annotations
-                        if (member.getParameterAnnotations() != null) {
-                            // Parse format: 0:[@NotNull@Valid]|1:[@Required]
-                            // Split on | to separate different parameters, but annotations within each parameter don't need delimiters
+                        if (member.getParameterAnnotations() != null && !member.getParameterAnnotations().isEmpty()) {
+                            // Parse dense format: "[annotations]||[annotations]|" where each position represents a parameter
+                            // Empty positions mean no annotations for that parameter
                             String[] paramAnnotations = TsvEscapeUtils.splitAnnotationList(member.getParameterAnnotations(), '|');
-                            for (String paramAnnotation : paramAnnotations) {
-                                int colonIdx = paramAnnotation.indexOf(':');
-                                if (colonIdx > 0) {
-                                    int paramIndex = Integer.parseInt(paramAnnotation.substring(0, colonIdx));
-                                    String annotationsPart = paramAnnotation.substring(colonIdx + 1);
-                                    // Remove brackets: [@Ann1@Ann2] -> @Ann1@Ann2
-                                    if (annotationsPart.startsWith("[") && annotationsPart.endsWith("]")) {
-                                        annotationsPart = annotationsPart.substring(1, annotationsPart.length() - 1);
-                                    }
+                            for (int i = 0; i < paramAnnotations.length; i++) {
+                                final int paramIndex = i;
+                                String annotationsPart = paramAnnotations[i];
+                                if (!annotationsPart.isEmpty()) {
                                     // Parse and apply the annotation sequence (no delimiters needed within)
                                     AnnotationApplier.applyAnnotations(annotationsPart,
                                             (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
@@ -939,7 +950,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames.isEmpty() ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions),
                             elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
-                            serializeParameterAnnotations(parameterAnnotations),
+                            serializeParameterAnnotations(parameterAnnotations, descriptor),
                             typeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(typeAnnotations),
                             constantValue == null ? "" : constantValue
                     );
@@ -1019,14 +1030,20 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     /**
      * Serializes parameter annotations from a list of "paramIndex:annotation" strings
-     * into the TSV format: "0:[annotations]|1:[annotations]".
-     * Escapes any pipe characters in annotation values to prevent delimiter conflicts.
+     * into a dense TSV format where each parameter position is represented.
+     * For a method with 4 parameters where only parameters 0 and 2 have annotations,
+     * the format would be: "[annotations]||[annotations]|"
+     * Returns empty string if no parameters have annotations.
      */
-    private static String serializeParameterAnnotations(List<String> parameterAnnotations) {
+    private static String serializeParameterAnnotations(List<String> parameterAnnotations, String descriptor) {
         if (parameterAnnotations.isEmpty()) {
             return "";
         }
 
+        // Parse the method descriptor to get parameter count
+        Type methodType = Type.getMethodType(descriptor);
+        int paramCount = methodType.getArgumentTypes().length;
+        
         // Group annotations by parameter index
         Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
         for (String paramAnnotation : parameterAnnotations) {
@@ -1037,23 +1054,25 @@ public class TypeTable implements JavaParserClasspathLoader {
                 annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
             }
         }
+        
+        // If no parameters have annotations, return empty string
+        if (annotationsByParam.isEmpty()) {
+            return "";
+        }
 
-        // Build the result string
+        // Build the dense representation
         StringBuilder result = new StringBuilder();
-        boolean first = true;
-        for (Map.Entry<Integer, List<String>> entry : annotationsByParam.entrySet()) {
-            if (!first) {
+        for (int i = 0; i < paramCount; i++) {
+            if (i > 0) {
                 result.append('|');
             }
-            first = false;
-
-            result.append(entry.getKey()).append(":[");
-            // No delimiters needed between annotations - they're self-delimiting
-            // But we need to escape pipes in annotation values since we use pipes to separate parameters
-            for (String annotation : entry.getValue()) {
-                result.append(PipeDelimitedJoiner.escapePipes(annotation));
+            List<String> annotations = annotationsByParam.get(i);
+            if (annotations != null && !annotations.isEmpty()) {
+                // Escape pipes in annotation values since we use pipes to separate parameters
+                for (String annotation : annotations) {
+                    result.append(PipeDelimitedJoiner.escapePipes(annotation));
+                }
             }
-            result.append("]");
         }
         return result.toString();
     }

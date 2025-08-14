@@ -16,7 +16,6 @@
 package org.openrewrite.java.internal.parser;
 
 import lombok.SneakyThrows;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
@@ -66,9 +65,6 @@ class TypeTableTest implements RewriteTest {
     ExecutionContext ctx;
     JavaCompiler compiler;
     Path tsv;
-
-    void foo(List<@Nullable ? extends @Nullable Number> l) {
-    }
 
     @BeforeEach
     void setUp() {
@@ -579,7 +575,7 @@ class TypeTableTest implements RewriteTest {
 
                     // Verify the annotation has the expected methods (proving structure is preserved)
                     assertThat(annotationType.getMethods()).hasSize(5);
-                    assertThat(annotationType.getMethods().stream().map(m -> m.getName()))
+                    assertThat(annotationType.getMethods().stream().map(JavaType.Method::getName))
                       .containsExactlyInAnyOrder("message", "values", "specialChars", "priority", "enabled");
 
                     // Verify all default values are preserved through the TypeTable roundtrip

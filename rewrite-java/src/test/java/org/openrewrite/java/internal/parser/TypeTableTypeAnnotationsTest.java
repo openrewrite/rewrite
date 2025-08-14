@@ -117,21 +117,21 @@ class TypeTableTypeAnnotationsTest {
                 String[] cols = line.split("\t", -1);
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[15]).as("parameterAnnotations column for singleParam")
-                  .isEqualTo("0:[@Ltest/annotations/NotNull;]");
+                  .isEqualTo("@Ltest/annotations/NotNull;");
             }
 
             if (line.contains("\tmultipleParams\t")) {
                 String[] cols = line.split("\t", -1);
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[15]).as("parameterAnnotations column for multipleParams")
-                  .isEqualTo("0:[@Ltest/annotations/NotNull;]|1:[@Ltest/annotations/NotNull;@Ltest/annotations/Valid;]");
+                  .isEqualTo("@Ltest/annotations/NotNull;|@Ltest/annotations/NotNull;@Ltest/annotations/Valid;");
             }
 
             if (line.contains("\tmixedParams\t")) {
                 String[] cols = line.split("\t", -1);
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[15]).as("parameterAnnotations column for mixedParams")
-                  .isEqualTo("1:[@Ltest/annotations/Valid;]");
+                  .isEqualTo("|@Ltest/annotations/Valid;");
             }
         }
     }
@@ -444,19 +444,9 @@ class TypeTableTypeAnnotationsTest {
                 // The pipe delimiter between parameters should work correctly
                 // even though the annotation values contain escaped pipes
                 assertThat(paramAnnotations).as("parameterAnnotations for validate method")
-                  .contains("0:[@Ltest/Pattern;")
-                  .contains("1:[@Ltest/Description;")
-                  .contains("2:[@Ltest/Pattern;")
-                  .contains("value=s\"\\\\d+\\|\\\\w+\"")  // Escaped pipes in value
-                  .contains("text=s\"Options: A\\|B\\|C\"")  // Escaped pipes in value
-                  .contains("value=s\"[a-z]+\\|[A-Z]+\"");  // Escaped pipes in value
-
-                // Verify that we can parse it back correctly by checking structure
-                String[] params = TsvEscapeUtils.splitAnnotationList(paramAnnotations, '|');
-                assertThat(params).hasSize(3);
-                assertThat(params[0]).startsWith("0:");
-                assertThat(params[1]).startsWith("1:");
-                assertThat(params[2]).startsWith("2:");
+                  .contains("@Ltest/Pattern;(value=s\"\\\\d+\\|\\\\w+\")")
+                  .contains("@Ltest/Description;(text=s\"Options: A\\|B\\|C\")")
+                  .contains("@Ltest/Pattern;(value=s\"[a-z]+\\|[A-Z]+\")@Ltest/Description;(text=s\"Letters\\|Digits\")");
 
                 break;
             }
@@ -502,7 +492,7 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[14]).as("elementAnnotations")
                   .contains("@Ltest/MethodAnnotation;");
                 assertThat(cols[15]).as("parameterAnnotations")
-                  .contains("0:[@Ltest/ParamAnnotation;]");
+                  .contains("@Ltest/ParamAnnotation;");
                 assertThat(cols[16]).as("typeAnnotations")
                   .contains("METHOD_RETURN:::@Ltest/TypeAnnotation;")
                   .contains("METHOD_PARAM:::@Ltest/TypeAnnotation;");
