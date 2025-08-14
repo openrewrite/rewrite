@@ -20,9 +20,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -185,7 +188,7 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
-    void superTypeInformation() {
+    void interfaceInformation() {
         rewriteRun(
           kotlin(
             """
@@ -204,9 +207,9 @@ class ImportTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 //noinspection DataFlowIssue
-                var supertype = TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getSupertype();
-                assertThat(supertype).isNotNull();
-                assertThat(supertype.getFullyQualifiedName()).isEqualTo("org.example.Shared");
+                List<JavaType.FullyQualified> interfaces = TypeUtils.asFullyQualified(cu.getImports().getFirst().getQualid().getType()).getOwningClass().getInterfaces();
+                assertThat(interfaces).hasSize(1);
+                assertThat(interfaces.getFirst().getFullyQualifiedName()).isEqualTo("org.example.Shared");
               }
             )
           )
