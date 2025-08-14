@@ -34,6 +34,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
@@ -45,7 +47,6 @@ import java.util.zip.ZipException;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
-import static org.objectweb.asm.ClassReader.SKIP_DEBUG;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.AnnotationSerializer.convertAnnotationValueToString;
@@ -184,10 +185,50 @@ public class TypeTable implements JavaParserClasspathLoader {
                 return;
             }
 
-            Set<Pattern> artifactNamePatterns = artifactNames.stream()
+            parseTsvAndProcess(is, createArtifactMatcher(artifactNames), this::writeClassesDir);
+        }
+
+        /**
+         * Read a type table and process classes with custom ClassVisitors instead of writing to disk.
+         *
+         * @param is The input stream containing the TSV data
+         * @param artifactNames Collection of artifact names to process (empty means process all)
+         * @param visitorSupplier Supplier to create a ClassVisitor for each class
+         */
+        public void read(InputStream is, Collection<String> artifactNames,
+                         Supplier<ClassVisitor> visitorSupplier) throws IOException {
+            Predicate<String> artifactMatcher = artifactNames.isEmpty() ?
+                    gav -> true : createArtifactMatcher(artifactNames);
+
+            parseTsvAndProcess(is, artifactMatcher,
+                    (gav, classes, nestedTypes) -> {
+                        for (ClassDefinition classDef : classes.values()) {
+                            processClass(classDef, nestedTypes.getOrDefault(classDef.getName(), emptyList()), visitorSupplier.get());
+                        }
+                    });
+        }
+
+        /**
+         * Creates a predicate to match artifact names.
+         * @param artifactNames Collection of artifact name prefixes to match
+         * @return A predicate that returns true if the artifact version matches any of the patterns,
+         *         or always returns true if artifactNames is empty
+         */
+        private Predicate<String> createArtifactMatcher(Collection<String> artifactNames) {
+            Set<Pattern> patterns = artifactNames.stream()
                     .map(name -> Pattern.compile(name + ".*"))
                     .collect(toSet());
 
+            return artifactVersion -> patterns.stream()
+                    .anyMatch(pattern -> pattern.matcher(artifactVersion).matches());
+        }
+
+        /**
+         * Common TSV parsing logic used by both read() and readWithVisitors().
+         * Parses the TSV and calls the processor for each GAV's classes.
+         */
+        private void parseTsvAndProcess(InputStream is, Predicate<String> artifactMatcher,
+                                        ClassesProcessor processor) throws IOException {
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
             // nested types appear first in type tables and therefore not stored in a `ClassDefinition` field
@@ -200,18 +241,18 @@ public class TypeTable implements JavaParserClasspathLoader {
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
-                        writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
+                        if (matchedGav.get() != null) {
+                            processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner);
+                        }
                         matchedGav.set(null);
                         classesByName.clear();
                         nestedTypesByOwner.clear();
 
                         String artifactVersion = fields[1] + "-" + fields[2];
 
-                        for (Pattern artifactNamePattern : artifactNamePatterns) {
-                            if (artifactNamePattern.matcher(artifactVersion).matches()) {
-                                matchedGav.set(rowGav);
-                                break;
-                            }
+                        // Check if this artifact matches our predicate
+                        if (artifactMatcher.test(artifactVersion)) {
+                            matchedGav.set(rowGav);
                         }
                     }
                     lastGav.set(rowGav);
@@ -254,7 +295,16 @@ public class TypeTable implements JavaParserClasspathLoader {
                 });
             }
 
-            writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
+            // Process final GAV if any
+            if (matchedGav.get() != null) {
+                processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner);
+            }
+        }
+
+        @FunctionalInterface
+        private interface ClassesProcessor {
+            void accept(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
+                        Map<String, List<ClassDefinition>> nestedTypes);
         }
 
         private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
@@ -280,134 +330,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
                             new CheckClassAdapter(cw) : cw;
 
-                    classWriter.visit(
-                            V1_8,
-                            classDef.getAccess(),
-                            classDef.getName(),
-                            classDef.getSignature(),
-                            classDef.getSuperclassSignature(),
-                            classDef.getSuperinterfaceSignatures()
-                    );
-
-                    // Apply annotations to the class
-                    if (classDef.getAnnotations() != null) {
-                        AnnotationApplier.applyAnnotations(classDef.getAnnotations(), classWriter::visitAnnotation);
-                    }
-
-                    for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
-                        classWriter.visitInnerClass(
-                                innerClassDef.getName(),
-                                classDef.getName(),
-                                innerClassDef.getName().substring(classDef.getName().length() + 1),
-                                innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
-                        );
-                    }
-
-                    for (Member member : classDef.getMembers()) {
-                        if (member.getDescriptor().startsWith("(")) {
-                            MethodVisitor mv = classWriter
-                                    .visitMethod(
-                                            member.getAccess(),
-                                            member.getName(),
-                                            member.getDescriptor(),
-                                            member.getSignature(),
-                                            member.getExceptions()
-                                    );
-
-                            // Apply element annotations to the method
-                            if (member.getAnnotations() != null) {
-                                AnnotationApplier.applyAnnotations(member.getAnnotations(), mv::visitAnnotation);
-                            }
-
-                            // Apply parameter annotations
-                            if (member.getParameterAnnotations() != null) {
-                                // Parse format: 0:[@NotNull@Valid]|1:[@Required]
-                                // Split on | to separate different parameters, but annotations within each parameter don't need delimiters
-                                String[] paramAnnotations = TsvEscapeUtils.splitAnnotationList(member.getParameterAnnotations(), '|');
-                                for (String paramAnnotation : paramAnnotations) {
-                                    int colonIdx = paramAnnotation.indexOf(':');
-                                    if (colonIdx > 0) {
-                                        int paramIndex = Integer.parseInt(paramAnnotation.substring(0, colonIdx));
-                                        String annotationsPart = paramAnnotation.substring(colonIdx + 1);
-                                        // Remove brackets: [@Ann1@Ann2] -> @Ann1@Ann2
-                                        if (annotationsPart.startsWith("[") && annotationsPart.endsWith("]")) {
-                                            annotationsPart = annotationsPart.substring(1, annotationsPart.length() - 1);
-                                        }
-                                        // Parse and apply the annotation sequence (no delimiters needed within)
-                                        AnnotationApplier.applyAnnotations(annotationsPart,
-                                                (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
-                                    }
-                                }
-                            }
-
-                            // Apply type annotations
-                            if (member.getTypeAnnotations() != null) {
-                                for (String typeAnnotation : member.getTypeAnnotations()) {
-                                    TypeAnnotationSupport.TypeAnnotationInfo info =
-                                            TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
-                                    AnnotationApplier.applyAnnotation(info.annotation,
-                                            (descriptor, visible) -> mv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
-                                }
-                            }
-
-                            String[] parameterNames = member.getParameterNames();
-                            if (parameterNames != null) {
-                                for (String parameterName : parameterNames) {
-                                    mv.visitParameter(parameterName, 0);
-                                }
-                            }
-
-                            if (member.getConstantValue() != null) {
-                                AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
-                                AnnotationSerializer.processAnnotationDefaultValue(
-                                        annotationDefaultVisitor,
-                                        AnnotationDeserializer.parseValue(member.getConstantValue())
-                                );
-                                annotationDefaultVisitor.visitEnd();
-                            }
-
-                            writeMethodBody(member, mv);
-                            mv.visitEnd();
-                        } else {
-                            // Determine the constant value for static final fields
-                            // Only set constantValue for bytecode if it's a valid ConstantValue attribute type
-                            Object constantValue = null;
-                            if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
-                                    member.getConstantValue() != null) {
-                                Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
-                                // Only primitive types and strings can be ConstantValue attributes
-                                if (isValidConstantValueType(parsedValue)) {
-                                    constantValue = parsedValue;
-                                }
-                            }
-
-                            FieldVisitor fv = classWriter
-                                    .visitField(
-                                            member.getAccess(),
-                                            member.getName(),
-                                            member.getDescriptor(),
-                                            member.getSignature(),
-                                            constantValue
-                                    );
-
-                            // Apply element annotations to the field
-                            if (member.getAnnotations() != null) {
-                                AnnotationApplier.applyAnnotations(member.getAnnotations(), fv::visitAnnotation);
-                            }
-
-                            // Apply type annotations for fields
-                            if (member.getTypeAnnotations() != null) {
-                                for (String typeAnnotation : member.getTypeAnnotations()) {
-                                    TypeAnnotationSupport.TypeAnnotationInfo info =
-                                            TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
-                                    AnnotationApplier.applyAnnotation(info.annotation,
-                                            (descriptor, visible) -> fv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
-                                }
-                            }
-
-                            fv.visitEnd();
-                        }
-                    }
+                    processClass(classDef, nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList()), classWriter);
 
                     try {
                         Files.write(classFile, cw.toByteArray());
@@ -419,6 +342,147 @@ public class TypeTable implements JavaParserClasspathLoader {
             } catch (Exception e) {
                 future.completeExceptionally(e);
             }
+        }
+
+        /**
+         * Process a single class definition by feeding it to a ClassVisitor.
+         * This contains the core logic for converting TypeTable data to ASM visitor calls.
+         */
+        private void processClass(ClassDefinition classDef, List<ClassDefinition> nestedTypes, ClassVisitor classVisitor) {
+            classVisitor.visit(
+                    V1_8,
+                    classDef.getAccess(),
+                    classDef.getName(),
+                    classDef.getSignature(),
+                    classDef.getSuperclassSignature(),
+                    classDef.getSuperinterfaceSignatures()
+            );
+
+            // Apply annotations to the class
+            if (classDef.getAnnotations() != null) {
+                AnnotationApplier.applyAnnotations(classDef.getAnnotations(), classVisitor::visitAnnotation);
+            }
+
+            for (ClassDefinition innerClassDef : nestedTypes) {
+                classVisitor.visitInnerClass(
+                        innerClassDef.getName(),
+                        classDef.getName(),
+                        innerClassDef.getName().substring(classDef.getName().length() + 1),
+                        innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
+                );
+            }
+
+            for (Member member : classDef.getMembers()) {
+                if (member.getDescriptor().startsWith("(")) {
+                    MethodVisitor mv = classVisitor
+                            .visitMethod(
+                                    member.getAccess(),
+                                    member.getName(),
+                                    member.getDescriptor(),
+                                    member.getSignature(),
+                                    member.getExceptions()
+                            );
+
+                    if (mv != null) {
+                        // Apply element annotations to the method
+                        if (member.getAnnotations() != null) {
+                            AnnotationApplier.applyAnnotations(member.getAnnotations(), mv::visitAnnotation);
+                        }
+
+                        // Apply parameter annotations
+                        if (member.getParameterAnnotations() != null) {
+                            // Parse format: 0:[@NotNull@Valid]|1:[@Required]
+                            // Split on | to separate different parameters, but annotations within each parameter don't need delimiters
+                            String[] paramAnnotations = TsvEscapeUtils.splitAnnotationList(member.getParameterAnnotations(), '|');
+                            for (String paramAnnotation : paramAnnotations) {
+                                int colonIdx = paramAnnotation.indexOf(':');
+                                if (colonIdx > 0) {
+                                    int paramIndex = Integer.parseInt(paramAnnotation.substring(0, colonIdx));
+                                    String annotationsPart = paramAnnotation.substring(colonIdx + 1);
+                                    // Remove brackets: [@Ann1@Ann2] -> @Ann1@Ann2
+                                    if (annotationsPart.startsWith("[") && annotationsPart.endsWith("]")) {
+                                        annotationsPart = annotationsPart.substring(1, annotationsPart.length() - 1);
+                                    }
+                                    // Parse and apply the annotation sequence (no delimiters needed within)
+                                    AnnotationApplier.applyAnnotations(annotationsPart,
+                                            (descriptor, visible) -> mv.visitParameterAnnotation(paramIndex, descriptor, visible));
+                                }
+                            }
+                        }
+
+                        // Apply type annotations
+                        if (member.getTypeAnnotations() != null) {
+                            for (String typeAnnotation : member.getTypeAnnotations()) {
+                                TypeAnnotationSupport.TypeAnnotationInfo info =
+                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                AnnotationApplier.applyAnnotation(info.annotation,
+                                        (descriptor, visible) -> mv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
+                            }
+                        }
+
+                        String[] parameterNames = member.getParameterNames();
+                        if (parameterNames != null) {
+                            for (String parameterName : parameterNames) {
+                                mv.visitParameter(parameterName, 0);
+                            }
+                        }
+
+                        if (member.getConstantValue() != null) {
+                            AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
+                            AnnotationSerializer.processAnnotationDefaultValue(
+                                    annotationDefaultVisitor,
+                                    AnnotationDeserializer.parseValue(member.getConstantValue())
+                            );
+                            annotationDefaultVisitor.visitEnd();
+                        }
+
+                        writeMethodBody(member, mv);
+                        mv.visitEnd();
+                    }
+                } else {
+                    // Determine the constant value for static final fields
+                    // Only set constantValue for bytecode if it's a valid ConstantValue attribute type
+                    Object constantValue = null;
+                    if ((member.getAccess() & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
+                            member.getConstantValue() != null) {
+                        Object parsedValue = AnnotationDeserializer.parseValue(member.getConstantValue());
+                        // Only primitive types and strings can be ConstantValue attributes
+                        if (isValidConstantValueType(parsedValue)) {
+                            constantValue = parsedValue;
+                        }
+                    }
+
+                    FieldVisitor fv = classVisitor
+                            .visitField(
+                                    member.getAccess(),
+                                    member.getName(),
+                                    member.getDescriptor(),
+                                    member.getSignature(),
+                                    constantValue
+                            );
+
+                    if (fv != null) {
+                        // Apply element annotations to the field
+                        if (member.getAnnotations() != null) {
+                            AnnotationApplier.applyAnnotations(member.getAnnotations(), fv::visitAnnotation);
+                        }
+
+                        // Apply type annotations for fields
+                        if (member.getTypeAnnotations() != null) {
+                            for (String typeAnnotation : member.getTypeAnnotations()) {
+                                TypeAnnotationSupport.TypeAnnotationInfo info =
+                                        TypeAnnotationSupport.TypeAnnotationInfo.parse(typeAnnotation);
+                                AnnotationApplier.applyAnnotation(info.annotation,
+                                        (descriptor, visible) -> fv.visitTypeAnnotation(info.typeRef, info.typePath, descriptor, visible));
+                            }
+                        }
+
+                        fv.visitEnd();
+                    }
+                }
+            }
+
+            classVisitor.visitEnd();
         }
 
         private void writeMethodBody(Member member, MethodVisitor mv) {
@@ -562,224 +626,235 @@ public class TypeTable implements JavaParserClasspathLoader {
                         JarEntry entry = entries.nextElement();
                         if (entry.getName().endsWith(".class")) {
                             try (InputStream inputStream = jarFile.getInputStream(entry)) {
-                                new ClassReader(inputStream).accept(new ClassVisitor(Opcodes.ASM9) {
-                                    @Nullable
-                                    ClassDefinition classDefinition;
-
-                                    @Override
-                                    public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                                        int lastIndexOf$ = name.lastIndexOf('$');
-                                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && !Character.isJavaIdentifierStart(name.charAt(lastIndexOf$ + 1))) {
-                                            // skip anonymous subclasses
-                                            classDefinition = null;
-                                        } else {
-                                            classDefinition = new ClassDefinition(
-                                                    Jar.this,
-                                                    access,
-                                                    name,
-                                                    signature,
-                                                    superName,
-                                                    interfaces
-                                            );
-                                            super.visit(version, access, name, signature, superName, interfaces);
-                                        }
-                                    }
-
-                                    @Override
-                                    public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                        if (classDefinition != null) {
-                                            return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
-                                        }
-                                        return null;
-                                    }
-
-                                    @Override
-                                    public @Nullable AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
-                                        if (classDefinition != null) {
-                                            List<String> tempCollector = new ArrayList<>();
-                                            AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
-                                            return new AnnotationVisitor(Opcodes.ASM9, collector) {
-                                                @Override
-                                                public void visitEnd() {
-                                                    super.visitEnd();
-                                                    if (!tempCollector.isEmpty()) {
-                                                        String annotation = tempCollector.get(0);
-                                                        String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
-                                                        classDefinition.classTypeAnnotations.add(formatted);
-                                                    }
-                                                }
-                                            };
-                                        }
-                                        return null;
-                                    }
-
-                                    @Override
-                                    public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        if (classDefinition != null) {
-                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
-
-                                            // Only store constant values that can be ConstantValue attributes in bytecode
-                                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
-                                                    isValidConstantValueType(value)) {
-                                                member.constantValue = AnnotationSerializer.convertConstantValueWithType(value, descriptor);
-                                            }
-
-                                            return new FieldVisitor(Opcodes.ASM9) {
-                                                @Override
-                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
-                                                    List<String> tempCollector = new ArrayList<>();
-                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
-                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
-                                                        @Override
-                                                        public void visitEnd() {
-                                                            super.visitEnd();
-                                                            if (!tempCollector.isEmpty()) {
-                                                                String annotation = tempCollector.get(0);
-                                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
-                                                                member.typeAnnotations.add(formatted);
-                                                            }
-                                                        }
-                                                    };
-                                                }
-
-                                                @Override
-                                                public void visitEnd() {
-                                                    classDefinition.addField(member);
-                                                }
-                                            };
-                                        }
-
-                                        return null;
-                                    }
-
-                                    @Override
-                                    public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
-                                                                               @Nullable String signature, String @Nullable [] exceptions) {
-                                        // Repeating check from `writeMethod()` for performance reasons
-                                        if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
-                                                name != null && !"<clinit>".equals(name)) {
-                                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
-                                            return new MethodVisitor(Opcodes.ASM9) {
-                                                @Override
-                                                public void visitParameter(@Nullable String name, int access) {
-                                                    if (name != null) {
-                                                        member.parameterNames.add(name);
-                                                    }
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-                                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitParameterAnnotation(int parameter, String descriptor, boolean visible) {
-                                                    List<String> tempCollector = new ArrayList<>();
-                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
-                                                    // After collection, add to parameter annotations with parameter index
-                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
-                                                        @Override
-                                                        public void visitEnd() {
-                                                            super.visitEnd();
-                                                            if (!tempCollector.isEmpty()) {
-                                                                // Format: "paramIndex:annotation"
-                                                                member.parameterAnnotations.add(parameter + ":" + tempCollector.get(0));
-                                                            }
-                                                        }
-                                                    };
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
-                                                    List<String> tempCollector = new ArrayList<>();
-                                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
-                                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
-                                                        @Override
-                                                        public void visitEnd() {
-                                                            super.visitEnd();
-                                                            if (!tempCollector.isEmpty()) {
-                                                                String annotation = tempCollector.get(0);
-                                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
-                                                                member.typeAnnotations.add(formatted);
-                                                            }
-                                                        }
-                                                    };
-                                                }
-
-                                                @Override
-                                                public AnnotationVisitor visitAnnotationDefault() {
-                                                    List<String> nested = new ArrayList<>();
-                                                    // Collect default values for annotation methods
-                                                    return new AnnotationVisitor(Opcodes.ASM9) {
-                                                        @Override
-                                                        public void visit(String name, Object value) {
-                                                            member.constantValue = convertAnnotationValueToString(value);
-                                                        }
-
-                                                        @Override
-                                                        public AnnotationVisitor visitArray(String name) {
-                                                            return new AnnotationVisitor(Opcodes.ASM9) {
-                                                                final List<String> arrayValues = new ArrayList<>();
-
-                                                                @Override
-                                                                public void visit(String name, Object value) {
-                                                                    arrayValues.add(convertAnnotationValueToString(value));
-                                                                }
-
-                                                                @Override
-                                                                public void visitEnd() {
-                                                                    member.constantValue = "[" + String.join(",", arrayValues) + "]";
-                                                                }
-                                                            };
-                                                        }
-
-                                                        @Override
-                                                        public void visitEnum(String name, String descriptor, String value) {
-                                                            member.constantValue = "e" + descriptor + "." + value;
-                                                        }
-
-                                                        @Override
-                                                        public AnnotationVisitor visitAnnotation(String name, String descriptor) {
-                                                            return AnnotationCollectorHelper.createCollector(descriptor, nested);
-                                                        }
-
-                                                        @Override
-                                                        public void visitEnd() {
-                                                            if (!nested.isEmpty()) {
-                                                                member.constantValue = serializeArray(nested.toArray(new String[0]));
-                                                            }
-                                                        }
-                                                    };
-                                                }
-
-                                                @Override
-                                                public void visitEnd() {
-                                                    classDefinition.addMethod(member);
-                                                }
-                                            };
-                                        }
-                                        return null;
-                                    }
-
-                                    @Override
-                                    public void visitEnd() {
-                                        if (classDefinition != null && !"module-info".equals(classDefinition.className)) {
-                                            // No fields or methods, which can happen for marker annotations for example
-                                            classDefinition.writeClass();
-                                        }
-                                    }
-                                }, SKIP_DEBUG);
+                                writeClass(inputStream);
                             }
                         }
                     }
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
+            }
+
+            /**
+             * Write a single class from an InputStream containing bytecode.
+             * This can be used for processing individual class files.
+             *
+             * @param classInputStream InputStream containing the class bytecode
+             * @throws IOException if reading the class fails
+             */
+            public void writeClass(InputStream classInputStream) throws IOException {
+                new ClassReader(classInputStream).accept(new ClassVisitor(Opcodes.ASM9) {
+                    @Nullable
+                    ClassDefinition classDefinition;
+
+                    @Override
+                    public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+                        int lastIndexOf$ = name.lastIndexOf('$');
+                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && !Character.isJavaIdentifierStart(name.charAt(lastIndexOf$ + 1))) {
+                            // skip anonymous subclasses
+                            classDefinition = null;
+                        } else {
+                            classDefinition = new ClassDefinition(
+                                    Jar.this,
+                                    access,
+                                    name,
+                                    signature,
+                                    superName,
+                                    interfaces
+                            );
+                            super.visit(version, access, name, signature, superName, interfaces);
+                        }
+                    }
+
+                    @Override
+                    public @Nullable AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                        if (classDefinition != null) {
+                            return AnnotationCollectorHelper.createCollector(descriptor, requireNonNull(classDefinition).classAnnotations);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public @Nullable AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                        if (classDefinition != null) {
+                            List<String> tempCollector = new ArrayList<>();
+                            AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                            return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                @Override
+                                public void visitEnd() {
+                                    super.visitEnd();
+                                    if (!tempCollector.isEmpty()) {
+                                        String annotation = tempCollector.get(0);
+                                        String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                        classDefinition.classTypeAnnotations.add(formatted);
+                                    }
+                                }
+                            };
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+                        if (classDefinition != null) {
+                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, null, null);
+
+                            // Only store constant values that can be ConstantValue attributes in bytecode
+                            if ((access & (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL)) == (Opcodes.ACC_STATIC | Opcodes.ACC_FINAL) &&
+                                    isValidConstantValueType(value)) {
+                                member.constantValue = AnnotationSerializer.convertConstantValueWithType(value, descriptor);
+                            }
+
+                            return new FieldVisitor(Opcodes.ASM9) {
+                                @Override
+                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
+                                }
+
+                                @Override
+                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                                    List<String> tempCollector = new ArrayList<>();
+                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                        @Override
+                                        public void visitEnd() {
+                                            super.visitEnd();
+                                            if (!tempCollector.isEmpty()) {
+                                                String annotation = tempCollector.get(0);
+                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                                member.typeAnnotations.add(formatted);
+                                            }
+                                        }
+                                    };
+                                }
+
+                                @Override
+                                public void visitEnd() {
+                                    classDefinition.addField(member);
+                                }
+                            };
+                        }
+
+                        return null;
+                    }
+
+                    @Override
+                    public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
+                                                               @Nullable String signature, String @Nullable [] exceptions) {
+                        // Repeating check from `writeMethod()` for performance reasons
+                        if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
+                                name != null && !"<clinit>".equals(name)) {
+                            Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
+                            return new MethodVisitor(Opcodes.ASM9) {
+                                @Override
+                                public void visitParameter(@Nullable String name, int access) {
+                                    if (name != null) {
+                                        member.parameterNames.add(name);
+                                    }
+                                }
+
+                                @Override
+                                public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+                                    return AnnotationCollectorHelper.createCollector(descriptor, member.elementAnnotations);
+                                }
+
+                                @Override
+                                public AnnotationVisitor visitParameterAnnotation(int parameter, String descriptor, boolean visible) {
+                                    List<String> tempCollector = new ArrayList<>();
+                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                    // After collection, add to parameter annotations with parameter index
+                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                        @Override
+                                        public void visitEnd() {
+                                            super.visitEnd();
+                                            if (!tempCollector.isEmpty()) {
+                                                // Format: "paramIndex:annotation"
+                                                member.parameterAnnotations.add(parameter + ":" + tempCollector.get(0));
+                                            }
+                                        }
+                                    };
+                                }
+
+                                @Override
+                                public AnnotationVisitor visitTypeAnnotation(int typeRef, TypePath typePath, String descriptor, boolean visible) {
+                                    List<String> tempCollector = new ArrayList<>();
+                                    AnnotationVisitor collector = AnnotationCollectorHelper.createCollector(descriptor, tempCollector);
+                                    return new AnnotationVisitor(Opcodes.ASM9, collector) {
+                                        @Override
+                                        public void visitEnd() {
+                                            super.visitEnd();
+                                            if (!tempCollector.isEmpty()) {
+                                                String annotation = tempCollector.get(0);
+                                                String formatted = TypeAnnotationSupport.formatTypeAnnotation(typeRef, typePath, annotation);
+                                                member.typeAnnotations.add(formatted);
+                                            }
+                                        }
+                                    };
+                                }
+
+                                @Override
+                                public AnnotationVisitor visitAnnotationDefault() {
+                                    List<String> nested = new ArrayList<>();
+                                    // Collect default values for annotation methods
+                                    return new AnnotationVisitor(Opcodes.ASM9) {
+                                        @Override
+                                        public void visit(String name, Object value) {
+                                            member.constantValue = convertAnnotationValueToString(value);
+                                        }
+
+                                        @Override
+                                        public AnnotationVisitor visitArray(String name) {
+                                            return new AnnotationVisitor(Opcodes.ASM9) {
+                                                final List<String> arrayValues = new ArrayList<>();
+
+                                                @Override
+                                                public void visit(String name, Object value) {
+                                                    arrayValues.add(convertAnnotationValueToString(value));
+                                                }
+
+                                                @Override
+                                                public void visitEnd() {
+                                                    member.constantValue = "[" + String.join(",", arrayValues) + "]";
+                                                }
+                                            };
+                                        }
+
+                                        @Override
+                                        public void visitEnum(String name, String descriptor, String value) {
+                                            member.constantValue = "e" + descriptor + "." + value;
+                                        }
+
+                                        @Override
+                                        public AnnotationVisitor visitAnnotation(String name, String descriptor) {
+                                            return AnnotationCollectorHelper.createCollector(descriptor, nested);
+                                        }
+
+                                        @Override
+                                        public void visitEnd() {
+                                            if (!nested.isEmpty()) {
+                                                member.constantValue = serializeArray(nested.toArray(new String[0]));
+                                            }
+                                        }
+                                    };
+                                }
+
+                                @Override
+                                public void visitEnd() {
+                                    classDefinition.addMethod(member);
+                                }
+                            };
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public void visitEnd() {
+                        if (classDefinition != null && !"module-info".equals(classDefinition.className)) {
+                            // No fields or methods, which can happen for marker annotations for example
+                            classDefinition.writeClass();
+                        }
+                    }
+                }, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES);
             }
         }
 
@@ -951,7 +1026,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         if (parameterAnnotations.isEmpty()) {
             return "";
         }
-        
+
         // Group annotations by parameter index
         Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
         for (String paramAnnotation : parameterAnnotations) {
@@ -962,7 +1037,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                 annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
             }
         }
-        
+
         // Build the result string
         StringBuilder result = new StringBuilder();
         boolean first = true;
@@ -971,7 +1046,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                 result.append('|');
             }
             first = false;
-            
+
             result.append(entry.getKey()).append(":[");
             // No delimiters needed between annotations - they're self-delimiting
             // But we need to escape pipes in annotation values since we use pipes to separate parameters
@@ -982,7 +1057,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
         return result.toString();
     }
-    
+
     private static class PipeDelimitedJoiner {
         static String joinWithPipes(List<String> items) {
             if (items.isEmpty()) {
