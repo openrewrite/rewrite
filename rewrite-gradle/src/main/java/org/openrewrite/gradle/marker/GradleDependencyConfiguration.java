@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings("unused")
 @Value
@@ -268,7 +269,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         if (others == null || others.isEmpty()) {
             return new ArrayList<>(preferred);
         }
-        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(Collectors.toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it));
+        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it));
         for (GradleDependencyConstraint lowerPrecedenceConstraint : others) {
             results.putIfAbsent(new GroupArtifact(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
         }
