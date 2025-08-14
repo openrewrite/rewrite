@@ -427,4 +427,32 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void publicToPackagePrivateMovesLineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.DatabaseConfiguration dataSource(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class DatabaseConfiguration {
+                  @SuppressWarnings("ALL")
+                  // comments
+                  public static void dataSource() {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class DatabaseConfiguration {
+                  @SuppressWarnings("ALL") // comments
+                  static void dataSource() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
