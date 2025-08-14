@@ -30,7 +30,6 @@ import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Path;
@@ -195,7 +194,7 @@ class JavaScriptParserTest {
 
     @Test
     @Disabled
-    void complexTypeScript() throws MalformedURLException {
+    void complexTypeScript() throws Exception {
         URL url = URI.create("https://raw.githubusercontent.com/sinclairzx81/typebox/f958156785350aa052c5f822bc2970d0945d887b/src/syntax/parser.ts").toURL();
         Parser.Input input = new Parser.Input(Paths.get("parser.ts"), null, () -> {
             try {

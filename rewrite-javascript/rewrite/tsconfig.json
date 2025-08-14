@@ -4,6 +4,7 @@
     "module": "Node16",
     "moduleResolution": "node16",
     "isolatedModules": true,
+    "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "esModuleInterop": true,

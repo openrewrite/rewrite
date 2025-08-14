@@ -393,7 +393,7 @@ class ResolvedPomTest implements RewriteTest {
         Path localRepository2;
 
         @Test
-        void singleRepositoryContainingJar() throws IOException {
+        void singleRepositoryContainingJar() throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
 
@@ -418,7 +418,7 @@ class ResolvedPomTest implements RewriteTest {
         }
 
         @Test
-        void twoRepositoriesSecondContainingJar() throws IOException {
+        void twoRepositoriesSecondContainingJar() throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             MavenRepository mavenLocal2 = createMavenRepository(localRepository2, "local2");
             createJarFile(localRepository2);
@@ -450,7 +450,7 @@ class ResolvedPomTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
         @Test
-        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws IOException {
+        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
             createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
@@ -556,7 +556,7 @@ class ResolvedPomTest implements RewriteTest {
     }
 
     @Test
-    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws IOException {
+    void ignoreScopeInDependencyManagement(@TempDir Path localRepository) throws Exception {
         MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
         createJarFile(localRepository, "com.some", "some-artifact", "1");
 

@@ -107,7 +107,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parseWithEncryption()  throws IOException{
+    void parseWithEncryption()  throws Exception{
         createSettingsSecurityFile();
 
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -135,7 +135,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parsePlainTextWithEncryption()  throws IOException{
+    void parsePlainTextWithEncryption()  throws Exception{
         createSettingsSecurityFile();
         String plainTextPassword = "password";
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -420,7 +420,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsWithEncryption() throws IOException {
+    void serverCredentialsWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
@@ -448,7 +448,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsPlainTextWithEncryption() throws IOException {
+    void serverCredentialsPlainTextWithEncryption() throws Exception {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
 
@@ -957,7 +957,7 @@ class MavenSettingsTest {
     }
 
     @Test
-    void canDeserializeSettingsCorrectly() throws IOException {
+    void canDeserializeSettingsCorrectly() throws Exception {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
             <settings>
               <servers>

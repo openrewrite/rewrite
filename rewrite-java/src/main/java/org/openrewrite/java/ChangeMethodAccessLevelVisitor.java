@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 
@@ -104,16 +105,32 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
             }
 
             // If target access level is package-private (no modifier), remove the current access level modifier
-            // and copy any associated comments
+            // and copy any associated comments and space
             else if (newAccessLevel == null) {
                 final List<Comment> modifierComments = new ArrayList<>();
+                final AtomicReference<@Nullable Space> removedModifierPrefix = new AtomicReference<>(null);
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {
                         modifierComments.addAll(mod.getComments());
+                        removedModifierPrefix.set(mod.getPrefix());
                         return null;
                     }
 
-                    // copy access level modifier comment to next modifier if it exists
+                    Space removedSpace = removedModifierPrefix.getAndSet(null);
+                    if (removedSpace != null) {
+                        J.Modifier nextModifier = mod.withPrefix(mod.getPrefix().withComments(
+                                ListUtils.concatAll(removedSpace.getComments(), mod.getComments())));
+
+                        // Also handle modifier's own comments if any
+                        if (!modifierComments.isEmpty()) {
+                            nextModifier = nextModifier.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
+                            modifierComments.clear();
+                        }
+
+                        return nextModifier;
+                    }
+
+                    // copy access level modifier comment to next modifier if it exists (fallback)
                     if (!modifierComments.isEmpty()) {
                         J.Modifier nextModifier = mod.withComments(ListUtils.concatAll(new ArrayList<>(modifierComments), mod.getComments()));
                         modifierComments.clear();
