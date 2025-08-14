@@ -17,10 +17,7 @@ package org.openrewrite.kotlin.internal.template;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.Collection;
@@ -32,17 +29,19 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after, JavaCoordinates.Mode mode) {
         if (j instanceof J.MethodInvocation) {
             before.insert(0, "class Template {\n");
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
+            if (mode == JavaCoordinates.Mode.REPLACEMENT && (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void)) {
                 before.append("var o : Any = ");
             }
             after.append(";\n}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {\n");
-            before.append("var o : Any = ");
+            if(mode == JavaCoordinates.Mode.REPLACEMENT) {
+                before.append("var o : Any = ");
+            }
             after.append(";\n}");
         } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
             throw new IllegalArgumentException(

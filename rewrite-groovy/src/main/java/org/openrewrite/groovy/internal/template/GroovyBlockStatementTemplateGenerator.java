@@ -18,10 +18,7 @@ package org.openrewrite.groovy.internal.template;
 import org.openrewrite.Cursor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.Collection;
 import java.util.Set;
@@ -32,17 +29,19 @@ public class GroovyBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after, JavaCoordinates.Mode mode) {
         if (j instanceof J.MethodInvocation) {
             before.insert(0, "class Template {\n");
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
+            if (mode == JavaCoordinates.Mode.REPLACEMENT && (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void)) {
                 before.append("Object o = ");
             }
             after.append(";\n}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {\n");
-            before.append("Object o = ");
+            if(mode == JavaCoordinates.Mode.REPLACEMENT) {
+                before.append("Object o = ");
+            }
             after.append(";\n}");
         } else if (j instanceof J.ClassDeclaration || j instanceof G.ClassDeclaration) {
             throw new IllegalArgumentException(
