@@ -200,6 +200,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             } else if (arg.getValue() instanceof J.Identifier) {
                                 J.Identifier value = (J.Identifier) arg.getValue();
                                 valueValue = value.getSimpleName();
+                            } else if (arg.getValue() instanceof J.FieldAccess) {
+                                valueValue = arg.getValue().printTrimmed(getCursor());
                             } else if (arg.getValue() instanceof G.GString) {
                                 G.GString value = (G.GString) arg.getValue();
                                 List<J> strings = value.getStrings();
@@ -207,6 +209,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     G.GString.Value versionGStringValue = (G.GString.Value) strings.get(0);
                                     if (versionGStringValue.getTree() instanceof J.Identifier) {
                                         valueValue = ((J.Identifier) versionGStringValue.getTree()).getSimpleName();
+                                    } else if (versionGStringValue.getTree() instanceof J.FieldAccess) {
+                                        valueValue = versionGStringValue.getTree().printTrimmed(getCursor());
                                     }
                                 }
                             }
@@ -454,11 +458,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         artifactValue = ((J.Assignment) depArgs.get(1)).getAssignment();
                         versionExp = ((J.Assignment) depArgs.get(2)).getAssignment();
                     }
-                    if (groupValue instanceof J.Literal && artifactValue instanceof J.Literal && versionExp instanceof J.Identifier) {
+                    if (groupValue instanceof J.Literal && artifactValue instanceof J.Literal && (versionExp instanceof J.Identifier || versionExp instanceof J.FieldAccess)) {
                         J.Literal groupLiteral = (J.Literal) groupValue;
                         J.Literal artifactLiteral = (J.Literal) artifactValue;
                         if (groupLiteral.getValue() instanceof String && artifactLiteral.getValue() instanceof String && shouldResolveVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
-                            String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
+                            String versionVariableName = versionExp instanceof J.Identifier ?
+                                    ((J.Identifier) versionExp).getSimpleName() :
+                                    (versionExp).printTrimmed(getCursor());
                             acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
                                     .computeIfAbsent(new GroupArtifact((String) groupLiteral.getValue(), (String) artifactLiteral.getValue()), it -> new HashSet<>())
                                     .add(method.getSimpleName());
@@ -624,6 +630,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             return a;
                         }
                         Map<GroupArtifact, Set<String>> groupArtifactSetMap = acc.versionPropNameToGA.get("gradle." + a.getVariable());
+                        // Guard to ensure that an unsupported notation doesn't throw an exception
+                        if (groupArtifactSetMap == null) {
+                            return a;
+                        }
                         GroupArtifact ga = groupArtifactSetMap.entrySet().stream().findFirst().map(Map.Entry::getKey).orElse(null);
                         if (ga == null) {
                             return a;
