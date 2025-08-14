@@ -391,7 +391,29 @@ class JavaParserTest implements RewriteTest {
               }
             }
             """
-          ));
+          )
+        );
+    }
+
+    @Test
+    void multiLinePackageComment() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+              package com.abc;
+              public class Server {
+                /**
+                 * @see com.abc.Server#load(
+                 * java.lang.
+                 * String)
+                 */
+                public void load(String str) {
+                }
+              }
+              """
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/5445")
@@ -435,5 +457,4 @@ class JavaParserTest implements RewriteTest {
           )
         );
     }
-
 }
