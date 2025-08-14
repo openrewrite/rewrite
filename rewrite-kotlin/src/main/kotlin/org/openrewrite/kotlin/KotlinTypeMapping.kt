@@ -224,7 +224,7 @@ class KotlinTypeMapping(
             return null
         }
 
-        // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
+        // If the symbol is not resolvable, we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
         return type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession)
             ?.let { type(it.fir, signature) }
             ?: ShallowClass.build(signature)
