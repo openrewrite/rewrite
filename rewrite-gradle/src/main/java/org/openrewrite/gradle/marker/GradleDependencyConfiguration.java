@@ -106,7 +106,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     @Nullable
     String message;
 
-    /**
+    /** '
      * Lists the constraints applied to manage the versions of transitive dependencies.
      * Produces a list of _only_ those constraints applied directly to this configuration.
      * But configurations inherit the constraints of the configurations they extend, so to get all the constraints
@@ -114,12 +114,6 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      */
     @NonFinal
     List<GradleDependencyConstraint> constraints;
-
-    /**
-     * 
-     */
-    @NonFinal
-    Map<GroupArtifactVersion, GroupArtifactVersion> substitutions;
 
     Map<String, String> attributes;
 
