@@ -557,7 +557,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (result == null || result instanceof Exception) {
                     return entry;
                 }
-                VersionComparator versionComparator = Semver.validate(StringUtils.isBlank(newVersion) ? "latest.release" : newVersion, versionPattern).getValue();
+                VersionComparator versionComparator = getVersionComparator();
                 if (versionComparator == null) {
                     return entry;
                 }
@@ -566,6 +566,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
             return entry;
         }
+    }
+
+    private @Nullable VersionComparator getVersionComparator() {
+        return Semver.validate(StringUtils.isBlank(newVersion) ? "latest.release" : newVersion, versionPattern).getValue();
     }
 
     @RequiredArgsConstructor
@@ -649,6 +653,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (J.Literal.isLiteralValue(l, newVersion)) {
                             return a;
                         }
+
+                        VersionComparator versionComparator = getVersionComparator();
+                        if (versionComparator != null) {
+                            String currentVersion = (String) l.getValue();
+                            Optional<String> finalVersion = versionComparator.upgrade(currentVersion, singletonList(newVersion));
+                            if (!finalVersion.isPresent()) {
+                                // Would be a downgrade, don't change
+                                return a;
+                            }
+                        }
+
                         String quote = l.getValueSource() == null ? "\"" : l.getValueSource().substring(0, 1);
                         return a.withAssignment(l.withValue(newVersion).withValueSource(quote + newVersion + quote));
                     }
