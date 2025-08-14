@@ -1953,8 +1953,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void upgradeVersionInSettingsGradleExt() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\"com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: gradle.jackson",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"$gradle.jackson\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"${gradle.jackson}\""
+    })
+    void upgradeVersionInSettingsGradleExt(String dependencyNotation) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
           settingsGradle(
@@ -1980,9 +1986,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+                  implementation %s
               }
-              """
+              """.formatted(dependencyNotation)
           )
         );
     }
