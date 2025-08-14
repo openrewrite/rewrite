@@ -4040,9 +4040,6 @@ class MavenParserTest implements RewriteTest {
                 MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                 assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(firstScope)))
                   .hasSize(0);
-//                  .extracting(ResolvedDependency::getGav)
-//                  .extracting(ResolvedGroupArtifactVersion::getVersion)
-//                  .containsExactly(firstVersion);
                 assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(secondScope)))
                   .hasSize(1)
                   .extracting(ResolvedDependency::getGav)
