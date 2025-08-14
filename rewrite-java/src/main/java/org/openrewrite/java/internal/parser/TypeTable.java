@@ -1043,7 +1043,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         // Parse the method descriptor to get parameter count
         Type methodType = Type.getMethodType(descriptor);
         int paramCount = methodType.getArgumentTypes().length;
-        
+
         // Group annotations by parameter index
         Map<Integer, List<String>> annotationsByParam = new TreeMap<>();
         for (String paramAnnotation : parameterAnnotations) {
@@ -1054,7 +1054,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                 annotationsByParam.computeIfAbsent(paramIndex, k -> new ArrayList<>()).add(annotation);
             }
         }
-        
+
         // If no parameters have annotations, return empty string
         if (annotationsByParam.isEmpty()) {
             return "";

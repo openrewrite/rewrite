@@ -17,7 +17,10 @@ package org.openrewrite.java.internal.parser;
 
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
-import org.objectweb.asm.*;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.TypePath;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -1140,10 +1143,10 @@ class TypeAnnotationSupport {
     public static String formatTypeAnnotation(int typeRef, @Nullable TypePath typePath, String annotation) {
         // Format typeRef as 8 hex digits
         String typeRefHex = String.format("%08x", typeRef);
-        
+
         // Use TypePath.toString() if present, empty string otherwise
         String pathString = (typePath != null) ? typePath.toString() : "";
-        
+
         return typeRefHex + ":" + pathString + ":" + annotation;
     }
 
