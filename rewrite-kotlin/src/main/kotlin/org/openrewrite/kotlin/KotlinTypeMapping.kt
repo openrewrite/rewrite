@@ -1227,7 +1227,6 @@ class KotlinTypeMapping(
                 bitMask += 1L shl 2
                 bitMask += 1L shl 3 // static
             }
-
             "internal", "package", "local" -> {}
             else -> throw UnsupportedOperationException("Unsupported visibility: ${visibility.name.lowercase()}")
         }
