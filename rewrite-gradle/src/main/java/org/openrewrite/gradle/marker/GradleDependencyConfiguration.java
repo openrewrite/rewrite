@@ -22,6 +22,7 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.maven.attributes.Attributed;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -29,14 +30,16 @@ import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 @SuppressWarnings("unused")
 @Value
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
-public class GradleDependencyConfiguration implements Serializable {
+public class GradleDependencyConfiguration implements Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
      */
@@ -54,8 +57,8 @@ public class GradleDependencyConfiguration implements Serializable {
     boolean isCanBeResolved;
 
     /**
-     *  Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
-     *  See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
+     * Indicates that this configuration is intended for exposing artifacts outside this project. A consumable configuration should not be declarable or resolvable.
+     * See <a href="https://docs.gradle.org/current/userguide/declaring_configurations.html#sec:configuration-flags-roles">Configuration flag roles</a>
      */
     boolean isCanBeConsumed;
 
@@ -112,7 +115,10 @@ public class GradleDependencyConfiguration implements Serializable {
      * But configurations inherit the constraints of the configurations they extend, so to get all the constraints
      * actually in effect for a given configuration call getAllConstraints()
      */
+    @NonFinal
     List<GradleDependencyConstraint> constraints;
+
+    Map<String, String> attributes;
 
     /**
      * Lists all the constraints in effect for the current configuration, including those constraints inherited from
@@ -173,6 +179,7 @@ public class GradleDependencyConfiguration implements Serializable {
         this.exceptionType = exceptionType;
         this.message = message;
         this.constraints = emptyList();
+        this.attributes = emptyMap();
     }
 
     /**
@@ -201,7 +208,7 @@ public class GradleDependencyConfiguration implements Serializable {
     public @Nullable Dependency findRequestedDependency(String groupId, String artifactId) {
         for (Dependency d : requested) {
             if (StringUtils.matchesGlob(d.getGav().getGroupId(), groupId) &&
-                StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
+                    StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
                 return d;
             }
         }
@@ -222,6 +229,10 @@ public class GradleDependencyConfiguration implements Serializable {
         this.extendsFrom = extendsFrom;
     }
 
+    public void unsafeSetConstraints(List<GradleDependencyConstraint> constraints) {
+        this.constraints = constraints;
+    }
+
     private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
         for (ResolvedDependency dependency : resolved) {
             GroupArtifact ga = dependency.getGav().asGroupArtifact();
@@ -237,5 +248,30 @@ public class GradleDependencyConfiguration implements Serializable {
             alreadyResolved.put(ga, dependency);
             resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved);
         }
+    }
+
+    /**
+     * Merge two collections of constraints, giving precedence to the constraints in the preferred collection.
+     * The preferred set are populated from resolved version numbers that cannot be explained only by things we can observe from Gradle's public API.
+     * The others are the constraints reported from Gradle's public API.
+     * When the preferred collection is null or empty, returns the others collection.
+     * When the others collection is null or empty, returns the preferred collection.
+     * If both are null or empty, returns an empty list.
+     */
+    public static List<GradleDependencyConstraint> merge(@Nullable Collection<GradleDependencyConstraint> preferred, @Nullable Collection<GradleDependencyConstraint> others) {
+        if ((preferred == null || preferred.isEmpty()) && (others == null || others.isEmpty())) {
+            return emptyList();
+        }
+        if (preferred == null || preferred.isEmpty()) {
+            return new ArrayList<>(others);
+        }
+        if (others == null || others.isEmpty()) {
+            return new ArrayList<>(preferred);
+        }
+        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(Collectors.toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it));
+        for (GradleDependencyConstraint lowerPrecedenceConstraint : others) {
+            results.putIfAbsent(new GroupArtifact(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
+        }
+        return new ArrayList<>(results.values());
     }
 }

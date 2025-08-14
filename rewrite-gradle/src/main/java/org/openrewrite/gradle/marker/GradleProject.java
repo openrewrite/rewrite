@@ -80,6 +80,7 @@ public class GradleProject implements Marker, Serializable {
     Map<String, GradleDependencyConfiguration> nameToConfiguration = emptyMap();
 
     @Builder.Default
+    @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
     public GradleBuildscript getBuildscript() {
@@ -139,7 +140,7 @@ public class GradleProject implements Marker, Serializable {
                 continue;
             }
             for (GradleDependencyConfiguration extendsFrom : configuration.getExtendsFrom()) {
-                if (extendsFrom == parentConfiguration) {
+                if (extendsFrom.getName().equals(parentConfiguration.getName())) {
                     result.add(configuration);
                     if (transitive) {
                         result.addAll(configurationsExtendingFrom(configuration, true));
