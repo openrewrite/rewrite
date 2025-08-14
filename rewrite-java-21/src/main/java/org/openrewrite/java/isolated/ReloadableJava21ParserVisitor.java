@@ -64,8 +64,7 @@ import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
-import static org.openrewrite.java.tree.Space.EMPTY;
-import static org.openrewrite.java.tree.Space.format;
+import static org.openrewrite.java.tree.Space.*;
 
 /**
  * Maps the compiler internal AST to the Rewrite {@link J} AST.
@@ -424,14 +423,16 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY);
 
         JContainer<Statement> primaryConstructor = null;
+        Map<String, RecordParam> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Space prefix = sourceBefore("(");
             Map<String, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
             List<JRightPadded<Statement>> varDecs = new ArrayList<>();
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
-                    if (hasFlag(md.getModifiers(), Flags.RECORD) && md.getName().toString().equals("<init>")) {
+                    if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
+                            recordParams.put(var.getName().toString(), new RecordParam(null, var, null, null));
                             recordAnnotationPosTable.put(var.getName().toString(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
                         }
                     }
@@ -443,26 +444,40 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                         Space typeExpressionPrefix = whitespace();
                         JRightPadded<Statement> varDec = convert(vt, commaDelim);
                         if (varDec != null) {
-                            varDecs.add(varDec);
-                            varDecs = ListUtils.mapLast(varDecs, elem -> {
-                                if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
-                                    return elem.withElement(vd.withLeadingAnnotations(recordAnnotations)
-                                            .withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix)));
+                            varDec = varDec.map(elem -> {
+                                if (elem instanceof J.VariableDeclarations vd) {
+                                    return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
                                 }
                                 return elem;
                             });
+                            recordParams.put(vt.getName().toString(), new RecordParam(vt, recordParams.get(vt.getName().toString()).consParam(), recordAnnotations, varDec));
+                            varDecs.add(varDec);
                         }
                     }
                 }
             }
-            varDecs = ListUtils.mapLast(varDecs, elem -> elem != null ? elem.withAfter(sourceBefore(")")) : null);
             if (varDecs.isEmpty()) {
                 varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
+            } else {
+                varDecs = ListUtils.mapLast(varDecs, elem -> elem.withAfter(sourceBefore(")")));
             }
 
             primaryConstructor = JContainer.build(
                     prefix,
-                    varDecs,
+                    ListUtils.map(varDecs, elem -> {
+                        if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
+                            RecordParam param = recordParams.get(vd.getVariables().getFirst().getSimpleName());
+                            return elem.withElement(vd.withLeadingAnnotations(param.annotations().stream().filter(ann -> {
+                                for (AnnotationTree anno : param.consParam().getModifiers().getAnnotations()) {
+                                    if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }).collect(toList())));
+                        }
+                        return elem;
+                    }),
                     Markers.EMPTY
             );
         }
@@ -565,8 +580,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                    (hasFlag(vt.getModifiers(), Flags.ENUM))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -574,11 +588,36 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         List<JRightPadded<Statement>> members = new ArrayList<>(
                 membersMultiVariablesSeparated.size() + (enumSet == null ? 0 : 1));
-        if (enumSet != null) {
-            members.add(enumSet);
+        if (kind.getType() != J.ClassDeclaration.Kind.Type.Record) {
+            if (enumSet != null) {
+                members.add(enumSet);
+            }
+            members.addAll(convertStatements(membersMultiVariablesSeparated));
+            addPossibleEmptyStatementsBeforeClosingBrace(members);
+        } else {
+            for (Tree tree : membersMultiVariablesSeparated) {
+                if (tree instanceof VariableTree vt) {
+                    RecordParam param = recordParams.get(vt.getName().toString());
+                    members.add(param.lstElem().map(elem -> {
+                        if (elem  instanceof J.VariableDeclarations vd) {
+                            return vd.withModifiers(List.of(
+                                    new J.Modifier(randomId(), vt.getModifiers().getAnnotations().isEmpty() ? EMPTY : SINGLE_SPACE, Markers.EMPTY, "private", J.Modifier.Type.Private, emptyList()),
+                                    new J.Modifier(randomId(), SINGLE_SPACE, Markers.EMPTY, "final", J.Modifier.Type.Final, emptyList())
+                                    ))
+                                    .withLeadingAnnotations(param.annotations().stream().filter(ann -> {
+                                for (AnnotationTree anno : param.varDecl().getModifiers().getAnnotations()) {
+                                    if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }).collect(toList()));
+                        }
+                        return elem;
+                    }));
+                }
+            }
         }
-        members.addAll(convertStatements(membersMultiVariablesSeparated));
-        addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
@@ -2493,4 +2532,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
     }
+}
+
+record RecordParam(VariableTree varDecl, JCVariableDecl consParam, List<J.Annotation> annotations, JRightPadded<Statement> lstElem) {
 }
