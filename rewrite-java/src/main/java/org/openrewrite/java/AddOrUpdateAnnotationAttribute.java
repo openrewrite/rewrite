@@ -23,10 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.*;
 
@@ -160,10 +157,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         (attributeName != null && !attributeName.equals(var_.getSimpleName()))) {
                     return as;
                 }
-                if (newAttributeValue == null) {
-                    return null;
-                }
                 Expression exp = as.getAssignment();
+                if (newAttributeValue == null) {
+                    if (exp instanceof J.NewArray) {
+                        List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
+                        List<Expression> updatedList = updateInitializer(annotation, initializerList, getAttributeValues());
+                        if (updatedList.isEmpty()) {
+                            return null;
+                        }
+                        return as.withAssignment(((J.NewArray) exp)
+                                .withInitializer(updatedList));
+                    }
+                    if (valueMatches(as.getAssignment(), oldAttributeValue)) {
+                        return null;
+                    }
+                    return as;
+                }
                 if (exp instanceof J.NewArray) {
                     List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
                     return as.withAssignment(((J.NewArray) exp)
@@ -202,7 +211,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private @Nullable Expression update(J.Literal literal, J.Annotation annotation, @Nullable String newAttributeValue) {
                 // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                 if ("value".equals(attributeName())) {
-                    if (newAttributeValue == null) {
+                    if (newAttributeValue == null && valueMatches(literal, oldAttributeValue)) {
                         return null;
                     }
                     if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
@@ -243,7 +252,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
             private @Nullable Expression update(J.NewArray arrayValue, J.Annotation annotation, @Nullable String newAttributeValue) {
                 if (newAttributeValue == null) {
-                    return null;
+                    List<Expression> initializerList = requireNonNull(arrayValue.getInitializer());
+                    List<Expression> updatedList = updateInitializer(annotation, initializerList, getAttributeValues());
+                    if (updatedList.isEmpty()) {
+                        return null;
+                    }
+                    return arrayValue.withInitializer(updatedList);
                 }
                 if (attributeName != null && !"value".equals(attributeValue)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
@@ -289,11 +303,18 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
         if (oldAttributeValue != null) {
             return ListUtils.flatMap(initializerList, it -> {
-                if (it instanceof J.Literal && oldAttributeValue.equals(((J.Literal) it).getValue())) {
+                if (it instanceof J.Literal && valueMatches(it, oldAttributeValue)) {
                     List<Expression> newItemsList = new ArrayList<>();
                     for (String attribute : attributeList) {
                         J.Literal newLiteral = new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String);
                         newItemsList.add(newLiteral);
+                    }
+                    return newItemsList;
+                } else if (it instanceof J.FieldAccess && valueMatches(it, oldAttributeValue)) {
+                    List<Expression> newItemsList = new ArrayList<>();
+                    for (String attribute : attributeList) {
+                        J.FieldAccess newFieldAccess = TypeTree.build(attribute);
+                        newItemsList.add(newFieldAccess);
                     }
                     return newItemsList;
                 }

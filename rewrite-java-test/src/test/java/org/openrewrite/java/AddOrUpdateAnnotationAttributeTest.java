@@ -21,12 +21,664 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
 
 class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.parser(JavaParser.fromJavaVersion().dependsOn(
+          //language=java
+          """
+            package org.example;
+            public @interface FooDefaultString {
+                String value() default "";
+                String a() default "";
+                String[] b() default {};
+                Class<? extends Number> c() default null;
+                Class<? extends Number>[] d() default {};
+            }
+            """,
+          //language=java
+          """
+            package org.example;
+            public @interface FooDefaultStringArray {
+                String[] value() default {};
+                String a() default "";
+                String[] b() default {};
+                Class<? extends Number> c() default null;
+                Class<? extends Number>[] d() default {};
+            }
+            """,
+          //language=java
+          """
+            package org.example;
+            public @interface FooDefaultClass {
+                Class<? extends Number> value() default null;
+                String a() default "";
+                String[] b() default {};
+                Class<? extends Number> c() default null;
+                Class<? extends Number>[] d() default {};
+            }
+            """,
+          //language=java
+          """
+            package org.example;
+            public @interface FooDefaultClassArray {
+                Class<? extends Number>[] value() default {};
+                String a() default "";
+                String[] b() default {};
+                Class<? extends Number> c() default null;
+                Class<? extends Number>[] d() default {};
+            }
+            """
+        ));
+    }
+
+    @Nested
+    class UsingImplicitAttributeName {
+        @Nested
+        class UsingNullAttributeValue {
+            // TODO: Check on `addOnly` and `appendArray` effects
+            @Nested
+            class WithLiteralTypeAttribute {
+                @Test
+                void literalAttribute_absent_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString()
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(a = "a")
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a")
+                          @FooDefaultString(value = "b")
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a", a = "z")
+                          @FooDefaultString(value = "b", a = "y")
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(a = "z")
+                          @FooDefaultString(a = "y")
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_usingProvidedOldAttributeValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, "a", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a")
+                          @FooDefaultString("b")
+                          @FooDefaultString(value = "a")
+                          @FooDefaultString(value = "b")
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString("b")
+                          @FooDefaultString
+                          @FooDefaultString("b")
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a", a = "a")
+                          @FooDefaultString("b", a = "a")
+                          @FooDefaultString(value = "a", a = "a")
+                          @FooDefaultString(value = "b", a = "a")
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(a = "a")
+                          @FooDefaultString("b", a = "a")
+                          @FooDefaultString(a = "a")
+                          @FooDefaultString(value = "b", a = "a")
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+            }
+
+            @Nested
+            class WithLiteralArrayTypeAttribute {
+                @Test
+                void literalArrayAttribute_absent_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray()
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(b = "a")
+                          @FooDefaultStringArray(b = {"b"})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalArrayAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray("a")
+                          @FooDefaultStringArray(value = "b")
+                          @FooDefaultStringArray({"c"})
+                          @FooDefaultStringArray(value = {"d"})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray("a", b = {"z"})
+                          @FooDefaultStringArray(value = "b", b = {"y"})
+                          @FooDefaultStringArray({"c"}, b = {"x"})
+                          @FooDefaultStringArray(value = {"d"}, b = {"w"})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(b = {"z"})
+                          @FooDefaultStringArray(b = {"y"})
+                          @FooDefaultStringArray(b = {"x"})
+                          @FooDefaultStringArray(b = {"w"})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalArrayAttribute_existing_usingProvidedOldAttributeValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, "a", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray("a")
+                          @FooDefaultStringArray("b")
+                          @FooDefaultStringArray(value = "a")
+                          @FooDefaultStringArray(value = "b")
+                          @FooDefaultStringArray({"a"})
+                          @FooDefaultStringArray({"b", "a", "c"})
+                          @FooDefaultStringArray(value = {"a"})
+                          @FooDefaultStringArray(value = {"b", "a", "c"})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray("b")
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray("b")
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({"b", "c"})
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({"b", "c"})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray("a", b = {"a"})
+                          @FooDefaultStringArray("b", b = {"a"})
+                          @FooDefaultStringArray(value = "a", b = {"a"})
+                          @FooDefaultStringArray(value = "b", b = {"a"})
+                          @FooDefaultStringArray({"a"}, b = {"a"})
+                          @FooDefaultStringArray({"b", "a", "c"}, b = {"a"})
+                          @FooDefaultStringArray(value = {"a"}, b = {"a"})
+                          @FooDefaultStringArray(value = {"b", "a", "c"}, b = {"a"})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(b = {"a"})
+                          @FooDefaultStringArray("b", b = {"a"})
+                          @FooDefaultStringArray(b = {"a"})
+                          @FooDefaultStringArray(value = "b", b = {"a"})
+                          @FooDefaultStringArray(b = {"a"})
+                          @FooDefaultStringArray({"b", "c"}, b = {"a"})
+                          @FooDefaultStringArray(b = {"a"})
+                          @FooDefaultStringArray(value = {"b", "c"}, b = {"a"})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+            }
+
+            @Nested
+            class WithClassTypeAttribute {
+                @Test
+                void classAttribute_absent_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass
+                          @FooDefaultClass()
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(c = Integer.class)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void classAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(Integer.class)
+                          @FooDefaultClass(Long.class)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass
+                          @FooDefaultClass
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(Integer.class, c = Short.class)
+                          @FooDefaultClass(value = Long.class, c = Byte.class)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(c = Short.class)
+                          @FooDefaultClass(c = Byte.class)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void classArrayAttribute_existing_usingProvidedOldAttributeValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, "Integer.class", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(Integer.class)
+                          @FooDefaultClassArray(Long.class)
+                          @FooDefaultClassArray(value = Integer.class)
+                          @FooDefaultClassArray(value = Long.class)
+                          @FooDefaultClassArray({Integer.class})
+                          @FooDefaultClassArray({Long.class, Integer.class, Short.class})
+                          @FooDefaultClassArray(value = {Integer.class})
+                          @FooDefaultClassArray(value = {Long.class, Integer.class, Short.class})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray(Long.class)
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray(Long.class)
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray({Long.class, Short.class})
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray({Long.class, Short.class})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(Integer.class, d = {Integer.class})
+                          @FooDefaultClassArray(Long.class, d = {Integer.class})
+                          @FooDefaultClassArray(value = Integer.class, d = {Integer.class})
+                          @FooDefaultClassArray(value = Long.class, d = {Integer.class})
+                          @FooDefaultClassArray({Integer.class}, d = {Integer.class})
+                          @FooDefaultClassArray({Long.class, Integer.class, Short.class}, d = {Integer.class})
+                          @FooDefaultClassArray(value = {Integer.class}, d = {Integer.class})
+                          @FooDefaultClassArray(value = {Long.class, Integer.class, Short.class}, d = {Integer.class})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(d = {Integer.class})
+                          @FooDefaultClassArray(Long.class, d = {Integer.class})
+                          @FooDefaultClassArray(d = {Integer.class})
+                          @FooDefaultClassArray(value = Long.class, d = {Integer.class})
+                          @FooDefaultClassArray(d = {Integer.class})
+                          @FooDefaultClassArray({Long.class, Short.class}, d = {Integer.class})
+                          @FooDefaultClassArray(d = {Integer.class})
+                          @FooDefaultClassArray(value = {Long.class, Short.class}, d = {Integer.class})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+            }
+
+
+
+
+
+
+
+
+            @Test
+            void classArrayAttribute_absent_doesNothing() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultClassArray;
+                      @FooDefaultClassArray
+                      public class A {
+                          @FooDefaultClassArray()
+                          public class AInner {}
+                      }
+                      """
+                  ),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultClassArray;
+                      @FooDefaultClassArray(d = Integer.class)
+                      public class B {
+                          @FooDefaultClassArray(d = {Long.class})
+                          public class BInner {}
+                      }
+                      """
+                  )
+                );
+            }
+        }
+
+        @Nested
+        class WhenImplicitIsLiteralType {
+            @Test
+            void unsetImplicitToLiteral_Adds() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "hello", null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("hello")
+                      public class A {}
+                      """
+                  ),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString()
+                      public class B {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("hello")
+                      public class B {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void existingImplicitToLiteral_Updates_AndDropsAttributeName() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("hello")
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("bonjour")
+                      public class A {}
+                      """
+                  ),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "hello")
+                      public class B {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("bonjour")
+                      public class B {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void existingImplicitToNull_Removes() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("hello")
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString
+                      public class A {}
+                      """
+                  ),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "hello")
+                      public class B {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString
+                      public class B {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void existingOtherAttributes_AndUnsetImplicitToLiteral_AddsSafely_AndAddsAttributeName() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void existingOtherAttributes_AndExistingImplicitToLiteral_AddsSafely_AndRetainsAttributeNameUsage() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "blah", additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """
+                  ),
+                  // TODO: Unclear whether the after actually should have had `value = "bonjour"` in reality
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("blah", additionalValue = "hello", additionalValues = {"hi"})
+                      public class B {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("bonjour", additionalValue = "hello", additionalValues = {"hi"})
+                      public class B {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void existingOtherAttributes_AndExistingImplicitToNull_RemovesSafely() {
+                rewriteRun(
+                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "blah", additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
+                      public class A {}
+                      """
+                  ),
+                  // TODO: Unclear whether the after actually should have had `value = "bonjour"` in reality
+                  //language=java
+                  java(
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("blah", additionalValue = "hello", additionalValues = {"hi"})
+                      public class B {}
+                      """,
+                    """
+                      import org.example.FooDefaultString;
+                      @FooDefaultString("bonjour", additionalValue = "hello", additionalValues = {"hi"})
+                      public class B {}
+                      """
+                  )
+                );
+            }
+        }
+
+    }
 
     @DocumentExample
     @Test
