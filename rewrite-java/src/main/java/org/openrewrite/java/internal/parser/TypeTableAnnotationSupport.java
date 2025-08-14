@@ -1131,70 +1131,20 @@ class TypeAnnotationSupport {
 
     /**
      * Format a complete type annotation for TSV.
-     * Format: TARGET:indexHex:pathHex:annotation
+     * Format: typeRefHex:pathString:annotation
      * Where:
-     * - TARGET is a symbolic name (FIELD, METHOD_RETURN, etc.) or HEX_XX for unknown
-     * - indexHex is the lower 3 bytes of typeRef in hex (omitted if all zeros)
-     * - pathHex is the TypePath bytes in hex (omitted if no path)
+     * - typeRefHex is the full typeRef value in hex (8 hex digits)
+     * - pathString is the TypePath.toString() representation (empty if no path)
      * - annotation is the full JVM descriptor with values
      */
     public static String formatTypeAnnotation(int typeRef, @Nullable TypePath typePath, String annotation) {
-        int targetType = typeRef >>> 24;
-
-        // Get symbolic target name or fall back to hex
-        String target;
-        switch (targetType) {
-            case TypeReference.FIELD:
-                target = "FIELD";
-                break;
-            case TypeReference.METHOD_RETURN:
-                target = "METHOD_RETURN";
-                break;
-            case TypeReference.METHOD_RECEIVER:
-                target = "METHOD_RECEIVER";
-                break;
-            case TypeReference.METHOD_FORMAL_PARAMETER:
-                target = "METHOD_PARAM";
-                break;
-            case TypeReference.THROWS:
-                target = "THROWS";
-                break;
-            case TypeReference.CLASS_EXTENDS:
-                target = "CLASS_EXTENDS";
-                break;
-            case TypeReference.CLASS_TYPE_PARAMETER:
-                target = "CLASS_TYPE_PARAM";
-                break;
-            case TypeReference.METHOD_TYPE_PARAMETER:
-                target = "METHOD_TYPE_PARAM";
-                break;
-            case TypeReference.CLASS_TYPE_PARAMETER_BOUND:
-                target = "CLASS_TYPE_PARAM_BOUND";
-                break;
-            case TypeReference.METHOD_TYPE_PARAMETER_BOUND:
-                target = "METHOD_TYPE_PARAM_BOUND";
-                break;
-            default:
-                target = "HEX_" + String.format("%02X", targetType);
-                break;
-        }
-
-        // Extract the index portion (lower 3 bytes) - omit if all zeros
-        int indexValue = typeRef & 0xFFFFFF;
-        String indexHex = indexValue == 0 ? "" : String.format("%06X", indexValue);
-
-        // Serialize TypePath to hex if present
-        String pathHex = "";
-        if (typePath != null && typePath.getLength() > 0) {
-            StringBuilder hex = new StringBuilder();
-            for (int i = 0; i < typePath.getLength(); i++) {
-                hex.append(String.format("%02X", typePath.getStep(i)));
-                hex.append(String.format("%02X", typePath.getStepArgument(i)));
-            }
-            pathHex = hex.toString();
-        }
-
-        return target + ":" + indexHex + ":" + pathHex + ":" + annotation;
+        // Format typeRef as 8 hex digits
+        String typeRefHex = String.format("%08x", typeRef);
+        
+        // Use TypePath.toString() if present, empty string otherwise
+        String pathString = (typePath != null) ? typePath.toString() : "";
+        
+        return typeRefHex + ":" + pathString + ":" + annotation;
     }
 
     /**
@@ -1212,89 +1162,25 @@ class TypeAnnotationSupport {
         }
 
         public static TypeAnnotationInfo parse(String serialized) {
-            // Type annotation format: "target:index:path:annotation"
-            final int EXPECTED_PARTS = 4;
+            // Type annotation format: "typeRefHex:pathString:annotation"
+            final int EXPECTED_PARTS = 3;
             String[] parts = serialized.split(":", EXPECTED_PARTS);
             if (parts.length != EXPECTED_PARTS) {
                 throw new IllegalArgumentException("Invalid type annotation format: " + serialized);
             }
 
-            String target = parts[0];
-            String indexHex = parts[1];
-            String pathHex = parts[2];
-            String annotation = parts[3];
+            String typeRefHex = parts[0];
+            String pathString = parts[1];
+            String annotation = parts[2];
 
-            // Reconstruct typeRef
-            int targetType;
-            if (target.startsWith("HEX_")) {
-                targetType = Integer.parseInt(target.substring(4), 16);
-            } else {
-                switch (target) {
-                    case "FIELD":
-                        targetType = TypeReference.FIELD;
-                        break;
-                    case "METHOD_RETURN":
-                        targetType = TypeReference.METHOD_RETURN;
-                        break;
-                    case "METHOD_RECEIVER":
-                        targetType = TypeReference.METHOD_RECEIVER;
-                        break;
-                    case "METHOD_PARAM":
-                        targetType = TypeReference.METHOD_FORMAL_PARAMETER;
-                        break;
-                    case "THROWS":
-                        targetType = TypeReference.THROWS;
-                        break;
-                    case "CLASS_EXTENDS":
-                        targetType = TypeReference.CLASS_EXTENDS;
-                        break;
-                    case "CLASS_TYPE_PARAM":
-                        targetType = TypeReference.CLASS_TYPE_PARAMETER;
-                        break;
-                    case "METHOD_TYPE_PARAM":
-                        targetType = TypeReference.METHOD_TYPE_PARAMETER;
-                        break;
-                    case "CLASS_TYPE_PARAM_BOUND":
-                        targetType = TypeReference.CLASS_TYPE_PARAMETER_BOUND;
-                        break;
-                    case "METHOD_TYPE_PARAM_BOUND":
-                        targetType = TypeReference.METHOD_TYPE_PARAMETER_BOUND;
-                        break;
-                    default:
-                        throw new IllegalArgumentException("Unknown target type: " + target);
-                }
-            }
-
-            // Parse index - default to 0 if empty
-            int indexValue = indexHex.isEmpty() ? 0 : Integer.parseInt(indexHex, 16);
-            int typeRef = (targetType << 24) | indexValue;
+            // Parse typeRef from hex (8 hex digits)
+            int typeRef = (int) Long.parseLong(typeRefHex, 16);
 
             // Reconstruct TypePath if present
             TypePath typePath = null;
-            if (!pathHex.isEmpty()) {
-                // Build the TypePath from the serialized hex bytes
-                StringBuilder pathBuilder = new StringBuilder();
-                int pathLength = pathHex.length() / 4; // 2 hex chars per byte, 2 bytes per step
-                for (int i = 0; i < pathLength; i++) {
-                    int typePathKind = Integer.parseInt(pathHex.substring(i * 4, i * 4 + 2), 16);
-                    int typeArgumentIndex = Integer.parseInt(pathHex.substring(i * 4 + 2, i * 4 + 4), 16);
-
-                    switch (typePathKind) {
-                        case TypePath.ARRAY_ELEMENT:
-                            pathBuilder.append('[');
-                            break;
-                        case TypePath.INNER_TYPE:
-                            pathBuilder.append('.');
-                            break;
-                        case TypePath.WILDCARD_BOUND:
-                            pathBuilder.append('*');
-                            break;
-                        case TypePath.TYPE_ARGUMENT:
-                            pathBuilder.append(typeArgumentIndex).append(';');
-                            break;
-                    }
-                }
-                typePath = pathBuilder.length() > 0 ? TypePath.fromString(pathBuilder.toString()) : null;
+            if (!pathString.isEmpty()) {
+                // Use TypePath.fromString() to parse the string representation
+                typePath = TypePath.fromString(pathString);
             }
 
             return new TypeAnnotationInfo(typeRef, typePath, annotation);

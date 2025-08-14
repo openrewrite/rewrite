@@ -205,37 +205,37 @@ class TypeTableTypeAnnotationsTest {
             if (line.contains("\tfield\t") && line.contains("Ljava/lang/String;")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for field")
-                  .contains("FIELD:::@Ltest/annotations/Nullable;");
+                  .contains("13000000::@Ltest/annotations/Nullable;");
             }
 
             if (line.contains("\tarrayField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for arrayField")
-                  .contains("FIELD:::@Ltest/annotations/NonNull;");
+                  .contains("13000000::@Ltest/annotations/NonNull;");
             }
 
             if (line.contains("\tgetField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for getField")
-                  .contains("METHOD_RETURN:::@Ltest/annotations/Nullable;");
+                  .contains("14000000::@Ltest/annotations/Nullable;");
             }
 
             if (line.contains("\tsetField\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for setField")
-                  .contains("METHOD_PARAM:::@Ltest/annotations/NonNull;");
+                  .contains("16000000::@Ltest/annotations/NonNull;");
             }
 
             if (line.contains("\tprocessList\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for processList")
-                  .contains("METHOD_PARAM::0300:@Ltest/annotations/Nullable;");
+                  .contains("16000000:0;:@Ltest/annotations/Nullable;");
             }
 
             if (line.contains("\tprocessWildcard\t")) {
                 assertThat(cols.length).isGreaterThanOrEqualTo(18);
                 assertThat(cols[16]).as("typeAnnotations for processWildcard")
-                  .contains("METHOD_PARAM::03000200:@Ltest/annotations/NonNull;");
+                  .contains("16000000:0;*:@Ltest/annotations/NonNull;");
             }
         }
     }
@@ -384,7 +384,7 @@ class TypeTableTypeAnnotationsTest {
             if (line.contains("\tgetDate\t")) {
                 // Check type annotation with regex pattern (pipes and backslashes are escaped in TSV)
                 assertThat(cols[16]).as("typeAnnotations for getDate method")
-                  .contains("METHOD_RETURN:::@Ltest/Format;")
+                  .contains("14000000::@Ltest/Format;")
                   .contains("pattern=s\"\\\\d{2,4}-\\\\d{2}-\\\\d{2}\\|\\\\d{4}/\\\\d{2}/\\\\d{2}\"");
             }
 
@@ -394,7 +394,7 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[15]).as("parameterAnnotations for complex method")
                   .contains("@Ltest/Message;");
                 assertThat(cols[16]).as("typeAnnotations for complex method")
-                  .contains("METHOD_PARAM:::@Ltest/Format;");
+                  .contains("16000000::@Ltest/Format;");
             }
         }
     }
@@ -494,8 +494,8 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[15]).as("parameterAnnotations")
                   .contains("@Ltest/ParamAnnotation;");
                 assertThat(cols[16]).as("typeAnnotations")
-                  .contains("METHOD_RETURN:::@Ltest/TypeAnnotation;")
-                  .contains("METHOD_PARAM:::@Ltest/TypeAnnotation;");
+                  .contains("14000000::@Ltest/TypeAnnotation;")
+                  .contains("16000000::@Ltest/TypeAnnotation;");
                 break;
             }
         }
