@@ -193,9 +193,10 @@ class ImportTest implements RewriteTest {
           kotlin(
             """
               package org.example
-              interface Shared {
+              interface SuperShared {
                   fun one() = "one"
               }
+              interface Shared : SuperShared
               class A {
                   companion object : Shared
               }
@@ -208,11 +209,19 @@ class ImportTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 JavaType firstImportType = cu.getImports().getFirst().getQualid().getType();
                 JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(firstImportType);
+
                 //noinspection DataFlowIssue
                 assertThat(fullyQualified.getOwningClass().getInterfaces())
                   .singleElement()
-                  .extracting(JavaType.FullyQualified::getFullyQualifiedName)
-                  .isEqualTo("org.example.Shared");
+                  .satisfies(sharedInterface -> {
+                      assertThat(sharedInterface.getFullyQualifiedName()).isEqualTo("org.example.Shared");
+                      assertThat(sharedInterface.getInterfaces())
+                        .singleElement()
+                        .satisfies(it -> {
+                            assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.SuperShared");
+                            assertThat(it.getMethods()).singleElement().extracting(JavaType.Method::getName).isEqualTo("one");
+                        });
+                  });
               }
             )
           )
