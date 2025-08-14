@@ -340,6 +340,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
+            // When an enum in an inner class used
             if (!(fa.getTarget() instanceof J.Identifier)) {
                 return oldAttributeValue.equals(fa.toString());
             }
