@@ -214,6 +214,13 @@ public class GradleProject implements Marker, Serializable {
                 ctx);
     }
 
+    public GradleProject changeDependencyConstraints(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
+        return mapConfigurations(
+                conf -> conf.changeDependencyConstraints(gavs, getMavenRepositories(), ctx),
+                ctx
+        );
+    }
+
     /**
      * Applies the specified mapping function to the named configuration and all configurations which extend from it.
      * @param configuration name of the configuration to apply the mapping function to

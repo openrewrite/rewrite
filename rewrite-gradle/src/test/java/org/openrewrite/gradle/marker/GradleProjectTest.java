@@ -39,7 +39,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void noopUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
             "implementation",
             (original, updated) -> assertThat(updated).isSameAs(original)
@@ -61,7 +61,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void multiProject() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
@@ -107,8 +107,8 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void plusVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.+"),
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
@@ -119,13 +119,13 @@ public class GradleProjectTest implements RewriteTest {
                     assertThat(requested).isNotNull()
                       .extracting(Dependency::getVersion)
                       .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
-                      .isEqualTo("8.56.+");
+                      .isEqualTo("8.57.0");
                     if(updatedConfiguration.isCanBeResolved()) {
                         ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
                         assertThat(resolved).isNotNull()
                           .extracting(ResolvedDependency::getVersion)
                           .as(updatedConfiguration.getName() + " expected to have resolved version upgrade")
-                          .isEqualTo("8.56.1");
+                          .isEqualTo("8.57.0");
                     }
                 }
 
@@ -139,7 +139,7 @@ public class GradleProjectTest implements RewriteTest {
                 mavenCentral()
             }
             dependencies {
-                implementation("org.openrewrite:rewrite-java:8.56.0")
+                implementation("org.openrewrite:rewrite-java:8.56.+")
             }
             """)
         );
@@ -148,7 +148,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void simpleUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
@@ -189,7 +189,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void bomUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("org.openrewrite", "rewrite-bom", "8.57.0"),
             "implementation",
             (original, updated) -> {
@@ -231,7 +231,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void removesDefunctTransitives() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeMarker(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("io.vertx", "vertx-core", "5.0.1"),
             "implementation",
             (original, updated) -> {
@@ -280,7 +280,7 @@ public class GradleProjectTest implements RewriteTest {
     @Test
     void removeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new Remove(
+          spec -> spec.recipe(new RemoveDependency(
             List.of(new GroupArtifact("org.openrewrite", "rewrite-core")),
             (original, updated) -> {
                 assertThat(updated).isNotSameAs(original);
@@ -309,24 +309,80 @@ public class GradleProjectTest implements RewriteTest {
             """)
         );
     }
+
+    @Test
+    void changeConstraint() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeConstraint(
+            List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2")),
+            (original, updated) -> {
+                GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
+                assertThat(implementation).isNotNull();
+
+                Dependency rewriteCore = implementation.findRequestedDependency("org.openrewrite", "rewrite-core");
+                assertThat(rewriteCore).isNotNull()
+                  .extracting(Dependency::getVersion)
+                  .as("rewrite-core version should not have changed")
+                  .isEqualTo("8.56.0");
+
+                // Verify the constraint was updated
+                List<GradleDependencyConstraint> constraints = implementation.getConstraints();
+                assertThat(constraints).isNotNull();
+
+                GradleDependencyConstraint jacksonConstraint = constraints.stream()
+                  .filter(c -> c.getGroupId().equals("com.fasterxml.jackson.core") &&
+                               c.getArtifactId().equals("jackson-databind"))
+                  .findFirst()
+                  .orElse(null);
+
+                assertThat(jacksonConstraint).isNotNull()
+                  .extracting(GradleDependencyConstraint::getRequiredVersion)
+                  .isEqualTo("2.19.2");
+
+                // Verify the runtimeClasspath has the updated resolved version
+                GradleDependencyConfiguration runtimeClasspath = updated.getConfiguration("runtimeClasspath");
+                assertThat(runtimeClasspath).isNotNull();
+                ResolvedDependency resolvedJackson = runtimeClasspath.findResolvedDependency("com.fasterxml.jackson.core", "jackson-databind");
+                assertThat(resolvedJackson).isNotNull()
+                  .extracting(ResolvedDependency::getVersion)
+                  .as("jackson-databind should be resolved to the constrained version")
+                  .isEqualTo("2.19.2");
+            }
+          )),
+          buildGradle("""
+            plugins {
+                id("java")
+            }
+            repositories {
+                mavenCentral()
+            }
+            dependencies {
+                constraints {
+                    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+                }
+                implementation("org.openrewrite:rewrite-core:8.56.0")
+            }
+            """)
+        );
+    }
 }
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-class UpgradeMarker extends Recipe {
+class UpgradeDependencyInMarker extends Recipe {
 
     List<GroupArtifactVersion> newGavs;
     @Nullable
     String configuration;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    public UpgradeMarker(GroupArtifactVersion newGav, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
+    public UpgradeDependencyInMarker(GroupArtifactVersion newGav, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
         this.newGavs = List.of(newGav);
         this.configuration = configuration;
         this.testAssertion = testAssertion;
     }
 
-    public UpgradeMarker(List<GroupArtifactVersion> newGavs, BiConsumer<GradleProject, GradleProject> testAssertion) {
+    public UpgradeDependencyInMarker(List<GroupArtifactVersion> newGavs, BiConsumer<GradleProject, GradleProject> testAssertion) {
         this.newGavs = newGavs;
         this.configuration = null;
         this.testAssertion = testAssertion;
@@ -365,20 +421,20 @@ class UpgradeMarker extends Recipe {
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-class Remove extends Recipe {
+class RemoveDependency extends Recipe {
 
     List<GroupArtifact> gas;
     @Nullable
     String configuration;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    public Remove(GroupArtifact gas, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
+    public RemoveDependency(GroupArtifact gas, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
         this.gas = List.of(gas);
         this.configuration = configuration;
         this.testAssertion = testAssertion;
     }
 
-    public Remove(List<GroupArtifact> gas, BiConsumer<GradleProject, GradleProject> testAssertion) {
+    public RemoveDependency(List<GroupArtifact> gas, BiConsumer<GradleProject, GradleProject> testAssertion) {
         this.gas = gas;
         this.configuration = null;
         this.testAssertion = testAssertion;
@@ -386,12 +442,12 @@ class Remove extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Upgrade a version within the GradleProject marker";
+        return "Remove a dependency within the GradleProject marker";
     }
 
     @Override
     public String getDescription() {
-        return "Upgrade a version within the GradleProject marker. Makes no changes to the source file itself";
+        return "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
     }
 
     @Override
@@ -403,6 +459,39 @@ class Remove extends Recipe {
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.removeDirectDependencies(gas, ctx);
+                testAssertion.accept(original, updated);
+                return tree;
+            }
+        };
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+class ChangeConstraint extends Recipe {
+
+    List<GroupArtifactVersion> newConstraints;
+    BiConsumer<GradleProject, GradleProject> testAssertion;
+
+    @Override
+    public String getDisplayName() {
+        return "Remove a dependency within the GradleProject marker";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Remove a dependency within the GradleProject marker. Makes no changes to the source file itself";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        //noinspection NullableProblems
+        return new TreeVisitor<>() {
+            @SneakyThrows
+            @Override
+            public Tree visit(Tree tree, ExecutionContext ctx) {
+                GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
+                GradleProject updated = original.changeDependencyConstraints(newConstraints, ctx);
                 testAssertion.accept(original, updated);
                 return tree;
             }

@@ -22,7 +22,6 @@ import lombok.With;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.gradle.attributes.Category;
 import org.openrewrite.gradle.attributes.ProjectAttribute;
 import org.openrewrite.internal.ListUtils;
@@ -344,6 +343,63 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         }, repositories, ctx);
     }
 
+    public GradleDependencyConfiguration changeDependencyConstraints(
+            Collection<GroupArtifactVersion> gavs,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        return mapConstraints(c -> {
+            for (GroupArtifactVersion gav : gavs) {
+                if(Objects.equals(c.getGroupId(), gav.getGroupId()) &&
+                   Objects.equals(c.getArtifactId(), gav.getArtifactId()) &&
+                   !Objects.equals(c.approximateEffectiveVersion(), gav.getVersion())) {
+                    return c.withPreferredVersion(null)
+                            .withStrictVersion(null)
+                            .withRequiredVersion(gav.getVersion());
+                }
+            }
+            return c;
+        }, repositories, ctx);
+    }
+
+    public GradleDependencyConfiguration mapConstraints(
+            Function<GradleDependencyConstraint, @Nullable GradleDependencyConstraint> mapping,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) throws MavenDownloadingException {
+        List<GradleDependencyConstraint> newConstraints = ListUtils.map(constraints, mapping::apply);
+        if (constraints == newConstraints) {
+            return this;
+        }
+        GradleDependencyConfiguration result = withConstraints(newConstraints);
+        if (isCanBeResolved) {
+            try {
+                // Any constraint changing could potentially result in changes to the resolved graph, so re-resolve everything
+                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                List<ResolvedDependency> newResolved = new ArrayList<>(requested.size());
+                for (Dependency dep : requested) {
+                    if (dep.findAttribute(ProjectAttribute.class).isPresent()) {
+                        // Dependencies representing another project in the same multi-project build can't be resolved
+                        ResolvedDependency resolved = ResolvedDependency.builder()
+                                .gav(dep.getGav().asResolved())
+                                .requested(dep)
+                                .classifier(dep.getClassifier())
+                                .build();
+                        newResolved.add(resolved);
+                    } else {
+                        Pom singlePom = singleDependencyPom(dep, requested, repositories, ctx);
+                        ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
+                        ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
+                        newResolved.add(resolved);
+                    }
+                }
+            } catch (MavenDownloadingExceptions e) {
+                throw e.getExceptions().get(0);
+            }
+        }
+        return result;
+    }
+
     /**
      * Produce a new GradleDependencyConfiguration according to the supplied mapping function.
      *
@@ -359,8 +415,22 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             List<MavenRepository> repositories,
             ExecutionContext ctx
     ) throws MavenDownloadingException {
-        List<Dependency> newRequested = ListUtils.map(requested, mapping::apply);
-        if(requested == newRequested) {
+        Map<GroupArtifact, @Nullable Dependency> updatedDependencies = new HashMap<>(requested.size());
+        Map<GroupArtifact, @Nullable Dependency> updatedBoms = new HashMap<>(requested.size());
+        List<Dependency> newRequested = ListUtils.map(requested, original -> {
+            Dependency maybeUpdated = mapping.apply(original);
+            if (maybeUpdated != original) {
+                if (original.findAttribute(Category.class).map(Category::isBom).orElse(false)) {
+                    updatedBoms.put(original.getGav().asGroupArtifact(), maybeUpdated);
+                } else {
+                    updatedDependencies.put(original.getGav().asGroupArtifact(), maybeUpdated);
+                }
+            }
+            //noinspection DataFlowIssue
+            return maybeUpdated;
+        });
+
+        if (requested == newRequested) {
             return this;
         }
 
@@ -369,20 +439,32 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             try {
                 MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                 List<ResolvedDependency> newResolved = new ArrayList<>(newRequested.size());
+                Map<GroupArtifact, ResolvedDependency> gaToOriginalDirectResolved = null;
+                // If any BOM has changed it could affect the resolution of all other dependencies
+                // But if no BOM has changed we should only need to re-resolve those that were touched by the updating function
+                boolean resolveAll = !updatedBoms.isEmpty();
                 for(Dependency dep : newRequested) {
+                    // Edge case I can think of no reasonable way to support: Another project in the same build used as a BOM
                     if(dep.findAttribute(ProjectAttribute.class).isPresent()) {
-                        // Dependencies representing another project in the same multi-project build can't be resolved by mav be trivially resolvable
+                        // Dependencies representing another project in the same multi-project build can't be resolved
                         ResolvedDependency resolved = ResolvedDependency.builder()
                                 .gav(dep.getGav().asResolved())
                                 .requested(dep)
                                 .classifier(dep.getClassifier())
                                 .build();
                         newResolved.add(resolved);
-                    } else {
+                    } else if (resolveAll || updatedBoms.containsKey(dep.getGav().asGroupArtifact()) || updatedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
                         Pom singlePom = singleDependencyPom(dep, newRequested, repositories, ctx);
                         ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
                         ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
                         newResolved.add(resolved);
+                    } else {
+                        // Unchanged dependency with no re-resolution needed
+                        if (gaToOriginalDirectResolved == null) {
+                            gaToOriginalDirectResolved = directResolved.stream()
+                                    .collect(Collectors.toMap(it -> it.getGav().asGroupArtifact(), it -> it));
+                        }
+                        newResolved.add(gaToOriginalDirectResolved.get(dep.getGav().asGroupArtifact()));
                     }
                 }
                 result = result.withDirectResolved(newResolved);
