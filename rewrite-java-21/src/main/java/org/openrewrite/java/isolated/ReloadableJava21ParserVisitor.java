@@ -426,29 +426,43 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Statement> primaryConstructor = null;
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Space prefix = sourceBefore("(");
-            Map<Integer, JCAnnotation> recordAnnotationPosTable = new HashMap<>();
-            List<Tree> stateVector = new ArrayList<>();
+            Map<String, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
+            List<JRightPadded<Statement>> varDecs = new ArrayList<>();
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && md.getName().toString().equals("<init>")) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            mapAnnotations(var.getModifiers().getAnnotations(), recordAnnotationPosTable);
+                            recordAnnotationPosTable.put(var.getName().toString(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
                         }
                     }
                 }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable);
+                        mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.get(vt.getName().toString()));
+                        List<J.Annotation> recordAnnotations = collectAnnotations(recordAnnotationPosTable.get(vt.getName().toString()));
+                        Space typeExpressionPrefix = whitespace();
+                        JRightPadded<Statement> varDec = convert(vt, commaDelim);
+                        if (varDec != null) {
+                            varDecs.add(varDec);
+                            varDecs = ListUtils.mapLast(varDecs, elem -> {
+                                if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
+                                    return elem.withElement(vd.withLeadingAnnotations(recordAnnotations)
+                                            .withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix)));
+                                }
+                                return elem;
+                            });
+                        }
                     }
                 }
             }
-            List<J.Annotation> recordAnnotations = collectAnnotations(recordAnnotationPosTable);
+            varDecs = ListUtils.mapLast(varDecs, elem -> elem != null ? elem.withAfter(sourceBefore(")")) : null);
+            if (varDecs.isEmpty()) {
+                varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
+            }
 
             primaryConstructor = JContainer.build(
                     prefix,
-                    stateVector.isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
+                    varDecs,
                     Markers.EMPTY
             );
         }
