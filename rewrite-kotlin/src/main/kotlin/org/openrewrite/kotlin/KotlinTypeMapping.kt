@@ -434,7 +434,6 @@ class KotlinTypeMapping(
                     else -> null
                 }
             }
-
             else -> null
         }
         return when (type) {
