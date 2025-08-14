@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.parser.JavaParserClasspathLoader;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
 import org.openrewrite.java.internal.parser.TypeTable;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -117,30 +118,25 @@ public interface JavaParser extends Parser {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
 
-        TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
-        if (typeTable != null) {
-            for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
-                Path located = typeTable.load(missingArtifactName);
-                if (located != null) {
-                    artifacts.add(located);
-                    missingArtifactNames.remove(missingArtifactName);
-                }
-            }
-        }
-        if (!missingArtifactNames.isEmpty()) {
-            try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
+        try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
+            List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
+            loaders.add(rewriteClasspathJarClasspathLoader);
+            // TODO support annotations in type tables (e.g. required by meta annotations support)
+            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
+
+            for (JavaParserClasspathLoader loader : loaders) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
-                    Path located = rewriteClasspathJarClasspathLoader.load(missingArtifactName);
+                    Path located = loader.load(missingArtifactName);
                     if (located != null) {
                         artifacts.add(located);
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
+            }
 
-                if (!missingArtifactNames.isEmpty()) {
-                    String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-                    throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
-                }
+            if (!missingArtifactNames.isEmpty()) {
+                String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+                throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
             }
         }
         return artifacts;
