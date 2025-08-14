@@ -23,7 +23,8 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 @Value
 @Builder
