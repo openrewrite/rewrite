@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -32,6 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.*;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
@@ -576,7 +578,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       classpath("com.google.guava:guava:${guavaVersion}")
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                //noinspection DataFlowIssue
+                assertThat(cu.getMarkers().findFirst(GradleProject.class))
+                  .get()
+                  .asInstanceOf(type(GradleProject.class))
+                  .extracting(gp -> gp.getBuildscript().getConfigurations())
+                  .asInstanceOf(list(GradleDependencyConfiguration.class))
+                  .singleElement()
+                  .extracting(conf -> conf.findResolvedDependency("com.google.guava", "guava"))
+                  .isNotNull()
+                  .extracting(ResolvedDependency::getVersion)
+                  .as("GradleProject model should reflect the updated guava version")
+                  .isEqualTo("30.1.1-jre");
+            })
           )
         );
     }

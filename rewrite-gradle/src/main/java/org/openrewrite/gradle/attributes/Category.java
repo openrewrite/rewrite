@@ -48,6 +48,14 @@ public enum Category implements Attribute {
      */
     VERIFICATION;
 
+    /**
+     * A regular platform or enforced platform dependency is being used as a bill-of-materials to provide version numbers,
+     * not actually as a dependency on its own.
+     */
+    public boolean isBom() {
+        return this == REGULAR_PLATFORM || this == ENFORCED_PLATFORM;
+    }
+
     public static String key() {
         return "org.gradle.category";
     }
