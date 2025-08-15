@@ -140,7 +140,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
 
                 // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
-                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues())) {
+                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameAlreadyPresent(a)) {
                     J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
                     a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                 }
@@ -195,7 +195,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
                 }
                 if (exp instanceof J.FieldAccess) {
-                    if (oldAttributeValue != null) {
+                    if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(exp.toString())) {
                         return as;
                     }
                     if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
@@ -211,8 +211,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             private @Nullable Expression update(J.Literal literal, J.Annotation annotation, @Nullable String newAttributeValue) {
                 // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                 if ("value".equals(attributeName())) {
-                    if (newAttributeValue == null && valueMatches(literal, oldAttributeValue)) {
-                        return null;
+                    if (newAttributeValue == null) {
+                        if (valueMatches(literal, oldAttributeValue)) {
+                            return null;
+                        }
+                        return literal;
                     }
                     if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
                         return literal;
@@ -231,7 +234,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                 if ("value".equals(attributeName())) {
                     if (newAttributeValue == null) {
-                        return null;
+                        if (valueMatches(fieldAccess, oldAttributeValue)) {
+                            return null;
+                        }
+                        return fieldAccess;
                     }
                     if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(fieldAccess.toString())) {
                         return fieldAccess;
@@ -317,6 +323,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         newItemsList.add(newFieldAccess);
                     }
                     return newItemsList;
+                } else if (it instanceof J.Empty) {
+                    return new ArrayList<>();
                 }
                 return it;
             });
@@ -456,6 +464,26 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         } else if (e instanceof J.NewArray) {
             List<Expression> initializer = ((J.NewArray) e).getInitializer();
             return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));
+        }
+        return false;
+    }
+
+    private boolean attributeNameAlreadyPresent(J.Annotation a) {
+        List<Expression> existingArguments = a.getArguments();
+        if (existingArguments == null) {
+            return false;
+        }
+        for (Expression e : a.getArguments()) {
+            if (e instanceof J.Assignment) {
+                J.Assignment as = (J.Assignment) e;
+                if (as.getVariable() instanceof J.Identifier) {
+                    if (((J.Identifier) as.getVariable()).getSimpleName().equals(attributeName())) {
+                        return true;
+                    }
+                }
+            } else if (attributeName().equals("value")) {
+                return true;
+            }
         }
         return false;
     }
