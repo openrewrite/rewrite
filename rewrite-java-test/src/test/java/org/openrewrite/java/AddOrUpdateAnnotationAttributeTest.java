@@ -34,45 +34,70 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           //language=java
           """
             package org.example;
+            import java.lang.annotation.Repeatable;
+            @interface FdsWrapper { FooDefaultString[] value(); }
+            @Repeatable(FdsWrapper.class)
             public @interface FooDefaultString {
                 String value() default "";
                 String a() default "";
                 String[] b() default {};
-                Class<? extends Number> c() default null;
+                Class<? extends Number> c() default Number.class;
                 Class<? extends Number>[] d() default {};
             }
             """,
           //language=java
           """
             package org.example;
+            import java.lang.annotation.Repeatable;
+            @interface FdsaWrapper { FooDefaultStringArray[] value(); }
+            @Repeatable(FdsaWrapper.class)
             public @interface FooDefaultStringArray {
                 String[] value() default {};
                 String a() default "";
                 String[] b() default {};
-                Class<? extends Number> c() default null;
+                Class<? extends Number> c() default Number.class;
                 Class<? extends Number>[] d() default {};
             }
             """,
           //language=java
           """
             package org.example;
+            import java.lang.annotation.Repeatable;
+            @interface FdcWrapper { FooDefaultClass[] value(); }
+            @Repeatable(FdcWrapper.class)
             public @interface FooDefaultClass {
-                Class<? extends Number> value() default null;
+                Class<? extends Number> value() default Number.class;
                 String a() default "";
                 String[] b() default {};
-                Class<? extends Number> c() default null;
+                Class<? extends Number> c() default Number.class;
                 Class<? extends Number>[] d() default {};
             }
             """,
           //language=java
           """
             package org.example;
+            import java.lang.annotation.Repeatable;
+            @interface FdcaWrapper { FooDefaultClassArray[] value(); }
+            @Repeatable(FdcaWrapper.class)
             public @interface FooDefaultClassArray {
                 Class<? extends Number>[] value() default {};
                 String a() default "";
                 String[] b() default {};
-                Class<? extends Number> c() default null;
+                Class<? extends Number> c() default Number.class;
                 Class<? extends Number>[] d() default {};
+            }
+            """,
+          //language=java
+          """
+            package org.example;
+            public class Const {
+                public class X {
+                    public class Y {
+                        public static final String SOME_CONST = "a";
+                        public static final String OTHER_CONST = "b";
+                        public static final String THIRD_CONST = "c";
+                    }
+                }
             }
             """
         ));
@@ -82,7 +107,6 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     class UsingImplicitAttributeName {
         @Nested
         class UsingNullAttributeValue {
-            // TODO: Check on `addOnly` and `appendArray` effects
             @Nested
             class WithLiteralTypeAttribute {
                 @Test
@@ -110,19 +134,54 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 }
 
                 @Test
+                void literalAttribute_existing_usingAddOnly_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, true, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a")
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = "b")
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = "a", a = "z")
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = "z")
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
                 void literalAttribute_existing_usingNullOldAttributeValue_removesSafely() {
                     rewriteRun(
                       spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
                       //language=java
                       java(
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultString;
                           @FooDefaultString("a")
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
                           @FooDefaultString(value = "b")
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
                           public class A {}
                           """,
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString
                           @FooDefaultString
                           @FooDefaultString
                           public class A {}
@@ -131,15 +190,108 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       //language=java
                       java(
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultString;
-                          @FooDefaultString("a", a = "z")
-                          @FooDefaultString(value = "b", a = "y")
+                          @FooDefaultString(value = "a", a = "z1")
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = "z2")
                           public class B {}
                           """,
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultString;
-                          @FooDefaultString(a = "z")
-                          @FooDefaultString(a = "y")
+                          @FooDefaultString(a = "z1")
+                          @FooDefaultString(a = "z2")
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Disabled("We can't support this right now, as there is no reference to the actual string literal of the constant")
+                @Test
+                void literalAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, "a", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstRef_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, "Const.X.Y.SOME_CONST", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
                           public class B {}
                           """
                       )
@@ -173,16 +325,12 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       java(
                         """
                           import org.example.FooDefaultString;
-                          @FooDefaultString("a", a = "a")
-                          @FooDefaultString("b", a = "a")
                           @FooDefaultString(value = "a", a = "a")
                           @FooDefaultString(value = "b", a = "a")
                           public class B {}
                           """,
                         """
                           import org.example.FooDefaultString;
-                          @FooDefaultString(a = "a")
-                          @FooDefaultString("b", a = "a")
                           @FooDefaultString(a = "a")
                           @FooDefaultString(value = "b", a = "a")
                           public class B {}
@@ -220,21 +368,65 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 }
 
                 @Test
-                void literalArrayAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                void literalArrayAttribute_existing_usingAddOnly_doesNothing() {
                     rewriteRun(
-                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, null, null, null)),
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, null, true, null)),
                       //language=java
                       java(
                         """
                           import org.example.FooDefaultStringArray;
                           @FooDefaultStringArray("a")
                           @FooDefaultStringArray(value = "b")
+                          @FooDefaultStringArray({})
                           @FooDefaultStringArray({"c"})
+                          @FooDefaultStringArray(value = {})
                           @FooDefaultStringArray(value = {"d"})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(value = "a", b = {"z"})
+                          @FooDefaultStringArray(value = {}, b = {"y"})
+                          @FooDefaultStringArray(value = {"d"}, b = {"x"})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalArrayAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray("a")
+                          @FooDefaultStringArray(Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray(value = "b")
+                          @FooDefaultStringArray(Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray({})
+                          @FooDefaultStringArray({"c"})
+                          @FooDefaultStringArray({Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {})
+                          @FooDefaultStringArray(value = {"d"})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST})
                           public class A {}
                           """,
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray
                           @FooDefaultStringArray
                           @FooDefaultStringArray
                           @FooDefaultStringArray
@@ -245,19 +437,138 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       //language=java
                       java(
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultStringArray;
-                          @FooDefaultStringArray("a", b = {"z"})
-                          @FooDefaultStringArray(value = "b", b = {"y"})
-                          @FooDefaultStringArray({"c"}, b = {"x"})
-                          @FooDefaultStringArray(value = {"d"}, b = {"w"})
+                          @FooDefaultStringArray(value = "b", b = {"z1"})
+                          @FooDefaultStringArray(value = Const.X.Y.SOME_CONST, b = {"z2"})
+                          @FooDefaultStringArray(value = {}, b = {"y1"})
+                          @FooDefaultStringArray(value = {"d"}, b = {"y2"})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST}, b = {"y3"})
                           public class B {}
                           """,
                         """
+                          import org.example.Const;
                           import org.example.FooDefaultStringArray;
-                          @FooDefaultStringArray(b = {"z"})
-                          @FooDefaultStringArray(b = {"y"})
-                          @FooDefaultStringArray(b = {"x"})
-                          @FooDefaultStringArray(b = {"w"})
+                          @FooDefaultStringArray(b = {"z1"})
+                          @FooDefaultStringArray(b = {"z2"})
+                          @FooDefaultStringArray(b = {"y1"})
+                          @FooDefaultStringArray(b = {"y2"})
+                          @FooDefaultStringArray(b = {"y3"})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Disabled("We can't support this right now, as there is no reference to the actual string literal of the constant")
+                @Test
+                void literalArrayAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, "a", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray({Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST})
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(value = Const.X.Y.SOME_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST}, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST}, b = {Const.X.Y.SOME_CONST})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST}, b = {Const.X.Y.SOME_CONST})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalArrayAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstRef_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, null, "Const.X.Y.SOME_CONST", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray({Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray(Const.X.Y.OTHER_CONST)
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST})
+                          @FooDefaultStringArray
+                          @FooDefaultStringArray({Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(value = Const.X.Y.SOME_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.SOME_CONST}, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.SOME_CONST, Const.X.Y.THIRD_CONST}, b = {Const.X.Y.SOME_CONST})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultStringArray;
+                          @FooDefaultStringArray(b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = Const.X.Y.OTHER_CONST, b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(b = {Const.X.Y.SOME_CONST})
+                          @FooDefaultStringArray(value = {Const.X.Y.OTHER_CONST, Const.X.Y.THIRD_CONST}, b = {Const.X.Y.SOME_CONST})
                           public class B {}
                           """
                       )
@@ -276,8 +587,10 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                           @FooDefaultStringArray("b")
                           @FooDefaultStringArray(value = "a")
                           @FooDefaultStringArray(value = "b")
+                          @FooDefaultStringArray({})
                           @FooDefaultStringArray({"a"})
                           @FooDefaultStringArray({"b", "a", "c"})
+                          @FooDefaultStringArray(value = {})
                           @FooDefaultStringArray(value = {"a"})
                           @FooDefaultStringArray(value = {"b", "a", "c"})
                           public class A {}
@@ -289,7 +602,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                           @FooDefaultStringArray
                           @FooDefaultStringArray("b")
                           @FooDefaultStringArray
+                          @FooDefaultStringArray
                           @FooDefaultStringArray({"b", "c"})
+                          @FooDefaultStringArray
                           @FooDefaultStringArray
                           @FooDefaultStringArray({"b", "c"})
                           public class A {}
@@ -299,12 +614,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       java(
                         """
                           import org.example.FooDefaultStringArray;
-                          @FooDefaultStringArray("a", b = {"a"})
-                          @FooDefaultStringArray("b", b = {"a"})
                           @FooDefaultStringArray(value = "a", b = {"a"})
                           @FooDefaultStringArray(value = "b", b = {"a"})
-                          @FooDefaultStringArray({"a"}, b = {"a"})
-                          @FooDefaultStringArray({"b", "a", "c"}, b = {"a"})
+                          @FooDefaultStringArray(value = {}, b = {"a"})
                           @FooDefaultStringArray(value = {"a"}, b = {"a"})
                           @FooDefaultStringArray(value = {"b", "a", "c"}, b = {"a"})
                           public class B {}
@@ -312,11 +624,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                         """
                           import org.example.FooDefaultStringArray;
                           @FooDefaultStringArray(b = {"a"})
-                          @FooDefaultStringArray("b", b = {"a"})
-                          @FooDefaultStringArray(b = {"a"})
                           @FooDefaultStringArray(value = "b", b = {"a"})
                           @FooDefaultStringArray(b = {"a"})
-                          @FooDefaultStringArray({"b", "c"}, b = {"a"})
                           @FooDefaultStringArray(b = {"a"})
                           @FooDefaultStringArray(value = {"b", "c"}, b = {"a"})
                           public class B {}
@@ -353,6 +662,30 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 }
 
                 @Test
+                void classAttribute_existing_usingAddOnly_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, null, null, true, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(Integer.class)
+                          @FooDefaultClass(Long.class)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(value = Integer.class, c = Long.class)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
                 void classAttribute_existing_usingNullOldAttributeValue_removesSafely() {
                     rewriteRun(
                       spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, null, null, null, null)),
@@ -375,14 +708,158 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       java(
                         """
                           import org.example.FooDefaultClass;
-                          @FooDefaultClass(Integer.class, c = Short.class)
                           @FooDefaultClass(value = Long.class, c = Byte.class)
                           public class B {}
                           """,
                         """
                           import org.example.FooDefaultClass;
-                          @FooDefaultClass(c = Short.class)
                           @FooDefaultClass(c = Byte.class)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void classAttribute_existing_usingProvidedOldAttributeValue_removesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, null, "Integer.class", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(Integer.class)
+                          @FooDefaultClass(Long.class)
+                          @FooDefaultClass(value = Integer.class)
+                          @FooDefaultClass(value = Long.class)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass
+                          @FooDefaultClass(Long.class)
+                          @FooDefaultClass
+                          @FooDefaultClass(Long.class)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(value = Integer.class, c = Integer.class)
+                          @FooDefaultClass(value = Long.class, c = Integer.class)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultClass;
+                          @FooDefaultClass(c = Integer.class)
+                          @FooDefaultClass(value = Long.class, c = Integer.class)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+            }
+
+            @Nested
+            class WithClassArrayTypeAttribute {
+                @Test
+                void classArrayAttribute_absent_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray()
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(d = Integer.class)
+                          @FooDefaultClassArray(d = {Long.class})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void classArrayAttribute_existing_usingAddOnly_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, null, true, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(Integer.class)
+                          @FooDefaultClassArray(value = Long.class)
+                          @FooDefaultClassArray({})
+                          @FooDefaultClassArray({Short.class})
+                          @FooDefaultClassArray(value = {})
+                          @FooDefaultClassArray(value = {Byte.class})
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(value = Long.class, d = {Byte.class})
+                          @FooDefaultClassArray(value = {}, d = {Integer.class})
+                          @FooDefaultClassArray(value = {Long.class}, d = {Integer.class})
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void classArrayAttribute_existing_usingNullOldAttributeValue_removesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(Integer.class)
+                          @FooDefaultClassArray(value = Long.class)
+                          @FooDefaultClassArray({})
+                          @FooDefaultClassArray({Short.class})
+                          @FooDefaultClassArray(value = {})
+                          @FooDefaultClassArray(value = {Byte.class})
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray
+                          @FooDefaultClassArray
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(value = Long.class, d = {Byte.class})
+                          @FooDefaultClassArray(value = {}, d = {Float.class})
+                          @FooDefaultClassArray(value = {Long.class}, d = {Integer.class})
+                          public class B {}
+                          """,
+                        """
+                          import org.example.FooDefaultClassArray;
+                          @FooDefaultClassArray(d = {Byte.class})
+                          @FooDefaultClassArray(d = {Float.class})
+                          @FooDefaultClassArray(d = {Integer.class})
                           public class B {}
                           """
                       )
@@ -401,8 +878,10 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                           @FooDefaultClassArray(Long.class)
                           @FooDefaultClassArray(value = Integer.class)
                           @FooDefaultClassArray(value = Long.class)
+                          @FooDefaultClassArray({})
                           @FooDefaultClassArray({Integer.class})
                           @FooDefaultClassArray({Long.class, Integer.class, Short.class})
+                          @FooDefaultClassArray(value = {})
                           @FooDefaultClassArray(value = {Integer.class})
                           @FooDefaultClassArray(value = {Long.class, Integer.class, Short.class})
                           public class A {}
@@ -414,7 +893,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                           @FooDefaultClassArray
                           @FooDefaultClassArray(Long.class)
                           @FooDefaultClassArray
+                          @FooDefaultClassArray
                           @FooDefaultClassArray({Long.class, Short.class})
+                          @FooDefaultClassArray
                           @FooDefaultClassArray
                           @FooDefaultClassArray({Long.class, Short.class})
                           public class A {}
@@ -424,12 +905,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       java(
                         """
                           import org.example.FooDefaultClassArray;
-                          @FooDefaultClassArray(Integer.class, d = {Integer.class})
-                          @FooDefaultClassArray(Long.class, d = {Integer.class})
                           @FooDefaultClassArray(value = Integer.class, d = {Integer.class})
                           @FooDefaultClassArray(value = Long.class, d = {Integer.class})
-                          @FooDefaultClassArray({Integer.class}, d = {Integer.class})
-                          @FooDefaultClassArray({Long.class, Integer.class, Short.class}, d = {Integer.class})
+                          @FooDefaultClassArray(value = {}, d = {Integer.class})
                           @FooDefaultClassArray(value = {Integer.class}, d = {Integer.class})
                           @FooDefaultClassArray(value = {Long.class, Integer.class, Short.class}, d = {Integer.class})
                           public class B {}
@@ -437,11 +915,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                         """
                           import org.example.FooDefaultClassArray;
                           @FooDefaultClassArray(d = {Integer.class})
-                          @FooDefaultClassArray(Long.class, d = {Integer.class})
-                          @FooDefaultClassArray(d = {Integer.class})
                           @FooDefaultClassArray(value = Long.class, d = {Integer.class})
                           @FooDefaultClassArray(d = {Integer.class})
-                          @FooDefaultClassArray({Long.class, Short.class}, d = {Integer.class})
                           @FooDefaultClassArray(d = {Integer.class})
                           @FooDefaultClassArray(value = {Long.class, Short.class}, d = {Integer.class})
                           public class B {}
@@ -450,235 +925,204 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                     );
                 }
             }
-
-
-
-
-
-
-
-
-            @Test
-            void classArrayAttribute_absent_doesNothing() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClassArray", null, null, null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultClassArray;
-                      @FooDefaultClassArray
-                      public class A {
-                          @FooDefaultClassArray()
-                          public class AInner {}
-                      }
-                      """
-                  ),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultClassArray;
-                      @FooDefaultClassArray(d = Integer.class)
-                      public class B {
-                          @FooDefaultClassArray(d = {Long.class})
-                          public class BInner {}
-                      }
-                      """
-                  )
-                );
-            }
         }
 
         @Nested
-        class WhenImplicitIsLiteralType {
-            @Test
-            void unsetImplicitToLiteral_Adds() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "hello", null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("hello")
-                      public class A {}
-                      """
-                  ),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString()
-                      public class B {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("hello")
-                      public class B {}
-                      """
-                  )
-                );
+        class UsingLiteralAttributeValue {
+            @Nested
+            class WithLiteralTypeAttribute {
+                @Test
+                void literalAttribute_absent_usingNullOldAttributeValue_addsSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "a", null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString()
+                          @FooDefaultString(a = "b")
+                          public class A {}
+                          """,
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a")
+                          @FooDefaultString("a")
+                          @FooDefaultString(value = "a", a = "b")
+                          public class A {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_absent_usingLiteralOldAttributeValue_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "a", "b", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.FooDefaultString;
+                          @FooDefaultString
+                          @FooDefaultString()
+                          @FooDefaultString(a = "b")
+                          public class A {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_usingAddOnly_doesNothing() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "a", null, true, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = "b")
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_usingNullOldAttributeValue_updatesSafely() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "a", null, null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = "c")
+                          @FooDefaultString(value = Const.X.Y.THIRD_CONST)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("a")
+                          @FooDefaultString("a")
+                          @FooDefaultString("a")
+                          @FooDefaultString("a")
+                          public class A {}
+                          """
+                      )
+                    );
+                }
+
+                @Disabled("We can't support this right now, as there is no reference to the actual string literal of the constant")
+                @Test
+                void literalAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstValue_updatesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "b", "a", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """
+                      ),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = "b", a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """
+                      )
+                    );
+                }
+
+                @Test
+                void literalAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstRef_updatesSafelyOnlyMatched() {
+                    rewriteRun(
+                      spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "b", "Const.X.Y.SOME_CONST", null, null)),
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(Const.X.Y.SOME_CONST)
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          @FooDefaultString("b")
+                          @FooDefaultString(Const.X.Y.OTHER_CONST)
+                          public class A {}
+                          """
+                      )/*,
+                      //language=java
+                      java(
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = Const.X.Y.SOME_CONST, a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """,
+                        """
+                          import org.example.Const;
+                          import org.example.FooDefaultString;
+                          @FooDefaultString(value = "b", a = Const.X.Y.SOME_CONST)
+                          @FooDefaultString(value = Const.X.Y.OTHER_CONST, a = Const.X.Y.SOME_CONST)
+                          public class B {}
+                          """
+                      )*/
+                    );
+                }
+
+                // TODO: `literalAttribute_existing_usingProvidedOldAttributeValue_updatesSafelyOnlyMatched`
             }
 
-            @Test
-            void existingImplicitToLiteral_Updates_AndDropsAttributeName() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("hello")
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("bonjour")
-                      public class A {}
-                      """
-                  ),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "hello")
-                      public class B {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("bonjour")
-                      public class B {}
-                      """
-                  )
-                );
-            }
-
-            @Test
-            void existingImplicitToNull_Removes() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("hello")
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString
-                      public class A {}
-                      """
-                  ),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "hello")
-                      public class B {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString
-                      public class B {}
-                      """
-                  )
-                );
-            }
-
-            @Test
-            void existingOtherAttributes_AndUnsetImplicitToLiteral_AddsSafely_AndAddsAttributeName() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """
-                  )
-                );
-            }
-
-            @Test
-            void existingOtherAttributes_AndExistingImplicitToLiteral_AddsSafely_AndRetainsAttributeNameUsage() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, "bonjour", null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "blah", additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """
-                  ),
-                  // TODO: Unclear whether the after actually should have had `value = "bonjour"` in reality
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("blah", additionalValue = "hello", additionalValues = {"hi"})
-                      public class B {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("bonjour", additionalValue = "hello", additionalValues = {"hi"})
-                      public class B {}
-                      """
-                  )
-                );
-            }
-
-            @Test
-            void existingOtherAttributes_AndExistingImplicitToNull_RemovesSafely() {
-                rewriteRun(
-                  spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", null, null, null, null, null)),
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "blah", additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString(value = "bonjour", additionalValue = "hello", additionalValues = {"hi"})
-                      public class A {}
-                      """
-                  ),
-                  // TODO: Unclear whether the after actually should have had `value = "bonjour"` in reality
-                  //language=java
-                  java(
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("blah", additionalValue = "hello", additionalValues = {"hi"})
-                      public class B {}
-                      """,
-                    """
-                      import org.example.FooDefaultString;
-                      @FooDefaultString("bonjour", additionalValue = "hello", additionalValues = {"hi"})
-                      public class B {}
-                      """
-                  )
-                );
-            }
+            // TODO: nested `WithLiteralArrayTypeAttribute`
+            // TODO: nested `WithClassTypeAttribute`
+            // TODO: nested `WithClassArrayTypeAttribute`
         }
 
+        // TODO: Check on `addOnly` and `appendArray` effects
+        // TODO: Pull other checks from below up, such as not getting confused by fields of the same name during qualified constant checks
     }
+
+    // TODO: all the above, but for explicit attribute
 
     @DocumentExample
     @Test
