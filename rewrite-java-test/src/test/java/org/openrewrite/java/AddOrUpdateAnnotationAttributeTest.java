@@ -2323,4 +2323,52 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void attributeWithShallowType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeType("org.example.Bar", "org.example.Foo", true),
+            new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "required",
+            "true",
+            null,
+            false,
+            false)
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  boolean required();
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Bar {
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Bar;
+
+              @Bar
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(required = true)
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
 }
