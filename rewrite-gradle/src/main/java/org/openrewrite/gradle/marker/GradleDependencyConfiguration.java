@@ -494,6 +494,41 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     }
 
     /**
+     * Update a matching constraint in place or add a new one as needed.
+     */
+    public GradleDependencyConfiguration addOrUpdateConstraint(
+            GroupArtifactVersion gav,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx) {
+        return addOrUpdateConstraint(GradleDependencyConstraint.builder()
+                .groupId(gav.getGroupId() == null ? "" : gav.getGroupId())
+                .artifactId(gav.getArtifactId())
+                .requiredVersion(gav.getVersion())
+                .build(), repositories, ctx);
+    }
+
+    /**
+     * Update a matching constraint in place or add a new one as needed.
+     */
+    public GradleDependencyConfiguration addOrUpdateConstraint(
+            GradleDependencyConstraint constraint,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx) {
+        GradleDependencyConfiguration maybeUpdated = mapConstraints(it -> {
+            if (Objects.equals(it.getArtifactId(), constraint.getArtifactId()) &&
+                Objects.equals(it.getGroupId(), constraint.getGroupId()) &&
+                !Objects.equals(it.approximateEffectiveVersion(), constraint.approximateEffectiveVersion())) {
+                return constraint;
+            }
+            return it;
+        }, repositories, ctx);
+        if (maybeUpdated == this) {
+            maybeUpdated = addConstraint(constraint, repositories, ctx);
+        }
+        return maybeUpdated;
+    }
+
+    /**
      * Produce a new GradleDependencyConfiguration according to the supplied mapping function.
      *
      * @param mapping An arbitrary mapping function which is applied to the requested dependencies of the named configuration.

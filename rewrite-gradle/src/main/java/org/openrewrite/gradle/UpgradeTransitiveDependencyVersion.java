@@ -59,7 +59,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
 
@@ -471,7 +470,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
 
             private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
-                Map<String, List<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
+                Map<String, Set<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
                     Map<GradleDependencyConfiguration, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
@@ -479,14 +478,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
                         String configName = configToVersion.getKey().getName();
                         String newVersion = configToVersion.getValue();
+                        configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
+                                .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                gp.changeDependencyConstraints()
-                return gp;
+                return gp.addOrUpdateConstraints(configsToUpdate, ctx);
             }
         };
     }
-
 
     @RequiredArgsConstructor
     private class UpdateGradle extends JavaVisitor<ExecutionContext> {

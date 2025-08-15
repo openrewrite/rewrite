@@ -1,3 +1,18 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.gradle.marker;
 
 import lombok.EqualsAndHashCode;
@@ -19,6 +34,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -313,7 +329,7 @@ public class GradleProjectTest implements RewriteTest {
     void changeConstraint() {
         rewriteRun(
           spec -> spec.recipe(new ChangeConstraint(
-            List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2")),
+            Map.of("implementation", List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2"))),
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
                 assertThat(implementation).isNotNull();
@@ -409,12 +425,6 @@ class RemoveDependency extends Recipe {
     String configuration;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
-    public RemoveDependency(GroupArtifact gas, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
-        this.gas = List.of(gas);
-        this.configuration = configuration;
-        this.testAssertion = testAssertion;
-    }
-
     public RemoveDependency(List<GroupArtifact> gas, BiConsumer<GradleProject, GradleProject> testAssertion) {
         this.gas = gas;
         this.configuration = null;
@@ -451,7 +461,7 @@ class RemoveDependency extends Recipe {
 @EqualsAndHashCode(callSuper = false)
 class ChangeConstraint extends Recipe {
 
-    List<GroupArtifactVersion> newConstraints;
+    Map<String, List<GroupArtifactVersion>> configToConstraint;
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
     @Override
@@ -472,7 +482,7 @@ class ChangeConstraint extends Recipe {
             @Override
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
-                GradleProject updated = original.changeDependencyConstraints(newConstraints, ctx);
+                GradleProject updated = original.addOrUpdateConstraints(configToConstraint, ctx);
                 testAssertion.accept(original, updated);
                 return tree;
             }

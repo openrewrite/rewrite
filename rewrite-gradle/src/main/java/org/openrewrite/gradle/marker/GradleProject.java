@@ -26,14 +26,13 @@ import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.maven.DownloadingFunction;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -79,6 +78,7 @@ public class GradleProject implements Marker, Serializable {
     @Builder.Default
     List<MavenRepository> mavenRepositories = emptyList();
 
+    @SuppressWarnings("DeprecatedIsStillUsed")
     @With
     @Deprecated
     @Nullable
@@ -191,7 +191,7 @@ public class GradleProject implements Marker, Serializable {
     }
 
 
-    public GradleProject removeDirectDependencies(Collection<GroupArtifact> gas, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject removeDirectDependencies(Collection<GroupArtifact> gas, ExecutionContext ctx) {
         return mapConfigurations(
                 conf -> conf.removeDirectDependencies(gas, getMavenRepositories(), ctx),
                 ctx
@@ -211,16 +211,24 @@ public class GradleProject implements Marker, Serializable {
     /**
      * Upgrade the specified dependency within the specified configuration and all configurations which extend from that configuration.
      */
-    public GradleProject upgradeDirectDependencyVersion(String configuration, GroupArtifactVersion gav, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject upgradeDirectDependencyVersion(String configuration, GroupArtifactVersion gav, ExecutionContext ctx) {
         return mapConfiguration(
                 configuration,
                 conf -> conf.upgradeDirectDependency(gav, getMavenRepositories(), ctx),
                 ctx);
     }
 
-    public GradleProject changeDependencyConstraints(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject addOrUpdateConstraints(Map<String, ? extends Collection<GroupArtifactVersion>> configurationNameToConstraints, ExecutionContext ctx) {
         return mapConfigurations(
-                conf -> conf.changeDependencyConstraints(gavs, getMavenRepositories(), ctx),
+                it -> {
+                    Collection<GroupArtifactVersion> gavs = configurationNameToConstraints.get(it.getName());
+                    if (gavs != null && !gavs.isEmpty()) {
+                        for (GroupArtifactVersion gav : gavs) {
+                            it = it.addOrUpdateConstraint(gav, mavenRepositories, ctx);
+                        }
+                    }
+                    return it;
+                },
                 ctx
         );
     }
@@ -229,14 +237,13 @@ public class GradleProject implements Marker, Serializable {
      * Applies the specified mapping function to the named configuration and all configurations which extend from it.
      * @param configuration name of the configuration to apply the mapping function to
      * @param mapping mapping function which is expected to either return a new configuration with modifications or the original configuration unchanged
-     * @return a GradleProject marker with updated configurations, or the original GradleProject marker if no updates were made
-     * @throws MavenDownloadingException if problems were encountered downloading dependency information while applying the mapping function
+     * @return a GradleProject marker with updated configurations, or the original GradleProject marker if no updates were made.
      */
     public GradleProject mapConfiguration(
             String configuration,
-            DownloadingFunction<GradleDependencyConfiguration, GradleDependencyConfiguration> mapping,
+            Function<GradleDependencyConfiguration, @Nullable GradleDependencyConfiguration> mapping,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         Set<String> extendingFrom = configurationsExtendingFrom(nameToConfiguration.get(configuration), true).stream()
                 .map(GradleDependencyConfiguration::getName)
                 .collect(Collectors.toSet());
@@ -249,9 +256,9 @@ public class GradleProject implements Marker, Serializable {
     }
 
     public GradleProject mapConfigurations(
-            DownloadingFunction<GradleDependencyConfiguration, GradleDependencyConfiguration> mapping,
+            Function<GradleDependencyConfiguration, @Nullable GradleDependencyConfiguration> mapping,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         Map<String, GradleDependencyConfiguration> updatedConfigurations = new HashMap<>(nameToConfiguration.size());
         Map<String, GradleDependencyConfiguration> untouchedConfigurations = new HashMap<>(nameToConfiguration.size());
         for (GradleDependencyConfiguration configuration : getConfigurations()) {
@@ -259,7 +266,7 @@ public class GradleProject implements Marker, Serializable {
             if (mapped == configuration) {
                 // Defensively copy the original configurations so that there's no mutation of the original objects' extendsFrom
                 untouchedConfigurations.put(configuration.getName(), configuration.clone());
-            } else {
+            } else if (mapped != null) {
                 updatedConfigurations.put(mapped.getName(), mapped);
             }
         }
@@ -287,9 +294,7 @@ public class GradleProject implements Marker, Serializable {
                 .map(untouchedConfigurations::get)
                 .filter(Objects::nonNull)
                 .distinct()
-                .forEach(needsUpdate -> {
-                    needsUpdate.markForReResolution(getMavenRepositories(), ctx);
-                });
+                .forEach(needsUpdate -> needsUpdate.markForReResolution(getMavenRepositories(), ctx));
 
         return result;
     }
