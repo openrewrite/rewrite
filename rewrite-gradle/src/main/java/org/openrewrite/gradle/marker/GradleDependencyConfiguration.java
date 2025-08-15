@@ -617,6 +617,26 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     }
 
     /**
+     * Recursively update the extendsFrom in the collection to point to only other members of that same collection.
+     * This mutates objects in the collections passed in as parameters.
+     */
+    public static Map<String, GradleDependencyConfiguration> updateExtendsFrom(Map<String, GradleDependencyConfiguration> updatedConfigurations, Map<String, GradleDependencyConfiguration> untouchedConfigurations) {
+        Map<String, GradleDependencyConfiguration> result = new HashMap<>();
+        for (GradleDependencyConfiguration conf : updatedConfigurations.values()) {
+            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
+                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
+            result.put(conf.getName(), conf);
+        }
+        for (GradleDependencyConfiguration conf : untouchedConfigurations.values()) {
+            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
+                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
+            result.put(conf.getName(), conf);
+        }
+        return result;
+    }
+
+
+    /**
      *
      */
     @SuppressWarnings("MethodDoesntCallSuperMethod")

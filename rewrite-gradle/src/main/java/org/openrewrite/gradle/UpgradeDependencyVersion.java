@@ -522,7 +522,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                             }
 
-                            gradleProject = gradleProject.upgradeDirectDependencyVersions(upgrades, ctx);
+                            gradleProject = gradleProject.upgradeDirectDependencyVersions(upgrades, ctx)
+                                    .upgradeBuildscriptDirectDependencyVersions(upgrades, ctx);
                             if (projectMarker.get() != gradleProject) {
                                 t = t.withMarkers(t.getMarkers().setByType(gradleProject));
                             }
@@ -530,7 +531,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             t = Markup.warn(t, e);
                         }
                     }
-
                 }
                 return t;
             }

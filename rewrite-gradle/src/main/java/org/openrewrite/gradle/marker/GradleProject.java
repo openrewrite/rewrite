@@ -24,9 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 
 import java.io.Serializable;
@@ -37,6 +35,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.gradle.marker.GradleDependencyConfiguration.updateExtendsFrom;
 
 /**
  * Contains metadata about a Gradle Project. Queried from Gradle itself when the OpenRewrite build plugin runs.
@@ -141,6 +140,25 @@ public class GradleProject implements Marker, Serializable {
             GradleDependencyConfiguration parentConfiguration,
             boolean transitive
     ) {
+        return configurationsExtendingFrom(parentConfiguration, nameToConfiguration, transitive);
+    }
+
+    /**
+     * List the configurations which extend from the given configuration.
+     * Assuming a hierarchy like:
+     * <pre>
+     *     implementation
+     *     |> compileClasspath
+     *     |> runtimeClasspath
+     *     |> testImplementation
+     *        |> testCompileClasspath
+     *        |> testRuntimeClasspath
+     * </pre>
+     * <p>
+     * When querying "implementation" with transitive is false this function will return [compileClasspath, runtimeClasspath, testImplementation].
+     * When transitive is true this function will also return [testCompileClasspath, testRuntimeClasspath].
+     */
+    public static List<GradleDependencyConfiguration> configurationsExtendingFrom(GradleDependencyConfiguration parentConfiguration, Map<String, GradleDependencyConfiguration> nameToConfiguration, boolean transitive) {
         List<GradleDependencyConfiguration> result = new ArrayList<>();
         for (GradleDependencyConfiguration configuration : nameToConfiguration.values()) {
             if (configuration == parentConfiguration) {
@@ -150,7 +168,7 @@ public class GradleProject implements Marker, Serializable {
                 if (extendsFrom.getName().equals(parentConfiguration.getName())) {
                     result.add(configuration);
                     if (transitive) {
-                        result.addAll(configurationsExtendingFrom(configuration, true));
+                        result.addAll(configurationsExtendingFrom(configuration, nameToConfiguration,true));
                     }
                 }
             }
@@ -200,7 +218,7 @@ public class GradleProject implements Marker, Serializable {
     /**
      * Upgrade the specified dependency within all configurations.
      */
-    public GradleProject upgradeDirectDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) throws MavenDownloadingException {
+    public GradleProject upgradeDirectDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) {
         return mapConfigurations(
                 conf -> conf.upgradeDirectDependencies(gavs, getMavenRepositories(), ctx),
                 ctx
@@ -299,22 +317,23 @@ public class GradleProject implements Marker, Serializable {
     }
 
     /**
-     * Recursively update the extendsFrom in the collection to point to only other members of that same collection.
-     * This mutates objects in the collections passed in as parameters.
+     * Upgrade the specified dependency within all configurations.
      */
-    private Map<String, GradleDependencyConfiguration> updateExtendsFrom(Map<String, GradleDependencyConfiguration> updatedConfigurations, Map<String, GradleDependencyConfiguration> untouchedConfigurations) {
-        Map<String, GradleDependencyConfiguration> result = new HashMap<>();
-        for (GradleDependencyConfiguration conf : updatedConfigurations.values()) {
-            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
-                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
-            result.put(conf.getName(), conf);
-        }
-        for (GradleDependencyConfiguration conf : untouchedConfigurations.values()) {
-            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
-                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
-            result.put(conf.getName(), conf);
-        }
-        return result;
+    public GradleProject upgradeBuildscriptDirectDependencyVersions(Collection<GroupArtifactVersion> gavs, ExecutionContext ctx) {
+        return mapBuildscriptConfigurations(
+                conf -> conf.upgradeDirectDependencies(gavs, buildscript.getMavenRepositories(), ctx),
+                ctx
+        );
+    }
+
+    /**
+     * Apply a transformation to the configurations of the buildscript.
+     * Typically, buildscripts have only the "classpath" configuration, but it is technically possible to declare more.
+     */
+    public GradleProject mapBuildscriptConfigurations(
+            Function<GradleDependencyConfiguration, @Nullable GradleDependencyConfiguration> mapping,
+            ExecutionContext ctx) {
+        return withBuildscript(buildscript.mapConfigurations(mapping, ctx));
     }
 
     /**
