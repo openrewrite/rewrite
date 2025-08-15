@@ -34,11 +34,13 @@ public interface Attributed {
      * Only works for attributes which expose "key" and "from" static methods.
      */
     default <T extends Attribute> Optional<T> findAttribute(Class<T> clazz) {
-
         try {
             Method keyMethod = clazz.getMethod("key");
             String key = (String) keyMethod.invoke(null);
             String value = getAttributes().get(key);
+            if (value == null) {
+                return Optional.empty();
+            }
             Method from = clazz.getMethod("from", String.class);
             //noinspection unchecked
             return Optional.ofNullable((T)from.invoke(null, value));
