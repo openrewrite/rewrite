@@ -470,25 +470,19 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return t;
             }
 
-            private GradleProject updatedModel(GradleProject gradleProject, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
-                GradleProject gp = gradleProject;
-                Set<String> configNames = gp.getConfigurations().stream()
-                        .map(GradleDependencyConfiguration::getName)
-                        .collect(toSet());
-                Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
+            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+                Map<String, List<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                    if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                        continue;
-                    }
                     Map<GradleDependencyConfiguration, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
                     String artifactId = update.getKey().getArtifactId();
                     for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
+                        String configName = configToVersion.getKey().getName();
                         String newVersion = configToVersion.getValue();
-                        gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                throw new IllegalStateException("implement me");
+                gp.changeDependencyConstraints()
+                return gp;
             }
         };
     }

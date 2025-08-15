@@ -22,14 +22,18 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.DownloadingFunction;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -233,38 +237,15 @@ public class GradleProject implements Marker, Serializable {
             DownloadingFunction<GradleDependencyConfiguration, GradleDependencyConfiguration> mapping,
             ExecutionContext ctx
     ) throws MavenDownloadingException {
-        GradleDependencyConfiguration original = getConfiguration(configuration);
-        if (original == null) {
-            return this;
-        }
-        GradleDependencyConfiguration updated = mapping.apply(original);
-        if (updated == original) {
-            return this;
-        }
-        Map<String, GradleDependencyConfiguration> nameToUpdatedConf = new HashMap<>();
-        nameToUpdatedConf.put(updated.getName(), updated);
-        for (GradleDependencyConfiguration conf : configurationsExtendingFrom(updated, true)) {
-            nameToUpdatedConf.put(conf.getName(), mapping.apply(conf));
-        }
-
-        HashMap<String, GradleDependencyConfiguration> finalUpdatedConfigurations = new HashMap<>(nameToConfiguration);
-        finalUpdatedConfigurations.putAll(nameToUpdatedConf);
-        // Update each configuration's "extendsFrom" so they aren't still pointing to the old, un-updated objects
-        for (GradleDependencyConfiguration descendant : finalUpdatedConfigurations.values()) {
-            descendant.unsafeSetExtendsFrom(ListUtils.map(descendant.getExtendsFrom(), it -> nameToUpdatedConf.getOrDefault(it.getName(), it)));
-        }
-        return new GradleProject(
-                id,
-                group,
-                name,
-                version,
-                path,
-                plugins,
-                mavenRepositories,
-                mavenPluginRepositories,
-                finalUpdatedConfigurations,
-                buildscript
-        );
+        Set<String> extendingFrom = configurationsExtendingFrom(nameToConfiguration.get(configuration), true).stream()
+                .map(GradleDependencyConfiguration::getName)
+                .collect(Collectors.toSet());
+        return mapConfigurations(it -> {
+            if (configuration.equals(it.getName()) || extendingFrom.contains(it.getName())) {
+                return mapping.apply(it);
+            }
+            return it;
+        }, ctx);
     }
 
     public GradleProject mapConfigurations(
@@ -272,20 +253,21 @@ public class GradleProject implements Marker, Serializable {
             ExecutionContext ctx
     ) throws MavenDownloadingException {
         Map<String, GradleDependencyConfiguration> updatedConfigurations = new HashMap<>(nameToConfiguration.size());
-        boolean anyUpdated = false;
+        Map<String, GradleDependencyConfiguration> untouchedConfigurations = new HashMap<>(nameToConfiguration.size());
         for (GradleDependencyConfiguration configuration : getConfigurations()) {
             GradleDependencyConfiguration mapped = mapping.apply(configuration);
-            anyUpdated |= mapped != configuration;
-            updatedConfigurations.put(mapped.getName(), mapped);
+            if (mapped == configuration) {
+                // Defensively copy the original configurations so that there's no mutation of the original objects' extendsFrom
+                untouchedConfigurations.put(configuration.getName(), configuration.clone());
+            } else {
+                updatedConfigurations.put(mapped.getName(), mapped);
+            }
         }
-        if (!anyUpdated) {
+        if (updatedConfigurations.isEmpty()) {
             return this;
         }
-        // Update each configuration's "extendsFrom" so they aren't still pointing to the old, un-updated objects
-        for (GradleDependencyConfiguration descendant : updatedConfigurations.values()) {
-            descendant.unsafeSetExtendsFrom(ListUtils.map(descendant.getExtendsFrom(), it -> updatedConfigurations.getOrDefault(it.getName(), it)));
-        }
-        return new GradleProject(
+
+        GradleProject result = new GradleProject(
                 id,
                 group,
                 name,
@@ -294,8 +276,61 @@ public class GradleProject implements Marker, Serializable {
                 plugins,
                 mavenRepositories,
                 mavenPluginRepositories,
-                updatedConfigurations,
+                updateExtendsFrom(updatedConfigurations, untouchedConfigurations),
                 buildscript
         );
+
+        // All configurations extending from a mutated configuration must be marked as requiring re-resolution to propagate heritable changes
+        updatedConfigurations.values().stream()
+                .flatMap(it -> result.configurationsExtendingFrom(it, true).stream()
+                        .map(GradleDependencyConfiguration::getName))
+                .map(untouchedConfigurations::get)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(needsUpdate -> {
+                    needsUpdate.markForReResolution(getMavenRepositories(), ctx);
+                });
+
+        return result;
+    }
+
+    /**
+     * Recursively update the extendsFrom in the collection to point to only other members of that same collection.
+     * This mutates objects in the collections passed in as parameters.
+     */
+    private Map<String, GradleDependencyConfiguration> updateExtendsFrom(Map<String, GradleDependencyConfiguration> updatedConfigurations, Map<String, GradleDependencyConfiguration> untouchedConfigurations) {
+        Map<String, GradleDependencyConfiguration> result = new HashMap<>();
+        for (GradleDependencyConfiguration conf : updatedConfigurations.values()) {
+            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
+                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
+            result.put(conf.getName(), conf);
+        }
+        for (GradleDependencyConfiguration conf : untouchedConfigurations.values()) {
+            conf.unsafeSetExtendsFrom(ListUtils.map(conf.getExtendsFrom(), extending ->
+                    updatedConfigurations.getOrDefault(extending.getName(), untouchedConfigurations.get(extending.getName()))));
+            result.put(conf.getName(), conf);
+        }
+        return result;
+    }
+
+    /**
+     * If any configurations within this GradleProject marker have reported dependency resolution failure attach
+     * the type and message to the specified tree as a Warning marker.
+     * This can be used to ensure that model-updating errors are not hidden.
+     * This does not always mean that OpenRewrite attempted to resolve a dependency and failed, sometimes this comes
+     * directly from Gradle at parse time.
+     *
+     * @param tree an LST element to be used to report a dependency resolution failure.
+     * @return Either the tree with a warning marker or the original tree if there are no errors to report
+     */
+    public <T extends Tree> T maybeWarn(T tree) {
+        for (GradleDependencyConfiguration conf : nameToConfiguration.values()) {
+            if (conf.getExceptionType() != null) {
+                return Markup.warn(tree, new IllegalStateException(
+                        conf.getName() + " reported a non-fatal dependency resolution problem which may cause inaccuracies: " +
+                        conf.getExceptionType() + " " + conf.getMessage()));
+            }
+        }
+        return tree;
     }
 }

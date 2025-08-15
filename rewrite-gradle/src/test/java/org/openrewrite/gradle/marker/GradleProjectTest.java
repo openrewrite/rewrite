@@ -128,7 +128,6 @@ public class GradleProjectTest implements RewriteTest {
                           .isEqualTo("8.57.0");
                     }
                 }
-
             }
           )),
           buildGradle("""
@@ -371,22 +370,9 @@ public class GradleProjectTest implements RewriteTest {
 @Value
 class UpgradeDependencyInMarker extends Recipe {
 
-    List<GroupArtifactVersion> newGavs;
-    @Nullable
+    GroupArtifactVersion newGav;
     String configuration;
     BiConsumer<GradleProject, GradleProject> testAssertion;
-
-    public UpgradeDependencyInMarker(GroupArtifactVersion newGav, String configuration, BiConsumer<GradleProject, GradleProject> testAssertion) {
-        this.newGavs = List.of(newGav);
-        this.configuration = configuration;
-        this.testAssertion = testAssertion;
-    }
-
-    public UpgradeDependencyInMarker(List<GroupArtifactVersion> newGavs, BiConsumer<GradleProject, GradleProject> testAssertion) {
-        this.newGavs = newGavs;
-        this.configuration = null;
-        this.testAssertion = testAssertion;
-    }
 
     @Override
     public String getDisplayName() {
@@ -406,12 +392,7 @@ class UpgradeDependencyInMarker extends Recipe {
             @Override
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
-                GradleProject updated;
-                if (configuration == null) {
-                    updated = original.upgradeDirectDependencyVersions(newGavs, ctx);
-                } else {
-                    updated = original.upgradeDirectDependencyVersion(configuration, newGavs.getFirst(), ctx);
-                }
+                GradleProject updated = original.upgradeDirectDependencyVersion(configuration, newGav, ctx);
                 testAssertion.accept(original, updated);
                 return tree;
             }

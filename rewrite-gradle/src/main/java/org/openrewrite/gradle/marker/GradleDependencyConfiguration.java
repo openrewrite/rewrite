@@ -16,9 +16,7 @@
 package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -55,6 +53,7 @@ import static java.util.stream.Collectors.toMap;
 @Value
 @With
 @AllArgsConstructor(onConstructor_ = {@JsonCreator})
+@Builder
 public class GradleDependencyConfiguration implements Serializable, Attributed {
     /**
      * The name of the dependency configuration. Unique within a given project.
@@ -92,14 +91,22 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     @NonFinal
     List<GradleDependencyConfiguration> extendsFrom;
 
+    /**
+     * The list of all repositories requested by this configuration.
+     * Includes dependencies requested by parent configurations.
+     */
     List<Dependency> requested;
+
+    @NonFinal
+    List<ResolvedDependency> directResolved;
 
     /**
      * The list of direct dependencies resolved for this configuration.
      */
-    List<ResolvedDependency> directResolved;
-
     public List<ResolvedDependency> getDirectResolved() {
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
         return directResolved == null ? emptyList() : directResolved;
     }
 
@@ -117,12 +124,14 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * The type of exception thrown when attempting to resolve this configuration. null if no exception was thrown.
      */
     @Nullable
+    @NonFinal
     String exceptionType;
 
     /**
      * The message of the exception thrown when attempting to resolve this configuration. null if no exception was thrown.
      */
     @Nullable
+    @NonFinal
     String message;
 
     /**
@@ -135,6 +144,94 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     List<GradleDependencyConstraint> constraints;
 
     Map<String, String> attributes;
+
+    /**
+     * When the current list of directResolved dependencies may have been invalidated by a mutation this lazily
+     * resolves the new direct dependencies upon request.
+     */
+    transient LazyResolutionContext resolutionContext = new LazyResolutionContext();
+    public GradleDependencyConfiguration markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
+        resolutionContext.markForReResolution(repositories, ctx);
+        return this;
+    }
+    private class LazyResolutionContext {
+        @Getter
+        private boolean resolveRequired;
+        @Nullable
+        private List<MavenRepository> repositories;
+        @Nullable
+        private ExecutionContext ctx;
+        public void markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
+            this.repositories = repositories;
+            this.resolveRequired = true;
+            this.ctx = ctx;
+        }
+
+        /**
+         * Attempt to download the maven poms of the direct dependencies to produce an updated set of resolved dependencies.
+         * It is expected that some dependencies may both be valid and beyond our ability to resolve.
+         * Anything coming from an ivy repository, flat directory, gcp artifact service, etc., OpenRewrite does not support.
+         * This method has not been tested in a Gradle composite build.
+         * So given that circumstances where some dependencies cannot be resolved is unexceptional, this does not throw an
+         * exception if dependency resolution fails. If resolution fails the original resolved dependency is preserved unaltered
+         * and the exception class and message fields on this object are set.
+         * It is the responsibility of recipes to report this to the user, typically via GradleProject.maybeWarn()
+         */
+        public void resolve() {
+            if (!resolveRequired || repositories == null || ctx == null) {
+                return;
+            }
+            if (isCanBeResolved) {
+                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                List<ResolvedDependency> newResolved = new ArrayList<>(requested.size());
+                Map<GroupArtifact, ResolvedDependency> gaToOriginalDirectResolved = null;
+                for (Dependency dep : requested) {
+                    try {
+                        if (dep.findAttribute(ProjectAttribute.class).isPresent()) {
+                            // Dependencies representing another project can't be resolved
+                            ResolvedDependency resolved = ResolvedDependency.builder()
+                                    .gav(dep.getGav().asResolved())
+                                    .requested(dep)
+                                    .classifier(dep.getClassifier())
+                                    .build();
+                            newResolved.add(resolved);
+                        } else {
+                            Pom singlePom = singleDependencyPom(dep, requested, repositories, ctx);
+                            ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
+                            ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
+                            newResolved.add(resolved);
+                        }
+                    } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
+                        MavenDownloadingException m;
+                        if (e instanceof MavenDownloadingException) {
+                            m = (MavenDownloadingException) e;
+                        } else {
+                            m = ((MavenDownloadingExceptions) e).getExceptions().get(0);
+                        }
+                        exceptionType = m.getClass().getName();
+                        message = e.getMessage();
+                        // There are some dependencies that we cannot resolve with a maven resolver
+                        // Perhaps these come from non-maven repositories (ivy, flat directory, gcp, etc.)
+                        // Since we do not support all possible repositories, fall back on leaving the original resolved dependency in place
+                        if (gaToOriginalDirectResolved == null) {
+                            gaToOriginalDirectResolved = directResolved.stream()
+                                    .collect(Collectors.toMap(it -> it.getGav().asGroupArtifact(), it -> it));
+                        }
+                        // If a new dependency was added but could not be resolved there may be no pre-existing resolved dependency available
+                        // Add a synthetic resolved dependency so that if a
+                        ResolvedDependency maybeOriginal = gaToOriginalDirectResolved.get(dep.getGav().asGroupArtifact());
+                        if (maybeOriginal != null) {
+                            newResolved.add(maybeOriginal);
+                        }
+                    }
+                }
+                unsafeSetDirectResolved(newResolved);
+            }
+            resolveRequired = false;
+            repositories = null;
+            ctx = null;
+        }
+    }
 
     /**
      * Lists all the constraints in effect for the current configuration, including those constraints inherited from
@@ -232,7 +329,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     }
 
     public @Nullable ResolvedDependency findResolvedDependency(@Nullable String groupId, String artifactId) {
-        for (ResolvedDependency d : directResolved) {
+        for (ResolvedDependency d : getDirectResolved()) {
             ResolvedDependency dependency = d.findDependency(groupId == null ? "" : groupId, artifactId);
             if (dependency != null) {
                 return dependency;
@@ -247,6 +344,10 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
 
     public void unsafeSetConstraints(List<GradleDependencyConstraint> constraints) {
         this.constraints = constraints;
+    }
+
+    void unsafeSetDirectResolved(List<ResolvedDependency> directResolved) {
+        this.directResolved = directResolved;
     }
 
     private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
@@ -295,7 +396,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             Collection<GroupArtifact> gas,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         return mapDependencies(d -> {
             for (GroupArtifact gav : gas) {
                 if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
@@ -311,13 +412,13 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             Collection<GroupArtifactVersion> gavs,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         return mapDependencies(d -> {
             for (GroupArtifactVersion gav : gavs) {
                 if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
                     Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
                     !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
-                        return d.withGav(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+                    return d.withGav(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
                 }
             }
             return d;
@@ -332,11 +433,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             GroupArtifactVersion gav,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         return mapDependencies(d -> {
-            if ( Objects.equals(d.getGroupId(), gav.getGroupId()) &&
-                 Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
-                 !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
+            if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
+                Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
+                !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
                 return d.withGav(gav);
             }
             return d;
@@ -347,12 +448,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             Collection<GroupArtifactVersion> gavs,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         return mapConstraints(c -> {
             for (GroupArtifactVersion gav : gavs) {
-                if(Objects.equals(c.getGroupId(), gav.getGroupId()) &&
-                   Objects.equals(c.getArtifactId(), gav.getArtifactId()) &&
-                   !Objects.equals(c.approximateEffectiveVersion(), gav.getVersion())) {
+                if (Objects.equals(c.getGroupId(), gav.getGroupId()) &&
+                    Objects.equals(c.getArtifactId(), gav.getArtifactId()) &&
+                    !Objects.equals(c.approximateEffectiveVersion(), gav.getVersion())) {
                     return c.withPreferredVersion(null)
                             .withStrictVersion(null)
                             .withRequiredVersion(gav.getVersion());
@@ -362,42 +463,34 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         }, repositories, ctx);
     }
 
+    /**
+     * Apply a transformation to this configuration's constraints.
+     * Does not handle automatically updating configurations which extend from this one.
+     */
     public GradleDependencyConfiguration mapConstraints(
             Function<GradleDependencyConstraint, @Nullable GradleDependencyConstraint> mapping,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
+    ) {
         List<GradleDependencyConstraint> newConstraints = ListUtils.map(constraints, mapping::apply);
         if (constraints == newConstraints) {
             return this;
         }
-        GradleDependencyConfiguration result = withConstraints(newConstraints);
-        if (isCanBeResolved) {
-            try {
-                // Any constraint changing could potentially result in changes to the resolved graph, so re-resolve everything
-                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                List<ResolvedDependency> newResolved = new ArrayList<>(requested.size());
-                for (Dependency dep : requested) {
-                    if (dep.findAttribute(ProjectAttribute.class).isPresent()) {
-                        // Dependencies representing another project in the same multi-project build can't be resolved
-                        ResolvedDependency resolved = ResolvedDependency.builder()
-                                .gav(dep.getGav().asResolved())
-                                .requested(dep)
-                                .classifier(dep.getClassifier())
-                                .build();
-                        newResolved.add(resolved);
-                    } else {
-                        Pom singlePom = singleDependencyPom(dep, requested, repositories, ctx);
-                        ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
-                        ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
-                        newResolved.add(resolved);
-                    }
-                }
-            } catch (MavenDownloadingExceptions e) {
-                throw e.getExceptions().get(0);
-            }
+        return withConstraints(newConstraints)
+                .markForReResolution(repositories, ctx);
+    }
+
+    public GradleDependencyConfiguration addConstraint(
+            GradleDependencyConstraint constraint,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) {
+        List<GradleDependencyConstraint> newConstraints = ListUtils.concat(constraints, constraint);
+        if (constraints == newConstraints) {
+            return this;
         }
-        return result;
+        return withConstraints(newConstraints)
+                .markForReResolution(repositories, ctx);
     }
 
     /**
@@ -408,72 +501,20 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * @param ctx the ExecutionContext of a recipe run suitable for retrieving HTTP communication and dependency caching configuration.
      * @return A GradleDependencyConfiguration with its requested and resolved dependencies upgraded according to the mapping function.
      *         Or the original GradleDependencyConfiguration if the mapping function made no changes.
-     * @throws MavenDownloadingException if there was a problem resolving the new requested dependencies.
+     *         If there was a problem downloading the new requested dependencies the MavenDownloadingException will be noted in the exception field.
      */
     public GradleDependencyConfiguration mapDependencies(
             Function<Dependency, @Nullable Dependency> mapping,
             List<MavenRepository> repositories,
             ExecutionContext ctx
-    ) throws MavenDownloadingException {
-        Map<GroupArtifact, @Nullable Dependency> updatedDependencies = new HashMap<>(requested.size());
-        Map<GroupArtifact, @Nullable Dependency> updatedBoms = new HashMap<>(requested.size());
-        List<Dependency> newRequested = ListUtils.map(requested, original -> {
-            Dependency maybeUpdated = mapping.apply(original);
-            if (maybeUpdated != original) {
-                if (original.findAttribute(Category.class).map(Category::isBom).orElse(false)) {
-                    updatedBoms.put(original.getGav().asGroupArtifact(), maybeUpdated);
-                } else {
-                    updatedDependencies.put(original.getGav().asGroupArtifact(), maybeUpdated);
-                }
-            }
-            //noinspection DataFlowIssue
-            return maybeUpdated;
-        });
-
+    ) {
+        List<Dependency> newRequested = ListUtils.map(requested, mapping::apply);
         if (requested == newRequested) {
             return this;
         }
 
-        GradleDependencyConfiguration result = withRequested(newRequested);
-        if (isCanBeResolved) {
-            try {
-                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
-                List<ResolvedDependency> newResolved = new ArrayList<>(newRequested.size());
-                Map<GroupArtifact, ResolvedDependency> gaToOriginalDirectResolved = null;
-                // If any BOM has changed it could affect the resolution of all other dependencies
-                // But if no BOM has changed we should only need to re-resolve those that were touched by the updating function
-                boolean resolveAll = !updatedBoms.isEmpty();
-                for(Dependency dep : newRequested) {
-                    // Edge case I can think of no reasonable way to support: Another project in the same build used as a BOM
-                    if(dep.findAttribute(ProjectAttribute.class).isPresent()) {
-                        // Dependencies representing another project in the same multi-project build can't be resolved
-                        ResolvedDependency resolved = ResolvedDependency.builder()
-                                .gav(dep.getGav().asResolved())
-                                .requested(dep)
-                                .classifier(dep.getClassifier())
-                                .build();
-                        newResolved.add(resolved);
-                    } else if (resolveAll || updatedBoms.containsKey(dep.getGav().asGroupArtifact()) || updatedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
-                        Pom singlePom = singleDependencyPom(dep, newRequested, repositories, ctx);
-                        ResolvedPom singleDependencyResolved = singlePom.resolve(emptyList(), mpd, ctx);
-                        ResolvedDependency resolved = singleDependencyResolved.resolveDependencies(Scope.Compile, mpd, ctx).get(0);
-                        newResolved.add(resolved);
-                    } else {
-                        // Unchanged dependency with no re-resolution needed
-                        if (gaToOriginalDirectResolved == null) {
-                            gaToOriginalDirectResolved = directResolved.stream()
-                                    .collect(Collectors.toMap(it -> it.getGav().asGroupArtifact(), it -> it));
-                        }
-                        newResolved.add(gaToOriginalDirectResolved.get(dep.getGav().asGroupArtifact()));
-                    }
-                }
-                result = result.withDirectResolved(newResolved);
-            } catch (MavenDownloadingExceptions e) {
-                throw e.getExceptions().get(0);
-            }
-        }
-
-        return result;
+        return withRequested(newRequested)
+                .markForReResolution(repositories, ctx);
     }
 
     /**
@@ -488,7 +529,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         List<ManagedDependency> managed = new ArrayList<>(allConstraints.size() + maybeContainsBoms.size());
         for (Dependency maybeBom : maybeContainsBoms) {
             maybeBom.findAttribute(Category.class).ifPresent(category -> {
-                if(category == Category.REGULAR_PLATFORM || category == Category.ENFORCED_PLATFORM ) {
+                if (category == Category.REGULAR_PLATFORM || category == Category.ENFORCED_PLATFORM) {
                     managed.add(new ManagedDependency.Imported(maybeBom.getGav()));
                 }
             });
@@ -498,12 +539,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             String version = null;
             if (StringUtils.isNotEmpty(constraint.getStrictVersion())) {
                 version = constraint.getStrictVersion();
-            } else if(StringUtils.isNotEmpty(constraint.getRequiredVersion())) {
+            } else if (StringUtils.isNotEmpty(constraint.getRequiredVersion())) {
                 version = constraint.getRequiredVersion();
-            } else if(StringUtils.isNotEmpty(constraint.getPreferredVersion())) {
+            } else if (StringUtils.isNotEmpty(constraint.getPreferredVersion())) {
                 version = constraint.getPreferredVersion();
             }
-            if(version == null) {
+            if (version == null) {
                 continue;
             }
             managed.add(new ManagedDependency.Defined(
@@ -519,7 +560,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     }
 
     /**
-     * Produce a
+     * Produce a Maven POM whose resolution produces results often identical and hopefully at least _similar_ to what Gradle would resolve.
      */
     private Pom singleDependencyPom(Dependency requested, List<Dependency> maybeContainsBoms, List<MavenRepository> repositories, ExecutionContext ctx) {
         // Gradle Dependency tend to list their "scope" as the name of the gradle configuration they are listed in
@@ -541,5 +582,31 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 .dependencies(Collections.singletonList(mavenCompatibleRequested))
                 .sourcePath(Paths.get("pom.xml"))
                 .build();
+    }
+
+    /**
+     *
+     */
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @Override
+    protected GradleDependencyConfiguration clone() {
+        // When I defined GradleDependencyConfiguration I foolishly made extendsFrom() a list of other GradleDependencyConfiguration
+        // instead of a list of names, thinking the user-friendliness would be worth the additional complexity.
+        // These are the wages of that sin.
+        return new GradleDependencyConfiguration(
+                name,
+                description,
+                isTransitive,
+                isCanBeResolved,
+                isCanBeConsumed,
+                isCanBeDeclared,
+                extendsFrom.stream().map(GradleDependencyConfiguration::clone).collect(Collectors.toList()),
+                requested,
+                getDirectResolved(),
+                exceptionType,
+                message,
+                constraints,
+                attributes
+        );
     }
 }
