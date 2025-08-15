@@ -32,12 +32,11 @@ import org.openrewrite.maven.tree.*;
 import java.io.Serializable;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.Tree.randomId;
-
 
 /**
  * Contains metadata about a Gradle Project. Queried from Gradle itself when the OpenRewrite build plugin runs.
@@ -246,7 +245,7 @@ public class GradleProject implements Marker, Serializable {
     ) {
         Set<String> extendingFrom = configurationsExtendingFrom(nameToConfiguration.get(configuration), true).stream()
                 .map(GradleDependencyConfiguration::getName)
-                .collect(Collectors.toSet());
+                .collect(toSet());
         return mapConfigurations(it -> {
             if (configuration.equals(it.getName()) || extendingFrom.contains(it.getName())) {
                 return mapping.apply(it);

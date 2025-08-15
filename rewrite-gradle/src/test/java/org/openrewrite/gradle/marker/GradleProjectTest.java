@@ -44,7 +44,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 
-public class GradleProjectTest implements RewriteTest {
+class GradleProjectTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -60,17 +60,19 @@ public class GradleProjectTest implements RewriteTest {
             "implementation",
             (original, updated) -> assertThat(updated).isSameAs(original)
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation("org.openrewrite:rewrite-java:8.56.0")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
         );
     }
 
@@ -85,36 +87,44 @@ public class GradleProjectTest implements RewriteTest {
             }
           )),
           mavenProject("root",
-            settingsGradle("""
-              include("a")
-              include("b")
-              """, SourceSpec::skip),
+            settingsGradle(
+              """
+                include("a")
+                include("b")
+                """,
+              SourceSpec::skip
+            ),
             mavenProject("a",
-              buildGradle("""
-                plugins {
-                    id("java")
-                }
-                repositories {
-                    mavenCentral()
-                }
-                dependencies {
-                    implementation("org.openrewrite:rewrite-java:8.56.0")
-                }
-                """, SourceSpec::skip)
+              buildGradle(
+                """
+                  plugins {
+                      id("java")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation("org.openrewrite:rewrite-java:8.56.0")
+                  }
+                  """,
+                SourceSpec::skip
+              )
             ),
             mavenProject("b",
-              buildGradle("""
-                plugins {
-                    id("java")
-                }
-                repositories {
-                    mavenCentral()
-                }
-                dependencies {
-                    implementation(project(":a"))
-                    implementation("org.openrewrite:rewrite-java:8.56.0")
-                }
-                """)
+              buildGradle(
+                """
+                  plugins {
+                      id("java")
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation(project(":a"))
+                      implementation("org.openrewrite:rewrite-java:8.56.0")
+                  }
+                  """
+              )
             )
           )
         );
@@ -136,7 +146,7 @@ public class GradleProjectTest implements RewriteTest {
                       .extracting(Dependency::getVersion)
                       .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
                       .isEqualTo("8.57.0");
-                    if(updatedConfiguration.isCanBeResolved()) {
+                    if (updatedConfiguration.isCanBeResolved()) {
                         ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
                         assertThat(resolved).isNotNull()
                           .extracting(ResolvedDependency::getVersion)
@@ -146,17 +156,19 @@ public class GradleProjectTest implements RewriteTest {
                 }
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation("org.openrewrite:rewrite-java:8.56.+")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.+")
+              }
+              """
+          )
         );
     }
 
@@ -176,7 +188,7 @@ public class GradleProjectTest implements RewriteTest {
                       .extracting(Dependency::getVersion)
                       .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
                       .isEqualTo("8.57.0");
-                    if(updatedConfiguration.isCanBeResolved()) {
+                    if (updatedConfiguration.isCanBeResolved()) {
                         ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
                         assertThat(resolved).isNotNull()
                           .extracting(ResolvedDependency::getVersion)
@@ -187,17 +199,19 @@ public class GradleProjectTest implements RewriteTest {
 
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation("org.openrewrite:rewrite-java:8.56.0")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
         );
     }
 
@@ -217,7 +231,7 @@ public class GradleProjectTest implements RewriteTest {
                       .extracting(Dependency::getVersion)
                       .as(updatedConfiguration.getName() + " expected to have requested version upgrade")
                       .isNull();
-                    if(updatedConfiguration.isCanBeResolved()) {
+                    if (updatedConfiguration.isCanBeResolved()) {
                         ResolvedDependency resolved = updatedConfiguration.findResolvedDependency("org.openrewrite", "rewrite-java");
                         assertThat(resolved).isNotNull()
                           .extracting(ResolvedDependency::getVersion)
@@ -228,18 +242,20 @@ public class GradleProjectTest implements RewriteTest {
 
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation(platform("org.openrewrite:rewrite-bom:8.56.0"))
-                implementation("org.openrewrite:rewrite-java")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation(platform("org.openrewrite:rewrite-bom:8.56.0"))
+                  implementation("org.openrewrite:rewrite-java")
+              }
+              """
+          )
         );
     }
 
@@ -273,22 +289,24 @@ public class GradleProjectTest implements RewriteTest {
                         // Check that netty-codec is NOT listed amongst the dependencies as it is not a dependency of vertx-core 5.0.1
                         assertThat(config.getResolved())
                           .as(config.getName() + " should NOT contain netty-codec after upgrade to vertx-core 5.0.1")
-                          .noneMatch(dep -> dep.getGroupId().equals("io.netty") && dep.getArtifactId().equals("netty-codec"));
+                          .noneMatch(dep -> "io.netty".equals(dep.getGroupId()) && "netty-codec".equals(dep.getArtifactId()));
                     }
                 }
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java-library")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation("io.vertx:vertx-core:3.9.8")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("io.vertx:vertx-core:3.9.8")
+              }
+              """
+          )
         );
     }
 
@@ -310,18 +328,20 @@ public class GradleProjectTest implements RewriteTest {
 
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                implementation("org.openrewrite:rewrite-core:8.56.0")
-                implementation("org.openrewrite:rewrite-java:8.56.0")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
         );
     }
 
@@ -345,8 +365,8 @@ public class GradleProjectTest implements RewriteTest {
                 assertThat(constraints).isNotNull();
 
                 GradleDependencyConstraint jacksonConstraint = constraints.stream()
-                  .filter(c -> c.getGroupId().equals("com.fasterxml.jackson.core") &&
-                               c.getArtifactId().equals("jackson-databind"))
+                  .filter(c -> "com.fasterxml.jackson.core".equals(c.getGroupId()) &&
+                               "jackson-databind".equals(c.getArtifactId()))
                   .findFirst()
                   .orElse(null);
 
@@ -364,20 +384,22 @@ public class GradleProjectTest implements RewriteTest {
                   .isEqualTo("2.19.2");
             }
           )),
-          buildGradle("""
-            plugins {
-                id("java")
-            }
-            repositories {
-                mavenCentral()
-            }
-            dependencies {
-                constraints {
-                    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
-                }
-                implementation("org.openrewrite:rewrite-core:8.56.0")
-            }
-            """)
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation("com.fasterxml.jackson.core:jackson-databind:2.15.0")
+                  }
+                  implementation("org.openrewrite:rewrite-core:8.56.0")
+              }
+              """
+          )
         );
     }
 }

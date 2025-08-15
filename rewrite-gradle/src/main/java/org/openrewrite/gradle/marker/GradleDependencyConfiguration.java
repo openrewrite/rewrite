@@ -34,19 +34,16 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.Version;
 
 import java.io.Serializable;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.*;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings("unused")
@@ -146,8 +143,8 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     Map<String, String> attributes;
 
     /**
-     * When the current list of directResolved dependencies may have been invalidated by a mutation this lazily
-     * resolves the new direct dependencies upon request.
+     * When the current list of directResolved dependencies may have been invalidated by a mutation this stores the
+     * state required to lazily re-resolve the new direct dependencies upon request.
      */
     transient LazyResolutionContext resolutionContext = new LazyResolutionContext();
     public GradleDependencyConfiguration markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
@@ -215,7 +212,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                         // Since we do not support all possible repositories, fall back on leaving the original resolved dependency in place
                         if (gaToOriginalDirectResolved == null) {
                             gaToOriginalDirectResolved = directResolved.stream()
-                                    .collect(Collectors.toMap(it -> it.getGav().asGroupArtifact(), it -> it));
+                                    .collect(toMap(it -> it.getGav().asGroupArtifact(), it -> it));
                         }
                         // If a new dependency was added but could not be resolved there may be no pre-existing resolved dependency available
                         // Add a synthetic resolved dependency so that if a
@@ -564,7 +561,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         List<ManagedDependency> managed = new ArrayList<>(allConstraints.size() + maybeContainsBoms.size());
         for (Dependency maybeBom : maybeContainsBoms) {
             maybeBom.findAttribute(Category.class).ifPresent(category -> {
-                if (category == Category.REGULAR_PLATFORM || category == Category.ENFORCED_PLATFORM) {
+                if (category.isBom()) {
                     managed.add(new ManagedDependency.Imported(maybeBom.getGav()));
                 }
             });
@@ -614,7 +611,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 )
                 .repositories(repositories)
                 .dependencyManagement(managedFrom(bomsOnly))
-                .dependencies(Collections.singletonList(mavenCompatibleRequested))
+                .dependencies(singletonList(mavenCompatibleRequested))
                 .sourcePath(Paths.get("pom.xml"))
                 .build();
     }
@@ -635,7 +632,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 isCanBeResolved,
                 isCanBeConsumed,
                 isCanBeDeclared,
-                extendsFrom.stream().map(GradleDependencyConfiguration::clone).collect(Collectors.toList()),
+                extendsFrom.stream().map(GradleDependencyConfiguration::clone).collect(toList()),
                 requested,
                 getDirectResolved(),
                 exceptionType,
