@@ -18,6 +18,7 @@ package org.openrewrite.gradle.marker;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
@@ -39,6 +40,7 @@ import static java.util.Collections.emptyList;
  * See: <a href="https://docs.gradle.org/current/userguide/dependency_versions.html#sec:rich-version-constraints">rich version constraints</a>.
  */
 @Value
+@With
 @Builder
 @AllArgsConstructor
 public class GradleDependencyConstraint implements Serializable {
