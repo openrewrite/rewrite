@@ -44,6 +44,7 @@ import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
@@ -978,10 +979,21 @@ public class ResolvedPom {
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
-            if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
-                //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
-                rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+            // Apply LATEST_WINS/MAVEN strategy, by removing a possible existing entry (which filters away old duplicates)
+            rootDependencies.remove(d.getGav().asGroupArtifact());
+            // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
+            //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
+            switch (scope) {
+                case Compile:
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, s -> s == Scope.Provided);
+                    break;
+                case Runtime:
+                case Provided:
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, null);
+                    break;
+                case Test:
+                    maybePutRootDependency(scope, requestedDependency, dScope, rootDependencies, d, s -> s == Scope.Provided || s == Scope.Runtime);
+                    break;
             }
         }
 
@@ -1136,6 +1148,12 @@ public class ResolvedPom {
         }
 
         return dependencies;
+    }
+
+    private void maybePutRootDependency(Scope scope, Dependency requestedDependency, Scope dScope, Map<GroupArtifact, DependencyAndDependent> rootDependencies, Dependency d, @Nullable Predicate<Scope> additionalCheck) {
+        if (dScope == scope || dScope.transitiveOf(scope) == scope || (additionalCheck != null && additionalCheck.test(dScope))) {
+            rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+        }
     }
 
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
