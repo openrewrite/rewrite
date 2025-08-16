@@ -290,8 +290,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
-                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -304,7 +304,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                         }
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
-                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -505,7 +505,17 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        String[] paramNames = getParamNames(methodSymbol);
+        String[] paramNames = null;
+        if (!methodSymbol.params().isEmpty()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
+                String s = p.name.toString();
+                paramNames[i] = s;
+            }
+        }
+
         JavaType.Method method = new JavaType.Method(
                 null,
                 methodSymbol.flags_field,
@@ -578,6 +588,16 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
+            String[] paramNames = null;
+            if (!methodSymbol.params().isEmpty()) {
+                paramNames = new String[methodSymbol.params().size()];
+                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+                for (int i = 0; i < params.size(); i++) {
+                    Symbol.VarSymbol p = params.get(i);
+                    String s = p.name.toString();
+                    paramNames[i] = s;
+                }
+            }
             List<String> defaultValues = null;
             if (methodSymbol.getDefaultValue() != null) {
                 if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
@@ -603,7 +623,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
-            String[] paramNames = getParamNames(methodSymbol);
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -642,8 +661,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
             if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol ||
                     methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
-                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
-                }
+                resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+            }
 
 
             if (resolvedDeclaringType == null) {
@@ -681,67 +700,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         return null;
-    }
-
-    private static String @Nullable[] getParamNames(Symbol.MethodSymbol methodSymbol) {
-        String[] paramNames = null;
-        if (!methodSymbol.params().isEmpty()) {
-            paramNames = new String[methodSymbol.params().size()];
-            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
-
-            // Try to get real parameter names via reflection if javac provides synthetic names
-            boolean hasSyntheticNames = false;
-            for (int i = 0; i < params.size(); i++) {
-                Symbol.VarSymbol p = params.get(i);
-                String s = p.name.toString();
-                paramNames[i] = s;
-                if (s.matches("arg\\d+")) {
-                    hasSyntheticNames = true;
-                }
-            }
-
-            // If we have synthetic names, try to get real names via reflection
-            if (hasSyntheticNames && methodSymbol.owner instanceof Symbol.ClassSymbol) {
-                try {
-                    String className = methodSymbol.owner.flatName().toString();
-                    Class<?> clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-
-                    // Find matching method
-                    java.lang.reflect.Method[] methods = clazz.getDeclaredMethods();
-                    for (java.lang.reflect.Method m : methods) {
-                        if (m.getName().equals(methodSymbol.name.toString()) &&
-                                m.getParameterCount() == methodSymbol.params().size()) {
-                            // Check if parameter types match
-                            boolean typesMatch = true;
-                            java.lang.reflect.Parameter[] reflectParams = m.getParameters();
-                            for (int i = 0; i < reflectParams.length; i++) {
-                                Symbol.VarSymbol varSym = methodSymbol.params().get(i);
-                                String javacTypeName = varSym.type.tsym.flatName().toString();
-                                String reflectTypeName = reflectParams[i].getType().getName();
-                                if (!javacTypeName.equals(reflectTypeName) &&
-                                        !javacTypeName.replace('$', '.').equals(reflectTypeName)) {
-                                    typesMatch = false;
-                                    break;
-                                }
-                            }
-
-                            if (typesMatch) {
-                                // Use reflection parameter names if they're present
-                                for (int i = 0; i < reflectParams.length; i++) {
-                                    if (reflectParams[i].isNamePresent()) {
-                                        paramNames[i] = reflectParams[i].getName();
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                } catch (ClassNotFoundException | SecurityException e) {
-                    // Fall back to javac names if reflection fails
-                }
-            }
-        }
-        return paramNames;
     }
 
     private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
