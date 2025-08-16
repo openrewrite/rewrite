@@ -489,7 +489,8 @@ public interface RewriteTest extends SourceSpecs {
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
             SourceFile source = specForSourceFile.getKey();
-            if (source instanceof ParseError parseError) {
+            if (source instanceof ParseError) {
+                ParseError parseError = (ParseError) source;
                 if (parseError.getErroneous() == null) {
                     throw parseError.toException();
                 }
@@ -640,8 +641,8 @@ public interface RewriteTest extends SourceSpecs {
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
-            if (t instanceof RecipeRunException exception) {
-                fail("Failed to run recipe at " + exception.getCursor(), t);
+            if (t instanceof RecipeRunException) {
+                fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
             }
             fail("Failed to parse sources or run recipe", t);
         });
