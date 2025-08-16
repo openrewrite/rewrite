@@ -215,6 +215,43 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void GStringNullVersionPreservesVariables() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", null, null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${version}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
@@ -518,6 +555,43 @@ class ChangeDependencyTest implements RewriteTest {
               dependencies {
                   val commonsLangVersion = "2.6"
                   implementation("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void KStringTemplateNullVersionPreservesVariables() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", null, null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
