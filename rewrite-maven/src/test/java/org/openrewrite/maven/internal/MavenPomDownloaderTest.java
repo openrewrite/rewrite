@@ -45,7 +45,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,7 +101,7 @@ class MavenPomDownloaderTest implements RewriteTest {
     @Test
     void repositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
             <settings>
@@ -253,7 +252,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void mirrorsOverrideRepositoriesInPom() {
             var ctx = MavenExecutionContextView.view(this.ctx);
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -268,7 +267,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                 """
             ), ctx));
 
-            Path pomPath = Paths.get("pom.xml");
+            Path pomPath = Path.of("pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(pomPath)
               .repository(MAVEN_CENTRAL)
@@ -576,7 +575,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                 var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
                 var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
 
-                var pomPath = Paths.get("pom.xml");
+                var pomPath = Path.of("pom.xml");
                 var pom = Pom.builder()
                   .sourcePath(pomPath)
                   .repository(snapshotRepo)
@@ -810,7 +809,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
-            Path target = repository.resolve(Paths.get("org", "openrewrite", "rewrite", "1.0.0"));
+            Path target = repository.resolve(Path.of("org", "openrewrite", "rewrite", "1.0.0"));
             Path pom = target.resolve("rewrite-1.0.0.pom");
             Path jar = target.resolve("rewrite-1.0.0.jar");
             Files.createDirectories(target);
@@ -834,7 +833,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         void shouldNotThrowExceptionForModulesInModulesWithRightProperty() {
             var gav = new GroupArtifactVersion("test", "test2", "${test}");
 
-            Path testTest2PomXml = Paths.get("test/test2/pom.xml");
+            Path testTest2PomXml = Path.of("test/test2/pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
@@ -850,7 +849,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .repositories(singletonList(MAVEN_CENTRAL))
               .build();
 
-            Path testPomXml = Paths.get("test/pom.xml");
+            Path testPomXml = Path.of("test/pom.xml");
             Pom pom2 = Pom.builder()
               .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
@@ -861,7 +860,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
 
 
-            Path rootPomXml = Paths.get("pom.xml");
+            Path rootPomXml = Path.of("pom.xml");
             Pom parentPom = Pom.builder()
               .sourcePath(rootPomXml)
               .repository(MAVEN_CENTRAL)
@@ -888,7 +887,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         void shouldThrowExceptionForModulesInModulesWithNoRightProperty() {
             var gav = new GroupArtifactVersion("test", "test2", "${test}");
 
-            Path testTest2PomXml = Paths.get("test/test2/pom.xml");
+            Path testTest2PomXml = Path.of("test/test2/pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
@@ -904,7 +903,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .repositories(singletonList(MAVEN_CENTRAL))
               .build();
 
-            Path testPomXml = Paths.get("test/pom.xml");
+            Path testPomXml = Path.of("test/pom.xml");
             Pom pom2 = Pom.builder()
               .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
@@ -915,7 +914,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .build();
 
 
-            Path rootPomXml = Paths.get("pom.xml");
+            Path rootPomXml = Path.of("pom.xml");
             Pom parentPom = Pom.builder()
               .sourcePath(rootPomXml)
               .repository(MAVEN_CENTRAL)
@@ -942,7 +941,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         void canResolveDifferentVersionOfProjectPom() {
             var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
-            Path pomPath = Paths.get("pom.xml");
+            Path pomPath = Path.of("pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(pomPath)
               .repository(MAVEN_CENTRAL)

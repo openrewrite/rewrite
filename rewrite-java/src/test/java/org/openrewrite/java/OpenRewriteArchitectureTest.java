@@ -57,7 +57,7 @@ public class OpenRewriteArchitectureTest {
             @Override
             public void check(JavaPackage javaPackage, ConditionEvents events) {
                 if (javaPackage.tryGetPackageInfo().isEmpty()) {
-                    String message = String.format("Package '%s' does not contain a package-info", javaPackage.getName());
+                    String message = "Package '%s' does not contain a package-info".formatted(javaPackage.getName());
                     events.add(SimpleConditionEvent.violated(javaPackage, message));
                 }
             }
@@ -67,7 +67,7 @@ public class OpenRewriteArchitectureTest {
                 javaPackage.tryGetPackageInfo()
                         .filter(packageInfo -> !packageInfo.isAnnotatedWith(NullMarked.class))
                         .ifPresent(packageInfo -> events.add(SimpleConditionEvent.violated(javaPackage,
-                                String.format("Package '%s' is not annotated as @NullMarked", javaPackage.getName()))));
+                        "Package '%s' is not annotated as @NullMarked".formatted(javaPackage.getName()))));
             }
         });
     }

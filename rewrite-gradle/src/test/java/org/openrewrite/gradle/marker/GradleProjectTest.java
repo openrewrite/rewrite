@@ -426,8 +426,8 @@ class UpgradeDependencyInMarker extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         //noinspection NullableProblems
         return new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.upgradeDirectDependencyVersion(configuration, newGav, ctx);
@@ -443,8 +443,10 @@ class UpgradeDependencyInMarker extends Recipe {
 class RemoveDependency extends Recipe {
 
     List<GroupArtifact> gas;
+
     @Nullable
     String configuration;
+
     BiConsumer<GradleProject, GradleProject> testAssertion;
 
     public RemoveDependency(List<GroupArtifact> gas, BiConsumer<GradleProject, GradleProject> testAssertion) {
@@ -467,8 +469,8 @@ class RemoveDependency extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         //noinspection NullableProblems
         return new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.removeDirectDependencies(gas, ctx);
@@ -479,8 +481,8 @@ class RemoveDependency extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class ChangeConstraint extends Recipe {
 
     Map<String, List<GroupArtifactVersion>> configToConstraint;
@@ -500,8 +502,8 @@ class ChangeConstraint extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         //noinspection NullableProblems
         return new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 GradleProject original = tree.getMarkers().findFirst(GradleProject.class).orElseThrow(() -> fail("Missing GradleProject"));
                 GradleProject updated = original.addOrUpdateConstraints(configToConstraint, ctx);
