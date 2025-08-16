@@ -43,7 +43,6 @@ import java.util.function.Function;
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings("unused")
 @Value
