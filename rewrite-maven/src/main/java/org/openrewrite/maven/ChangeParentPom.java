@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -104,6 +105,39 @@ public class ChangeParentPom extends Recipe {
             required = false)
     @Nullable
     Boolean allowVersionDowngrades;
+
+    @Option(displayName = "Except",
+            description = "Accepts a list of GAVs that will be passed to RemoveRedundantDependencyVersions.",
+            example = "com.jcraft:jsch",
+            required = false)
+    @Nullable
+    List<String> except;
+
+    @JsonCreator
+    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId,
+                           @Nullable String newArtifactId, String newVersion,
+                           @Nullable String oldRelativePath, @Nullable String newRelativePath,
+                           @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
+        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion,
+                oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null);
+    }
+
+    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId,
+                           @Nullable String newArtifactId, String newVersion,
+                           @Nullable String oldRelativePath, @Nullable String newRelativePath,
+                           @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades,
+                           @Nullable List<String> except) {
+        this.oldGroupId = oldGroupId;
+        this.newGroupId = newGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.oldRelativePath = oldRelativePath;
+        this.newRelativePath = newRelativePath;
+        this.versionPattern = versionPattern;
+        this.allowVersionDowngrades = allowVersionDowngrades;
+        this.except = except;
+    }
 
     @Override
     public String getDisplayName() {
@@ -241,7 +275,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
                             for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
