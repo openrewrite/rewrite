@@ -224,9 +224,15 @@ class KotlinTypeMapping(
             return null
         }
 
-        // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
-        val sym = type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession) ?: return ShallowClass.build(signature)
-        return type(sym.fir, signature)
+        // If the symbol is not resolvable, we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
+        return type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession)
+            ?.let { type(it.fir, signature) }
+            ?: ShallowClass.build(signature)
+                .withOwningClass(
+                    (type as? FirResolvedImport)?.resolvedParentClassId?.toSymbol(firSession)
+                        ?.let { it as? FirRegularClassSymbol }
+                        ?.let { TypeUtils.asFullyQualified(type(it.fir, signature)) }
+                )
     }
 
     private fun packageDirective(signature: String): JavaType? {
