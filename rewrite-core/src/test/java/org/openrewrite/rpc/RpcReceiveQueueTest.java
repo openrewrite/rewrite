@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,7 +42,7 @@ public class RpcReceiveQueueTest {
     @Test
     void add() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
 
@@ -60,7 +59,7 @@ public class RpcReceiveQueueTest {
     @SuppressWarnings("UnnecessaryLocalVariable")
     void noChange() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText noChange = before;
@@ -76,7 +75,7 @@ public class RpcReceiveQueueTest {
     @Test
     void changeId() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText newId = before.withId(Tree.randomId());

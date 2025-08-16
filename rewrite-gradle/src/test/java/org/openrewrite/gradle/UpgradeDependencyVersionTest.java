@@ -26,7 +26,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -397,7 +397,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void mapNotationGStringInterpolation(String stringInterpolationReference) {
         rewriteRun(
           buildGradle(
-            String.format("""
+                  """
               plugins {
                 id 'java-library'
               }
@@ -411,8 +411,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group: "com.google.guava", name: "guava", version: "%s")
               }
-              """, stringInterpolationReference),
-            String.format("""
+              """.formatted(stringInterpolationReference),
+                  """
               plugins {
                 id 'java-library'
               }
@@ -426,7 +426,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group: "com.google.guava", name: "guava", version: "%s")
               }
-              """, stringInterpolationReference)
+              """.formatted(stringInterpolationReference)
           )
         );
     }
@@ -436,7 +436,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void mapNotationKStringTemplateInterpolation(String stringInterpolationReference) {
         rewriteRun(
           buildGradleKts(
-            String.format("""
+                  """
               plugins {
                 `java-library`
               }
@@ -450,8 +450,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group = "com.google.guava", name = "guava", version = "%s")
               }
-              """, stringInterpolationReference),
-            String.format("""
+              """.formatted(stringInterpolationReference),
+                  """
               plugins {
                 `java-library`
               }
@@ -465,7 +465,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group = "com.google.guava", name = "guava", version = "%s")
               }
-              """, stringInterpolationReference)
+              """.formatted(stringInterpolationReference)
           )
         );
     }
@@ -1348,7 +1348,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
-        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Paths.get("not-a-gradle-file.txt"));
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Path.of("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
 
         sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();

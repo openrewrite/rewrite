@@ -32,7 +32,7 @@ import org.openrewrite.test.TypeValidation;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,7 +56,7 @@ class KotlinTypeMappingTest {
         cu = (K.CompilationUnit) KotlinParser.builder()
             .logCompilationWarningsAndErrors(true)
             .build()
-            .parseInputs(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+            .parseInputs(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), null, ctx)
             .findFirst()
             .orElseThrow();
 
@@ -195,7 +195,7 @@ class KotlinTypeMappingTest {
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
 
         J.MethodDeclaration md = goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
-          .filter(it -> (it instanceof J.MethodDeclaration) && "parameterized".equals(((J.MethodDeclaration) it).getSimpleName()))
+          .filter(it -> (it instanceof J.MethodDeclaration md1) && "parameterized".equals(md1.getSimpleName()))
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
@@ -1276,7 +1276,7 @@ class KotlinTypeMappingTest {
             //noinspection RemoveRedundantBackticks
             rewriteRun(
               kotlin(
-                String.format("%s", input),
+                      "%s".formatted(input),
                 spec -> spec.afterRecipe(cu -> {
                     AtomicBoolean found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
