@@ -33,7 +33,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.*;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
@@ -579,7 +580,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
+            spec -> spec.afterRecipe(cu ->
                 //noinspection DataFlowIssue
                 assertThat(cu.getMarkers().findFirst(GradleProject.class))
                   .get()
@@ -591,8 +592,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   .isNotNull()
                   .extracting(ResolvedDependency::getVersion)
                   .as("GradleProject model should reflect the updated guava version")
-                  .isEqualTo("30.1.1-jre");
-            })
+                  .isEqualTo("30.1.1-jre"))
           )
         );
     }
