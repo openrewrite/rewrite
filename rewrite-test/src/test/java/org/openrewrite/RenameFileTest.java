@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -40,7 +40,7 @@ class RenameFileTest implements RewriteTest {
             spec ->
                 spec
                   .path("a/b/hello.txt")
-                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")))
+                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("a/b/goodbye.txt")))
           )
         );
     }
