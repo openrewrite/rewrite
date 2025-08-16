@@ -22,7 +22,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class MethodTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/5400")

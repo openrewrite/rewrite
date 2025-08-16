@@ -505,17 +505,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        String[] paramNames = null;
-        if (!methodSymbol.params().isEmpty()) {
-            paramNames = new String[methodSymbol.params().size()];
-            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
-            for (int i = 0; i < params.size(); i++) {
-                Symbol.VarSymbol p = params.get(i);
-                String s = p.name.toString();
-                paramNames[i] = s;
-            }
-        }
-
+        String[] paramNames = getParamNames(methodSymbol);
         JavaType.Method method = new JavaType.Method(
                 null,
                 methodSymbol.flags_field,
@@ -588,16 +578,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
-            String[] paramNames = null;
-            if (!methodSymbol.params().isEmpty()) {
-                paramNames = new String[methodSymbol.params().size()];
-                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
-                for (int i = 0; i < params.size(); i++) {
-                    Symbol.VarSymbol p = params.get(i);
-                    String s = p.name.toString();
-                    paramNames[i] = s;
-                }
-            }
             List<String> defaultValues = null;
             if (methodSymbol.getDefaultValue() != null) {
                 if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
@@ -623,6 +603,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
+            String[] paramNames = getParamNames(methodSymbol);
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -700,6 +681,71 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         return null;
+    }
+
+    private static String @Nullable[] getParamNames(Symbol.MethodSymbol methodSymbol) {
+        String[] paramNames = null;
+        if (!methodSymbol.params().isEmpty()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+
+            // Try to get real parameter names via reflection if javac provides synthetic names
+            boolean hasSyntheticNames = false;
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
+                String s = p.name.toString();
+                paramNames[i] = s;
+                if (s.matches("arg\\d+")) {
+                    hasSyntheticNames = true;
+                }
+            }
+
+            // If we have synthetic names, try to get real names via reflection
+            if (hasSyntheticNames && methodSymbol.owner instanceof Symbol.ClassSymbol) {
+                try {
+                    String className = methodSymbol.owner.flatName().toString();
+                    Class<?> clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
+
+                    // Find matching method
+                    java.lang.reflect.Method[] methods = clazz.getDeclaredMethods();
+                    for (java.lang.reflect.Method m : methods) {
+                        if (m.getName().equals(methodSymbol.name.toString()) &&
+                                m.getParameterCount() == methodSymbol.params().size()) {
+                            // Check if parameter types match
+                            boolean typesMatch = true;
+                            java.lang.reflect.Parameter[] reflectParams = m.getParameters();
+                            for (int i = 0; i < reflectParams.length; i++) {
+                                Symbol.VarSymbol varSym = methodSymbol.params().get(i);
+                                String javacTypeName = varSym.type.tsym.flatName().toString();
+                                String reflectTypeName = reflectParams[i].getType().getName();
+
+                                // Handle primitive type name differences
+                                if (javacTypeName.equals("int") && reflectTypeName.equals("int")) continue;
+                                if (javacTypeName.equals("java.lang.String") && reflectTypeName.equals("java.lang.String")) continue;
+                                if (!javacTypeName.equals(reflectTypeName) &&
+                                        !javacTypeName.replace('$', '.').equals(reflectTypeName)) {
+                                    typesMatch = false;
+                                    break;
+                                }
+                            }
+
+                            if (typesMatch) {
+                                // Use reflection parameter names if they're present
+                                for (int i = 0; i < reflectParams.length; i++) {
+                                    if (reflectParams[i].isNamePresent()) {
+                                        paramNames[i] = reflectParams[i].getName();
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } catch (ClassNotFoundException | SecurityException e) {
+                    // Fall back to javac names if reflection fails
+                }
+            }
+        }
+        return paramNames;
     }
 
     private void completeClassSymbol(Symbol.ClassSymbol classSymbol) {
