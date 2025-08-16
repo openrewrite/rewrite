@@ -26,6 +26,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Position;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -63,8 +64,7 @@ import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
-import static org.openrewrite.java.tree.Space.EMPTY;
-import static org.openrewrite.java.tree.Space.format;
+import static org.openrewrite.java.tree.Space.*;
 
 /**
  * Maps the compiler internal AST to the Rewrite {@link J} AST.
@@ -423,20 +423,62 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY);
 
         JContainer<Statement> primaryConstructor = null;
+        Map<String, RecordParam> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
-            List<Tree> stateVector = new ArrayList<>();
+            Space prefix = sourceBefore("(");
+            Map<String, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
+            List<JRightPadded<Statement>> varDecs = new ArrayList<>();
             for (Tree member : node.getMembers()) {
+                if (member instanceof JCMethodDecl md) {
+                    if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
+                        for (JCVariableDecl var : md.getParameters()) {
+                            recordParams.put(var.getName().toString(), new RecordParam(null, var, null, null));
+                            recordAnnotationPosTable.put(var.getName().toString(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                        }
+                    }
+                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        stateVector.add(vt);
+                        mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.get(vt.getName().toString()));
+                        List<J.Annotation> recordAnnotations = collectAnnotations(recordAnnotationPosTable.get(vt.getName().toString()));
+                        Space typeExpressionPrefix = whitespace();
+                        JRightPadded<Statement> varDec = convert(vt, commaDelim);
+                        if (varDec != null) {
+                            varDec = varDec.map(elem -> {
+                                if (elem instanceof J.VariableDeclarations vd) {
+                                    return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
+                                }
+                                return elem;
+                            });
+                            recordParams.put(vt.getName().toString(), new RecordParam(vt, recordParams.get(vt.getName().toString()).consParam(), recordAnnotations, varDec));
+                            varDecs.add(varDec);
+                        }
                     }
                 }
             }
+            if (varDecs.isEmpty()) {
+                varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
+            } else {
+                varDecs = ListUtils.mapLast(varDecs, elem -> elem.withAfter(sourceBefore(")")));
+            }
+
             primaryConstructor = JContainer.build(
-                    sourceBefore("("),
-                    stateVector.isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
+                    prefix,
+                    // We have to determine which annotations to add to the constructor parameters here.
+                    ListUtils.map(varDecs, elem -> {
+                        if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
+                            RecordParam param = recordParams.get(vd.getVariables().getFirst().getSimpleName());
+                            return elem.withElement(vd.withLeadingAnnotations(param.annotations().stream().filter(ann -> {
+                                for (AnnotationTree anno : param.consParam().getModifiers().getAnnotations()) {
+                                    if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }).collect(toList())));
+                        }
+                        return elem;
+                    }),
                     Markers.EMPTY
             );
         }
@@ -539,8 +581,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                    (hasFlag(vt.getModifiers(), Flags.ENUM))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -551,7 +592,33 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (enumSet != null) {
             members.add(enumSet);
         }
-        members.addAll(convertStatements(membersMultiVariablesSeparated));
+        // We have to determine which annotations to add to the field declarations here.
+        if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
+            for (Tree tree : membersMultiVariablesSeparated) {
+                if (tree instanceof VariableTree vt) {
+                    RecordParam param = recordParams.get(vt.getName().toString());
+                    members.add(param.lstElem().map(elem -> {
+                        if (elem instanceof J.VariableDeclarations vd) {
+                            return vd.withModifiers(List.of(
+                                            new J.Modifier(randomId(), vt.getModifiers().getAnnotations().isEmpty() ? EMPTY : SINGLE_SPACE, Markers.EMPTY, "private", J.Modifier.Type.Private, emptyList()),
+                                            new J.Modifier(randomId(), SINGLE_SPACE, Markers.EMPTY, "final", J.Modifier.Type.Final, emptyList())
+                                    ))
+                                    .withLeadingAnnotations(param.annotations().stream().filter(ann -> {
+                                        for (AnnotationTree anno : param.varDecl().getModifiers().getAnnotations()) {
+                                            if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    }).collect(toList()));
+                        }
+                        return elem;
+                    }));
+                }
+            }
+        } else {
+            members.addAll(convertStatements(membersMultiVariablesSeparated));
+        }
         addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
@@ -877,9 +944,17 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
-        cursor(endPos(node));
+        int endPos = endPos(node);
         Object value = node.getValue();
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+
+        if (endPos == Position.NOPOS) {
+            String str = value + "";
+            int delimLength = source.substring(cursor).indexOf(str);
+            endPos = cursor + delimLength + str.length() + delimLength;
+        }
+
+        cursor(endPos);
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
@@ -2459,4 +2534,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
     }
+}
+
+record RecordParam(VariableTree varDecl,
+                   JCVariableDecl consParam,
+                   List<J.Annotation> annotations,
+                   JRightPadded<Statement> lstElem) {
 }
