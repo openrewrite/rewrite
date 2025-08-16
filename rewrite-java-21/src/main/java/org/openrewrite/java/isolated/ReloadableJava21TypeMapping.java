@@ -718,10 +718,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                                 Symbol.VarSymbol varSym = methodSymbol.params().get(i);
                                 String javacTypeName = varSym.type.tsym.flatName().toString();
                                 String reflectTypeName = reflectParams[i].getType().getName();
-
-                                // Handle primitive type name differences
-                                if (javacTypeName.equals("int") && reflectTypeName.equals("int")) continue;
-                                if (javacTypeName.equals("java.lang.String") && reflectTypeName.equals("java.lang.String")) continue;
                                 if (!javacTypeName.equals(reflectTypeName) &&
                                         !javacTypeName.replace('$', '.').equals(reflectTypeName)) {
                                     typesMatch = false;
