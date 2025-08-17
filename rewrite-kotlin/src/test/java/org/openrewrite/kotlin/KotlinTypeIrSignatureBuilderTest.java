@@ -30,7 +30,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +44,7 @@ public class KotlinTypeIrSignatureBuilderTest {
             .logCompilationWarningsAndErrors(true)
             .moduleName("test")
             .build()
-            .parse(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
+            .parse(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
                     new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
 
     @AfterAll
@@ -166,7 +166,7 @@ public class KotlinTypeIrSignatureBuilderTest {
     @Test
     void fileField() {
         IrProperty property = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof IrProperty && "field".equals(((IrProperty) it).getName().asString()))
+          .filter(it -> it instanceof IrProperty ip && "field".equals(ip.getName().asString()))
           .map(it -> (IrProperty) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().variableSignature(property))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
@@ -175,7 +175,7 @@ public class KotlinTypeIrSignatureBuilderTest {
     @Test
     void fileFunction() {
         IrFunction function = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof IrFunction && "function".equals(((IrFunction) it).getName().asString()))
+          .filter(it -> it instanceof IrFunction if1 && "function".equals(if1.getName().asString()))
           .map(it -> (IrFunction) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().methodSignature(function))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");

@@ -440,11 +440,13 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                         if (member.getConstantValue() != null) {
                             AnnotationVisitor annotationDefaultVisitor = mv.visitAnnotationDefault();
-                            AnnotationSerializer.processAnnotationDefaultValue(
-                                    annotationDefaultVisitor,
-                                    AnnotationDeserializer.parseValue(member.getConstantValue())
-                            );
-                            annotationDefaultVisitor.visitEnd();
+                            if (annotationDefaultVisitor != null) {
+                                AnnotationSerializer.processAnnotationDefaultValue(
+                                        annotationDefaultVisitor,
+                                        AnnotationDeserializer.parseValue(member.getConstantValue())
+                                );
+                                annotationDefaultVisitor.visitEnd();
+                            }
                         }
 
                         writeMethodBody(member, mv);

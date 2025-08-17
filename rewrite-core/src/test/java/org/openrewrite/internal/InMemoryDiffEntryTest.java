@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.jgit.lib.FileMode;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -29,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class InMemoryDiffEntryTest {
-    private final Path filePath = Paths.get("com/netflix/MyJavaClass.java");
+    private final Path filePath = Path.of("com/netflix/MyJavaClass.java");
 
     private String ab(String which) {
         return which + "/" + filePath.toString().replace("\\", "/");
@@ -38,8 +37,8 @@ class InMemoryDiffEntryTest {
     @Test
     void idempotent() {
         try (var diff = new InMemoryDiffEntry(
-          Paths.get("com/netflix/MyJavaClass.java"),
-          Paths.get("com/netflix/MyJavaClass.java"),
+          Path.of("com/netflix/MyJavaClass.java"),
+          Path.of("com/netflix/MyJavaClass.java"),
           null,
           "public class A {}",
           "public class A {}",
@@ -52,8 +51,8 @@ class InMemoryDiffEntryTest {
     @Test
     void ignoreWhitespace() {
         try (var diff = new InMemoryDiffEntry(
-          Paths.get("com/netflix/MyJavaClass.java"),
-          Paths.get("com/netflix/MyJavaClass.java"),
+          Path.of("com/netflix/MyJavaClass.java"),
+          Path.of("com/netflix/MyJavaClass.java"),
           null,
           "public class A {} ",
           "public class A {}",

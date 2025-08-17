@@ -38,7 +38,10 @@ import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -410,7 +413,7 @@ class TypeTableTest implements RewriteTest {
         @Disabled
         @Test
         void writeAllMavenLocal() throws Exception {
-            Path m2Repo = Paths.get(System.getProperty("user.home"), ".m2", "repository");
+            Path m2Repo = Path.of(System.getProperty("user.home"), ".m2", "repository");
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
                 AtomicLong jarsSize = new AtomicLong();
                 AtomicLong jarCount = new AtomicLong();
