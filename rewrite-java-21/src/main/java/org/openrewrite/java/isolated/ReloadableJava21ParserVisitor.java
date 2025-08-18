@@ -424,7 +424,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY);
 
         JContainer<Statement> primaryConstructor = null;
-        Map<String, RecordParam> recordParams = new HashMap<>();
+        Map<String, List<J.Annotation>> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Space prefix = sourceBefore("(");
             Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
@@ -433,7 +433,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
-                            recordParams.put(var.getName().toString(), new RecordParam(null, var, null, null));
                             recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
                         }
                     }
@@ -451,7 +450,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                                     }
                                     return elem;
                                 });
-                        recordParams.compute(vt.getName().toString(), (k, v) -> new RecordParam(vt, v != null ? v.consParam() : null, recordAnnotations, varDec));
+                        recordParams.put(vt.getName().toString(), recordAnnotations);
                         varDecs.add(varDec);
                     }
                 }
@@ -464,18 +463,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
             primaryConstructor = JContainer.build(
                     prefix,
-                    // We have to determine which annotations to add to the constructor parameters here.
                     ListUtils.map(varDecs, elem -> {
                         if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
-                            RecordParam param = recordParams.get(vd.getVariables().getFirst().getSimpleName());
-                            return param == null ? elem : elem.withElement(vd.withLeadingAnnotations(param.annotations().stream().filter(ann -> {
-                                for (AnnotationTree anno : param.consParam().getModifiers().getAnnotations()) {
-                                    if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            }).collect(toList())));
+                            return elem.withElement(vd.withLeadingAnnotations(recordParams.get(vd.getVariables().getFirst().getSimpleName())));
                         }
                         return elem;
                     }),
@@ -581,7 +571,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                    (hasFlag(vt.getModifiers(), Flags.ENUM))) {
+                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -592,35 +583,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (enumSet != null) {
             members.add(enumSet);
         }
-        // We have to determine which annotations to add to the field declarations here.
-        if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
-            for (Tree tree : membersMultiVariablesSeparated) {
-                if (tree instanceof VariableTree vt) {
-                    RecordParam param = recordParams.get(vt.getName().toString());
-                    members.add(param.lstElem().map(elem -> {
-                        if (elem instanceof J.VariableDeclarations vd) {
-                            return vd.withModifiers(List.of(
-                                            new J.Modifier(randomId(), vt.getModifiers().getAnnotations().isEmpty() ? EMPTY : SINGLE_SPACE, Markers.EMPTY, "private", J.Modifier.Type.Private, emptyList()),
-                                            new J.Modifier(randomId(), SINGLE_SPACE, Markers.EMPTY, "final", J.Modifier.Type.Final, emptyList())
-                                    ))
-                                    .withLeadingAnnotations(param.annotations().stream().filter(ann -> {
-                                        for (AnnotationTree anno : param.varDecl().getModifiers().getAnnotations()) {
-                                            if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
-                                                return true;
-                                            }
-                                        }
-                                        return false;
-                                    }).collect(toList()));
-                        }
-                        return elem;
-                    }));
-                } else {
-                    members.addAll(convertStatements(singletonList(tree)));
-                }
-            }
-        } else {
-            members.addAll(convertStatements(membersMultiVariablesSeparated));
-        }
+        members.addAll(convertStatements(membersMultiVariablesSeparated));
         addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
@@ -2541,8 +2504,3 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 }
 
-record RecordParam(VariableTree varDecl,
-                   JCVariableDecl consParam,
-                   List<J.Annotation> annotations,
-                   JRightPadded<Statement> lstElem) {
-}
