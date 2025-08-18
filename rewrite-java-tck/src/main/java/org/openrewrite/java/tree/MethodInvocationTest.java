@@ -136,8 +136,8 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @MinimumJava11 // Fails on Java 8, but passes on Java 11 and later
-    @Issue("https://github.com/openrewrite/rewrite/issues/5400")
+    @Issue("https://github.com/openrewrite/rewrite/issues/5400") // Fails on Java 8, but passes on Java 11 and later
+    @MinimumJava11
     @Test
     void methodParameterNamesPresent() {
         rewriteRun(
