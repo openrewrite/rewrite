@@ -567,12 +567,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
                     hasFlag(md.getModifiers(), Flags.GENERATEDCONSTR) ||
-                            hasFlag(md.getModifiers(), Flags.RECORD))) {
+                    hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -2258,7 +2258,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                                field.getName().matches("[A-Z_]+");
+                               field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }
@@ -2503,4 +2503,3 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 }
-

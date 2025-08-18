@@ -26,6 +26,8 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Position;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -419,20 +421,51 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY);
 
         JContainer<Statement> primaryConstructor = null;
+        Map<String, List<J.Annotation>> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
-            List<Tree> stateVector = new ArrayList<>();
+            Space prefix = sourceBefore("(");
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
+            List<JRightPadded<Statement>> varDecs = new ArrayList<>();
             for (Tree member : node.getMembers()) {
+                if (member instanceof JCMethodDecl md) {
+                    if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
+                        for (JCVariableDecl var : md.getParameters()) {
+                            recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                        }
+                    }
+                }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        stateVector.add(vt);
+                        List<J.Annotation> recordAnnotations = collectAnnotations(
+                                mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
+                        );
+                        Space typeExpressionPrefix = whitespace();
+                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, t -> { Space suffix = whitespace(); skip(","); return suffix; })
+                                .map(elem -> {
+                                    if (elem instanceof J.VariableDeclarations vd) {
+                                        return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
+                                    }
+                                    return elem;
+                                });
+                        recordParams.put(vt.getName().toString(), recordAnnotations);
+                        varDecs.add(varDec);
                     }
                 }
             }
+            if (varDecs.isEmpty()) {
+                varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
+            } else {
+                varDecs = ListUtils.mapLast(varDecs, elem -> elem.withAfter(sourceBefore(")")));
+            }
+
             primaryConstructor = JContainer.build(
-                    sourceBefore("("),
-                    stateVector.isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
+                    prefix,
+                    ListUtils.map(varDecs, elem -> {
+                        if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
+                            return elem.withElement(vd.withLeadingAnnotations(recordParams.get(vd.getVariables().get(0).getSimpleName())));
+                        }
+                        return elem;
+                    }),
                     Markers.EMPTY
             );
         }
@@ -849,9 +882,17 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitLiteral(LiteralTree node, Space fmt) {
-        cursor(endPos(node));
+        int endPos = endPos(node);
         Object value = node.getValue();
-        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos(node));
+
+        if (endPos == Position.NOPOS) {
+            String str = value + "";
+            int delimLength = source.substring(cursor).indexOf(str);
+            endPos = cursor + delimLength + str.length() + delimLength;
+        }
+
+        cursor(endPos);
+        String valueSource = source.substring(((JCLiteral) node).getStartPosition(), endPos);
         JavaType.Primitive type = typeMapping.primitive(((JCLiteral) node).typetag);
 
         if (value instanceof Character) {
@@ -1169,7 +1210,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     members.add(m);
                 }
             }
-
             List<JRightPadded<Statement>> converted = convertStatements(members);
             addPossibleEmptyStatementsBeforeClosingBrace(converted);
 
@@ -1753,6 +1793,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
+    @Contract("null -> null")
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
@@ -1807,10 +1848,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
     }
 
+    @Contract("null, _ -> null; !null, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
         return convert(t, suffix, j -> Markers.EMPTY);
     }
 
+    @Contract("null, _, _ -> null; !null, _, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
         if (t == null) {
             return null;
