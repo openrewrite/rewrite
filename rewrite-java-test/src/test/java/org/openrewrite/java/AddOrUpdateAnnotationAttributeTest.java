@@ -2324,6 +2324,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5918")
     @Test
     void attributeWithShallowType() {
         rewriteRun(
@@ -2340,15 +2341,15 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           java(
             """
               package org.example;
-              public @interface Foo {
-                  boolean required();
+              public @interface Bar {
               }
               """
           ),
           java(
             """
               package org.example;
-              public @interface Bar {
+              public @interface Foo {
+                  boolean required();
               }
               """
           ),

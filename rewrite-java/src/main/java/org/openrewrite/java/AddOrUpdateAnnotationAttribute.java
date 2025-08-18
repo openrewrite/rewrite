@@ -98,8 +98,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             @Override
             public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(original, ctx);
-                if (!TypeUtils.isOfClassType(a.getType(), annotationType)
-                        || !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType) ||
+                        !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
                     return a;
                 }
 
