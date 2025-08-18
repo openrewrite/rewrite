@@ -421,8 +421,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY);
 
         JContainer<Statement> primaryConstructor = null;
-        Map<String, List<J.Annotation>> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
+            Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
             Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
             List<JRightPadded<Statement>> varDecs = new ArrayList<>();
