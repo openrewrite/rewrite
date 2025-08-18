@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -31,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RemoteVisitorTest {
 
     @Test
-    void visitsMarkers() throws URISyntaxException {
+    void visitsMarkers() throws Exception {
         AtomicBoolean markersVisited = new AtomicBoolean();
         RemoteVisitor<Integer> remoteVisitor = new RemoteVisitor<>() {
             @Override

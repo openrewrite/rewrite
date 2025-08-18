@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
@@ -39,12 +39,12 @@ class RemoteFileTest {
         URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
         ExecutionContext ctx = new InMemoryExecutionContext();
         RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperProperties")));
+          Path.of(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperProperties")));
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
         RemoteFile remoteFile = Remote
-          .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+          .builder(Path.of("gradle/wrapper/gradle-wrapper.properties"))
           .build(distributionUrl.toURI());
 
         long actual = getInputStreamSize(remoteFile.getInputStream(ctx));
@@ -59,7 +59,7 @@ class RemoteFileTest {
           .setLargeFileHttpSender(new MockHttpSender(408));
 
         RemoteArchive remoteFile = Remote
-          .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+          .builder(Path.of("gradle/wrapper/gradle-wrapper.properties"))
           .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
 
@@ -74,7 +74,7 @@ class RemoteFileTest {
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
         LocalRemoteArtifactCache localRemoteArtifactCache = new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperPropertiesConcurrent"));
+          Path.of(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperPropertiesConcurrent"));
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
                 URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
@@ -85,7 +85,7 @@ class RemoteFileTest {
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
                 RemoteFile remoteFile = Remote
-                  .builder(Paths.get("gradle/wrapper/gradle-wrapper.properties"))
+                  .builder(Path.of("gradle/wrapper/gradle-wrapper.properties"))
                   .build(distributionUrl.toURI());
 
                 return getInputStreamSize(remoteFile.getInputStream(ctx));

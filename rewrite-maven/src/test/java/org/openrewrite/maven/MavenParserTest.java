@@ -29,6 +29,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.maven.http.OkHttpSender;
@@ -38,10 +39,8 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.tree.ParseError;
 
-import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -982,7 +981,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void mirrorsAndAuth() throws IOException {
+    void mirrorsAndAuth() throws Exception {
         // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
         // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
@@ -1030,7 +1029,7 @@ class MavenParserTest implements RewriteTest {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -3966,6 +3965,134 @@ class MavenParserTest implements RewriteTest {
                     );
               }
             )
+          )
+        );
+    }
+
+    @CsvSource({"2.15.0,2.13.0", "2.13.0,2.15.0", "2.13.0,2.13.0"})
+    @ParameterizedTest
+    void lastListedDependencyIsUsed(String firstVersion, String secondVersion) {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(firstVersion, secondVersion),
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Compile))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(secondVersion);
+            })
+          )
+        );
+    }
+
+    @CsvSource({"2.15.0,runtime,2.13.0,test", "2.13.0,runtime,2.15.0,test", "2.13.0,runtime,2.13.0,test", "2.15.0,compile,2.13.0,test", "2.13.0,compile,2.15.0,test", "2.13.0,compile,2.13.0,test"})
+    @ParameterizedTest
+    void lastListedDependencyIsUsedForScope(String firstVersion, String firstScope, String secondVersion, String secondScope) {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                    <scope>%s</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                    <scope>%s</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(firstVersion, firstScope, secondVersion, secondScope),
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(firstScope)))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(firstVersion);
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.fromName(secondScope)))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(secondVersion);
+            })
+          )
+        );
+    }
+
+    @CsvSource({"2.15.0,2.13.0", "2.13.0,2.15.0", "2.13.0,2.13.0"})
+    @ParameterizedTest
+    void lastListedDependencyIsUsedForTransitiveScope(String firstVersion, String secondVersion) {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                    <version>%s</version>
+                    <scope>compile</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """.formatted(firstVersion, secondVersion),
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Test))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(secondVersion);
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-core", Scope.Compile))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(secondVersion);
+            })
           )
         );
     }

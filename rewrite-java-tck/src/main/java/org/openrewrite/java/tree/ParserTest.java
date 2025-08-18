@@ -21,7 +21,6 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,7 +32,7 @@ class ParserTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/pull/4914")
     @Test
-    void parseString() throws IOException {
+    void parseString() throws Exception {
         // path needs to be resolvable from `rewrite-java-8` etc.
         Path targetFile = Paths.get("../rewrite-java-tck/src/main/java/org/openrewrite/java/tree/ParserTest.java");
         @SuppressWarnings("SimplifyStreamApiCallChains") List<SourceFile> ignore = JavaParser.fromJavaVersion()
