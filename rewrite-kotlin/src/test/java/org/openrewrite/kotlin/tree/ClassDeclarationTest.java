@@ -162,8 +162,8 @@ class ClassDeclarationTest implements RewriteTest {
               """,
                 spec -> spec.afterRecipe(cu -> {
                     assertThat(cu.getStatements().stream()
-                            .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
+                            .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                                    cd.getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
                 })
           )
         );
@@ -182,8 +182,8 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("annotation class A",
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements().stream()
-                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
+                  .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                    cd.getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
             }))
           );
     }
@@ -194,8 +194,8 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("enum  class A",
             spec -> spec.afterRecipe(cu -> {
               assertThat(cu.getStatements().stream()
-                .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                  ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
+                .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                  cd.getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
           }))
         );
     }
@@ -558,9 +558,9 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("class A",
             spec -> spec.afterRecipe(cu -> {
                 for (Statement statement : cu.getStatements()) {
-                    if (statement instanceof J.ClassDeclaration) {
-                        J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final);
-                        assertThat(J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    if (statement instanceof J.ClassDeclaration declaration) {
+                        J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final);
+                        assertThat(J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final)).isTrue();
                     }
                 }
             }))
