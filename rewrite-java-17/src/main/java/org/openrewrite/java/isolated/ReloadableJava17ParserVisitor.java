@@ -441,7 +441,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
                         );
                         Space typeExpressionPrefix = whitespace();
-                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, commaDelim)
+                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, t -> { Space suffix = whitespace(); skip(","); skip(")"); return suffix; })
                                 .map(elem -> {
                                     if (elem instanceof J.VariableDeclarations vd) {
                                         return vd.withPrefix(varDecsPrefix).withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
@@ -455,8 +455,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             }
             if (varDecs.isEmpty()) {
                 varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
-            } else {
-                varDecs = ListUtils.mapLast(varDecs, elem -> elem.withAfter(sourceBefore(")")));
             }
 
             primaryConstructor = JContainer.build(
