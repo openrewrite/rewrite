@@ -27,6 +27,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Position;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -426,33 +427,32 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         Map<String, RecordParam> recordParams = new HashMap<>();
         if (kind.getType() == J.ClassDeclaration.Kind.Type.Record) {
             Space prefix = sourceBefore("(");
-            Map<String, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
+            Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
             List<JRightPadded<Statement>> varDecs = new ArrayList<>();
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
                         for (JCVariableDecl var : md.getParameters()) {
                             recordParams.put(var.getName().toString(), new RecordParam(null, var, null, null));
-                            recordAnnotationPosTable.put(var.getName().toString(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
+                            recordAnnotationPosTable.put(var.getName(), mapAnnotations(var.getModifiers().getAnnotations(), new HashMap<>()));
                         }
                     }
                 }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.get(vt.getName().toString()));
-                        List<J.Annotation> recordAnnotations = collectAnnotations(recordAnnotationPosTable.get(vt.getName().toString()));
+                        List<J.Annotation> recordAnnotations = collectAnnotations(
+                                mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
+                        );
                         Space typeExpressionPrefix = whitespace();
-                        JRightPadded<Statement> varDec = convert(vt, commaDelim);
-                        if (varDec != null) {
-                            varDec = varDec.map(elem -> {
-                                if (elem instanceof J.VariableDeclarations vd) {
-                                    return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
-                                }
-                                return elem;
-                            });
-                            recordParams.put(vt.getName().toString(), new RecordParam(vt, recordParams.get(vt.getName().toString()).consParam(), recordAnnotations, varDec));
-                            varDecs.add(varDec);
-                        }
+                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, t -> { Space suffix = whitespace(); skip(","); return suffix; })
+                                .map(elem -> {
+                                    if (elem instanceof J.VariableDeclarations vd) {
+                                        return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
+                                    }
+                                    return elem;
+                                });
+                        recordParams.compute(vt.getName().toString(), (k, v) -> new RecordParam(vt, v != null ? v.consParam() : null, recordAnnotations, varDec));
+                        varDecs.add(varDec);
                     }
                 }
             }
@@ -468,7 +468,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     ListUtils.map(varDecs, elem -> {
                         if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
                             RecordParam param = recordParams.get(vd.getVariables().getFirst().getSimpleName());
-                            return elem.withElement(vd.withLeadingAnnotations(param.annotations().stream().filter(ann -> {
+                            return param == null ? elem : elem.withElement(vd.withLeadingAnnotations(param.annotations().stream().filter(ann -> {
                                 for (AnnotationTree anno : param.consParam().getModifiers().getAnnotations()) {
                                     if (anno.getAnnotationType().toString().equals(ann.getAnnotationType().toString())) {
                                         return true;
@@ -614,6 +614,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                         }
                         return elem;
                     }));
+                } else {
+                    members.addAll(convertStatements(singletonList(tree)));
                 }
             }
         } else {
@@ -1855,6 +1857,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
+    @Contract("null -> null")
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
@@ -1908,10 +1911,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
     }
 
+    @Contract("null, _ -> null; !null, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
         return convert(t, suffix, j -> Markers.EMPTY);
     }
 
+    @Contract("null, _, _ -> null; !null, _, _ -> !null")
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
         if (t == null) {
             return null;
