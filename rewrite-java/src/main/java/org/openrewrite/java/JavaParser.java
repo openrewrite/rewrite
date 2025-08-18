@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.parser.JavaParserClasspathLoader;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
@@ -313,6 +314,16 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
+         * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
+         * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
+         * <p>
+         * Fine for example when writing tests, which may need to use older versions of dependencies that need not be
+         * added to the recipe runtime classpath through resources.
+         *
+         * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
+         */
         public B classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = emptyList();
@@ -336,15 +347,10 @@ public interface JavaParser extends Parser {
         }
 
         /**
-         * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
-         * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
-         * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
-         * <p>
-         * Fine for example when writing tests, which may need to use older versions of dependencies that need not be
-         * added to the recipe runtime classpath through resources.
-         *
-         * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
+         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
          */
+        @Deprecated
+        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
         public B classpath(byte[]... classpath) {
             this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
