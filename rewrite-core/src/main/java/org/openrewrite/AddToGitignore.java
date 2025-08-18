@@ -26,7 +26,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.toList;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -92,7 +92,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             return PlainTextParser.builder().build()
                     .parse(entries)
                     .map(text -> (SourceFile) text.withSourcePath(Paths.get(path)))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
