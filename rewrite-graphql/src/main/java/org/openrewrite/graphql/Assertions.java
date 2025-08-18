@@ -15,6 +15,7 @@
  */
 package org.openrewrite.graphql;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.graphql.tree.GraphQl;
 import org.openrewrite.test.SourceSpec;
@@ -25,22 +26,29 @@ import java.util.function.Consumer;
 public class Assertions {
     private Assertions() {}
 
-    public static SourceSpecs graphQl(@Nullable String before) {
+    public static SourceSpecs graphQl(
+            @Language("graphql") @Nullable String before) {
         return graphQl(before, s -> {});
     }
 
-    public static SourceSpecs graphQl(@Nullable String before, Consumer<SourceSpec<GraphQl.Document>> spec) {
+    public static SourceSpecs graphQl(
+            @Language("graphql") @Nullable String before,
+            Consumer<SourceSpec<GraphQl.Document>> spec) {
         SourceSpec<GraphQl.Document> graphQl = new SourceSpec<>(GraphQl.Document.class, null, GraphQlParser.builder(), before, null);
         spec.accept(graphQl);
         return graphQl;
     }
 
-    public static SourceSpecs graphQl(@Nullable String before, @Nullable String after) {
+    public static SourceSpecs graphQl(
+            @Language("graphql") @Nullable String before,
+            @Language("graphql") @Nullable String after) {
         return graphQl(before, after, s -> {});
     }
 
-    public static SourceSpecs graphQl(@Nullable String before, @Nullable String after, 
-                                     Consumer<SourceSpec<GraphQl.Document>> spec) {
+    public static SourceSpecs graphQl(
+            @Language("graphql") @Nullable String before,
+            @Language("graphql") @Nullable String after,
+            Consumer<SourceSpec<GraphQl.Document>> spec) {
         SourceSpec<GraphQl.Document> graphQl = new SourceSpec<>(GraphQl.Document.class, null, GraphQlParser.builder(), before, s -> after);
         spec.accept(graphQl);
         return graphQl;
