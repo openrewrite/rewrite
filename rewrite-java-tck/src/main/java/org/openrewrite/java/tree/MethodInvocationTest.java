@@ -150,8 +150,8 @@ class MethodInvocationTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(cu -> {
-                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
-                J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().getFirst();
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
                 assertThat(mi.getMethodType().getParameterNames()).containsExactly("expected");
             })
           )
