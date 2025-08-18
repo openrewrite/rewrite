@@ -60,7 +60,7 @@ public class UpgradeParentVersion extends Recipe {
     Boolean onlyExternal;
 
     @Option(displayName = "Except",
-            description = "Accepts a list of GAVs that is passed to RemoveRedundantDependencyVersions recipe via ChangeParentPom.",
+            description = "Accepts a list of GAVs that should be excluded from dependencies list.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable

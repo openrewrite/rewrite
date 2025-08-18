@@ -107,7 +107,7 @@ public class ChangeParentPom extends Recipe {
     Boolean allowVersionDowngrades;
 
     @Option(displayName = "Except",
-            description = "Accepts a list of GAVs that will be passed to RemoveRedundantDependencyVersions.",
+            description = "Accepts a list of GAVs that should be excluded from dependencies list.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
