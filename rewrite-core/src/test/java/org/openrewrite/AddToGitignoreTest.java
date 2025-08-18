@@ -168,6 +168,7 @@ class AddToGitignoreTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void handleNestedGitignoreWithExplicitPath() {
         // When explicitly targeting nested .gitignore, should update it
