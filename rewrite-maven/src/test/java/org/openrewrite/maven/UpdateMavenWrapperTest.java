@@ -282,7 +282,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
           spec -> spec.recipe(new UpdateMavenWrapper("3.1.x", null, "3.8.x", null, null, null))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
             .afterRecipe(run -> {
-                Path subdir = Paths.get("subdir");
+                Path subdir = Path.of("subdir");
                 var mvnw = result(run, PlainText.class, "mvnw");
                 assertThat(mvnw.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
                 var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
