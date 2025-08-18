@@ -26,9 +26,9 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import static java.util.stream.Collectors.toList;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
@@ -42,7 +42,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "File pattern",
             description = "A glob pattern to match .gitignore files to update. Defaults to only the root .gitignore file. " +
-                          "Use `**/.gitignore` to update all .gitignore files in the repository, or specify a specific path like `src/.gitignore`.",
+                    "Use `**/.gitignore` to update all .gitignore files in the repository, or specify a specific path like `src/.gitignore`.",
             required = false,
             example = ".gitignore")
     @Nullable
@@ -56,7 +56,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "Adds entries to the project's .gitignore file. If no .gitignore file exists, one will be created. " +
-               "Existing entries that match will not be duplicated.";
+                "Existing entries that match will not be duplicated.";
     }
 
     @Override
@@ -106,11 +106,11 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 String existingContent = text.getText();
                 String mergedContent = mergeGitignoreEntries(existingContent, entries);
-                
+
                 if (!existingContent.equals(mergedContent)) {
                     return text.withText(mergedContent);
                 }
-                
+
                 return text;
             }
         });
@@ -118,12 +118,12 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
     private String mergeGitignoreEntries(String existing, String newEntries) {
         String separator = existing.contains("\r\n") ? "\r\n" : "\n";
-        
+
         Set<String> existingRules = new LinkedHashSet<>();
         Set<String> existingWildcardPatterns = new LinkedHashSet<>();
         Set<String> existingComments = new LinkedHashSet<>();
         List<String> existingLines = new ArrayList<>();
-        
+
         if (!StringUtils.isBlank(existing)) {
             String[] lines = existing.split("\r?\n");
             for (String line : lines) {
@@ -142,16 +142,16 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 }
             }
         }
-        
+
         List<String> newLines = new ArrayList<>();
         String[] entriesToAdd = newEntries.split("\r?\n");
-        
+
         for (String entry : entriesToAdd) {
             String trimmed = entry.trim();
             if (StringUtils.isBlank(trimmed)) {
                 continue;
             }
-            
+
             if (trimmed.startsWith("#")) {
                 if (!existingComments.contains(trimmed)) {
                     newLines.add(entry);
@@ -165,40 +165,40 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 }
             }
         }
-        
+
         if (newLines.isEmpty()) {
             return existing;
         }
-        
+
         List<String> result = new ArrayList<>(existingLines);
-        
+
         if (!existingLines.isEmpty() && !StringUtils.isBlank(existingLines.get(existingLines.size() - 1))) {
             result.add("");
         }
-        
+
         result.addAll(newLines);
-        
+
         return String.join(separator, result);
     }
-    
+
     private String normalizeRule(String rule) {
         String normalized = rule.trim();
-        
+
         if (normalized.startsWith("!")) {
             normalized = normalized.substring(1).trim();
         }
-        
+
         if (normalized.endsWith("/")) {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
-        
+
         if (normalized.startsWith("/")) {
             normalized = normalized.substring(1);
         }
-        
+
         return normalized.toLowerCase();
     }
-    
+
     private boolean isSuperfluousEntry(String entry, Set<String> existingWildcardPatterns) {
         // Check if this entry would be redundant given existing wildcard patterns
         for (String pattern : existingWildcardPatterns) {
@@ -208,22 +208,22 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         }
         return false;
     }
-    
+
     private boolean matchesGitignorePattern(String path, String pattern) {
         // Simple gitignore pattern matching
         // This is a simplified implementation - gitignore patterns can be complex
-        
+
         // Remove leading slashes for comparison
         String normalizedPath = path.trim();
         String normalizedPattern = pattern.trim();
-        
+
         if (normalizedPath.startsWith("/")) {
             normalizedPath = normalizedPath.substring(1);
         }
         if (normalizedPattern.startsWith("/")) {
             normalizedPattern = normalizedPattern.substring(1);
         }
-        
+
         // Handle directory patterns (ending with /)
         boolean isDirectoryPattern = normalizedPattern.endsWith("/");
         if (isDirectoryPattern) {
@@ -233,12 +233,12 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
             }
             // Check if the path is under this directory
-            if (normalizedPath.equals(normalizedPattern) || 
-                normalizedPath.startsWith(normalizedPattern + "/")) {
+            if (normalizedPath.equals(normalizedPattern) ||
+                    normalizedPath.startsWith(normalizedPattern + "/")) {
                 return true;
             }
         }
-        
+
         // Convert gitignore pattern to regex for wildcard matching
         String regex = normalizedPattern
                 .replace(".", "\\.")
@@ -246,15 +246,15 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 .replace("*", "[^/]*")  // * matches anything except /
                 .replace("§§§", ".*")   // ** matches anything including /
                 .replace("?", "[^/]");  // ? matches single character except /
-                
+
         // Check if the path matches the pattern
         return normalizedPath.matches(regex);
     }
-    
+
     private String getEffectiveFilePattern() {
         return isBlank(filePattern) ? ".gitignore" : filePattern;
     }
-    
+
     private boolean matchesPattern(String sourcePath, String pattern) {
         // Simple pattern matching for common cases
         if (pattern.equals(".gitignore")) {
@@ -272,7 +272,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             return true;
         }
     }
-    
+
     private String extractPathFromPattern(String pattern) {
         // Extract a concrete path from the pattern for file generation
         if (!pattern.contains("*") && !pattern.contains("?")) {
