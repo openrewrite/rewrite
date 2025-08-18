@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Optional;
@@ -135,6 +136,7 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @MinimumJava11 // Fails on Java 8, but passes on Java 11 and later
     @Issue("https://github.com/openrewrite/rewrite/issues/5400")
     @Test
     void methodParameterNamesPresent() {
