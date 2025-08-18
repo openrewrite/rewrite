@@ -15,12 +15,15 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.semver.Semver;
+
+import java.util.List;
 
 @Getter
 @Value
@@ -56,6 +59,13 @@ public class UpgradeParentVersion extends Recipe {
     @Nullable
     Boolean onlyExternal;
 
+    @Option(displayName = "Except",
+            description = "Accepts a list of GAVs that should be excluded from dependencies list.",
+            example = "com.jcraft:jsch",
+            required = false)
+    @Nullable
+    List<String> except;
+
     @Override
     public String getDisplayName() {
         return "Upgrade Maven parent project version";
@@ -70,6 +80,23 @@ public class UpgradeParentVersion extends Recipe {
     public String getDescription() {
         return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
                "or to a specific version number.";
+    }
+
+    @JsonCreator
+    public UpgradeParentVersion(String groupId, String artifactId, String newVersion,
+                                   @Nullable String versionPattern, @Nullable Boolean onlyExternal) {
+        this(groupId, artifactId, newVersion, versionPattern, onlyExternal, null);
+    }
+
+    public UpgradeParentVersion(String groupId, String artifactId, String newVersion,
+                                   @Nullable String versionPattern, @Nullable Boolean onlyExternal,
+                                   @Nullable List<String> except) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.onlyExternal = onlyExternal;
+        this.except = except;
     }
 
     @Override
@@ -89,6 +116,6 @@ public class UpgradeParentVersion extends Recipe {
 
     private ChangeParentPom changeParentPom() {
         return new ChangeParentPom(groupId, null, artifactId, null, newVersion, Boolean.TRUE.equals(onlyExternal) ? "" : null, null,
-                versionPattern, false);
+                versionPattern, false, except);
     }
 }
