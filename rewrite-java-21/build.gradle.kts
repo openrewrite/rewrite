@@ -23,8 +23,6 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation("org.antlr:antlr4-runtime:4.13.2")
     "javaTck"(project(":rewrite-java-tck"))
-
-    testRuntimeOnly("com.google.guava:guava:33.4.8-jre")
 }
 
 java {

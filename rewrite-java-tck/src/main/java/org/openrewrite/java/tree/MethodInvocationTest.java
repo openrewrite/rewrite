@@ -17,7 +17,9 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Optional;
@@ -129,6 +131,29 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5400")
+    @Test
+    void methodParameterNamesPresent() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("assertj-core")),
+          java(
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Regular {
+                  void method(String exp, String act) {
+                      assertThat(act).isEqualTo(exp);
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().getFirst();
+                assertThat(mi.getMethodType().getParameterNames()).containsExactly("expected");
+            })
           )
         );
     }
