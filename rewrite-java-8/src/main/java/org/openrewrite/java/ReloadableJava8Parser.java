@@ -102,6 +102,7 @@ class ReloadableJava8Parser implements JavaParser {
         // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
+        Options.instance(context).put("-parameters", "true");
 
         // Ensure type attribution continues despite errors in individual files or nodes.
         // If an error occurs in a single file or node, type attribution should still proceed
