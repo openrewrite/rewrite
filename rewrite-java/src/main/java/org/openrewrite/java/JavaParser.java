@@ -111,6 +111,15 @@ public interface JavaParser extends Parser {
         return artifacts;
     }
 
+    /**
+     * Load artifacts from packaged resources. This is useful for loading dependencies that are not on the recipe
+     * execution classpath, or where you need to load multiple different versions of the same artifact.
+     * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+     *
+     * @param ctx                       The execution context to use for loading resources.
+     * @param artifactNamesWithVersions artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+     * @return A list of paths to the located artifacts.
+     */
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         if (artifactNamesWithVersions.length == 0) {
             return emptyList();
@@ -310,6 +319,15 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * Load artifacts from packaged resources. This is useful for loading dependencies that are not on the recipe
+         * execution classpath, or where you need to load multiple different versions of the same artifact.
+         * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+         *
+         * @param ctx       The execution context to use for loading resources.
+         * @param classpath artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+         * @return A list of paths to the located artifacts.
+         */
         @SuppressWarnings({"UnusedReturnValue", "unused"})
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = emptyList();
@@ -317,6 +335,16 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
+         * {@link #dependenciesFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
+         * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
+         * <p>
+         * Fine for example when writing tests, which may need to use older versions of dependencies that need not be
+         * added to the recipe runtime classpath through resources.
+         *
+         * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
+         */
         public B classpath(byte[]... classpath) {
             this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
