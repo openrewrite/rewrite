@@ -337,7 +337,7 @@ public interface JavaParser extends Parser {
 
         /**
          * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
-         * {@link #dependenciesFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
+         * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
          * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
          * <p>
          * Fine for example when writing tests, which may need to use older versions of dependencies that need not be
