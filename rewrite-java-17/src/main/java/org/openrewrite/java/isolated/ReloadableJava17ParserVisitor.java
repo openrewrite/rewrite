@@ -436,14 +436,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
+                        Space varDecsPrefix = whitespace();
                         List<J.Annotation> recordAnnotations = collectAnnotations(
                                 mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
                         );
                         Space typeExpressionPrefix = whitespace();
-                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, t -> { Space suffix = whitespace(); skip(","); return suffix; })
+                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, commaDelim)
                                 .map(elem -> {
                                     if (elem instanceof J.VariableDeclarations vd) {
-                                        return vd.withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
+                                        return vd.withPrefix(varDecsPrefix).withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
                                     }
                                     return elem;
                                 });
