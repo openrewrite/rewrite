@@ -113,7 +113,7 @@ public interface JavaParser extends Parser {
     }
 
     /**
-     * Load artifacts from packaged resources. This is useful for loading dependencies that are not on the recipe
+     * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
      * execution classpath, or where you need to load multiple different versions of the same artifact.
      * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
      *
@@ -319,8 +319,8 @@ public interface JavaParser extends Parser {
          * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
          * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
          * <p>
-         * Fine for example when writing tests, which may need to use older versions of dependencies that need not be
-         * added to the recipe runtime classpath through resources.
+         * This is suitable, for example, when writing tests that may require older versions of dependencies,
+         * without needing to add them to the recipe runtime classpath through resources.
          *
          * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
          */
@@ -331,7 +331,7 @@ public interface JavaParser extends Parser {
         }
 
         /**
-         * Load artifacts from packaged resources. This is useful for loading dependencies that are not on the recipe
+         * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
          * execution classpath, or where you need to load multiple different versions of the same artifact.
          * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
          *
