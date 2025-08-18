@@ -175,8 +175,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 }
                 if (exp instanceof J.NewArray) {
                     List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
+                    List<Expression> updatedList = updateInitializer(annotation, initializerList, getAttributeValues());
+                    if (updatedList.isEmpty()) {
+                        return null;
+                    }
                     return as.withAssignment(((J.NewArray) exp)
-                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues())));
+                            .withInitializer(updatedList));
                 }
                 if (exp instanceof J.Literal) {
                     if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
@@ -187,7 +191,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         Expression flattenedList = createAnnotationLiteralFromString(
                                 annotation,
                                 wrapValues(updatedList.stream()
-                                        .map(e -> ((J.Literal) e).getValueSource())
+                                        .map(e -> {
+                                            if (e instanceof J.Literal) {
+                                                return ((J.Literal) e).getValueSource();
+                                            } else if (e instanceof J.FieldAccess) {
+                                                return getUsefulNameFromFieldAccess(((J.FieldAccess) e));
+                                            }
+                                            return "<bad parse>";
+                                        })
                                         .collect(toList()), true)
                         );
                         return as.withAssignment(flattenedList);
@@ -200,6 +211,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
                         return as;
+                    }
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        List<Expression> updatedList = updateInitializer(annotation, singletonList(exp), getAttributeValues());
+                        return as.withAssignment(createAnnotationLiteralFromString(
+                                annotation,
+                                wrapValues(updatedList.stream()
+                                        .map(e -> {
+                                            if (e instanceof J.Literal) {
+                                                return ((J.Literal) e).getValueSource();
+                                            } else if (e instanceof J.FieldAccess) {
+                                                return getUsefulNameFromFieldAccess(((J.FieldAccess) e));
+                                            }
+                                            return "<bad parse>";
+                                        })
+                                        .collect(toList()), true)
+                        ));
                     }
                     //noinspection ConstantConditions
                     return JavaTemplate.<J.Annotation>apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
@@ -219,6 +246,22 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
                         return literal;
+                    }
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        List<Expression> updatedList = updateInitializer(annotation, singletonList(literal), getAttributeValues());
+                        return createAnnotationLiteralFromString(
+                                annotation,
+                                wrapValues(updatedList.stream()
+                                        .map(e -> {
+                                            if (e instanceof J.Literal) {
+                                                return ((J.Literal) e).getValueSource();
+                                            } else if (e instanceof J.FieldAccess) {
+                                                return getUsefulNameFromFieldAccess(((J.FieldAccess) e));
+                                            }
+                                            return "<bad parse>";
+                                        })
+                                        .collect(toList()), true)
+                        );
                     }
                     return createAnnotationLiteral(annotation, newAttributeValue);
                 }
@@ -245,6 +288,23 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
                         return fieldAccess;
                     }
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        List<Expression> updatedList = updateInitializer(annotation, singletonList(fieldAccess), getAttributeValues());
+                        Expression flattenedList = createAnnotationLiteralFromString(
+                                annotation,
+                                wrapValues(updatedList.stream()
+                                        .map(e -> {
+                                            if (e instanceof J.Literal) {
+                                                return ((J.Literal) e).getValueSource();
+                                            } else if (e instanceof J.FieldAccess) {
+                                                return getUsefulNameFromFieldAccess(((J.FieldAccess) e));
+                                            }
+                                            return "<bad parse>";
+                                        })
+                                        .collect(toList()), true)
+                        );
+                        return flattenedList;
+                    }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
                             getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) :
                             newAttributeValue;
@@ -268,7 +328,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (attributeName != null && !"value".equals(attributeValue)) {
                     return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
                 }
-                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues()));
+                List<Expression> updatedList = updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues());
+                if (updatedList.isEmpty()) {
+                    return null;
+                }
+                return arrayValue.withInitializer(updatedList);
             }
 
             private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
@@ -309,18 +373,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
         if (oldAttributeValue != null) {
             return ListUtils.flatMap(initializerList, it -> {
-                if (it instanceof J.Literal && valueMatches(it, oldAttributeValue)) {
-                    List<Expression> newItemsList = new ArrayList<>();
+                List<Expression> newItemsList = new ArrayList<>();
+                if ((it instanceof J.Literal || it instanceof J.FieldAccess) && valueMatches(it, oldAttributeValue)) {
                     for (String attribute : attributeList) {
                         J.Literal newLiteral = new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String);
                         newItemsList.add(newLiteral);
-                    }
-                    return newItemsList;
-                } else if (it instanceof J.FieldAccess && valueMatches(it, oldAttributeValue)) {
-                    List<Expression> newItemsList = new ArrayList<>();
-                    for (String attribute : attributeList) {
-                        J.FieldAccess newFieldAccess = TypeTree.build(attribute);
-                        newItemsList.add(newFieldAccess);
                     }
                     return newItemsList;
                 } else if (it instanceof J.Empty) {
@@ -385,6 +442,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return getMethods(annotation).size() == 1 && "value".equals(getMethods(annotation).get(0).getName());
     }
 
+    private static String getUsefulNameFromFieldAccess(J.FieldAccess fa) {
+        if (!(fa.getTarget() instanceof J.Identifier)) {
+            return fa.toString();
+        }
+        return ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
+    }
+
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {
         if (expression == null) {
             return oldAttributeValue == null;
@@ -394,10 +458,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
-            if (!(fa.getTarget() instanceof J.Identifier)) {
-                return oldAttributeValue.equals(fa.toString());
-            }
-            String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
+            String currentValue = getUsefulNameFromFieldAccess(fa);
             return oldAttributeValue.equals(currentValue);
         } else if (expression instanceof J.Identifier) { // class names, static variables, ...
             if (oldAttributeValue.endsWith(".class")) {
