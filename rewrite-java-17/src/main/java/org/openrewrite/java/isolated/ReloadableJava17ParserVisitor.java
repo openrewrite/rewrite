@@ -441,7 +441,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
                         );
                         Space typeExpressionPrefix = whitespace();
-                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, t -> { Space suffix = whitespace(); skip(","); skip(")"); return suffix; })
+                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, __ -> { Space suffix = whitespace(); skip(","); skip(")"); return suffix; })
                                 .map(elem -> {
                                     if (elem instanceof J.VariableDeclarations vd) {
                                         return vd.withPrefix(varDecsPrefix).withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
@@ -460,7 +460,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             primaryConstructor = JContainer.build(
                     prefix,
                     ListUtils.map(varDecs, elem -> {
-                        if (elem != null && elem.getElement() instanceof J.VariableDeclarations vd) {
+                        if (elem.getElement() instanceof J.VariableDeclarations vd) {
                             return elem.withElement(vd.withLeadingAnnotations(recordParams.get(vd.getVariables().get(0).getSimpleName())));
                         }
                         return elem;
