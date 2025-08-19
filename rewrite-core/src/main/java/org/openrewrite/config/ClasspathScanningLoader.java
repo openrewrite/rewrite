@@ -23,7 +23,6 @@ import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
-import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
@@ -100,10 +99,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
         String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
+            // Scan entire classpath to get full inheritance hierarchy, but filter results to target jar
             scanClasses(new ClassGraph()
-                    .acceptJars(jarName)
                     .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader);
+                    .overrideClassLoaders(classLoader), classLoader, jarName);
 
             scanYaml(new ClassGraph()
                     .acceptJars(jarName)
@@ -155,37 +154,53 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     private void scanClasses(ClassGraph classGraph, ClassLoader classLoader) {
+        scanClasses(classGraph, classLoader, null);
+    }
+
+    private void scanClasses(ClassGraph classGraph, ClassLoader classLoader, @Nullable String targetJarName) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            configureRecipes(result, Recipe.class.getName());
-            configureRecipes(result, ScanningRecipe.class.getName());
+            configureRecipes(result, Recipe.class.getName(), targetJarName);
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
+                // Only process styles from the target jar if specified
+                if (targetJarName != null && !isFromJar(classInfo, targetJarName)) {
+                    continue;
+                }
                 Class<?> styleClass = classInfo.loadClass();
-                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if (constructor != null) {
-                        constructor.setAccessible(true);
-                        try {
-                            styles.add((NamedStyles) constructor.newInstance());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
+                Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                if (constructor != null) {
+                    constructor.setAccessible(true);
+                    try {
+                        styles.add((NamedStyles) constructor.newInstance());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
-
+                }
             }
         }
     }
 
-    private void configureRecipes(ScanResult result, String className) {
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean isFromJar(ClassInfo classInfo, String jarName) {
+        return classInfo.getClasspathElementURI() != null &&
+               classInfo.getClasspathElementURI().toString().contains(jarName);
+    }
+
+    private void configureRecipes(ScanResult result, String className, @Nullable String targetJarName) {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
+            // Only process recipes from the target jar if specified
+            if (targetJarName != null && !isFromJar(classInfo, targetJarName)) {
+                continue;
+            }
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
-                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
