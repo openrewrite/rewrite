@@ -61,7 +61,7 @@ gradle.allprojects {
         resolutionStrategy.dependencySubstitution {
             allProjects
                 .minus(includedProjects)
-                .minus(arrayOf("rewrite-bom"))
+                .minus(arrayOf("rewrite-bom", "rewrite-gradle-tooling-model:model", "rewrite-gradle-tooling-model:plugin"))
                 .forEach {
                     substitute(project(":$it"))
                         .using(module("org.openrewrite:$it:latest.integration"))
