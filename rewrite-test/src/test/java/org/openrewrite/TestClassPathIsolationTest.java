@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.tree.ParseError;
@@ -54,61 +56,137 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TestClassPathIsolationTest {
 
-    private final JavaParser JAKARTA_CP_PARSER = JavaParser.fromJavaVersion()
-      .classpathFromResources(new InMemoryExecutionContext(), "jakarta.servlet-api")
-      .build();
-    private final JavaParser JAVAX_CP_PARSER = JavaParser.fromJavaVersion()
-      .classpathFromResources(new InMemoryExecutionContext(), "javax.servlet-api")
-      .build();
+    @Nested
+    class TypeTable {
 
-    /**
-     * Tests that jakarta-only classpath rejects javax imports (isolation failure).
-     *
-     * <p><strong>Current Failure:</strong> The test currently passes (javax imports
-     * work) due to runtime classpath contamination, documenting the broken behavior.
-     * When classpath isolation is fixed, this assertion should be changed to
-     * {@code isFalse()}.
-     */
-    @Test
-    void rejectUnexpectedType() {
-        assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
-          .as("javax.servlet should NOT be available in Jakarta-only classpath")
-          .hasOnlyElementsOfType(ParseError.class);
+        private final JavaParser JAKARTA_CP_PARSER = JavaParser.fromJavaVersion()
+          .classpathFromResources(new InMemoryExecutionContext(), "jakarta.servlet-api")
+          .build();
+        private final JavaParser JAVAX_CP_PARSER = JavaParser.fromJavaVersion()
+          .classpathFromResources(new InMemoryExecutionContext(), "javax.servlet-api")
+          .build();
+
+        /**
+         * Tests that jakarta-only classpath rejects javax imports (isolation failure).
+         *
+         * <p><strong>Current Failure:</strong> The test currently passes (javax imports
+         * work) due to runtime classpath contamination, documenting the broken behavior.
+         * When classpath isolation is fixed, this assertion should be changed to
+         * {@code isFalse()}.
+         */
+        @Test
+        void rejectUnexpectedType() {
+            assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should NOT be available in Jakarta-only classpath")
+              .hasOnlyElementsOfType(ParseError.class);
+        }
+
+
+        /**
+         * Tests that jakarta-only classpath accepts jakarta imports (positive case).
+         *
+         * <p><strong>Expected Behavior:</strong> This test should pass both before and
+         * after fixing classpath isolation, as it tests the intended functionality.
+         */
+        @Test
+        void parseExpectedType() {
+            assertThat(JAKARTA_CP_PARSER.parse("import jakarta.servlet.ServletContext; class Test {}"))
+              .as("jakarta.servlet should be available in Jakarta classpath")
+              .doesNotHaveAnyElementsOfTypes(ParseError.class);
+        }
+
+        /**
+         * Tests that recipe detection differs based on classpath configuration (isolation failure).
+         *
+         * <p>This test simulates how migration recipes could detect which servlet API version is
+         * available in the target environment. It creates two parsers with different classpath
+         * configurations and checks whether they produce different detection results.
+         *
+         * <p><strong>Current Failure:</strong> Because both parsers can resolve both API
+         * versions due to runtime classpath contamination, they produce identical detection
+         * results. This breaks recipe logic that depends on classpath-based API detection.
+         */
+        @Test
+        void resultShouldDifferByClasspath() {
+            assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should be available in javax classpath")
+              .hasOnlyElementsOfType(ParseError.class);
+
+            assertThat(JAVAX_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should be available in javax classpath")
+              .doesNotHaveAnyElementsOfTypes(ParseError.class);
+        }
     }
 
-
     /**
-     * Tests that jakarta-only classpath accepts jakarta imports (positive case).
-     *
-     * <p><strong>Expected Behavior:</strong> This test should pass both before and
-     * after fixing classpath isolation, as it tests the intended functionality.
+     * you need to alter the build.gradle file to include the dependencies as testRuntimeOnly and comment the recipeDependencies
+     * dependencies {
+     *     testRuntimeOnly("javax.servlet:javax.servlet-api:4.+")
+     *     testRuntimeOnly("jakarta.servlet:jakarta.servlet-api:6.+")
+     * }
      */
-    @Test
-    void parseExpectedType() {
-         assertThat(JAKARTA_CP_PARSER.parse("import jakarta.servlet.ServletContext; class Test {}"))
-          .as("jakarta.servlet should be available in Jakarta classpath")
-          .doesNotHaveAnyElementsOfTypes(ParseError.class);
-    }
+    @Nested
+    @Disabled // due to needed manual changes in build.gradle
+    class Classpath {
 
-    /**
-     * Tests that recipe detection differs based on classpath configuration (isolation failure).
-     *
-     * <p>This test simulates how migration recipes could detect which servlet API version is
-     * available in the target environment. It creates two parsers with different classpath
-     * configurations and checks whether they produce different detection results.
-     *
-     * <p><strong>Current Failure:</strong> Because both parsers can resolve both API
-     * versions due to runtime classpath contamination, they produce identical detection
-     * results. This breaks recipe logic that depends on classpath-based API detection.
-     */
-    @Test
-    void resultShouldDifferByClasspath() {
-        assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
-          .as("javax.servlet should be available in javax classpath")
-          .hasOnlyElementsOfType(ParseError.class);
 
-        assertThat(JAVAX_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
-          .as("javax.servlet should be available in javax classpath")
-          .doesNotHaveAnyElementsOfTypes(ParseError.class);
+        private final JavaParser JAKARTA_CP_PARSER = JavaParser.fromJavaVersion()
+          .classpath("jakarta.servlet-api")
+          .build();
+        private final JavaParser JAVAX_CP_PARSER = JavaParser.fromJavaVersion()
+          .classpath("jakarta.servlet-api")
+          .build();
+
+        /**
+         * Tests that jakarta-only classpath rejects javax imports (isolation failure).
+         *
+         * <p><strong>Current Failure:</strong> The test currently passes (javax imports
+         * work) due to runtime classpath contamination, documenting the broken behavior.
+         * When classpath isolation is fixed, this assertion should be changed to
+         * {@code isFalse()}.
+         */
+        @Test
+        void rejectUnexpectedType() {
+            assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should NOT be available in Jakarta-only classpath")
+              .hasOnlyElementsOfType(ParseError.class);
+        }
+
+
+        /**
+         * Tests that jakarta-only classpath accepts jakarta imports (positive case).
+         *
+         * <p><strong>Expected Behavior:</strong> This test should pass both before and
+         * after fixing classpath isolation, as it tests the intended functionality.
+         */
+        @Test
+        void parseExpectedType() {
+            assertThat(JAKARTA_CP_PARSER.parse("import jakarta.servlet.ServletContext; class Test {}"))
+              .as("jakarta.servlet should be available in Jakarta classpath")
+              .doesNotHaveAnyElementsOfTypes(ParseError.class);
+        }
+
+
+        /**
+         * Tests that recipe detection differs based on classpath configuration (isolation failure).
+         *
+         * <p>This test simulates how migration recipes could detect which servlet API version is
+         * available in the target environment. It creates two parsers with different classpath
+         * configurations and checks whether they produce different detection results.
+         *
+         * <p><strong>Current Failure:</strong> Because both parsers can resolve both API
+         * versions due to runtime classpath contamination, they produce identical detection
+         * results. This breaks recipe logic that depends on classpath-based API detection.
+         */
+        @Test
+        void resultShouldDifferByClasspath() {
+            assertThat(JAKARTA_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should be available in javax classpath")
+              .hasOnlyElementsOfType(ParseError.class);
+
+            assertThat(JAVAX_CP_PARSER.parse("import javax.servlet.ServletContext; class Test {}"))
+              .as("javax.servlet should be available in javax classpath")
+              .doesNotHaveAnyElementsOfTypes(ParseError.class);
+        }
     }
 }

@@ -2,6 +2,7 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
+// comment out to run TestClassPathIsolationTest#Classpath
 recipeDependencies {
     // note both on the classpath to show bug in TestClassPathIsolationTest
     parserClasspath("javax.servlet:javax.servlet-api:4.+")
@@ -9,6 +10,11 @@ recipeDependencies {
 }
 
 dependencies {
+
+//    uncomment to run TestClassPathIsolationTest#Classpath
+//    testRuntimeOnly("javax.servlet:javax.servlet-api:4.+")
+//    testRuntimeOnly("jakarta.servlet:jakarta.servlet-api:6.+")
+
     api(platform("org.junit:junit-bom:5.13.3"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
