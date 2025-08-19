@@ -184,11 +184,11 @@ public final class GradleProjectBuilder {
             try {
                 List<org.openrewrite.maven.tree.Dependency> requested = conf.getAllDependencies().stream()
                         .map(dep -> dependency(dep, conf))
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 List<org.openrewrite.maven.tree.ResolvedDependency> resolved;
                 Map<GroupArtifact, org.openrewrite.maven.tree.Dependency> gaToRequested = requested.stream()
-                        .collect(Collectors.toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
+                        .collect(toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
                 String exceptionType = null;
                 String exceptionMessage = null;
                 // Archives and default are redundant with other configurations
