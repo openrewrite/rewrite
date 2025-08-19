@@ -425,7 +425,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             Map<String, List<J.Annotation>> recordParams = new HashMap<>();
             Space prefix = sourceBefore("(");
             Map<Name, Map<Integer, JCAnnotation>> recordAnnotationPosTable = new HashMap<>();
-            List<JRightPadded<Statement>> varDecs = new ArrayList<>();
+            List<JRightPadded<J.VariableDeclarations>> varDecls = new ArrayList<>();
             for (Tree member : node.getMembers()) {
                 if (member instanceof JCMethodDecl md) {
                     if (hasFlag(md.getModifiers(), Flags.RECORD) && "<init>".equals(md.getName().toString())) {
@@ -436,37 +436,39 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 }
                 if (member instanceof VariableTree vt) {
                     if (hasFlag(vt.getModifiers(), Flags.RECORD)) {
-                        Space varDecsPrefix = whitespace();
+                        Space varDeclPrefix = whitespace();
                         List<J.Annotation> recordAnnotations = collectAnnotations(
                                 mapAnnotations(vt.getModifiers().getAnnotations(), recordAnnotationPosTable.getOrDefault(vt.getName(), new HashMap<>()))
                         );
                         Space typeExpressionPrefix = whitespace();
-                        JRightPadded<Statement> varDec = this.<Statement>convert(vt, __ -> { Space suffix = whitespace(); skip(","); skip(")"); return suffix; })
-                                .map(elem -> {
-                                    if (elem instanceof J.VariableDeclarations vd) {
-                                        return vd.withPrefix(varDecsPrefix).withTypeExpression(vd.getTypeExpression().withPrefix(typeExpressionPrefix));
-                                    }
-                                    return elem;
-                                });
+                        JRightPadded<J.VariableDeclarations> varDecl = this.<J.VariableDeclarations>convert(vt, commaDelim)
+                                .map(elem -> elem.withPrefix(varDeclPrefix)
+                                        .withTypeExpression(elem.getTypeExpression()
+                                                .withPrefix(typeExpressionPrefix)));
                         recordParams.put(vt.getName().toString(), recordAnnotations);
-                        varDecs.add(varDec);
+                        varDecls.add(varDecl);
                     }
                 }
             }
-            if (varDecs.isEmpty()) {
-                varDecs.add(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY));
-            }
 
-            primaryConstructor = JContainer.build(
-                    prefix,
-                    ListUtils.map(varDecs, elem -> {
-                        if (elem.getElement() instanceof J.VariableDeclarations vd) {
-                            return elem.withElement(vd.withLeadingAnnotations(recordParams.get(vd.getVariables().get(0).getSimpleName())));
-                        }
-                        return elem;
-                    }),
-                    Markers.EMPTY
-            );
+            if (varDecls.isEmpty()) {
+                primaryConstructor = JContainer.build(
+                        prefix,
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
+                        Markers.EMPTY
+                );
+            } else {
+                skip(")");
+                //noinspection unchecked
+                primaryConstructor = JContainer.build(
+                        prefix,
+                        varDecls.stream().map(varDecl ->
+                                (JRightPadded<Statement>) (JRightPadded<?>) varDecl.withElement(varDecl.getElement()
+                                        .withLeadingAnnotations(recordParams.get(varDecl.getElement().getVariables().get(0).getSimpleName())))
+                        ).collect(toList()),
+                        Markers.EMPTY
+                );
+            }
         }
 
         JLeftPadded<TypeTree> extendings = node.getExtendsClause() == null ? null :
@@ -1792,7 +1794,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-    @Contract("null -> null")
+    @Contract("null -> null; !null -> !null")
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
@@ -2183,8 +2185,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
-    private final Function<Tree, Space> semiDelim = ignored -> sourceBefore(";");
-    private final Function<Tree, Space> commaDelim = ignored -> sourceBefore(",");
+    private final Function<Tree, Space> semiDelim = ignored -> {
+        Space prefix = whitespace();
+        skip(";");
+        return prefix;
+    };
+    private final Function<Tree, Space> commaDelim = ignored -> {
+        Space prefix = whitespace();
+        skip(",");
+        return prefix;
+    };
     private final Function<Tree, Space> noDelim = ignored -> EMPTY;
 
     private Space whitespace() {
