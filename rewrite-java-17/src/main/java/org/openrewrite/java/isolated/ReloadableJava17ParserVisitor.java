@@ -64,6 +64,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -887,9 +888,23 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Object value = node.getValue();
 
         if (endPos == Position.NOPOS) {
-            String str = value + "";
-            int delimLength = source.substring(cursor).indexOf(str);
-            endPos = cursor + delimLength + str.length() + delimLength;
+            if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
+                if (source.substring(cursor).startsWith("\"\"\"")) {
+                    cursor += 3;
+                    endPos = cursor + source.substring(cursor).indexOf("\"\"\"") + 3; // +3 for the closing delimiter
+                } else {
+                    endPos = cursor + value.toString().length() + 2; // +2 for the quotes
+                }
+            } else {
+                endPos = cursor + indexOf(source.substring(cursor),
+                        ch ->
+                                ch.equals(',') || ch.equals(';') || ch.equals(')') || ch.equals(']') || ch.equals('}') ||
+                                ch.equals('+') || ch.equals('-') || ch.equals('*') || ch.equals('/') || ch.equals('%') ||
+                                ch.equals('=') || ch.equals('!') || ch.equals('<') || ch.equals('>') || ch.equals('&') ||
+                                ch.equals('|') || ch.equals('^') || ch.equals('?') || ch.equals(':') || ch.equals('.') ||
+                                Character.isWhitespace(ch)
+                );
+            }
         }
 
         cursor(endPos);

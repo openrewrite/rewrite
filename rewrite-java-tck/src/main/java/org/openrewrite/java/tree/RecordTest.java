@@ -76,6 +76,38 @@ class RecordTest implements RewriteTest {
         );
     }
 
+    @Test
+    void differentLiteralTypesAnnotation() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({PARAMETER, FIELD})
+              public @interface A {
+                  String value() default "";
+                  Long a() default 0L;
+                  int b() default 0;
+              }
+              """
+          ),
+          java(
+            """
+              record JavaRecord(@jdk.jfr.Name("A") @A(value = ""\"
+                  one value "with a quote" and
+                  another value
+                  ""\", a=2L, b=123) String name) {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2455")
     @Test
     void compactConstructor() {
