@@ -29,7 +29,7 @@ dependencies {
     // rewrite-gradle-tooling-model BEFORE rewrite but also need to depend on
     // changes to the ABI of rewrite-maven.
     compileOnly(project(":rewrite-core"))
-    compileOnly(project(":rewrite-maven:"))
+    compileOnly(project(":rewrite-maven"))
 
     // These are for org.openrewrite.gradle.toolingapi.Assertions
     compileOnly(project(":rewrite-test"))
