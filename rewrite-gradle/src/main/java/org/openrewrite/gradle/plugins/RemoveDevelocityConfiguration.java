@@ -15,17 +15,11 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.gradle.RemoveExtension;
 
-import static org.openrewrite.Preconditions.or;
+import java.util.Arrays;
+import java.util.List;
 
 public class RemoveDevelocityConfiguration extends Recipe {
     @Override
@@ -39,19 +33,9 @@ public class RemoveDevelocityConfiguration extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(
-                or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        if ("develocity".equals(method.getSimpleName()) ||
-                            "gradleEnterprise".equals(method.getSimpleName())) {
-                            return null;
-                        }
-                        return super.visitMethodInvocation(method, ctx);
-                    }
-                }
-        );
+    public List<Recipe> getRecipeList() {
+        return Arrays.asList(
+                new RemoveExtension("develocity"),
+                new RemoveExtension("gradleEnterprise"));
     }
 }

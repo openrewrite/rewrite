@@ -120,6 +120,22 @@ class LatestReleaseTest {
     }
 
     @Test
+    void latestReleaseOrLatestIntegrationKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "latest.release", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "latest.release")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.release", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "latest.release", "latest.release")).isZero();
+
+        assertThat(latestRelease.compare(null, "latest.integration", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "latest.integration")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.integration", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "latest.integration", "latest.integration")).isZero();
+
+        assertThat(latestRelease.compare(null, "lATesT.reLeaSE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "lATesT.inTegRATion", "1.2.3")).isPositive();
+    }
+
+    @Test
     void compareQualifiers() {
         assertThat(latestRelease.compare(null, "1.2.3.final", "1.2.3")).isEqualTo(0);
         assertThat(latestRelease.compare(null, "1.2.3.ga", "1.2.3")).isEqualTo(0);
@@ -139,6 +155,12 @@ class LatestReleaseTest {
     void latestKeywordIsNewerThanReleaseKeyword() {
         assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
         assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
+    }
+
+    @Test
+    void latestIntegrationKeywordIsNewerThanLatestReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "latest.release", "latest.integration")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.integration", "latest.release")).isPositive();
     }
 
     @Test

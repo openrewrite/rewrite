@@ -72,8 +72,8 @@ class FindMethodsTest implements RewriteTest {
           .validate().isValid()).isFalse();
     }
 
-    @ParameterizedTest
     @MethodSource("missingTypes")
+    @ParameterizedTest
     void anyTypeMatchesOnNullDeclaringType(JavaType.FullyQualified declaringType) {
         rewriteRun(
           spec -> spec
@@ -310,7 +310,7 @@ class FindMethodsTest implements RewriteTest {
             """
               public @interface Example {
                   String name() default "";
-              
+
                   String description() default "";
               }
               """

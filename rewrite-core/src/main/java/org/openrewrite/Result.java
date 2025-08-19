@@ -30,10 +30,11 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 public class Result {
@@ -120,7 +121,7 @@ public class Result {
         return "The following diff highlights the places where unexpected changes were made:\n" +
                Arrays.stream(requireNonNull(diff).split("\n"))
                        .map(l -> "  " + l)
-                       .collect(Collectors.joining("\n"));
+                       .collect(joining("\n"));
     }
 
     private static boolean subtreeChanged(Tree root, Map<UUID, Tree> beforeTrees) {
@@ -251,7 +252,7 @@ public class Result {
                 null,
                 before,
                 after,
-                Collections.emptySet(),
+                emptySet(),
                 FileMode.REGULAR_FILE,
                 FileMode.REGULAR_FILE
         )) {

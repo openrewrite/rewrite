@@ -38,7 +38,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -46,7 +46,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 11
               targetCompatibility = 1.8
               """
@@ -54,7 +54,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
       '1.8','1.8','11','11'
@@ -63,6 +62,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       1.8,"1.8",11,"11"
       JavaVersion.VERSION_1_8,"1.8",JavaVersion.VERSION_11,"11",
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
@@ -71,7 +71,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(beforeSourceCompatibility, beforeTargetCompatibility),
@@ -79,7 +79,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(afterSourceCompatibility, afterTargetCompatibility)
@@ -96,7 +96,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -104,7 +104,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 11
               """
@@ -112,7 +112,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       Enum,1.8,JavaVersion.VERSION_1_8
       Enum,'1.8',JavaVersion.VERSION_1_8
@@ -126,6 +125,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       String,JavaVersion.VERSION_1_8,'1.8'
       String,JavaVersion.toVersion("1.8"),'1.8'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
@@ -134,7 +134,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(beforeCompatibility, beforeCompatibility),
@@ -142,7 +142,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(afterCompatibility, afterCompatibility)
@@ -159,7 +159,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 1.8
                   targetCompatibility = 1.8
@@ -169,7 +169,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 11
                   targetCompatibility = 11
@@ -179,8 +179,12 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @Test
-    void handlesJavaToolchains() {
+    @CsvSource(textBlock = """
+      1.8,11
+      '1.8','11'
+      """, quoteCharacter = '`')
+    @ParameterizedTest
+    void handlesJavaToolchains(String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
           buildGradle(
@@ -188,35 +192,35 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   toolchain {
-                      languageVersion = JavaLanguageVersion.of(8)
+                      languageVersion = JavaLanguageVersion.of(%s)
                   }
               }
-              """,
+              """.formatted(beforeCompatibility),
             """
               plugins {
                   id "java"
               }
-              
+
               java {
                   toolchain {
-                      languageVersion = JavaLanguageVersion.of(11)
+                      languageVersion = JavaLanguageVersion.of(%s)
                   }
               }
-              """
+              """.formatted(afterCompatibility)
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/3255")
-    @ParameterizedTest
     @CsvSource(textBlock = """
       11,"1.8","11"
       11,1.8,11
       11,8,11
       """)
+    @Issue("https://github.com/openrewrite/rewrite/issues/3255")
+    @ParameterizedTest
     void handlesJavaVersionMethodInvocation(int version, String before, String after) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null, null, null)),
@@ -237,7 +241,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       source,Enum,JavaVersion.VERSION_11,1.8
       source,Number,11,1.8
@@ -246,6 +249,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       target,Number,1.8,11
       target,String,1.8,'11'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, null)),
@@ -254,7 +258,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = 1.8
               targetCompatibility = 1.8
               """,
@@ -262,7 +266,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               sourceCompatibility = %s
               targetCompatibility = %s
               """.formatted(expectedSourceCompatibility, expectedTargetCompatibility)
@@ -305,7 +309,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 21
                   targetCompatibility = 21
@@ -327,7 +331,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 21
                   targetCompatibility = 21
@@ -341,7 +345,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               java {
                   sourceCompatibility = 17
                   targetCompatibility = 17
@@ -354,7 +358,6 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(textBlock = """
       8,Enum,JavaVersion.VERSION_1_8,JavaVersion.VERSION_1_8
       8,Number,1.8,1.8
@@ -363,6 +366,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       11,Number,11,11
       11,String,'11','11'
       """, quoteCharacter = '`')
+    @ParameterizedTest
     void addSourceAndTargetCompatibilityIfMissing(String version, String declarationStyle, String sourceCompatibility, String targetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(Integer.valueOf(version), null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle), null, true)),
@@ -371,7 +375,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
@@ -379,7 +383,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               }
               sourceCompatibility = %s
               targetCompatibility = %s
-              
+
               """.formatted(sourceCompatibility, targetCompatibility)
           )
         );
@@ -394,14 +398,14 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
                   id "java"
               }
               sourceCompatibility = 11
-              
+
               """
           )
         );
@@ -416,21 +420,21 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               """,
             """
               plugins {
                   id "java"
               }
               targetCompatibility = 11
-              
+
               """
           )
         );
     }
 
-    @Test
     @Issue("https://docs.gradle.org/current/userguide/building_java_projects.html#sec:compiling_with_release")
+    @Test
     void releaseValueGetsUpdated() {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
@@ -439,38 +443,38 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   id "java"
               }
-              
+
               tasks.withType(JavaCompile) {
                   options.release = 8
               }
-              
+
               tasks.withType(JavaCompile).configureEach {
                   options.release = 8
               }
-              
+
               compileJava {
                   options.release = 8
               }
-              
+
               compileJava.options.release = 8
               """,
             """
               plugins {
                   id "java"
               }
-              
+
               tasks.withType(JavaCompile) {
                   options.release = 11
               }
-              
+
               tasks.withType(JavaCompile).configureEach {
                   options.release = 11
               }
-              
+
               compileJava {
                   options.release = 11
               }
-              
+
               compileJava.options.release = 11
               """
           )
@@ -486,7 +490,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               sourceCompatibility = JavaVersion.VERSION_1_8
               targetCompatibility = JavaVersion.VERSION_1_8
               """,
@@ -494,7 +498,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               sourceCompatibility = JavaVersion.VERSION_11
               targetCompatibility = JavaVersion.VERSION_1_8
               """
@@ -516,7 +520,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   sourceCompatibility = JavaVersion.VERSION_11
                   targetCompatibility = JavaVersion.VERSION_11
@@ -535,7 +539,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(8))
@@ -546,11 +550,54 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               plugins {
                   java
               }
-              
+
               java {
                   toolchain {
                       languageVersion.set(JavaLanguageVersion.of(11))
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handlesKotlinJvmToolchainInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(8))
+                  }
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain {
+                      languageVersion.set(JavaLanguageVersion.of(11))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void handlesKotlinJvmToolchainShorthandInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null, null, null)),
+          buildGradleKts(
+            """
+              kotlin {
+                  jvmToolchain(8)
+              }
+              """,
+            """
+              kotlin {
+                  jvmToolchain(11)
               }
               """
           )

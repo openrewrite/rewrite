@@ -35,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -55,7 +54,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(toRecipe()
-              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
+              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Path.of("test.txt")).text("test").build()))
               .withName("test.GeneratingRecipe")
               .withMaxCycles(1)
             )
@@ -123,8 +122,8 @@ class RecipeLifecycleTest implements RewriteTest {
           ));
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class ErrorDuringScanningPhase extends ScanningRecipe<Integer> {
 
         @Override
@@ -157,8 +156,8 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class DeleteFirst extends Recipe {
 
         @Override
@@ -301,7 +300,6 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
-    @DocumentExample
     @Test
     void accurateReportingOfRecipesMakingChanges() {
         rewriteRun(
@@ -324,7 +322,7 @@ class RecipeLifecycleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/389")
     @Test
     void sourceFilesAcceptOnlyApplicableVisitors() {
-        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build());
+        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Path.of("test.txt")).text("test").build());
         var fooVisitor = new FooVisitor<ExecutionContext>();
         var textVisitor = new PlainTextVisitor<ExecutionContext>();
         var ctx = new InMemoryExecutionContext();
@@ -517,8 +515,8 @@ class DefaultConstructorRecipe extends Recipe {
     }
 }
 
-@SuppressWarnings("unused") // referenced in yaml
-@NoArgsConstructor
+@NoArgsConstructor // referenced in yaml
+@SuppressWarnings("unused")
 class NoArgRecipe extends Recipe {
     @Override
     public String getDisplayName() {

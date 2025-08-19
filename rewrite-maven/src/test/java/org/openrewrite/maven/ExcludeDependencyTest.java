@@ -42,7 +42,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -67,7 +67,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -105,7 +105,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.4.0</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <dependencies>

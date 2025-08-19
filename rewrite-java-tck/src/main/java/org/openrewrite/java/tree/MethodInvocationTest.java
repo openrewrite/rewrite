@@ -17,7 +17,10 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Optional;
@@ -35,7 +38,7 @@ class MethodInvocationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("foo")) {
+                  if ("foo".equals(method.getSimpleName())) {
                       assertThat("foo").isEqualTo(method.getSimpleName());
                       assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(method.getType())
                         .getFullyQualifiedName());
@@ -55,7 +58,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               public class A {
                   Integer m = foo ( 0, 1, 2 );
-              
+
                   public Integer foo(Integer n, Integer... ns) { return n; }
               }
               """
@@ -70,7 +73,7 @@ class MethodInvocationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("generic")) {
+                  if ("generic".equals(method.getSimpleName())) {
                       var methType = method.getMethodType();
                       assertThat(TypeUtils.asFullyQualified(methType.getReturnType()).getFullyQualifiedName())
                         .isEqualTo("java.lang.Integer");
@@ -87,7 +90,7 @@ class MethodInvocationTest implements RewriteTest {
               public class A {
                   Integer o = generic ( 0, 1, 2 );
                   Integer p = this . < Integer > generic ( 0, 1, 2 );
-                            
+
                   public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
               }
               """,
@@ -120,7 +123,7 @@ class MethodInvocationTest implements RewriteTest {
               import java.util.Collections;
               import java.util.HashSet;
               import java.util.Set;
-              
+
               class A {
                   void m() {
                       Set<Class<?>> primitiveTypes = new HashSet<>(32);
@@ -129,6 +132,30 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5400") // Fails on Java 8, but passes on Java 11 and later
+    @MinimumJava11
+    @Test
+    void methodParameterNamesPresent() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("assertj-core")),
+          java(
+            """
+              import static org.assertj.core.api.Assertions.assertThat;
+              class Regular {
+                  void method(String exp, String act) {
+                      assertThat(act).isEqualTo(exp);
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
+                assertThat(mi.getMethodType().getParameterNames()).containsExactly("expected");
+            })
           )
         );
     }

@@ -117,8 +117,8 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3964")
+    @Test
     void partialMatchWithMultipleRegexReplacements() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null, null)),
@@ -139,8 +139,8 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3964")
+    @Test
     void partialMatchNotReplacedWithoutRegexTrue() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null, null)),
@@ -155,8 +155,8 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4593")
+    @Test
     void supportYamlListValues() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("**.script", "replaced", "replaceme", null, null, null)),
@@ -203,8 +203,8 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4593")
+    @Test
     void supportYamlListValuesWithRegex() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("**.script", "$1replaced$2", "(.*)replaceme(.*)", true, null, null)),

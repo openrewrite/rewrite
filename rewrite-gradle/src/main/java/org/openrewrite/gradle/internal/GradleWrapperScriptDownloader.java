@@ -40,9 +40,9 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 import java.util.zip.Adler32;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 
@@ -52,7 +52,7 @@ public class GradleWrapperScriptDownloader {
     public static void main(String[] args) throws IOException, InterruptedException {
         Lock lock = new ReentrantLock();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(null, ctx);
+        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(ctx);
         Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
                 new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
 
@@ -96,7 +96,7 @@ public class GradleWrapperScriptDownloader {
                 lock.unlock();
             }
             return null;
-        }).collect(Collectors.toList()));
+        }).collect(toList()));
 
         while (pool.getActiveThreadCount() > 0) {
             //noinspection BusyWait

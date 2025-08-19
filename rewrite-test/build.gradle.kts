@@ -25,4 +25,5 @@ dependencies {
     testImplementation(project(":rewrite-java"))
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+    testRuntimeOnly(project(":rewrite-java-21"))
 }

@@ -45,9 +45,10 @@ import org.openrewrite.maven.tree.Plugin.Execution;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -366,7 +367,7 @@ public class ResolvedPom {
         }
 
         ResolvedManagedDependency searchKey = createSearchKey(groupId, artifactId, type, classifier);
-        int index = Collections.binarySearch(dependencyManagement, searchKey, MANAGED_DEPENDENCY_COMPARATOR);
+        int index = binarySearch(dependencyManagement, searchKey, MANAGED_DEPENDENCY_COMPARATOR);
         return index >= 0 ? dependencyManagement.get(index) : null;
     }
 
@@ -465,7 +466,7 @@ public class ResolvedPom {
                 return;
             }
             Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap = dependencyManagement.stream()
-                    .collect(Collectors.toMap(
+                    .collect(toMap(
                             this::createDependencyManagementKey,
                             d -> d,
                             (x, y) -> y, // Keep first (child wins)
@@ -475,7 +476,7 @@ public class ResolvedPom {
             if (!managedDependencyMap.isEmpty()) {
                 dependencyManagement = managedDependencyMap.values().stream()
                         .sorted(MANAGED_DEPENDENCY_COMPARATOR)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
         }
 
@@ -696,7 +697,7 @@ public class ResolvedPom {
                 return currentExecutions;
             }
             Map<String, Plugin.Execution> currentExecutionsById = currentExecutions.stream()
-                    .collect(Collectors.toMap(Execution::getId, Function.identity()));
+                    .collect(toMap(Execution::getId, Function.identity()));
             List<Plugin.Execution> mergedExecutions = new ArrayList<>(currentExecutions);
 
             for (Plugin.Execution incomingExecution : incomingExecutions) {
@@ -973,17 +974,20 @@ public class ResolvedPom {
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
-        List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
+        Map<GroupArtifact, DependencyAndDependent> rootDependencies = new HashMap<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
+                // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
+                //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
+                rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
             }
         }
 
         MavenDownloadingExceptions exceptions = null;
         int depth = 0;
+        Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
 

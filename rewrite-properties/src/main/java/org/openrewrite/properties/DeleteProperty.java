@@ -22,11 +22,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
@@ -36,12 +38,13 @@ public class DeleteProperty extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Delete Property";
+        return "Delete property by key";
     }
 
     @Override
     public String getDescription() {
-        return "Deletes key/value pairs from properties files.";
+        return "Deletes key/value pairs from properties files, as well as any comments that immediately precede the key/value pair. " +
+                "Comments separated by two or more newlines from the deleted key/value pair are preserved." ;
     }
 
     @Option(displayName = "Property key matcher",
@@ -61,35 +64,60 @@ public class DeleteProperty extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                Properties.File f = (Properties.File) super.visitFile(file, ctx);
-
-                String prefix = null;
-                List<Properties.Content> contents = f.getContent();
-                List<Properties.Content> newContents = new ArrayList<>();
-                for (int i = 0; i < contents.size(); i++) {
-                    Properties.Content content = contents.get(i);
-                    if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
-                        if (i == 0) {
-                            prefix = ((Properties.Entry) content).getPrefix();
-                        }
-                    } else {
-                        if (prefix != null) {
-                            content = (Properties.Content) content.withPrefix(prefix);
-                            prefix = null;
-                        }
-                        newContents.add(content);
+                Properties.File f1 = (Properties.File) super.visitFile(file, ctx);
+                AtomicReference<@Nullable String> prefixOnNextEntry = new AtomicReference<>(null);
+                AtomicBoolean deleted = new AtomicBoolean(false);
+                Properties.File mapped = f1.withContent(ListUtils.map(f1.getContent(), (index, current) -> {
+                    if (current instanceof Properties.Comment && nextEntryMatches(f1.getContent(), index)) {
+                        prefixOnNextEntry.compareAndSet(null, current.getPrefix());
+                        return null;
                     }
+                    if (isMatch(current)) {
+                        deleted.set(true);
+                        return null;
+                    }
+                    if (deleted.getAndSet(false)) {
+                        String prefix = prefixOnNextEntry.getAndSet(null);
+                        if (prefix != null) {
+                            return (Properties.Content) current.withPrefix(prefix);
+                        }
+                    }
+                    return current;
+                }));
+                if (f1 != mapped) {
+                    return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
                 }
-
-                return contents.size() == newContents.size() ? f : f.withContent(newContents);
+                return mapped;
             }
 
-            private boolean isMatch(String key) {
-                if (!Boolean.FALSE.equals(relaxedBinding)) {
+            private boolean isMatch(Properties.Content current) {
+                if (current instanceof Properties.Entry) {
+                    String key = ((Properties.Entry) current).getKey();
+                    if (Boolean.FALSE.equals(relaxedBinding)) {
+                        return StringUtils.matchesGlob(key, propertyKey);
+                    }
                     return StringUtils.matchesGlob(LOWER_CAMEL.format(key), LOWER_CAMEL.format(propertyKey));
-                } else {
-                    return StringUtils.matchesGlob(key, propertyKey);
                 }
+                return false;
+            }
+
+            /**
+             * @return true if the next entry not separated by two or more newlines matches the property key.
+             */
+            private boolean nextEntryMatches(List<Properties.Content> contents, int index) {
+                while (++index < contents.size()) {
+                    Properties.Content next = contents.get(index);
+                    if (next.getPrefix().matches("\\R{2,}")) {
+                        return false; // Two or more newlines, stop checking.
+                    }
+                    if (isMatch(next)) {
+                        return true;
+                    }
+                    if (next instanceof Properties.Entry) {
+                        return false; // Unrelated entry, stop checking.
+                    }
+                }
+                return false;
             }
         };
     }

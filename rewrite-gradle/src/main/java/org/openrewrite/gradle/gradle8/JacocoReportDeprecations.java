@@ -53,7 +53,7 @@ public class JacocoReportDeprecations extends Recipe {
                 if (index == null) {
                     index = 0;
                 } else {
-                    index = index + 1;
+                    index++;
                 }
                 if (assignment.getVariable() instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
@@ -72,7 +72,7 @@ public class JacocoReportDeprecations extends Recipe {
                 if (parent == null) {
                     parent = 0;
                 } else {
-                    parent = parent + 1;
+                    parent++;
                 }
                 if (isPartOfDeprecatedPath(method.getSimpleName(), parent)) {
                     getCursor().putMessage(JACOCO_SETTINGS_INDEX, parent);

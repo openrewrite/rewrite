@@ -37,8 +37,8 @@ class SimplifySingleElementAnnotationTest implements RewriteTest {
     /**
      * Here is an example of a single-element annotation.
      */
-    @Test
     @DocumentExample
+    @Test
     void simpleExample() {
         rewriteRun(
           spec -> spec
@@ -141,7 +141,7 @@ class SimplifySingleElementAnnotationTest implements RewriteTest {
                 """
                   public @interface Quality {
                       Level value();
-                  
+
                       enum Level {
                           POOR, AVERAGE, GOOD, EXCELLENT
                       }
