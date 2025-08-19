@@ -65,9 +65,7 @@ dependencies {
         exclude("org.slf4j", "slf4j-nop")
     }
     testImplementation(project(":rewrite-toml"))
-
-    testImplementation("org.openrewrite.gradle.tooling:model:$latest")
-
+    testImplementation(project(":rewrite-gradle-tooling-model:model"))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
