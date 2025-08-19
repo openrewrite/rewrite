@@ -23,7 +23,9 @@ import org.gradle.tooling.provider.model.ToolingModelBuilder;
 import org.gradle.tooling.provider.model.ToolingModelBuilderRegistry;
 import org.gradle.util.GradleVersion;
 import org.openrewrite.RecipeSerializer;
-import org.openrewrite.gradle.marker.*;
+import org.openrewrite.gradle.marker.GradleProjectBuilder;
+import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.marker.GradleSettingsBuilder;
 
 import javax.inject.Inject;
 import java.io.File;

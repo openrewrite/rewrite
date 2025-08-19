@@ -37,11 +37,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.stream.Collectors.toList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.*;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.marker.GradleSettingsBuilder.GRADLE_PLUGIN_PORTAL;
@@ -208,7 +205,7 @@ public final class GradleProjectBuilder {
                         }
                     }
                     Map<GroupArtifact, ResolvedDependency> gaToResolved = resolvedConf.getFirstLevelModuleDependencies().stream()
-                            .collect(Collectors.toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
+                            .collect(toMap(GradleProjectBuilder::groupArtifact, dep -> dep, (a, b) -> a));
                     resolved = resolved(gaToRequested, gaToResolved);
                 } else {
                     resolved = emptyList();
@@ -232,7 +229,7 @@ public final class GradleProjectBuilder {
             if (dc != null) {
                 List<GradleDependencyConfiguration> extendsFrom = conf.getExtendsFrom().stream()
                         .map(it -> results.get(it.getName()))
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 dc.unsafeSetExtendsFrom(extendsFrom);
             }
         }
@@ -377,7 +374,7 @@ public final class GradleProjectBuilder {
                     }
                     return resolvedDependency;
                 })
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     /**

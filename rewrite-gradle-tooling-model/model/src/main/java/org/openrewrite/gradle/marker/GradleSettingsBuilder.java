@@ -28,6 +28,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.marker.GradleProjectBuilder.mapRepositories;
 
@@ -65,7 +66,7 @@ public final class GradleSettingsBuilder {
 
     private static Map<String, FeaturePreview> featurePreviews(DefaultSettings settings) {
         if (GradleVersion.current().compareTo(GradleVersion.version("4.6")) < 0) {
-            return Collections.emptyMap();
+            return emptyMap();
         }
 
         Map<String, FeaturePreview> featurePreviews = new HashMap<>();

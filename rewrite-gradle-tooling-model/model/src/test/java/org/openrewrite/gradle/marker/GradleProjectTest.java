@@ -269,9 +269,9 @@ class GradleProjectTest {
               .as("rewrite-bom should be marked as a platform() dependency")
               .anyMatch(it -> it.findAttribute(Category.class)
                                 .filter(Category.REGULAR_PLATFORM::equals)
-                                .isPresent()
-                              && "rewrite-bom".equals(it.getArtifactId())
-                              && "pom".equals(it.getType()));
+                                .isPresent() &&
+                              "rewrite-bom".equals(it.getArtifactId()) &&
+                              "pom".equals(it.getType()));
             assertThat(runtimeClasspath.getDirectResolved())
               .filteredOn(it -> "rewrite-bom".equals(it.getArtifactId()))
               .singleElement()
