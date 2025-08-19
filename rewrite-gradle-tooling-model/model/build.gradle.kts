@@ -86,5 +86,8 @@ tasks.named("check").configure {
 }
 
 tasks.withType<Test>().configureEach {
-    dependsOn(tasks.named("publishToMavenLocal"), project.rootProject.childProjects["model"]!!.tasks.named("publishToMavenLocal"))
+    dependsOn(
+        tasks.named("publishToMavenLocal"),
+        project.rootProject.childProjects["rewrite-gradle-tooling-model"]!!.childProjects["model"]!!.tasks.named("publishToMavenLocal")
+    )
 }
