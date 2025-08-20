@@ -300,6 +300,10 @@ public interface RewriteTest extends SourceSpecs {
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
+                // Call user hook to inspect source file before validation and recipe execution
+                //noinspection unchecked
+                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
+
                 // Validate before source
                 TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
                 nextSpec.validateSource.accept(sourceFile, beforeValidations);
@@ -319,21 +323,21 @@ public interface RewriteTest extends SourceSpecs {
                                 "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                 "code that generated this error."
                         );
-                        try {
-                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
-                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
-                            if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
-                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
-                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                        if (!beforeValidations.allowNonWhitespaceInWhitespace()) {
+                            try {
+                                WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                                SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                                if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                    fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                         "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                                }
+                            } catch (UnsupportedOperationException e) {
+                                // Language/parser does not provide whitespace validation and that's OK for now
                             }
-                        } catch (UnsupportedOperationException e) {
-                            // Language/parser does not provide whitespace validation and that's OK for now
                         }
                     }
                 }
 
-                //noinspection unchecked
-                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
                 specBySourceFile.put(mapped, nextSpec);
             }
         }
@@ -596,8 +600,7 @@ public interface RewriteTest extends SourceSpecs {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
-                        assert result.getAfter() != null;
-                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getBefore().getSourcePath().toString();
                         String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
                         return "    " + beforePath + " | " + afterPath + " | " + status;

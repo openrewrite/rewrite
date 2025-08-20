@@ -113,18 +113,13 @@ public class RecipeIntrospectionUtils {
 
     private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
         Constructor<?> constructor = getConstructor(clazz, args);
-        Object @Nullable[] constructorArgs = new Object[constructor.getParameterCount()];
+        Object [] constructorArgs = new Object[constructor.getParameterCount()];
         for (int i = 0; i < constructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
                 constructorArgs[i] = convert(args.get(param.getName()), param.getType());
             } else if (param.getType().isPrimitive()) {
                 constructorArgs[i] = getPrimitiveDefault(param.getType());
-            } else if (param.getType().equals(String.class) && isKotlin(clazz)) {
-                // Default Recipe::validate is more valuable if we pass null for unconfigured Strings.
-                // But, that's not safe for Kotlin non-null types, so use an empty String for those
-                // (though it will sneak through default recipe validation)
-                constructorArgs[i] = "";
             } else if (Enum.class.isAssignableFrom(param.getType()) && args == null) {
                 try {
                     Object[] values = (Object[]) param.getType().getMethod("values").invoke(null);
@@ -149,6 +144,9 @@ public class RecipeIntrospectionUtils {
     }
 
     private static Constructor<?> getConstructor(Class<?> clazz, @Nullable Map<String, Object> args) {
+        if (isKotlin(clazz)) {
+            throw new RecipeIntrospectionException("Kotlin recipes must be instantiated using Jackson");
+        }
         if (args == null || args.isEmpty()) {
             Constructor<?> constructor = getZeroArgsConstructor(clazz);
             if (constructor != null) {
@@ -233,7 +231,7 @@ public class RecipeIntrospectionUtils {
     }
 
     private static boolean isKotlin(Class<?> clazz) {
-        for (Annotation a : clazz.getAnnotations()) {
+        for (Annotation a : clazz.getDeclaredAnnotations()) {
             if ("kotlin.Metadata".equals(a.annotationType().getName())) {
                 return true;
             }

@@ -59,10 +59,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Preconditions.not;
 import static org.openrewrite.gradle.UpgradeDependencyVersion.getGradleProjectKey;
-import static org.openrewrite.gradle.UpgradeDependencyVersion.replaceVersion;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
@@ -241,7 +239,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                             }
                         }
                         for (ResolvedDependency resolved : configuration.getResolved()) {
-                            if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
+                            if (resolved.isTransitive() && dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId(), resolved.getVersion())) {
                                 try {
                                     String selected = versionSelector.select(resolved.getGav(), configuration.getName(), version, versionPattern, ctx);
                                     if (selected == null || resolved.getVersion().equals(selected)) {
@@ -265,8 +263,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                                     }
 
                                                     for (GradleDependencyConfiguration config : all.keySet()) {
-                                                        if (c.allExtendsFrom().contains(config)) {
-                                                            return true;
+                                                        for (GradleDependencyConfiguration gc : c.allExtendsFrom()) {
+                                                            if (gc.getName().equals(config.getName())) {
+                                                                return true;
+                                                            }
                                                         }
 
                                                         // TODO there has to be a better way!
@@ -469,32 +469,23 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return t;
             }
 
-            private GradleProject updatedModel(GradleProject gradleProject, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
-                GradleProject gp = gradleProject;
-                Set<String> configNames = gp.getConfigurations().stream()
-                        .map(GradleDependencyConfiguration::getName)
-                        .collect(toSet());
-                Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
+            private GradleProject updatedModel(GradleProject gp, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+                Map<String, Set<GroupArtifactVersion>> configsToUpdate = new HashMap<>();
                 for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
-                    if (!dependencyMatcher.matches(update.getKey().getGroupId(), update.getKey().getArtifactId())) {
-                        continue;
-                    }
                     Map<GradleDependencyConfiguration, String> configs = update.getValue();
                     String groupId = update.getKey().getGroupId();
                     String artifactId = update.getKey().getArtifactId();
                     for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
+                        String configName = configToVersion.getKey().getName();
                         String newVersion = configToVersion.getValue();
-                        gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                        configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
+                                .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
                     }
                 }
-                for (GroupArtifactVersion gav : gavs) {
-                    gp = replaceVersion(gp, ctx, gav, configNames);
-                }
-                return gp;
+                return gp.addOrUpdateConstraints(configsToUpdate, ctx);
             }
         };
     }
-
 
     @RequiredArgsConstructor
     private class UpdateGradle extends JavaVisitor<ExecutionContext> {

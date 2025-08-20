@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
@@ -90,10 +91,10 @@ class DependencyInsightTest implements RewriteTest {
 
         private SourceSpecs expectationHelper(String configuration, String template, String matchComment, boolean matched) {
             @Language("groovy")
-            final String before = String.format(template, configuration);
+            final String before = template.formatted(configuration);
             if (matched) {
                 @Language("groovy")
-                final String after = String.format(template, matchComment + configuration);
+                final String after = template.formatted(matchComment + configuration);
                 return buildGradle(before, after);
             }
             return buildGradle(before);
@@ -321,6 +322,119 @@ class DependencyInsightTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class VersionParameter {
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "1.0.1", // exact
+          "1.0.1-1.0.5", // hyphenated
+          "[1.0.1,1.0.5)", "[1.0.1,1.0.5]", "[1.0.1,1.0.5]", "(1.0.0,1.0.5]", // full range
+          "~1.0.1"// tilde range
+        })
+        void singleMatch(String versionPattern) {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", versionPattern, null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * `1.0.X` is expected to match both dependencies.
+         */
+        @Test
+        void multiMatch() {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("jakarta.data", "*", "1.0.X", null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      /*~~(jakarta.data:jakarta.data-api:1.0.1)~~>*/implementation 'jakarta.data:jakarta.data-api:1.0.1'
+                      /*~~(jakarta.data:jakarta.data-spec:1.0.0)~~>*/implementation 'jakarta.data:jakarta.data-spec:1.0.0'
+                  }
+                  """
+              )
+            );
+        }
+
+        /**
+         * Gradle supports defining constraints on the framework side.
+         * f.i. `org.springframework:spring-aop:6.2.2` enforces version 6.2.2 on every other dependency causing `org.springframework:spring-core:6.1.5` to be `org.springframework:spring-core:6.2.2` in fact.
+         */
+        @ParameterizedTest
+        @ValueSource(strings = {
+          "6.1.1-6.1.15", // hyphenated
+          "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
+          "6.1.X", // X range
+          "~6.1.0", "~6.1", // tilde range
+        })
+        void withConstraintsEnforced(String versionPattern) {
+            rewriteRun(
+              recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", versionPattern, null)),
+              //language=groovy
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      implementation 'org.springframework:spring-core:6.1.5'
+                      implementation 'org.springframework:spring-aop:6.2.2'
+                  }
+                  """
+              )
+            );
+        }
     }
 
     @Test

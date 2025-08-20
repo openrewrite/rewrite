@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,19 +36,13 @@ public class RpcReceiveQueueTest {
         batches = new ArrayDeque<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
         sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, false);
-        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst, refId ->
-            // Find the object with this ref ID in the send queue's local refs
-            localRefs.entrySet().stream()
-                    .filter(entry -> entry.getValue().equals(refId))
-                    .map(Map.Entry::getKey)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Reference " + refId + " not found in test")));
+        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst);
     }
 
     @Test
     void add() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
 
@@ -66,7 +59,7 @@ public class RpcReceiveQueueTest {
     @SuppressWarnings("UnnecessaryLocalVariable")
     void noChange() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText noChange = before;
@@ -82,7 +75,7 @@ public class RpcReceiveQueueTest {
     @Test
     void changeId() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText newId = before.withId(Tree.randomId());

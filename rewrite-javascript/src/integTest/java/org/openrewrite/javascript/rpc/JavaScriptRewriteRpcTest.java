@@ -37,7 +37,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -172,7 +171,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
         SourceFile cu = JavaScriptParser.builder().rewriteRpc(client).build()
           .parseInputs(List.of(Parser.Input.fromString(
-          Paths.get("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().get();
+          Path.of("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().get();
 
         new JavaIsoVisitor<Integer>() {
             @Override
@@ -203,7 +202,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             "Hello Jon!",
             spec -> spec.beforeRecipe(text -> {
                 text = Markup.info(text, "INFO", null);
-                String fence = "{{" + text.getMarkers().getMarkers().get(0).getId() + "}}";
+                String fence = "{{" + text.getMarkers().getMarkers().getFirst().getId() + "}}";
                 assertThat(client.print(text, Print.MarkerPrinter.FENCED)).isEqualTo(fence + "Hello Jon!" + fence);
             })
           )
