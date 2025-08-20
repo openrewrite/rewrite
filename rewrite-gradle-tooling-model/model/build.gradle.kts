@@ -75,7 +75,9 @@ val testManifestTask =  tasks.register("testManifest") {
         manifestFile.asFile.writeText(classpathText)
     }
 }
-
+tasks.named<Jar>("sourcesJar").configure {
+    dependsOn(testManifestTask)
+}
 tasks.named<ProcessResources>("processResources").configure {
     dependsOn(testManifestTask)
 }
