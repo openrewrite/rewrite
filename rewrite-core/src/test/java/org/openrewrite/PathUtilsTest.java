@@ -18,7 +18,6 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.PathUtils.matchesGlob;
@@ -140,6 +139,6 @@ class PathUtilsTest {
     }
 
     private static Path path(String path) {
-        return Paths.get(path);
+        return Path.of(path);
     }
 }

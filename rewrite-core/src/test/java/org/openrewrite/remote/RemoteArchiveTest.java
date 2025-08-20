@@ -27,9 +27,8 @@ import org.openrewrite.test.MockHttpSender;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
@@ -45,7 +44,7 @@ class RemoteArchiveTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         RemoteArchive remoteArchive = Remote
-          .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+          .builder(Path.of("gradle/wrapper/gradle-wrapper.jar"))
           .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
@@ -61,7 +60,7 @@ class RemoteArchiveTest {
           .setLargeFileHttpSender(new MockHttpSender(408));
 
         RemoteArchive remoteArchive = Remote
-          .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+          .builder(Path.of("gradle/wrapper/gradle-wrapper.jar"))
           .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         assertThatThrownBy(() -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
@@ -76,7 +75,7 @@ class RemoteArchiveTest {
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
         LocalRemoteArtifactCache localRemoteArtifactCache = new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperConcurrent"));
+          Path.of(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperConcurrent"));
 
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
@@ -89,7 +88,7 @@ class RemoteArchiveTest {
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
                 RemoteArchive remoteArchive = Remote
-                  .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+                  .builder(Path.of("gradle/wrapper/gradle-wrapper.jar"))
                   .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
                 return getInputStreamSize(remoteArchive.getInputStream(ctx));
@@ -106,11 +105,11 @@ class RemoteArchiveTest {
     }
 
     @Test
-    void printingRemoteArchive() throws URISyntaxException {
+    void printingRemoteArchive() throws Exception {
         URL zipUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("zipfile.zip"));
 
         RemoteArchive remoteArchive = Remote
-          .builder(Paths.get("content.txt"))
+          .builder(Path.of("content.txt"))
           .build(zipUrl.toURI(), "content.txt");
 
         String printed = remoteArchive.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.DEFAULT));

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,10 +29,10 @@ class PlainTextParserTest {
     @Test
     void plainTextMask() {
         PlainTextParser parser = PlainTextParser.builder()
-          .plainTextMasks(Paths.get("."), List.of("**/*.png"))
+          .plainTextMasks(Path.of("."), List.of("**/*.png"))
           .build();
 
-        List<Parser.Input> inputs = List.of(Parser.Input.fromString(Paths.get("test.png"), "test"));
+        List<Parser.Input> inputs = List.of(Parser.Input.fromString(Path.of("test.png"), "test"));
         assertThat(inputs)
           .allMatch(input -> parser.accept(input.getPath()));
 

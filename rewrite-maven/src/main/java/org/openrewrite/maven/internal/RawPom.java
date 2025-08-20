@@ -563,8 +563,15 @@ public class RawPom {
                 dependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
                     GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                    dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                            d.getOptional()));
+                    dependencies.add(
+                            org.openrewrite.maven.tree.Dependency.builder()
+                                    .gav(dGav)
+                                    .classifier(d.getClassifier())
+                                    .type(d.getType())
+                                    .scope(d.getScope())
+                                    .exclusions(d.getExclusions())
+                                    .optional(d.getOptional())
+                                    .build());
                 }
             }
         }
@@ -577,8 +584,14 @@ public class RawPom {
             dependencies = new ArrayList<>(rawDependencies.size());
             for (Dependency d : rawDependencies) {
                 GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                        d.getOptional()));
+                dependencies.add(org.openrewrite.maven.tree.Dependency.builder()
+                        .gav(dGav)
+                        .classifier(d.getClassifier())
+                        .type(d.getType())
+                        .scope(d.getScope())
+                        .exclusions(d.getExclusions())
+                        .optional(d.getOptional())
+                        .build());
             }
         }
         return dependencies;

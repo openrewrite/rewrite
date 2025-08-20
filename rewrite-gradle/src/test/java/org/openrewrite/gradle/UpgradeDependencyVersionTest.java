@@ -21,17 +21,20 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
@@ -397,7 +400,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void mapNotationGStringInterpolation(String stringInterpolationReference) {
         rewriteRun(
           buildGradle(
-            String.format("""
+                  """
               plugins {
                 id 'java-library'
               }
@@ -411,8 +414,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group: "com.google.guava", name: "guava", version: "%s")
               }
-              """, stringInterpolationReference),
-            String.format("""
+              """.formatted(stringInterpolationReference),
+                  """
               plugins {
                 id 'java-library'
               }
@@ -426,7 +429,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group: "com.google.guava", name: "guava", version: "%s")
               }
-              """, stringInterpolationReference)
+              """.formatted(stringInterpolationReference)
           )
         );
     }
@@ -436,7 +439,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void mapNotationKStringTemplateInterpolation(String stringInterpolationReference) {
         rewriteRun(
           buildGradleKts(
-            String.format("""
+                  """
               plugins {
                 `java-library`
               }
@@ -450,8 +453,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group = "com.google.guava", name = "guava", version = "%s")
               }
-              """, stringInterpolationReference),
-            String.format("""
+              """.formatted(stringInterpolationReference),
+                  """
               plugins {
                 `java-library`
               }
@@ -465,7 +468,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                 implementation(group = "com.google.guava", name = "guava", version = "%s")
               }
-              """, stringInterpolationReference)
+              """.formatted(stringInterpolationReference)
           )
         );
     }
@@ -576,7 +579,20 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       classpath("com.google.guava:guava:${guavaVersion}")
                   }
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu ->
+                //noinspection DataFlowIssue
+                assertThat(cu.getMarkers().findFirst(GradleProject.class))
+                  .get()
+                  .asInstanceOf(type(GradleProject.class))
+                  .extracting(gp -> gp.getBuildscript().getConfigurations())
+                  .asInstanceOf(list(GradleDependencyConfiguration.class))
+                  .singleElement()
+                  .extracting(conf -> conf.findResolvedDependency("com.google.guava", "guava"))
+                  .isNotNull()
+                  .extracting(ResolvedDependency::getVersion)
+                  .as("GradleProject model should reflect the updated guava version")
+                  .isEqualTo("30.1.1-jre"))
           )
         );
     }
@@ -1348,7 +1364,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
-        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Paths.get("not-a-gradle-file.txt"));
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Path.of("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
 
         sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();
@@ -1953,8 +1969,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void upgradeVersionInSettingsGradleExt() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\"com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: gradle.jackson",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"$gradle.jackson\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"${gradle.jackson}\""
+    })
+    void upgradeVersionInSettingsGradleExt(String dependencyNotation) {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
           settingsGradle(
@@ -1980,9 +2002,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+                  implementation %s
               }
-              """
+              """.formatted(dependencyNotation)
           )
         );
     }
@@ -2028,7 +2050,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void doesNotDowngradeVersionInSettingsGradleExt() {
+    void doesNotDowngradeRegularDependencyVersionInSettingsGradleExt() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
           settingsGradle(
@@ -2050,6 +2072,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+                  }
               }
               """
           )

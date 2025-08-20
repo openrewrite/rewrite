@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -440,7 +440,7 @@ class XmlParserTest implements RewriteTest {
       "packages.config"
     })
     void acceptWithValidPaths(String path) {
-        assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
+        assertThat(new XmlParser().accept(Path.of(path))).isTrue();
     }
 
     @DisabledOnOs(OS.WINDOWS)
@@ -452,7 +452,7 @@ class XmlParserTest implements RewriteTest {
       "/foo/bar/baz.xml.txt"
     })
     void acceptWithInvalidPaths(String path) {
-        assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
+        assertThat(new XmlParser().accept(Path.of(path))).isFalse();
     }
 
     @Test
