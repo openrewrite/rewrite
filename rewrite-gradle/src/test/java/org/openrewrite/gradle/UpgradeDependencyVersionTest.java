@@ -2108,8 +2108,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     void upgradeAnnotationProcessors() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null)),
-          //language=groovy
           buildGradle(
+            //language=groovy
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
