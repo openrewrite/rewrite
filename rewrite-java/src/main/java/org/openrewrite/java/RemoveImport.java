@@ -119,6 +119,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         } else {
                             otherMethodsAndFieldsInTypeUsed.add(method.getName());
                         }
+                    } else if (declaringType.endsWith(".kt") || declaringType.endsWith(".kts")) { // Kotlin top level function
+                        // TODO: <something>
                     }
                 }
             }
