@@ -15,16 +15,24 @@
  */
 package org.openrewrite.gradle.internal;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -43,8 +51,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Adler32;
 
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 
 public class GradleWrapperScriptDownloader {
     private static final Path WRAPPER_SCRIPTS = Paths.get("rewrite-gradle/src/main/resources/META-INF/rewrite/gradle-wrapper/");
@@ -52,7 +59,7 @@ public class GradleWrapperScriptDownloader {
     public static void main(String[] args) throws IOException, InterruptedException {
         Lock lock = new ReentrantLock();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(ctx);
+        List<GradleWrapper.GradleVersion> allGradleReleases = listAllVersions(ctx);
         Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
                 new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
 
@@ -76,15 +83,15 @@ public class GradleWrapperScriptDownloader {
                 String gradlewBatChecksum = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
 
                 lock.lock();
-                allDownloadedVersions.put(v, new GradleWrapperScriptLoader.Version(v, gradlewChecksum, gradlewBatChecksum));
+                allDownloadedVersions.put(v, new GradleWrapperScriptLoader.Version(v, infos.getDownloadUrl(), infos.getChecksum() == null ? "" : infos.getChecksum().getHexValue(), infos.getWrapperJarChecksum() == null ? "" : infos.getWrapperJarChecksum().getHexValue(), gradlewChecksum, gradlewBatChecksum));
 
                 List<String> sortedVersions = new ArrayList<>(allDownloadedVersions.keySet());
                 sortedVersions.sort(new LatestRelease(null).reversed());
                 try (BufferedWriter writer = Files.newBufferedWriter(WRAPPER_SCRIPTS.resolve("versions.csv"))) {
-                    writer.write("version,gradlew,gradlewBat\n");
+                    writer.write("version,downloadUrl,checksum,wrapperChecksum,gradlew,gradlewBat\n");
                     for (String sortedVersion : sortedVersions) {
                         GradleWrapperScriptLoader.Version version1 = allDownloadedVersions.get(sortedVersion);
-                        writer.write(sortedVersion + "," + version1.getGradlewChecksum() + "," + version1.getGradlewBatChecksum() + "\n");
+                        writer.write(sortedVersion + "," + version1.getDownloadUrl() + "," + version1.getChecksum() + "," + version1.getWrapperChecksum() + "," + version1.getGradlewChecksum() + "," + version1.getGradlewBatChecksum() + "\n");
                     }
                 }
                 System.out.printf("%03d: %s downloaded.%s%n", i.incrementAndGet(), v, threadName);
@@ -101,6 +108,22 @@ public class GradleWrapperScriptDownloader {
         while (pool.getActiveThreadCount() > 0) {
             //noinspection BusyWait
             Thread.sleep(100);
+        }
+    }
+
+    private static List<GradleWrapper.GradleVersion> listAllVersions(ExecutionContext ctx) {
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+        try (HttpSender.Response resp = httpSender.send(httpSender.get("https://services.gradle.org/versions/all").build())) {
+            if (resp.isSuccessful()) {
+                return new ObjectMapper()
+                        .registerModule(new ParameterNamesModule())
+                        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                        .readValue(resp.getBody(), new TypeReference<List<GradleWrapper.GradleVersion>>() {
+                        });
+            }
+            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

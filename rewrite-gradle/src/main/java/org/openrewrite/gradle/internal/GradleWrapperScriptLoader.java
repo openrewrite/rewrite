@@ -18,13 +18,18 @@ package org.openrewrite.gradle.internal;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Checksum;
+import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.remote.RemoteResource;
 import org.openrewrite.semver.LatestRelease;
+import org.openrewrite.semver.VersionComparator;
 
 import java.io.*;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
@@ -42,11 +47,20 @@ public class GradleWrapperScriptLoader {
             String line;
             while ((line = in.readLine()) != null) {
                 String[] row = line.split(",");
-                allVersions.put(row[0], new Version(row[0], row[1], row[2]));
+                allVersions.put(row[0], new Version(row[0], row[1], row[2], row[3], row[4], row[5]));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    public Version select(VersionComparator versionComparator) {
+        return allVersions.entrySet()
+                .stream()
+                .filter(v -> versionComparator.isValid(null, v.getKey()))
+                .max((v1, v2) -> versionComparator.compare(null, v1.getKey(), v2.getKey()))
+                .map(Map.Entry::getValue)
+                .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
     }
 
     /**
@@ -66,6 +80,18 @@ public class GradleWrapperScriptLoader {
         String requestedVersion;
 
         Version resolved;
+
+        public String downloadUrl() {
+            return resolved.getDownloadUrl();
+        }
+
+        public String getChecksum() {
+            return resolved.getChecksum();
+        }
+
+        public @Nullable String getWrapperChecksum() {
+            return StringUtils.isBlank(resolved.getWrapperChecksum()) ? null : resolved.getWrapperChecksum();
+        }
 
         public RemoteResource gradlew() {
             InputStream script = getClass().getResourceAsStream("/META-INF/rewrite/gradle-wrapper/unix/" + resolved.getGradlewChecksum() + ".txt");
@@ -95,6 +121,9 @@ public class GradleWrapperScriptLoader {
     @Value
     public static class Version {
         String version;
+        String downloadUrl;
+        String checksum;
+        String wrapperChecksum;
         String gradlewChecksum;
         String gradlewBatChecksum;
     }
