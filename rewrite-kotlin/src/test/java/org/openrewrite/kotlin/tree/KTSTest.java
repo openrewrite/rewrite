@@ -44,9 +44,29 @@ class KTSTest implements RewriteTest {
     void topLevelFunctionCall() {
         rewriteRun(
           kotlinScript(
-                """
-            println("foo")
             """
+              package org.example
+              
+              fun one() = "one"
+              fun two() = "two"
+              """
+          ),
+          kotlinScript(
+            """
+            import org.example.one
+            one("foo")
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getTypesInUse().getUsedMethods())
+                  .singleElement()
+                    .satisfies(m -> {
+                       assertThat(m.getDeclaringType())
+                         .satisfies(it -> {
+                             assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1.kts");
+                             assertThat(it.getMethods()).hasSize(2);
+                         });
+                    });
+            })
           )
         );
     }
@@ -70,7 +90,6 @@ class KTSTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlinScript(
-            //language=none
             """
             plugins {
                 id("org.flywaydb.flyway") version "8.0.2"

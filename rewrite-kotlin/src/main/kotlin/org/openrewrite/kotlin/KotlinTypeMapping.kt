@@ -682,10 +682,10 @@ class KotlinTypeMapping(
             return null
         }
         val signature = signatureBuilder.methodCallSignature(fir)
-        val existing = typeCache.get<Method>(signature)
+        /*val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
-        }
+        }*/
         return methodInvocationType(fir, signature)
     }
 
@@ -777,6 +777,11 @@ class KotlinTypeMapping(
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
                 }
+            } else if (resolvedSymbol.callableId.classId == null) {
+                methodDeclarationType(resolvedSymbol.fir, null)
+                declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name)
+                    //.withMethods(mutableListOf(methodDeclarationType(resolvedSymbol.fir, null)))
+                //TODO: <need to add methods information here too
             }
         } else {
             declaringType = TypeUtils.asFullyQualified(type(function.typeRef))
