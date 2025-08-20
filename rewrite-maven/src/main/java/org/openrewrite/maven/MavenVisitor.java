@@ -416,8 +416,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    private String getGroupId(Object dependency) {
+    private @Nullable String getGroupId(Object dependency) {
         if (dependency instanceof ResolvedDependency) {
             return ((ResolvedDependency) dependency).getGroupId();
         } else if (dependency instanceof Dependency) {
@@ -426,8 +425,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return null;
     }
 
-    @Nullable
-    private String getArtifactId(Object dependency) {
+    private @Nullable String getArtifactId(Object dependency) {
         if (dependency instanceof ResolvedDependency) {
             return ((ResolvedDependency) dependency).getArtifactId();
         } else if (dependency instanceof Dependency) {
