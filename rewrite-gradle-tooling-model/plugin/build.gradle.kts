@@ -12,10 +12,10 @@ dependencies {
     implementation(gradleApi())
 }
 
-tasks.withType<Test>().configureEach {
-    dependsOn(tasks.named("publishToMavenLocal"))
-}
-
 tasks.named<JavaCompile>("compileJava").configure {
     options.release.set(8)
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
 }

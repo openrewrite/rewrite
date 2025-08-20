@@ -76,6 +76,10 @@ dependencies {
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 
+tasks.withType<Test>().configureEach {
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
+}
+
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
 // No option to explicitly target java-8 in the groovy compiler
 tasks.withType<GroovyCompile>().configureEach {

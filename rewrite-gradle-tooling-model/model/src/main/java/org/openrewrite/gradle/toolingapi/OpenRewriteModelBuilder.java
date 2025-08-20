@@ -21,10 +21,13 @@ import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.jspecify.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -99,11 +102,18 @@ public class OpenRewriteModelBuilder {
             ModelBuilder<OpenRewriteModelProxy> customModelBuilder = connection.model(OpenRewriteModelProxy.class);
             try {
                 if (initScript == null) {
-                    try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
-                        if (is == null) {
-                            throw new IllegalStateException("Expected to find init.gradle on the classpath");
+                    if (System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath") != null) {
+                        // code path only expected to be taken from within openrewrite/rewrite
+                        String generatedInitScript = generateInitScriptFromManifest();
+                        Files.write(init, generatedInitScript.getBytes(StandardCharsets.UTF_8));
+                    } else {
+                        // Use default init.gradle from resources
+                        try (InputStream is = OpenRewriteModel.class.getResourceAsStream("/init.gradle")) {
+                            if (is == null) {
+                                throw new IllegalStateException("Expected to find init.gradle on the classpath");
+                            }
+                            Files.copy(is, init);
                         }
-                        Files.copy(is, init);
                     }
                 } else {
                     Files.write(init, initScript.getBytes());
@@ -118,6 +128,43 @@ public class OpenRewriteModelBuilder {
                     throw new UncheckedIOException(e);
                 }
             }
+        }
+    }
+
+    /**
+     * Everywhere except within openrewrite/rewrite itself the plugin will be resolved from some artifact repository
+     * But within openrewrite/rewrite it comes from a build directory.
+     * So for our build only use an init script which understands that.
+     */
+    private static String generateInitScriptFromManifest() throws IOException {
+        try (InputStream is = OpenRewriteModelBuilder.class.getResourceAsStream("/test-manifest.txt")) {
+            if (is == null) {
+                throw new IllegalStateException("Expected to find test-manifest.txt on the classpath");
+            }
+
+            StringBuilder initScript = new StringBuilder();
+            initScript.append("initscript {\n");
+            initScript.append("    dependencies {\n");
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (!line.isEmpty()) {
+                        // Escape backslashes for Groovy string
+                        String escapedPath = line.replace("\\", "\\\\");
+                        initScript.append("        classpath files('").append(escapedPath).append("')\n");
+                    }
+                }
+            }
+
+            initScript.append("    }\n");
+            initScript.append("}\n\n");
+            initScript.append("allprojects {\n");
+            initScript.append("    apply plugin: org.openrewrite.gradle.toolingapi.ToolingApiOpenRewriteModelPlugin\n");
+            initScript.append("}\n");
+
+            return initScript.toString();
         }
     }
 }

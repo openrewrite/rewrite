@@ -9,6 +9,8 @@ plugins {
 // This is all messy and non-idiomatic from Gradle's standpoint, so some better way would be ideal
 evaluationDependsOn(":rewrite-gradle-tooling-model:plugin")
 
+val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
+
 dependencies {
     constraints {
         // last version which supports java 8, which testGradle4 runs on
@@ -46,6 +48,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testImplementation("org.junit.jupiter:junit-jupiter-params")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    "pluginLocalTestClasspath"(project(":rewrite-gradle-tooling-model:plugin"))
 }
 
 tasks.named<JavaCompile>("compileJava").configure {
@@ -61,17 +64,33 @@ val testGradle4 = tasks.register<Test>("testGradle4") {
     })
 }
 
+val manifestFile = layout.buildDirectory.dir("test-manifest").get().file("test-manifest.txt")
+val testManifestTask =  tasks.register("testManifest") {
+    val classpath = pluginLocalTestClasspath.files
+    inputs.files(classpath)
+    val outputDir = layout.buildDirectory.dir("test-manifest").get().dir("test-classpath")
+    outputs.dir(outputDir)
+    outputs.file(manifestFile)
+    doLast {
+        manifestFile.asFile.parentFile.deleteRecursively()
+        mkdir(manifestFile.asFile.parentFile)
+        copy {
+            from(classpath)
+            into(outputDir)
+        }
+        manifestFile.asFile.writeText(classpath.joinToString(separator = "\n") { it.absolutePath })
+    }
+}
+
+tasks.named<ProcessResources>("processResources").configure {
+    from(manifestFile)
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
 }
 
 tasks.named("check").configure {
     dependsOn(testGradle4)
-}
-
-tasks.withType<Test>().configureEach {
-    dependsOn(
-        tasks.named("publishToMavenLocal"),
-        project.rootProject.childProjects["rewrite-gradle-tooling-model"]!!.childProjects["model"]!!.tasks.named("publishToMavenLocal")
-    )
 }
