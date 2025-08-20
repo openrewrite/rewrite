@@ -152,7 +152,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
             Optional<J.MethodInvocation> javaStatement = c.getStatements().stream().filter(s -> s instanceof J.MethodInvocation)
                     .map(s -> (J.MethodInvocation) s)
-                    .filter(m -> m.getSimpleName().equals("java"))
+                    .filter(m -> "java".equals(m.getSimpleName()))
                     .findFirst();
 
             if (javaStatement.isPresent()) {
@@ -176,7 +176,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 for (Statement s : c.getStatements()) {
                     if (s instanceof J.MethodInvocation) {
                         J.MethodInvocation invocation = (J.MethodInvocation) s;
-                        if (invocation.getName().getSimpleName().equals("java")) {
+                        if ("java".equals(invocation.getName().getSimpleName())) {
                             newStatements.add(newJavaStatement);
                             continue;
                         }
