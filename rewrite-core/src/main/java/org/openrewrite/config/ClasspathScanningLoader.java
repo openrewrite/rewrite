@@ -28,9 +28,14 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -96,16 +101,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
-        String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
             // Scan entire classpath to get full inheritance hierarchy, but filter results to target jar
             scanClasses(new ClassGraph()
                     .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader, jarName);
+                    .overrideClassLoaders(classLoader), classLoader, jar);
 
             scanYaml(new ClassGraph()
-                    .acceptJars(jarName)
+                    .acceptJars(jar.toFile().getName())
                     .ignoreParentClassLoaders()
                     .overrideClassLoaders(classLoader)
                     .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
@@ -157,7 +161,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         scanClasses(classGraph, classLoader, null);
     }
 
-    private void scanClasses(ClassGraph classGraph, ClassLoader classLoader, @Nullable String targetJarName) {
+    private void scanClasses(ClassGraph classGraph, ClassLoader classLoader, @Nullable Path targetJarName) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
                 .overrideClassLoaders(classLoader)
@@ -167,7 +171,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 // Only process styles from the target jar if specified
-                if (targetJarName != null && !isFromJar(classInfo, targetJarName)) {
+                if (targetJarName != null && !isFromJar(classInfo.getClasspathElementURI(), targetJarName)) {
                     continue;
                 }
                 Class<?> styleClass = classInfo.loadClass();
@@ -185,15 +189,18 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    private boolean isFromJar(ClassInfo classInfo, String jarName) {
-        return classInfo.getClasspathElementURI() != null &&
-               classInfo.getClasspathElementURI().toString().contains(jarName);
+    private boolean isFromJar(@Nullable URI classpathElementURI, Path jar) {
+        try {
+            return classpathElementURI != null && Files.isSameFile(Paths.get(classpathElementURI), jar);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
-    private void configureRecipes(ScanResult result, String className, @Nullable String targetJarName) {
+    private void configureRecipes(ScanResult result, String className, @Nullable Path targetJar) {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             // Only process recipes from the target jar if specified
-            if (targetJarName != null && !isFromJar(classInfo, targetJarName)) {
+            if (targetJar != null && !isFromJar(classInfo.getClasspathElementURI(), targetJar)) {
                 continue;
             }
             Class<?> recipeClass = classInfo.loadClass();
@@ -239,8 +246,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private void ensureScanned() {
         if (performScan != null) {
-            performScan.run();
+            Runnable scan = performScan;
             performScan = null;
+            scan.run();
         }
     }
 
