@@ -292,7 +292,7 @@ public class StringUtils {
      * or <code>-1</code> if no character in the string matches the predicate.
      */
     public static int indexOf(String text, Predicate<Character> test) {
-        return  indexOf(text, 0, test);
+        return indexOf(text, 0, test);
     }
 
     /**
