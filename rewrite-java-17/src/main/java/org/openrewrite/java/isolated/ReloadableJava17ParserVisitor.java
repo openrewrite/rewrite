@@ -890,13 +890,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos == Position.NOPOS) {
             if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
                 int quote = source.substring(cursor).startsWith("\"\"\"") ? 3 : 1;
-                if (quote == 3) {
-                    endPos = cursor + quote + source.indexOf("\"\"\"", cursor + quote) + quote;
-                } else {
-                    endPos = cursor + quote + value.toString().length() + quote;
-                }
+                int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) : value.toString().length();
+                endPos = cursor + quote + elementLength + quote;
             } else {
-                endPos = cursor + indexOf(source.substring(cursor),
+                endPos = cursor + indexOf(source, cursor,
                         ch -> Character.isWhitespace(ch) || ",;)]}+-*/%=!<>&|^?:.".indexOf(ch) != -1
                 );
             }

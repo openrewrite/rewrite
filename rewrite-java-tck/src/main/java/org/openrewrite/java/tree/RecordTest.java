@@ -88,7 +88,7 @@ class RecordTest implements RewriteTest {
               import static java.lang.annotation.ElementType.*;
               
               @Retention(RetentionPolicy.RUNTIME)
-              @Target({PARAMETER, FIELD})
+              @Target({PARAMETER})
               public @interface A {
                   String value() default "";
                   Long a() default 0L;
@@ -101,7 +101,7 @@ class RecordTest implements RewriteTest {
               record JavaRecord(@jdk.jfr.Name("A") @A(value = ""\"
                   one value "with a quote" and
                   another value
-                  ""\", a=2L, b=123) String name) {
+                  ""\", a=2_000L, b=123) String name) {
               }
               """
           )
