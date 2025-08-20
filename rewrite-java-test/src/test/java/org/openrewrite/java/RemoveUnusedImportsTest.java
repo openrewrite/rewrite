@@ -146,7 +146,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class Test {
                   List list;
               }
-            """
+              """
           )
         );
     }
@@ -165,7 +165,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class Test2 {
                   List list;
               }
-            """,
+              """,
             """
               import java.util.List;
 
@@ -175,7 +175,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class Test2 {
                   List list;
               }
-            """
+              """
           )
         );
     }
