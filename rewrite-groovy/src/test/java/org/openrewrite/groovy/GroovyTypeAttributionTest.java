@@ -204,15 +204,15 @@ class GroovyTypeAttributionTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
     @ExpectedToFail
+    @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
     @Test
     void infersDelegateViaSimilarGradleApi() {
         rewriteRun(
           groovy(
                 """
               package org.gradle.api
-              
+
               interface Action<T> {
                   void execute(T t);
               }
@@ -241,8 +241,8 @@ class GroovyTypeAttributionTest implements RewriteTest {
 
     private Consumer<SourceSpec<G.CompilationUnit>> isAttributed(boolean attributed) {
         return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
-            @SuppressWarnings("ConstantConditions")
             @Override
+            @SuppressWarnings("ConstantConditions")
             public J visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
                 assertThat(TypeUtils.asFullyQualified(variable.getVariableType().getType())
                   .getFullyQualifiedName())

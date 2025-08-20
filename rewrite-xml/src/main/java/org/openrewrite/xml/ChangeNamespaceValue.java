@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -170,7 +170,7 @@ public class ChangeNamespaceValue extends Recipe {
             private boolean isXmlnsAttribute(Xml.Attribute attribute) {
                 boolean searchAll = searchAllNamespaces == null || Boolean.TRUE.equals(searchAllNamespaces);
                 return searchAll && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
-                       !searchAll && attribute.getKeyAsString().equals(XMLNS_PREFIX);
+                       !searchAll && XMLNS_PREFIX.equals(attribute.getKeyAsString());
             }
 
             private boolean isVersionAttribute(Xml.Attribute attribute) {
@@ -270,7 +270,7 @@ public class ChangeNamespaceValue extends Recipe {
                     }
                 } else {
                     Map<String, Xml.Attribute> attributeByKey = attributes.stream()
-                            .collect(Collectors.toMap(
+                            .collect(toMap(
                                     Xml.Attribute::getKeyAsString,
                                     a -> a
                             ));

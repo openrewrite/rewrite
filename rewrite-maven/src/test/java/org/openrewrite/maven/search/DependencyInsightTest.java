@@ -16,6 +16,8 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -192,6 +194,63 @@ class DependencyInsightTest implements RewriteTest {
               </project>
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "6.1.5", // exact
+      "6.1.1-6.1.15", // hyphenated
+      "[6.1.1,6.1.6)", "[6.1.1,6.1.5]", "[6.1.5,6.1.15]", "(6.1.4,6.1.15]", // full range
+      "6.1.X", // X range
+      "~6.1.0", "~6.1", // tilde range
+    })
+    void versionPatterns(String versionPattern) {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(new DependencyInsight("org.springframework", "*", null, versionPattern, null)),
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0.0</version>
+    
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-core</artifactId>
+                      <version>6.1.5</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-aop</artifactId>
+                      <version>6.2.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0.0</version>
+    
+                  <dependencies>
+                    <!--~~>--><dependency>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-core</artifactId>
+                      <version>6.1.5</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-aop</artifactId>
+                      <version>6.2.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
         );
     }
 }

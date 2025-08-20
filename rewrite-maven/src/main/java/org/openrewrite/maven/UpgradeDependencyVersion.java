@@ -194,8 +194,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final VersionComparator versionComparator =
-                    requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
+            private final VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {

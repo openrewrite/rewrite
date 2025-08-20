@@ -51,7 +51,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void decryptCredentials() throws IOException {
+    void decryptCredentials() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -95,7 +95,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void relocatedCredentials() throws IOException {
+    void relocatedCredentials() throws Exception {
         // Create settings-security.xml with relocation
         Path relocated = tempDir.resolve(".m2/relocation-settings-security.xml");
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
@@ -149,7 +149,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void handleInvalidEncryptedPassword() throws IOException {
+    void handleInvalidEncryptedPassword() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -187,7 +187,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void noSecuritySettingsNoDecryption() throws IOException {
+    void noSecuritySettingsNoDecryption() throws Exception {
         // Only create settings.xml without settings-security.xml
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
           //language=xml
@@ -216,7 +216,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void decryptPasswordWithComments() throws IOException {
+    void decryptPasswordWithComments() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -255,7 +255,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void invalidMasterPasswordButValidPasswordFormat() throws IOException {
+    void invalidMasterPasswordButValidPasswordFormat() throws Exception {
         // Create settings-security.xml with invalid master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml

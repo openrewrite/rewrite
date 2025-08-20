@@ -33,7 +33,7 @@ class FindMethodsTest implements RewriteTest {
             """
               import java.lang.Integer
               import java.lang.Integer.decode
-              
+
               val i1 = java.lang.Integer.decode("1")
               val i2 = Integer.decode("1")
               val i3 = decode("1")
@@ -44,7 +44,7 @@ class FindMethodsTest implements RewriteTest {
             """
               import java.lang.Integer
               import java.lang.Integer.decode
-              
+
               val i1 = /*~~>*/java.lang.Integer.decode("1")
               val i2 = /*~~>*/Integer.decode("1")
               val i3 = /*~~>*/decode("1")

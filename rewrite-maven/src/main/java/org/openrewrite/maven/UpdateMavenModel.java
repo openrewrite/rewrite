@@ -23,9 +23,14 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
@@ -70,22 +75,23 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
             List<Dependency> requestedDependencies = new ArrayList<>(eachDependency.size());
             for (Xml.Tag dependency : eachDependency) {
-                requestedDependencies.add(new Dependency(
-                        new GroupArtifactVersion(
+                requestedDependencies.add(Dependency.builder()
+                        .gav(new GroupArtifactVersion(
                                 dependency.getChildValue("groupId").orElse(null),
                                 dependency.getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("Dependency must have artifactId")),
                                 dependency.getChildValue("version").orElse(null)
-                        ),
-                        dependency.getChildValue("classifier").orElse(null),
-                        dependency.getChildValue("type").orElse(null),
-                        dependency.getChildValue("scope").orElse("compile"),
-                        mapExclusions(dependency),
-                        dependency.getChildValue("optional").orElse(null)
-                ));
+                        ))
+                        .classifier(dependency.getChildValue("classifier").orElse(null))
+                        .type(dependency.getChildValue("type").orElse(null))
+                        .scope(dependency.getChildValue("scope").orElse("compile"))
+                        .exclusions(mapExclusions(dependency))
+                        .optional(dependency.getChildValue("optional").orElse(null))
+                        .build()
+                );
             }
             requested = requested.withDependencies(requestedDependencies);
         } else if (!requested.getDependencies().isEmpty()) {
-            requested = requested.withDependencies(Collections.emptyList());
+            requested = requested.withDependencies(emptyList());
         }
 
         Optional<Xml.Tag> dependencyManagement = document.getRoot().getChild("dependencyManagement");
@@ -114,7 +120,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 requested = requested.withDependencyManagement(requestedManagedDependencies);
             }
         } else if (!requested.getDependencyManagement().isEmpty()) {
-            requested = requested.withDependencyManagement(Collections.emptyList());
+            requested = requested.withDependencyManagement(emptyList());
         }
 
         Optional<Xml.Tag> repos = document.getRoot().getChild("repositories");
@@ -127,9 +133,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     null,
                     null,
                     null
-            )).collect(Collectors.toList()));
+            )).collect(toList()));
         } else {
-            requested = requested.withRepositories(Collections.emptyList());
+            requested = requested.withRepositories(emptyList());
         }
 
         try {

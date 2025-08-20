@@ -228,7 +228,7 @@ final class PatternVariables {
                 }
                 if (case_ instanceof J.Case) {
                     Expression elem = ((J.Case) case_).getPattern();
-                    if (elem instanceof J.Identifier && ((J.Identifier) elem).getSimpleName().equals("default")) {
+                    if (elem instanceof J.Identifier && "default".equals(((J.Identifier) elem).getSimpleName())) {
                         defaultCase = case_;
                     }
                 }
@@ -350,8 +350,8 @@ final class PatternVariables {
 
     private static boolean isSystemExit(J.MethodInvocation method) {
         return method.getMethodType() != null &&
-               method.getMethodType().getName().equals("exit") &&
-               method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.lang.System");
+               "exit".equals(method.getMethodType().getName()) &&
+               "java.lang.System".equals(method.getMethodType().getDeclaringType().getFullyQualifiedName());
     }
 
     private static boolean alwaysCompletesAbnormallyIgnoringLabel(@Nullable Statement statement, String label, Set<String> labelsToIgnore) {

@@ -252,10 +252,7 @@ export class RpcReceiveQueue {
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: Writable,
-                private readonly getRef: (refId: number) => Promise<any> = async (refId: number) => {
-                    throw new Error(`Reference ${refId} not found and no getRef function provided`);
-                }) {
+                private readonly logFile?: Writable) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -299,10 +296,7 @@ export class RpcReceiveQueue {
                         if (this.refs.has(ref)) {
                             return this.refs.get(ref);
                         } else {
-                            // Ref was evicted from cache, fetch it
-                            const refObject = await this.getRef(ref);
-                            this.refs.set(ref, refObject);
-                            return refObject;
+                            throw new Error(`Received a reference to an object that was not previously sent: ${ref}`);
                         }
                     } else {
                         // This is either a new object or a forward declaration with ref

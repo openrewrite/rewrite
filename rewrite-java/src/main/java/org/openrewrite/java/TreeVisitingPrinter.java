@@ -19,10 +19,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.*;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Spliterators;
 
+import static java.util.Collections.nCopies;
+import static java.util.Collections.reverse;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 
@@ -93,8 +98,8 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
     private static Optional<Tree> findRootOfJType(Cursor cursor) {
         List<Object> cursorStack =
             stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
-                .collect(Collectors.toList());
-        Collections.reverse(cursorStack);
+                .collect(toList());
+        reverse(cursorStack);
         return cursorStack.stream().filter(Tree.class::isInstance)
             .map(Tree.class::cast)
             .findFirst();
@@ -112,7 +117,7 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
         StringBuilder sb = new StringBuilder();
         int tabCount = depth - 1;
         if (tabCount > 0) {
-            sb.append(String.join("", Collections.nCopies(tabCount, TAB)));
+            sb.append(String.join("", nCopies(tabCount, TAB)));
         }
         // only root has not prefix
         if (depth > 0) {
@@ -216,8 +221,8 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
         Cursor cursor = this.getCursor();
         List<Object> cursorStack =
                 stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
-                        .collect(Collectors.toList());
-        Collections.reverse(cursorStack);
+                        .collect(toList());
+        reverse(cursorStack);
         int depth = cursorStack.size();
 
         // Compare lastCursorStack vs cursorStack, find the fork and print the diff
