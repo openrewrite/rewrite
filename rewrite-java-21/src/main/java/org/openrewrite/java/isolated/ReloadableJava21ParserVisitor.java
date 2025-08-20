@@ -921,7 +921,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 int elementLength = quote == 3 ? source.indexOf("\"\"\"", cursor + quote) - cursor - quote  : value.toString().length();
                 endPos = cursor + quote + elementLength + quote;
             } else {
-                endPos = cursor + indexOf(source, cursor,
+                endPos = indexOf(source, cursor,
                         ch -> Character.isWhitespace(ch) || ",;)]}+-*/%=!<>&|^?:.".indexOf(ch) != -1
                 );
             }

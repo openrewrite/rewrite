@@ -305,7 +305,7 @@ public class StringUtils {
     public static int indexOf(String text, int fromIndex, Predicate<Character> test) {
         for (int i = fromIndex; i < text.length(); i++) {
             if (test.test(text.charAt(i))) {
-                return i - fromIndex;
+                return i;
             }
         }
         return -1;
