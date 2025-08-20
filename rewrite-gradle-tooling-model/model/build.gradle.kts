@@ -84,6 +84,9 @@ tasks.named<ProcessResources>("processResources").configure {
 tasks.named("rewriteRecipeAuthorAttributionResources").configure {
     dependsOn(testManifestTask)
 }
+tasks.named("licenseMain").configure {
+    dependsOn(testManifestTask)
+}
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
