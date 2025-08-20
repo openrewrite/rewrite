@@ -39,6 +39,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -330,6 +331,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     .text(gradlewText)
                     .sourcePath(WRAPPER_SCRIPT_LOCATION)
                     .fileAttributes(wrapperScriptAttributes)
+                    .charsetName(StandardCharsets.UTF_8.name())
                     .build();
             gradleWrapperFiles.add(gradlew);
         }
@@ -340,6 +342,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     .text(gradlewBatText)
                     .sourcePath(WRAPPER_BATCH_LOCATION)
                     .fileAttributes(wrapperScriptAttributes)
+                    .charsetName(StandardCharsets.UTF_8.name())
                     .build();
             gradleWrapperFiles.add(gradlewBat);
         }
@@ -389,7 +392,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
                     if (!gradlewText.equals(gradlew.getText())) {
-                        gradlew = gradlew.withText(gradlewText);
+                        gradlew = (PlainText) gradlew.withText(gradlewText).withCharset(StandardCharsets.UTF_8);
                     }
                     return gradlew;
                 }
@@ -397,7 +400,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     String gradlewBatText = batchScript(gradleWrapper, ctx);
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
                     if (!gradlewBatText.equals(gradlewBat.getText())) {
-                        gradlewBat = gradlewBat.withText(gradlewBatText);
+                        gradlewBat = (PlainText) gradlewBat.withText(gradlewBatText).withCharset(StandardCharsets.UTF_8);
                     }
                     return gradlewBat;
                 }

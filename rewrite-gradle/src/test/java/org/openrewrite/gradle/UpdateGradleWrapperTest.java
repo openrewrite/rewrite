@@ -79,6 +79,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
                 assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getCharset().name()).isEqualTo("UTF-8");
                 //noinspection DataFlowIssue
                 assertThat(gradleSh.getFileAttributes()).isNotNull();
                 assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
@@ -87,6 +88,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 var gradleBat = result(run, PlainText.class, "gradlew.bat");
                 assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+                assertThat(gradleBat.getCharset().name()).isEqualTo("UTF-8");
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
@@ -131,6 +133,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
               assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+              assertThat(gradleSh.getCharset().name()).isEqualTo("UTF-8");
               //noinspection DataFlowIssue
               assertThat(gradleSh.getFileAttributes()).isNotNull();
               assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
@@ -139,6 +142,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
               var gradleBat = result(run, PlainText.class, "gradlew.bat");
               assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
               assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+              assertThat(gradleBat.getCharset().name()).isEqualTo("UTF-8");
 
               var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
               assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
