@@ -463,10 +463,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 //noinspection unchecked
                 primaryConstructor = JContainer.build(
                         prefix,
-                        varDecls.stream().map(varDecl ->
-                                (JRightPadded<Statement>) (JRightPadded<?>) varDecl.withElement(varDecl.getElement()
+                        (List<JRightPadded<Statement>>) (List<?>) ListUtils.map(varDecls, varDecl ->
+                                varDecl.withElement(varDecl.getElement()
                                         .withLeadingAnnotations(recordParams.get(varDecl.getElement().getVariables().get(0).getSimpleName())))
-                        ).collect(toList()),
+                        ),
                         Markers.EMPTY
                 );
             }
@@ -889,20 +889,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         if (endPos == Position.NOPOS) {
             if (typeMapping.primitive(((JCLiteral) node).typetag) == JavaType.Primitive.String) {
-                if (source.substring(cursor).startsWith("\"\"\"")) {
-                    cursor += 3;
-                    endPos = cursor + source.substring(cursor).indexOf("\"\"\"") + 3; // +3 for the closing delimiter
+                int quote = source.substring(cursor).startsWith("\"\"\"") ? 3 : 1;
+                if (quote == 3) {
+                    endPos = cursor + quote + source.indexOf("\"\"\"", cursor + quote) + quote;
                 } else {
-                    endPos = cursor + value.toString().length() + 2; // +2 for the quotes
+                    endPos = cursor + quote + value.toString().length() + quote;
                 }
             } else {
                 endPos = cursor + indexOf(source.substring(cursor),
-                        ch ->
-                                ch.equals(',') || ch.equals(';') || ch.equals(')') || ch.equals(']') || ch.equals('}') ||
-                                ch.equals('+') || ch.equals('-') || ch.equals('*') || ch.equals('/') || ch.equals('%') ||
-                                ch.equals('=') || ch.equals('!') || ch.equals('<') || ch.equals('>') || ch.equals('&') ||
-                                ch.equals('|') || ch.equals('^') || ch.equals('?') || ch.equals(':') || ch.equals('.') ||
-                                Character.isWhitespace(ch)
+                        ch -> Character.isWhitespace(ch) || ",;)]}+-*/%=!<>&|^?:.".indexOf(ch) != -1
                 );
             }
         }
@@ -2200,17 +2195,17 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
-    private final Function<Tree, Space> semiDelim = ignored -> {
+    private final Function<Tree, Space> semiDelim = __ -> {
         Space prefix = whitespace();
         skip(";");
         return prefix;
     };
-    private final Function<Tree, Space> commaDelim = ignored -> {
+    private final Function<Tree, Space> commaDelim = __ -> {
         Space prefix = whitespace();
         skip(",");
         return prefix;
     };
-    private final Function<Tree, Space> noDelim = ignored -> EMPTY;
+    private final Function<Tree, Space> noDelim = __ -> EMPTY;
 
     private Space whitespace() {
         int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
