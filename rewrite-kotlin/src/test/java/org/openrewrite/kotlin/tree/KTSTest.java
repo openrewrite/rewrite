@@ -54,7 +54,7 @@ class KTSTest implements RewriteTest {
           kotlinScript(
             """
             import org.example.one
-            one("foo")
+            one()
             """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getTypesInUse().getUsedMethods())

@@ -682,10 +682,10 @@ class KotlinTypeMapping(
             return null
         }
         val signature = signatureBuilder.methodCallSignature(fir)
-        /*val existing = typeCache.get<Method>(signature)
+        val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
-        }*/
+        }
         return methodInvocationType(fir, signature)
     }
 
