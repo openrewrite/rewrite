@@ -65,9 +65,7 @@ dependencies {
         exclude("org.slf4j", "slf4j-nop")
     }
     testImplementation(project(":rewrite-toml"))
-
-    testImplementation("org.openrewrite.gradle.tooling:model:$latest")
-
+    testImplementation(project(":rewrite-gradle-tooling-model:model"))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
@@ -76,6 +74,10 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
