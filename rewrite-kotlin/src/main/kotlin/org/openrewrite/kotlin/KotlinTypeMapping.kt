@@ -779,7 +779,7 @@ class KotlinTypeMapping(
                 }
             } else if (resolvedSymbol.callableId.classId == null) {
                 methodDeclarationType(resolvedSymbol.fir, null)
-                declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name)
+                declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name.replaceFirst(".kts", "Kt").replaceFirst(".kt", "Kt"))
                     //.withMethods(mutableListOf(methodDeclarationType(resolvedSymbol.fir, null)))
                 //TODO: <need to add methods information here too
             }

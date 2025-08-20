@@ -62,7 +62,7 @@ class KTSTest implements RewriteTest {
                     .satisfies(m -> {
                        assertThat(m.getDeclaringType())
                          .satisfies(it -> {
-                             assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1.kts");
+                             assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
                              assertThat(it.getMethods()).hasSize(2);
                          });
                     });
