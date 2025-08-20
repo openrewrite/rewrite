@@ -226,7 +226,6 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("First fix: https://github.com/openrewrite/rewrite/pull/5862")
     @Test
     void dontRemoveUsedParentMembers() {
         rewriteRun(
@@ -267,7 +266,7 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void keepStarFoldWhenUsingStaticChildAndParentMembersFromJavaClasses() {
         rewriteRun(
-          // This kind of setup is only possible in Java, as you cannot use star imports for companion object members
+          // This kind of setup is only possible with a Java <> Kotlin mix, as you cannot use star imports for companion object members
           java(
             """
               package org.example;

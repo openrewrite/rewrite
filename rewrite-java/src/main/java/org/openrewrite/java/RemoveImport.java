@@ -63,7 +63,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     .orElse(IntelliJ.importLayout());
 
             boolean typeUsed = false;
-            Set<String> typeWithSuperTypes = new HashSet<>(singleton(type));
+            Set<String> types = new HashSet<>(singleton(type));
             Set<String> otherTypesInPackageUsed = new TreeSet<>();
 
             Set<String> methodsAndFieldsUsed = new HashSet<>();
@@ -74,11 +74,27 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 if (fq != null) {
                     String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
                     originalImports.add(fqnType);
-                    // For Kotlin, there is the option star imports reference to Java types of superclasses
                     if (isKotlin && type.equals(fqnType)) {
+                        // For Kotlin, the owning class interfaces with methods can be used directly without actually importing those interfaces
+                        JavaType.Class owningClass = TypeUtils.asClass(fq.getOwningClass());
+                        if (owningClass != null) {
+                            Queue<JavaType.FullyQualified> toVisit = new LinkedList<>(owningClass.getInterfaces());
+                            Set<JavaType.FullyQualified> visited = new HashSet<>();
+                            while (!toVisit.isEmpty()) {
+                                JavaType.FullyQualified current = toVisit.poll();
+                                if (!visited.add(current)) {
+                                    continue;
+                                }
+                                toVisit.addAll(current.getInterfaces());
+                            }
+                            for (JavaType.FullyQualified current : visited) {
+                                types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
+                            }
+                        }
+                        // And there is the option to star imports references of Java sourced superclasses types
                         while (fq.getSupertype() != null) {
                             fq = fq.getSupertype();
-                            typeWithSuperTypes.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
+                            types.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
                         }
                     }
                 }
@@ -86,7 +102,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && (fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), typeWithSuperTypes) ||
+                if (fq != null && (fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), types) ||
                         TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), owner))) {
                     methodsAndFieldsUsed.add(variable.getName());
                 }
@@ -95,7 +111,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static) || isKotlin) {
                     String declaringType = TypeUtils.toFullyQualifiedName(method.getDeclaringType().getFullyQualifiedName());
-                    if (fullyQualifiedNamesAreEqual(declaringType, typeWithSuperTypes)) {
+                    if (fullyQualifiedNamesAreEqual(declaringType, types)) {
                         methodsAndFieldsUsed.add(method.getName());
                     } else if (declaringType.equals(owner)) {
                         if (method.getName().equals(type.substring(type.lastIndexOf('.') + 1))) {
@@ -110,7 +126,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
             for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                 if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) javaType;
-                    if (fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), typeWithSuperTypes)) {
+                    if (fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), types)) {
                         typeUsed = true;
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getFullyQualifiedName(), owner) ||
                             TypeUtils.fullyQualifiedNamesAreEqual(fullyQualified.getPackageName(), owner)) {
@@ -139,12 +155,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 String typeName = import_.getTypeName();
                 if (import_.isStatic()) {
                     String imported = import_.getQualid().getSimpleName();
-                    if (fullyQualifiedNamesAreEqual(typeName + "." + imported, typeWithSuperTypes) && (force || !methodsAndFieldsUsed.contains(imported))) {
+                    if (fullyQualifiedNamesAreEqual(typeName + "." + imported, types) && (force || !methodsAndFieldsUsed.contains(imported))) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (fullyQualifiedNamesAreEqual(typeName, typeWithSuperTypes) ||
-                            fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), typeWithSuperTypes))) {
+                    } else if ("*".equals(imported) && (fullyQualifiedNamesAreEqual(typeName, types) ||
+                            fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), types))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;
@@ -153,12 +169,12 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                             return unfoldStarImport(import_, methodsAndFieldsUsed);
                         }
-                    } else if (fullyQualifiedNamesAreEqual(typeName, typeWithSuperTypes) && !methodsAndFieldsUsed.contains(imported)) {
+                    } else if (fullyQualifiedNamesAreEqual(typeName, types) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
-                } else if (!keepImport && fullyQualifiedNamesAreEqual(typeName, typeWithSuperTypes)) {
+                } else if (!keepImport && fullyQualifiedNamesAreEqual(typeName, types)) {
                     spaceForNextImport.set(import_.getPrefix());
                     return null;
                 } else if (!keepImport && import_.getPackageName().equals(owner) &&
