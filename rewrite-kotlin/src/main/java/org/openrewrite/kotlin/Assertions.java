@@ -218,7 +218,7 @@ public final class Assertions {
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
-            typeValidation.constructorInvocations()) {
+                typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -272,7 +272,7 @@ public final class Assertions {
                             ((J.Break) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
                     } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.Return &&
-                               ((K.Return) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
+                            ((K.Return) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
                     } else if (loc == Space.Location.LABEL_SUFFIX) {
                         return space;
@@ -456,7 +456,7 @@ public final class Assertions {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
             if (n.getClazz() instanceof J.Identifier && n.getClazz().getType() != null &&
-                !(n.getClazz().getType() instanceof JavaType.Class || n.getClazz().getType() instanceof JavaType.Unknown)) {
+                    !(n.getClazz().getType() instanceof JavaType.Class || n.getClazz().getType() instanceof JavaType.Unknown)) {
                 n = SearchResult.found(n, "NewClass#clazz is J.Identifier and the type is is not JavaType$Class.");
             }
             return n;
@@ -466,7 +466,7 @@ public final class Assertions {
         public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
             J.ParameterizedType p = super.visitParameterizedType(type, ctx);
             if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
-                !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
+                    !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
             }
             return p;
@@ -474,9 +474,9 @@ public final class Assertions {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName() ||
-                   isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
-                   isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
-                   isInJavaDoc(ident) || isWhenLabel() || isUseSite();
+                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
+                    isInJavaDoc(ident) || isWhenLabel() || isUseSite();
         }
 
         private boolean inPackageDeclaration() {
@@ -502,8 +502,8 @@ public final class Assertions {
         private boolean isFieldAccess(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess &&
-                   (ident == ((J.FieldAccess) value).getName() ||
-                       ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
+                    (ident == ((J.FieldAccess) value).getName() ||
+                            ident == ((J.FieldAccess) value).getTarget() && !"class".equals(((J.FieldAccess) value).getSimpleName()));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
@@ -528,13 +528,13 @@ public final class Assertions {
         private boolean isMemberReference(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.MemberReference &&
-                   ident == ((J.MemberReference) value).getReference();
+                    ident == ((J.MemberReference) value).getReference();
         }
 
         private boolean isInJavaDoc(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof Javadoc.Reference &&
-                   ident == ((Javadoc.Reference) value).getTree();
+                    ident == ((Javadoc.Reference) value).getTree();
         }
 
         private boolean isCaseLabel() {
@@ -558,7 +558,7 @@ public final class Assertions {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParentTreeCursor();
             return parent.getValue() instanceof J.Assignment &&
-                   (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
+                    (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
         private boolean isValidated(J.Identifier i) {
