@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Javadoc;
 
 import java.util.IdentityHashMap;
 import java.util.Objects;
@@ -87,12 +88,20 @@ public class TypesInUse {
                     } else {
                         usedMethods.add((JavaType.Method) javaType);
                     }
-                } else if (!(cursor.getValue() instanceof J.ClassDeclaration) && !(cursor.getValue() instanceof J.Lambda)) {
-                    // ignore type representing class declaration itself and inferred lambda types
+                } else if (!(cursor.getValue() instanceof J.ClassDeclaration) &&
+                        !(cursor.getValue() instanceof J.Lambda) &&
+                        !isFullyQualifiedJavaDocReference(cursor)) {
                     types.add(javaType);
                 }
             }
             return javaType;
+        }
+
+        private boolean isFullyQualifiedJavaDocReference(Cursor cursor) {
+            // Fully qualified Javadoc references are _using_ those types as much as they are just references;
+            // TypesInUse also determines what imports are retained, and for fully qualified these can be dropped
+            return cursor.getValue() instanceof J.FieldAccess &&
+                    cursor.getPathAsStream().anyMatch(o -> o instanceof Javadoc.Reference);
         }
     }
 }
