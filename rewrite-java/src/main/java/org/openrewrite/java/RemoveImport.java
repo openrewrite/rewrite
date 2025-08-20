@@ -75,7 +75,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
                     originalImports.add(fqnType);
                     if (isKotlin && type.equals(fqnType)) {
-                        // For Kotlin, the owning class interfaces with methods can be used directly without actually importing those interfaces
+                        // For Kotlin, the owning class interfaces with methods can be used without actually importing those interfaces directly...
                         JavaType.Class owningClass = TypeUtils.asClass(fq.getOwningClass());
                         if (owningClass != null) {
                             Queue<JavaType.FullyQualified> toVisit = new LinkedList<>(owningClass.getInterfaces());
@@ -91,7 +91,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                                 types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
                             }
                         }
-                        // And there is the option to star imports references of Java sourced superclasses types
+                        // ... and there is the option to star imports references of Java sourced superclasses types
                         while (fq.getSupertype() != null) {
                             fq = fq.getSupertype();
                             types.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
@@ -202,8 +202,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
-    private boolean fullyQualifiedNamesAreEqual(String declaringType, Collection<String> typeWithSuperTypes) {
-        for (String type : typeWithSuperTypes) {
+    private boolean fullyQualifiedNamesAreEqual(String declaringType, Collection<String> types) {
+        for (String type : types) {
             if (TypeUtils.fullyQualifiedNamesAreEqual(declaringType, type)) {
                 return true;
             }

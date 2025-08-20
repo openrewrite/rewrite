@@ -262,6 +262,33 @@ class RemoveImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keepStarFoldWhenUsingTopLevelFunctions() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("org.example.one")),
+          kotlin(
+            """
+              package org.example
+              
+              fun one() = "one"
+              fun two() = "two"
+              """
+          ),
+          kotlin(
+            """
+              import org.example.*
+              
+              class A {
+                  fun test() {
+                      one()
+                      two()
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled("We cannot use Java sources as dependencies in Kotlin sources yet")
     @Test
     void keepStarFoldWhenUsingStaticChildAndParentMembersFromJavaClasses() {
