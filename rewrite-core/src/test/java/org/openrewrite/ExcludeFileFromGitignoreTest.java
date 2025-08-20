@@ -115,19 +115,19 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
           text(
             """
               # comment
-              
+
               test.yml
               # comment
-              
+
               file.yaml
               """,
             """
               # comment
-              
+
               test.yml
               !/directory/test.yml
               # comment
-              
+
               file.yaml
               """,
             spec -> spec.path(".gitignore")

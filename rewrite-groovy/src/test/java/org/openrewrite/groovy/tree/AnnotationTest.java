@@ -149,7 +149,7 @@ class AnnotationTest implements RewriteTest {
             """
               import groovy.transform.EqualsAndHashCode
               import groovy.transform.ToString
-              
+
               @Foo
               @ToString
               @EqualsAndHashCode
@@ -168,7 +168,7 @@ class AnnotationTest implements RewriteTest {
             """
               import groovy.transform.Immutable
               import groovy.transform.TupleConstructor
-              
+
               @Foo
               @TupleConstructor
               @Immutable
@@ -210,7 +210,7 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               import groovy.transform.Field
-              
+
               @Field def a = [1, 2, 3]
               """
           )

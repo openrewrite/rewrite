@@ -34,7 +34,7 @@ class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import javax.annotation.processing.Generated;
-              
+
               @SuppressWarnings("all")
               public @Generated("foo") class T {}
               """,
@@ -66,9 +66,9 @@ class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.*;
-              
+
               import static java.lang.annotation.ElementType.*;
-              
+
               class T {
                   public @A1 Integer @A2 [] arg;
               }
@@ -76,7 +76,7 @@ class AnnotationServiceTest implements RewriteTest {
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               @interface A1 {}
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               @interface A2 {}
@@ -109,17 +109,17 @@ class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.*;
-              
+
               import static java.lang.annotation.ElementType.*;
-              
+
               class T {
                   Integer @A1 [] @A2 [] foo;
               }
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               @interface A1 {}
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               @interface A2 {}
@@ -157,9 +157,9 @@ class AnnotationServiceTest implements RewriteTest {
           java(
             """
               import java.lang.annotation.*;
-              
+
               import static java.lang.annotation.ElementType.*;
-              
+
               class T {
                   java. lang. @Ann Integer arg;
               }
@@ -178,7 +178,7 @@ class AnnotationServiceTest implements RewriteTest {
 
                 @Override
                 public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
-                    if (fieldAccess.getSimpleName().equals("Integer")) {
+                    if ("Integer".equals(fieldAccess.getSimpleName())) {
                         AnnotationService service = service(AnnotationService.class);
                         assertThat(service.getAllAnnotations(new Cursor(null, fieldAccess))).satisfiesExactly(
                           ann -> assertThat(ann.getSimpleName()).isEqualTo("Ann")

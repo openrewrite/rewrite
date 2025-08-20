@@ -146,7 +146,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             """
               import java.util.ArrayList;
-              
+
               class A {{ B.foo(new ArrayList<>()); }}
               """,
             """
@@ -163,7 +163,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class A {{ B.foo(Collections.emptyList()); }}
               """,
             """
@@ -180,7 +180,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             """
               import static java.lang.Math.max;
-              
+
               class A {{ B.foo(max(1,2)); }}
               """,
             """
@@ -197,7 +197,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             """
               import static java.lang.Integer.MAX_VALUE;
-              
+
               class A {{ B.foo(MAX_VALUE); }}
               """,
             """
@@ -216,7 +216,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
             """
               import java.util.AbstractMap.SimpleEntry;
               import java.util.List;
-              
+
               class A {{
                   B.foo(List.of(new SimpleEntry<>("a", "b")));
               }}
@@ -239,7 +239,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
               import java.math.BigInteger;
               import java.util.stream.Collectors;
               import java.util.stream.Stream;
-              
+
               class A {{
                   B.foo(Stream.of("23").map(s -> {
                       return new BigInteger(s).toString();

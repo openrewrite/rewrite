@@ -58,7 +58,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import b.B;
-                            
+
               class C {
                  public void test() {
                      B.foo();
@@ -93,7 +93,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
           java(
             """
               import static a.A.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -102,7 +102,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import static b.B.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -185,17 +185,17 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
-    @Disabled
     void keepImportComments() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
           java(
             """
               package org.codehaus.plexus.util;
-                            
+
               public class StringUtils {
                  public boolean isBlank(String s) {
                      s.isBlank();

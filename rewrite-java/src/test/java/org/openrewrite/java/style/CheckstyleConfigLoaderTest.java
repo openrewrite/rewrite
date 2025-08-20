@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.style;
 
-import com.puppycrawl.tools.checkstyle.api.CheckstyleException;
 import org.junit.jupiter.api.Test;
 
 import static java.util.Collections.emptyMap;
@@ -25,7 +24,7 @@ import static org.openrewrite.java.style.CheckstyleConfigLoader.loadCheckstyleCo
 class CheckstyleConfigLoaderTest {
 
     @Test
-    void basicSingleStyle() throws CheckstyleException {
+    void basicSingleStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -43,7 +42,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void singleStyleWithProperty() throws CheckstyleException {
+    void singleStyleWithProperty() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -64,7 +63,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void emptyBlockStyle() throws CheckstyleException {
+    void emptyBlockStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -89,7 +88,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void equalsAvoidsNull() throws CheckstyleException {
+    void equalsAvoidsNull() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -111,7 +110,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void insideTreeWalker() throws CheckstyleException {
+    void insideTreeWalker() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -134,7 +133,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void moduleNameEndsWithCheck() throws CheckstyleException {
+    void moduleNameEndsWithCheck() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -155,7 +154,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void emptyForPadInitializer() throws CheckstyleException {
+    void emptyForPadInitializer() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -176,7 +175,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void methodParamPadStyle() throws CheckstyleException {
+    void methodParamPadStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -199,7 +198,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void noWhitespaceAfterStyle() throws CheckstyleException {
+    void noWhitespaceAfterStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -220,7 +219,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void noWhitespaceBeforeStyle() throws CheckstyleException {
+    void noWhitespaceBeforeStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -241,7 +240,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void needBraces() throws CheckstyleException {
+    void needBraces() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -264,7 +263,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void operatorWrap() throws CheckstyleException {
+    void operatorWrap() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -285,7 +284,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void typecastParenPad() throws CheckstyleException {
+    void typecastParenPad() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -307,7 +306,7 @@ class CheckstyleConfigLoaderTest {
 
 
     @Test
-    void duplicatedModuleNames() throws CheckstyleException {
+    void duplicatedModuleNames() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -332,7 +331,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void customImportOrderStyle() throws CheckstyleException {
+    void customImportOrderStyle() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -365,7 +364,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void unusedImportsWithJavadocProcessing() throws CheckstyleException {
+    void unusedImportsWithJavadocProcessing() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -386,7 +385,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void unusedImportsWithoutExpliciteJavadocProcessing() throws CheckstyleException {
+    void unusedImportsWithoutExpliciteJavadocProcessing() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
@@ -407,7 +406,7 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
-    void unusedImportsWithoutJavadocProcessing() throws CheckstyleException {
+    void unusedImportsWithoutJavadocProcessing() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC
                 "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"

@@ -31,6 +31,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.max;
 import static org.openrewrite.Validated.test;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
@@ -100,7 +101,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        validated = validated.and(test(
+        return validated.and(test(
                 "coordinates",
                 "newGroupId OR newArtifactId must be different from before",
                 this,
@@ -110,7 +111,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return !(sameGroupId && sameArtifactId);
                 }
         ));
-        return validated;
     }
 
     @Override
@@ -216,7 +216,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     }
 
                 }
-                return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
+                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
         };
     }

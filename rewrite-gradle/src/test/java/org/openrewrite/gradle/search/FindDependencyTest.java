@@ -125,8 +125,8 @@ class FindDependencyTest implements RewriteTest {
         );
     }
 
-    @Nested
     @Issue("https://github.com/moderneinc/customer-requests/issues/895")
+    @Nested
     class WithInterpolatedVersion {
         @Test
         void withCurly() {
@@ -138,16 +138,16 @@ class FindDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   ext {
                       someVersion = 'latest.release'
                       otherVersion = 'latest.integration'
                   }
-                  
+
                   dependencies {
                       api "org.openrewrite:rewrite-core:${someVersion}"
                       api "org.openrewrite.internal:rewrite-core:${otherVersion}"
@@ -163,16 +163,16 @@ class FindDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   ext {
                       someVersion = 'latest.release'
                       otherVersion = 'latest.integration'
                   }
-                  
+
                   dependencies {
                       /*~~>*/api "org.openrewrite:rewrite-core:${someVersion}"
                       /*~~>*/api "org.openrewrite.internal:rewrite-core:${otherVersion}"
@@ -198,16 +198,16 @@ class FindDependencyTest implements RewriteTest {
                   plugins {
                       id 'java-library'
                   }
-                  
+
                   repositories {
                       mavenCentral()
                   }
-                  
+
                   ext {
                       someVersion = 'latest.release'
                       otherVersion = 'integration'
                   }
-                  
+
                   dependencies {
                       api "org.openrewrite:${otherVersion}:${someVersion}"
                   }
@@ -218,8 +218,8 @@ class FindDependencyTest implements RewriteTest {
 
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    @Test
     void ignoreConstraints() {
         rewriteRun(
           spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", "implementation")),
@@ -228,18 +228,18 @@ class FindDependencyTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1') 
+                      implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                   }
               }
               """
           ));
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5599")
+    @Test
     void constraintsVsRegularDependencies() {
         rewriteRun(
           spec -> spec.recipe(new FindDependency("com.fasterxml.jackson.core", "jackson-databind", null)),
@@ -248,11 +248,11 @@ class FindDependencyTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
                   testImplementation 'junit:junit:4.13.2'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                       api('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
@@ -262,11 +262,11 @@ class FindDependencyTest implements RewriteTest {
             """
               plugins { id 'java' }
               repositories { mavenCentral() }
-              
+
               dependencies {
                   /*~~>*/implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
                   testImplementation 'junit:junit:4.13.2'
-              
+
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')
                       api('com.fasterxml.jackson.core:jackson-databind:2.12.7.1')

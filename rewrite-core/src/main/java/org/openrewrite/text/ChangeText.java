@@ -23,9 +23,9 @@ import org.openrewrite.binary.Binary;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
-import java.util.Collections;
 import java.util.Set;
 
+import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -38,7 +38,7 @@ public class ChangeText extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("plain text");
+        return singleton("plain text");
     }
 
     @Override

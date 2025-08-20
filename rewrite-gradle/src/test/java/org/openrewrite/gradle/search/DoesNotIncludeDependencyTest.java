@@ -73,27 +73,26 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
-              buildGradle(String.format(directDependencyTemplate, configuration))
+              buildGradle(directDependencyTemplate.formatted(configuration))
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
         @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
         @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
         @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
         @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        @ParameterizedTest
         void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                String.format(directDependencyTemplate, existingConfiguration),
+                      directDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + directDependencyTemplate, existingConfiguration)
               )
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
         @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
         @CsvSource({"compileOnly,compileClasspath"})
@@ -101,10 +100,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
         @CsvSource({"testCompileOnly,testCompileClasspath"})
         @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        @ParameterizedTest
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
-              buildGradle(String.format(directDependencyTemplate, existingConfiguration))
+              buildGradle(directDependencyTemplate.formatted(existingConfiguration))
             );
         }
     }
@@ -129,27 +129,26 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
-              buildGradle(String.format(transitiveDependencyTemplate, configuration))
+              buildGradle(transitiveDependencyTemplate.formatted(configuration))
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"compileOnly,runtimeClasspath", "compileOnly,testCompileClasspath", "compileOnly,testRuntimeClasspath"})
         @CsvSource({"runtimeOnly,compileClasspath", "runtimeOnly,testCompileClasspath"})
         @CsvSource({"testImplementation,compileClasspath", "testImplementation,runtimeClasspath"})
         @CsvSource({"testCompileOnly,compileClasspath", "testCompileOnly,runtimeClasspath", "testCompileOnly,testRuntimeClasspath"})
         @CsvSource({"testRuntimeOnly,compileClasspath", "testRuntimeOnly,runtimeClasspath", "testRuntimeOnly,testCompileClasspath"})
+        @ParameterizedTest
         void notInDesiredConfigurationMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                String.format(transitiveDependencyTemplate, existingConfiguration),
+                      transitiveDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + transitiveDependencyTemplate, existingConfiguration)
               )
             );
         }
 
-        @ParameterizedTest
         @CsvSource({"api,compileClasspath", "api,runtimeClasspath", "api,testCompileClasspath", "api,testRuntimeClasspath"})
         @CsvSource({"implementation,compileClasspath", "implementation,runtimeClasspath", "implementation,testCompileClasspath", "implementation,testRuntimeClasspath"})
         @CsvSource({"compileOnly,compileClasspath"})
@@ -157,10 +156,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         @CsvSource({"testImplementation,testCompileClasspath", "testImplementation,testRuntimeClasspath"})
         @CsvSource({"testCompileOnly,testCompileClasspath"})
         @CsvSource({"testRuntimeOnly,testRuntimeClasspath"})
+        @ParameterizedTest
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
-              buildGradle(String.format(transitiveDependencyTemplate, existingConfiguration))
+              buildGradle(transitiveDependencyTemplate.formatted(existingConfiguration))
             );
         }
     }

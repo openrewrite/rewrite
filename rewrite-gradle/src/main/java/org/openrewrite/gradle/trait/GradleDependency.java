@@ -19,11 +19,14 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -33,11 +36,12 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -75,6 +79,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<GradleDependency, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, P p) {
+                    GradleDependency dependency = test(getCursor());
+                    return dependency != null ?
+                            (J) visitor.visit(dependency, p) :
+                            super.visitMethodInvocation(method, p);
+                }
+            };
+        }
+
+        @Override
         protected @Nullable GradleDependency test(Cursor cursor) {
             Object object = cursor.getValue();
             if (object instanceof J.MethodInvocation) {
@@ -106,10 +123,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
                     dependency = parseDependency(Arrays.asList(((J.Binary) argument).getLeft()));
                 } else if (argument instanceof J.MethodInvocation) {
-                    if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {
+                    if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
+                            "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
                         dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
-                    } else if (((J.MethodInvocation) argument).getSimpleName().equals("project")) {
+                    } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
                         // project dependencies are not yet supported
                         return null;
                     }
@@ -187,26 +204,11 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
 
             String methodName = methodInvocation.getSimpleName();
-            if (methodName.equals("classpath")) {
+            if ("classpath".equals(methodName)) {
                 return gradleProject.getBuildscript().getConfiguration(methodName);
             } else {
                 return gradleProject.getConfiguration(methodName);
             }
-        }
-
-        private boolean withinBlock(Cursor cursor, String name) {
-            Cursor parentCursor = cursor.getParent();
-            while (parentCursor != null) {
-                if (parentCursor.getValue() instanceof J.MethodInvocation) {
-                    J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals(name)) {
-                        return true;
-                    }
-                }
-                parentCursor = parentCursor.getParent();
-            }
-
-            return false;
         }
 
         private boolean withinDependenciesBlock(Cursor cursor) {
@@ -231,7 +233,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 List<Expression> mapEntryExpressions = ((G.MapLiteral) argument).getElements()
                         .stream()
                         .map(e -> (Expression) e)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
                 return getMapEntriesDependency(arguments);

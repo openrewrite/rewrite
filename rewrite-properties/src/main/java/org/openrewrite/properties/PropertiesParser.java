@@ -27,10 +27,10 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Collections.unmodifiableList;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser {
@@ -104,7 +104,7 @@ public class PropertiesParser implements Parser {
                 "",
                 Markers.EMPTY,
                 sourceFile,
-                Collections.unmodifiableList(contents),
+                unmodifiableList(contents),
                 prefix.toString(),
                 source.getCharset().name(),
                 source.isCharsetBomMarked(),

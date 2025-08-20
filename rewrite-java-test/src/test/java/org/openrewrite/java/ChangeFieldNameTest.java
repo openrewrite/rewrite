@@ -70,14 +70,14 @@ class ChangeFieldNameTest implements RewriteTest {
             """
               class Test {
                  int n;
-                 
+
                  {
                      n = 1;
                      n /= 2;
                      if(n + 1 == 2) {}
                      n++;
                  }
-                 
+
                  public int foo(int n) {
                      return n + this.n;
                  }
@@ -86,14 +86,14 @@ class ChangeFieldNameTest implements RewriteTest {
             """
               class Test {
                  int n1;
-                 
+
                  {
                      n1 = 1;
                      n1 /= 2;
                      if(n1 + 1 == 2) {}
                      n1++;
                  }
-                 
+
                  public int foo(int n) {
                      return n + this.n1;
                  }
@@ -136,8 +136,8 @@ class ChangeFieldNameTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/632")
+    @Test
     void changeFieldNameReferencesInOtherClassUsingStaticImport() {
         rewriteRun(
           spec -> spec.recipe(changeFieldName("com.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1")),

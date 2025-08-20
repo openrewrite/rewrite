@@ -36,7 +36,7 @@ class CreatePropertiesFileTest implements RewriteTest {
             null
           )),
           properties(
-            null,
+            doesNotExist(),
             """
               # This is a comment
               x.y=z
@@ -46,7 +46,6 @@ class CreatePropertiesFileTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
@@ -106,7 +105,7 @@ class CreatePropertiesFileTest implements RewriteTest {
             spec -> spec.path("test/test-file-1.properties")
           ),
           properties(
-            null,
+            doesNotExist(),
             "",
             spec -> spec.path("test/test-file-2.properties")
           )

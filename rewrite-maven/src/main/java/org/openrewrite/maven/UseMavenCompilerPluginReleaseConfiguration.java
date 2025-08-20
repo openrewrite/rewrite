@@ -59,17 +59,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (!PLUGINS_MATCHER.matches(getCursor())) {
+                if (!isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
                     return t;
                 }
-                Optional<Xml.Tag> maybeCompilerPlugin = t.getChildren().stream()
-                        .filter(plugin ->
-                                "plugin".equals(plugin.getName()) &&
-                                "org.apache.maven.plugins".equals(plugin.getChildValue("groupId").orElse("org.apache.maven.plugins")) &&
-                                "maven-compiler-plugin".equals(plugin.getChildValue("artifactId").orElse(null)))
-                        .findAny();
-                Optional<Xml.Tag> maybeCompilerPluginConfig = maybeCompilerPlugin
-                        .flatMap(it -> it.getChild("configuration"));
+                Optional<Xml.Tag> maybeCompilerPluginConfig = t.getChild("configuration");
                 if (!maybeCompilerPluginConfig.isPresent()) {
                     return t;
                 }
@@ -77,10 +70,12 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                 Optional<String> source = compilerPluginConfig.getChildValue("source");
                 Optional<String> target = compilerPluginConfig.getChildValue("target");
                 Optional<String> release = compilerPluginConfig.getChildValue("release");
-
-                if (currentNewerThanProposed(source)
-                        || currentNewerThanProposed(target)
-                        || currentNewerThanProposed(release)) {
+                if (!source.isPresent() && !target.isPresent() && !release.isPresent()) {
+                    return t; // Do not introduce a new tag if none of the values are present
+                }
+                if (currentNewerThanProposed(source) ||
+                        currentNewerThanProposed(target) ||
+                        currentNewerThanProposed(release)) {
                     return t;
                 }
 

@@ -77,7 +77,7 @@ class HclBlockTest implements RewriteTest {
                 volume_id   = "aws_ebs_volume.web_host_storage.id"
                 instance_id = "aws_instance.web_host.id"
               }
-              
+
               resource "aws_route_table_association" "rtbassoc2" {
                 subnet_id      = aws_subnet.web_subnet2.id
                 route_table_id = aws_route_table.web_rtb.id

@@ -93,8 +93,8 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1944")
     @Test
     void multiCatch() {
         rewriteRun(
@@ -108,8 +108,8 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResource() {
         rewriteRun(
@@ -123,8 +123,8 @@ class TryTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/1945")
     @Test
     void tryWithResources() {
         rewriteRun(
@@ -144,11 +144,11 @@ class TryTest implements RewriteTest {
           groovy(
             """
               try     {
-              
+
               }    catch(RuntimeException e)      {
-              
+
               }catch (     final         Exception          e) {
-              
+
               }finally{
                   // some comment
               }
