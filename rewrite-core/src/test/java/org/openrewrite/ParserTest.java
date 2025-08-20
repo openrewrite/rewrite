@@ -22,7 +22,6 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,7 +68,7 @@ class ParserTest implements RewriteTest {
           DIFF HERE
           line 2
           """;
-        Path path = Paths.get("1.txt");
+        Path path = Path.of("1.txt");
         String expectedDiff = """
           --- a/1.txt
           +++ b/1.txt

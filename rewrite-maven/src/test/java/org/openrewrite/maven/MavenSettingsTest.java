@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
@@ -75,7 +74,7 @@ class MavenSettingsTest {
 
     @Test
     void parse() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -110,7 +109,7 @@ class MavenSettingsTest {
     void parseWithEncryption()  throws Exception{
         createSettingsSecurityFile();
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -138,7 +137,7 @@ class MavenSettingsTest {
     void parsePlainTextWithEncryption()  throws Exception{
         createSettingsSecurityFile();
         String plainTextPassword = "password";
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -164,7 +163,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultActiveWhenNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -204,7 +203,7 @@ class MavenSettingsTest {
 
     @Test
     void idCollisionLastRepositoryWins() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -246,7 +245,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultOnlyActiveIfNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -296,7 +295,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/130")
     @Test
     void mirrorReplacesRepository() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -338,7 +337,7 @@ class MavenSettingsTest {
 
     @Test
     void starredMirrorWithExclusion() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -393,7 +392,7 @@ class MavenSettingsTest {
 
     @Test
     void serverCredentials() {
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -423,7 +422,7 @@ class MavenSettingsTest {
     void serverCredentialsWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -452,7 +451,7 @@ class MavenSettingsTest {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -479,7 +478,7 @@ class MavenSettingsTest {
     void serverTimeouts() {
         // Deliberately supporting the simpler old configuration of a single timeout
         // https://maven.apache.org/guides/mini/guide-http-settings.html#connection-timeouts
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -509,7 +508,7 @@ class MavenSettingsTest {
     class LocalRepositoryTest {
         @Test
         void parsesLocalRepositoryPathFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -526,7 +525,7 @@ class MavenSettingsTest {
 
         @Test
         void parsesLocalRepositoryUriFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -544,7 +543,7 @@ class MavenSettingsTest {
 
         @Test
         void defaultsToTheMavenDefault() {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                         <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -564,7 +563,7 @@ class MavenSettingsTest {
         @Test
         void properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp");
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -604,7 +603,7 @@ class MavenSettingsTest {
 
         @Test
         void unresolvedPlaceholdersRemainUnchanged() {
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -650,7 +649,7 @@ class MavenSettingsTest {
         void env() {
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_USERNAME", "user");
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_PASSWORD", "pass");
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -752,7 +751,7 @@ class MavenSettingsTest {
 
         @Test
         void concatenatesElementsWithUniqueIds() {
-            Path path = Paths.get("settings.xml");
+            Path path = Path.of("settings.xml");
             var baseSettings = MavenSettings.parse(Parser.Input.fromString(path, installationSettings), ctx);
             var userSettings = MavenSettings.parse(Parser.Input.fromString(path,
               //language=xml
@@ -811,7 +810,7 @@ class MavenSettingsTest {
 
         @Test
         void mergedOrderingPutsFirstSettingsFirst() {
-            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -830,7 +829,7 @@ class MavenSettingsTest {
                 </settings>
                 """
             ), ctx);
-            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -859,8 +858,8 @@ class MavenSettingsTest {
 
         @Test
         void replacesElementsWithMatchingIds() {
-            var baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"), installationSettings), ctx);
-            var userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var baseSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"), installationSettings), ctx);
+            var userSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -919,7 +918,7 @@ class MavenSettingsTest {
      */
     @Test
     void serverHttpHeaders() {
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
             <settings>

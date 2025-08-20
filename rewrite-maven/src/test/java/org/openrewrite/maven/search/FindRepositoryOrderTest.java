@@ -24,7 +24,7 @@ import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.table.MavenRepositoryOrder;
 import org.openrewrite.test.RewriteTest;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -35,7 +35,7 @@ class FindRepositoryOrderTest implements RewriteTest {
     @Test
     void findRepositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"

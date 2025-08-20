@@ -18,7 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -37,7 +37,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/renameMe/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/application.yml")))
           ),
           text(
             "hello: world",
@@ -45,7 +45,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/renameMe/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/application-dev.yml")))
           )
         );
     }
@@ -60,7 +60,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/renameMe/nested/deeply/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/nested/deeply/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/nested/deeply/application.yml")))
           ),
           text(
             "hello: world",
@@ -68,7 +68,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/renameMe/nested/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/nested/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/nested/application-dev.yml")))
           ),
           text(
             "hello: world",
@@ -76,7 +76,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/renameMe/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/application-dev.yml")))
           )
         );
     }
@@ -90,21 +90,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\deeply\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\deeply\\profiles\\application.yml")))
           )
         );
     }
@@ -118,21 +118,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\profiles\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\profiles\\nested\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\profiles\\deeply\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\profiles\\deeply\\nested\\application.yml")))
           )
         );
     }
@@ -147,7 +147,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/profiles/application.yml")))
           ),
           text(
             "hello: world",
@@ -155,7 +155,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/profiles/application-dev.yml")))
           )
         );
     }
@@ -170,7 +170,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/nested/resources/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/nested/resources/application.yml")))
           )
         );
     }
@@ -185,7 +185,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/subdirectory/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/profiles/subdirectory/application.yml")))
           ),
           text(
             "hello: world",
@@ -193,7 +193,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/resources/profiles/subdirectory/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/resources/profiles/subdirectory/application-dev.yml")))
           )
         );
     }
@@ -208,7 +208,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src/main/nested/subdirectory/resources/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src/main/nested/subdirectory/resources/application.yml")))
           )
         );
     }
@@ -222,21 +222,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\nested\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\nested\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\deeply\\nested\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\deeply\\nested\\profiles\\application.yml")))
           )
         );
     }
@@ -250,21 +250,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\nested\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\deeply\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\deeply\\nested\\application.yml")))
           )
         );
     }
@@ -278,21 +278,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\nested\\profiles\\subdirectory\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\nested\\profiles\\subdirectory\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\deeply\\nested\\profiles\\subdirectory\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\deeply\\nested\\profiles\\subdirectory\\application.yml")))
           )
         );
     }
@@ -306,21 +306,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\subdirectory\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\subdirectory\\nested\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("src\\main\\renameMe\\profiles\\subdirectory\\deeply\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("src\\main\\renameMe\\profiles\\subdirectory\\deeply\\nested\\application.yml")))
           )
         );
     }
@@ -335,7 +335,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/application.yml")))
           ),
           text(
             "hello: world",
@@ -343,7 +343,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/application-dev.yml")))
           )
         );
     }
@@ -359,7 +359,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/application.yml")))
           ),
           text(
             "hello: world",
@@ -367,7 +367,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/application-dev.yml")))
           ),
           text(
             "hello: world",
@@ -375,7 +375,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/nested/application.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/nested/application.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/nested/application.yml")))
           ),
           text(
             "hello: world",
@@ -383,7 +383,7 @@ class MoveFileTest implements RewriteTest {
             spec ->
               spec
                 .path("src/main/resources/deeply/nested/application-dev.yml")
-                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles/deeply/nested/application-dev.yml")))
+                .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles/deeply/nested/application-dev.yml")))
           )
         );
     }
@@ -399,21 +399,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\application.yml")))
           )
         );
     }
@@ -427,21 +427,21 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\nested\\application.yml")))
           ),
           text(
             "hello: world",
             "hello: world",
             spec -> spec
               .path("src\\main\\renameMe\\deeply\\nested\\application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("profiles\\deeply\\nested\\application.yml")))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of("profiles\\deeply\\nested\\application.yml")))
           )
         );
     }
@@ -501,7 +501,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }
@@ -515,7 +515,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }
@@ -529,7 +529,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }
@@ -543,7 +543,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }
@@ -557,7 +557,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("src/main/resources/application.yml"))))
           )
         );
     }
@@ -570,7 +570,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("application.yml"))))
           )
         );
     }
@@ -583,7 +583,7 @@ class MoveFileTest implements RewriteTest {
             "hello: world",
             spec -> spec
               .path("application.yml")
-              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get(PathUtils.separatorsToSystem("application.yml"))))
+              .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Path.of(PathUtils.separatorsToSystem("application.yml"))))
           )
         );
     }

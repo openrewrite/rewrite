@@ -18,7 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.text.PlainText;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -40,7 +40,7 @@ class CursorTest {
     @Test
     void pollMessages() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
+          .sourcePath(Path.of("test.txt"))
           .text("test")
           .build();
         var cursor = new Cursor(null, t);
@@ -57,7 +57,7 @@ class CursorTest {
     @Test
     void pathPredicates() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
+          .sourcePath(Path.of("test.txt"))
           .text("test")
           .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
@@ -67,7 +67,7 @@ class CursorTest {
     @Test
     void pathAsStreamPredicates() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
+          .sourcePath(Path.of("test.txt"))
           .text("test")
           .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);

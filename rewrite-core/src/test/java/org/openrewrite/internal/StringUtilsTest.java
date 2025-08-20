@@ -119,16 +119,18 @@ class StringUtilsTest {
     @Test
     void greatestCommonMargin() {
         assertThat(StringUtils.greatestCommonMargin(
-          "" +
-          "  \n" +
-          "   \n" +
-          "     \n")).isEqualTo("  ");
+          """
+           \s
+            \s
+              \s
+          """)).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin(
-          "" +
-          "   \n" +
-          "  s \n" +
-          "    \n")).isEqualTo("  ");
+          """
+            \s
+            s\s
+             \s
+          """)).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin("")).isEqualTo("");
         assertThat(StringUtils.greatestCommonMargin("\n\n")).isEqualTo("");
