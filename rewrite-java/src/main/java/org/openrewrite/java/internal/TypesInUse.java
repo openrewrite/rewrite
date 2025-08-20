@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
 
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 
@@ -112,9 +113,20 @@ public class TypesInUse {
 
         private boolean isFullyQualifiedJavaDocReference(Cursor cursor) {
             // Fully qualified Javadoc references are _using_ those types as much as they are just references;
-            // TypesInUse also determines what imports are retained, and for fully qualified these can be dropped
-            return cursor.getValue() instanceof J.FieldAccess &&
-                    cursor.getPathAsStream().anyMatch(o -> o instanceof Javadoc.Reference);
+            // TypesInUse entries determines what imports are retained, and for fully qualified these can be dropped
+            if (cursor.getValue() instanceof J.FieldAccess) {
+                Iterator<Object> path = cursor.getPath();
+                while (path.hasNext()) {
+                    Object o = path.next();
+                    if (o instanceof Javadoc.Reference) {
+                        return true;
+                    }
+                    if (o instanceof J.Block) {
+                        return false;
+                    }
+                }
+            }
+            return false;
         }
     }
 }
