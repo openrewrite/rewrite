@@ -132,85 +132,50 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
-    void doNotDocRemoval() {
+    void retainImportIfUsedInJavaDoc() {
         rewriteRun(
           java(
             """
-              /*
-               * Copyright 2015-2025 the original author or authors.
-               *
-               * All rights reserved. This program and the accompanying materials are
-               * made available under the terms of the Eclipse Public License v2.0 which
-               * accompanies this distribution and is available at
-               *
-               * https://www.eclipse.org/legal/epl-v20.html
-               */
-              
-              package org.junit.platform.suite.api;
-              
-              import static org.apiguardian.api.API.Status.STABLE;
-              
-              import java.lang.annotation.Documented;
-              import java.lang.annotation.ElementType;
-              import java.lang.annotation.Inherited;
-              import java.lang.annotation.Retention;
-              import java.lang.annotation.RetentionPolicy;
-              import java.lang.annotation.Target;
-              import java.util.Set;
-              
-              import org.apiguardian.api.API;
-              
+              import java.util.Date;
+              import java.util.List;
+
               /**
-               * {@code @SelectModules} specifies the modules to <em>select</em> when running
-               * a test suite on the JUnit Platform.
-               *
-               * @since 1.8
-               * @see Suite
-               * @see org.junit.platform.engine.discovery.DiscoverySelectors#selectModules(Set)
+               * referencing {@link Date} only in doc
                */
-              @Retention(RetentionPolicy.RUNTIME)
-              @Target(ElementType.TYPE)
-              @Inherited
-              @Documented
-              @API(status = STABLE, since = "1.10")
-              public @interface SelectModules {
-              
-              	/**
-              	 * One or more modules to select.
-              	 */
-              	String[] value();
-              
+              class Test {
+                  List list;
               }
-              """
+            """
           )
         );
+    }
+
+    @Test
+    void removeImportIfFullyQualifiedInJavaDoc() {
         rewriteRun(
           java(
             """
+              import java.util.Date;
+              import java.util.List;
+
               /**
-               * BSD-style license; for more info see http://pmd.sourceforge.net/license.html
+               * referencing {@link java.util.Date} only in doc
                */
-              
-              package net.sourceforge.pmd.lang.java.ast;
-              
-              import net.sourceforge.pmd.lang.ast.Node;
-              
-              /**
-               * The declaration of an annotation type.
-               * This is a {@linkplain Node#isFindBoundary() find boundary} for tree traversal methods.
-               * </pre>
-               *
-               */
-              public final class ASTAnnotationTypeDeclaration {
-              
-              
-                  ASTAnnotationTypeDeclaration(int id) {
-                  }
-              
+              class Test2 {
+                  List list;
               }
-              """
+            """,
+            """
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+            """
           )
         );
     }
