@@ -18,8 +18,6 @@ package org.openrewrite.gradle.internal;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Checksum;
-import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markup;
