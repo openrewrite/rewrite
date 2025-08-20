@@ -122,7 +122,9 @@ public class OpenRewriteModelBuilder {
                 return OpenRewriteModel.from(customModelBuilder.get());
             } finally {
                 try {
-                    Files.delete(init);
+                    if (Files.exists(init)) {
+                        Files.delete(init);
+                    }
                 } catch (IOException e) {
                     //noinspection ThrowFromFinallyBlock
                     throw new UncheckedIOException(e);

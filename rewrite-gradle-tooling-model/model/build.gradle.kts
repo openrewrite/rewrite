@@ -64,28 +64,24 @@ val testGradle4 = tasks.register<Test>("testGradle4") {
     })
 }
 
-val manifestFile = layout.buildDirectory.dir("test-manifest").get().file("test-manifest.txt")
+val manifestFile = layout.projectDirectory.file("src/main/resources/test-manifest.txt")
 val testManifestTask =  tasks.register("testManifest") {
-    val classpath = pluginLocalTestClasspath.files
-    inputs.files(classpath)
-    val outputDir = layout.buildDirectory.dir("test-manifest").get().dir("test-classpath")
-    outputs.dir(outputDir)
+    val classpathText = pluginLocalTestClasspath.files.joinToString(separator = "\n") { it.absolutePath }
+    inputs.property("manifestContents", classpathText)
     outputs.file(manifestFile)
     doLast {
         manifestFile.asFile.parentFile.deleteRecursively()
         mkdir(manifestFile.asFile.parentFile)
-        copy {
-            from(classpath)
-            into(outputDir)
-        }
-        manifestFile.asFile.writeText(classpath.joinToString(separator = "\n") { it.absolutePath })
+        manifestFile.asFile.writeText(classpathText)
     }
 }
 
 tasks.named<ProcessResources>("processResources").configure {
-    from(manifestFile)
+    dependsOn(testManifestTask)
 }
-
+tasks.named("rewriteRecipeAuthorAttributionResources").configure {
+    dependsOn(testManifestTask)
+}
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
