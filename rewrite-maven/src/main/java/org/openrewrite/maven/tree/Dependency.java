@@ -51,7 +51,12 @@ public class Dependency implements Serializable, Attributed {
     String optional;
 
     @Builder.Default
+    @Nullable
     Map<String, String> attributes = emptyMap();
+
+    public Map<String, String> getAttributes() {
+        return attributes != null ? attributes : emptyMap();
+    }
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();
