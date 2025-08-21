@@ -53,20 +53,20 @@ class KTSTest implements RewriteTest {
           ),
           kotlinScript(
             """
-            import org.example.one
-            one()
-            """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getTypesInUse().getUsedMethods())
-                  .singleElement()
-                    .satisfies(m -> {
-                       assertThat(m.getDeclaringType())
-                         .satisfies(it -> {
-                             assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
-                             assertThat(it.getMethods()).hasSize(2);
-                         });
-                    });
-            })
+              import org.example.one
+              one()
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(cu.getTypesInUse().getUsedMethods())
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getDeclaringType())
+                      .satisfies(it -> {
+                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
+                          assertThat(it.getMethods()).hasSize(2);
+                      });
+                })
+            )
           )
         );
     }
