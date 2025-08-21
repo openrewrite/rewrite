@@ -295,19 +295,24 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
                     ResolvedPom pom = resolutionResult.getPom();
-                    //If the current requested pom has the property defined, or if the pom has the property defined and it is inherited from a parent pom that is not in the same source tree
                     if (pom.getRequested().getProperties().containsKey(propertyName)) {
+                        // The current REQUESTED pom already has a property, let's change the value of the property in the current file
                         doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, addPropertyIfMissing, false).getVisitor());
                     } else if (pom.getProperties().containsKey(propertyName)) {
+                        // The combined pom knows about the property, but it is not originating from the current requested pom
                         boolean inheritsPropertyFromExternalParent = true;
                         while (resolutionResult.getParent() != null) {
                             resolutionResult = resolutionResult.getParent();
                             if (resolutionResult.getPom().getRequested().getProperties().containsKey(propertyName)) {
+                                // We found an in-repo parent pom that creates this property, so we do not have to adapt this file as the other file will be adapted.
                                 inheritsPropertyFromExternalParent = false;
                                 break;
                             }
                         }
                         if (inheritsPropertyFromExternalParent) {
+                            // We did not find a parent POM (external parents are not mapped on the resolution result's POM) in the repo,
+                            // but the property exists so it must be a property that comes from an external parent pom,
+                            // so we create the property in the current pom file in order to override its value
                             doAfterVisit((TreeVisitor<?, P>) new ChangePropertyValue(propertyName, newValue, true, false).getVisitor());
                         }
                     }
