@@ -22,4 +22,3 @@ public interface OpenRewriteModelProxy {
 
     byte @Nullable [] getGradleSettingsBytes();
 }
-
