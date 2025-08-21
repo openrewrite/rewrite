@@ -780,7 +780,15 @@ class KotlinTypeMapping(
                     else -> Unknown.getInstance()
                 }
             } else if (resolvedSymbol.callableId.classId == null) {
-                val topLevelFunctions = resolvedSymbol.getContainingFile()?.collectTopLevelFunctions() ?: emptyList()
+                val topLevelFunctions= buildList {
+                    resolvedSymbol.getContainingFile()?.declarations?.forEach {
+                        when (it) {
+                            is FirSimpleFunction -> add(it)
+                            is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                            else -> {}
+                        }
+                    }
+                }
                 declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name.replaceFirst(".kts", "Kt").replaceFirst(".kt", "Kt"))
                     .withMethods(topLevelFunctions.map { methodDeclarationType(it, null) })
             }
@@ -1387,16 +1395,5 @@ class KotlinTypeMapping(
             is FirCallableSymbol<*> -> moduleData.session.firProvider.getFirCallableContainerFile(this)
             is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
             else -> null
-        }
-
-    fun FirFile.collectTopLevelFunctions(): List<FirSimpleFunction> =
-        buildList {
-            declarations.forEach {
-                when (it) {
-                    is FirSimpleFunction -> add(it)
-                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
-                    else -> {}
-                }
-            }
         }
 }
