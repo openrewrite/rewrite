@@ -26,7 +26,7 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
-    compileOnly("org.rocksdb:rocksdbjni:latest.release")
+    compileOnly("org.rocksdb:rocksdbjni:10.2.1")
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
 
@@ -44,7 +44,7 @@ dependencies {
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
-    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
+    testRuntimeOnly("org.rocksdb:rocksdbjni:10.2.1")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

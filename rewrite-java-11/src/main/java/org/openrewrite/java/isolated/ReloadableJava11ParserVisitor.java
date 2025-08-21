@@ -467,7 +467,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
         for (Tree m : node.getMembers()) {
-            // skip lomobok generated trees
+            // skip lombok generated trees
             if (isLombokGenerated(m)) {
                 continue;
             }
@@ -1938,7 +1938,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = extractSymbol(tree);
-
         if (sym == null) {
             // not a symbol we can check
             return false;

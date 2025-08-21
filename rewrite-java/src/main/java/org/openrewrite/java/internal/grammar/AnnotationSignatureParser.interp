@@ -20,7 +20,7 @@ null
 '@'
 '...'
 '..'
-' '
+null
 null
 
 token symbolic names:
@@ -45,7 +45,7 @@ OR
 AT
 ELLIPSIS
 DOTDOT
-SPACE
+WS
 Identifier
 
 rule names:

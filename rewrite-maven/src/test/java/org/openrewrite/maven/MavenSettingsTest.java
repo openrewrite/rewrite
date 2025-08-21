@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -47,6 +49,7 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
+@Execution(ExecutionMode.SAME_THREAD)
 class MavenSettingsTest {
 
     private final MavenExecutionContextView ctx = MavenExecutionContextView.view(
@@ -106,7 +109,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parseWithEncryption()  throws Exception{
+    void parseWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
@@ -134,7 +137,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parsePlainTextWithEncryption()  throws Exception{
+    void parsePlainTextWithEncryption() throws Exception {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
         MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
@@ -958,23 +961,23 @@ class MavenSettingsTest {
     @Test
     void canDeserializeSettingsCorrectly() throws Exception {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
-            <settings>
-              <servers>
-                <server>
-                  <id>maven-snapshots</id>
-                  <configuration>
-                    <timeout>10000</timeout>
-                    <httpHeaders>
-                      <property>
-                        <name>X-JFrog-Art-Api</name>
-                        <value>myApiToken</value>
-                      </property>
-                    </httpHeaders>
-                  </configuration>
-                </server>
-              </servers>
-            </settings>
-            """).findFirst().get();
+          <settings>
+            <servers>
+              <server>
+                <id>maven-snapshots</id>
+                <configuration>
+                  <timeout>10000</timeout>
+                  <httpHeaders>
+                    <property>
+                      <name>X-JFrog-Art-Api</name>
+                      <value>myApiToken</value>
+                    </property>
+                  </httpHeaders>
+                </configuration>
+              </server>
+            </servers>
+          </settings>
+          """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
         MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(singletonList(httpHeader), 10000L);
@@ -992,8 +995,8 @@ class MavenSettingsTest {
           .isPresent()
           .get(InstanceOfAssertFactories.type(Xml.Document.class))
           .isNotNull()
-            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
-            .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+          .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
+          .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
     }
 
     private void createSettingsSecurityFile() throws IOException {

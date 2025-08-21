@@ -83,7 +83,8 @@ public class HclParser implements Parser {
     public boolean accept(Path path) {
         return path.toString().endsWith(".hcl") ||
                 path.toString().endsWith(".tf") ||
-                path.toString().endsWith(".tfvars");
+                path.toString().endsWith(".tfvars") ||
+                path.toString().endsWith(".tofu");
     }
 
     @Override

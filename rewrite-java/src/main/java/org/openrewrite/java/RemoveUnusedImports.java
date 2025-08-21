@@ -94,7 +94,7 @@ public class RemoveUnusedImports extends Recipe {
 
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null) {
+                if (fq != null && !"class".equals(variable.getName())) {
                     methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
                             .add(variable.getName());
                 }
