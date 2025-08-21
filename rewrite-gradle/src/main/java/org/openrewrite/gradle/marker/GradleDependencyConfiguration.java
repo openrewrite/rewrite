@@ -138,7 +138,13 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     @NonFinal
     List<GradleDependencyConstraint> constraints;
 
+    @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     Map<String, String> attributes;
+
+    @Override
+    public Map<String, String> getAttributes() {
+        return attributes != null ? attributes : emptyMap();
+    }
 
     /**
      * When the current list of directResolved dependencies may have been invalidated by a mutation this stores the
