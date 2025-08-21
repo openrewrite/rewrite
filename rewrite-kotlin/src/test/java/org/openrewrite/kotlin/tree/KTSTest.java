@@ -60,13 +60,13 @@ class KTSTest implements RewriteTest {
             spec -> spec.afterRecipe(cu ->
               assertThat(cu.getTypesInUse().getUsedMethods())
                 .singleElement()
-                .satisfies(m -> {
-                    assertThat(m.getDeclaringType())
-                      .satisfies(it -> {
-                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
-                          assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("one", "two");
-                      });
-                })
+                .satisfies(m ->
+                  assertThat(m.getDeclaringType())
+                    .satisfies(it -> {
+                        assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
+                        assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("one", "two");
+                    })
+                )
             )
           )
         );
