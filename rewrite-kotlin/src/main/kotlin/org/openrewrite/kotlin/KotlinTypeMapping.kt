@@ -779,7 +779,7 @@ class KotlinTypeMapping(
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
                 }
-            } else if (resolvedSymbol.callableId.classId == null) {
+            } else if (resolvedSymbol.getContainingFile() != firFile && resolvedSymbol.callableId.classId == null) {
                 val topLevelFunctions = buildList {
                     resolvedSymbol.getContainingFile()?.declarations?.forEach {
                         when (it) {
@@ -1389,11 +1389,11 @@ class KotlinTypeMapping(
             }
         }
     }
-
-    private fun FirBasedSymbol<*>.getContainingFile() =
-        when (this) {
-            is FirCallableSymbol<*> -> moduleData.session.firProvider.getFirCallableContainerFile(this)
-            is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
-            else -> null
-        }
 }
+
+internal fun FirBasedSymbol<*>.getContainingFile() =
+    when (this) {
+        is FirCallableSymbol<*> -> moduleData.session.firProvider.getFirCallableContainerFile(this)
+        is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
+        else -> null
+    }
