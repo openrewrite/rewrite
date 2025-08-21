@@ -278,7 +278,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         if (!pattern.contains("*") && !pattern.contains("?")) {
             // It's already a concrete path
             return pattern;
-        } else if (pattern.equals("**/.gitignore")) {
+        } else if ("**/.gitignore".equals(pattern)) {
             // Default to root for wildcard patterns
             return ".gitignore";
         } else if (pattern.endsWith("/.gitignore")) {
