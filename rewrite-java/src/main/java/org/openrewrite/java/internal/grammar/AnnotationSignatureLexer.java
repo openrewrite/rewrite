@@ -45,18 +45,18 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"IntegerLiteral", "DecimalIntegerLiteral", "HexIntegerLiteral", "OctalIntegerLiteral", 
-			"BinaryIntegerLiteral", "IntegerTypeSuffix", "DecimalNumeral", "Digits", 
-			"Digit", "NonZeroDigit", "DigitOrUnderscore", "Underscores", "HexNumeral", 
-			"HexDigits", "HexDigit", "HexDigitOrUnderscore", "OctalNumeral", "OctalDigits", 
-			"OctalDigit", "OctalDigitOrUnderscore", "BinaryNumeral", "BinaryDigits", 
-			"BinaryDigit", "BinaryDigitOrUnderscore", "FloatingPointLiteral", "DecimalFloatingPointLiteral", 
-			"ExponentPart", "ExponentIndicator", "SignedInteger", "Sign", "FloatTypeSuffix", 
-			"HexadecimalFloatingPointLiteral", "HexSignificand", "BinaryExponent", 
-			"BinaryExponentIndicator", "BooleanLiteral", "CharacterLiteral", "SingleCharacter", 
-			"StringLiteral", "StringCharacters", "StringCharacter", "EscapeSequence", 
-			"OctalEscape", "UnicodeEscape", "ZeroToThree", "LPAREN", "RPAREN", "LBRACK", 
-			"RBRACK", "COMMA", "DOT", "ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", 
+			"IntegerLiteral", "DecimalIntegerLiteral", "HexIntegerLiteral", "OctalIntegerLiteral",
+			"BinaryIntegerLiteral", "IntegerTypeSuffix", "DecimalNumeral", "Digits",
+			"Digit", "NonZeroDigit", "DigitOrUnderscore", "Underscores", "HexNumeral",
+			"HexDigits", "HexDigit", "HexDigitOrUnderscore", "OctalNumeral", "OctalDigits",
+			"OctalDigit", "OctalDigitOrUnderscore", "BinaryNumeral", "BinaryDigits",
+			"BinaryDigit", "BinaryDigitOrUnderscore", "FloatingPointLiteral", "DecimalFloatingPointLiteral",
+			"ExponentPart", "ExponentIndicator", "SignedInteger", "Sign", "FloatTypeSuffix",
+			"HexadecimalFloatingPointLiteral", "HexSignificand", "BinaryExponent",
+			"BinaryExponentIndicator", "BooleanLiteral", "CharacterLiteral", "SingleCharacter",
+			"StringLiteral", "StringCharacters", "StringCharacter", "EscapeSequence",
+			"OctalEscape", "UnicodeEscape", "ZeroToThree", "LPAREN", "RPAREN", "LBRACK",
+			"RBRACK", "COMMA", "DOT", "ASSIGN", "COLON", "ADD", "SUB", "AND", "OR",
 			"AT", "ELLIPSIS", "DOTDOT", "WS", "Identifier", "JavaLetter", "JavaLetterOrDigit"
 		};
 	}
@@ -64,16 +64,16 @@ public class AnnotationSignatureLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','", 
+			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','",
 			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
-			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
-			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT", 
+			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral",
+			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
+			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT",
 			"WS", "Identifier"
 		};
 	}
