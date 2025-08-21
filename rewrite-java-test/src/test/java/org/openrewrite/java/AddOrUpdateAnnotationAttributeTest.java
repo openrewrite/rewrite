@@ -53,7 +53,11 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           //language=java
           """
             package org.example;
-            public @interface FooDefaultBase {
+            import java.lang.annotation.Repeatable;
+            @interface FdsWrapper { FooDefaultString[] value(); }
+            @Repeatable(FdsWrapper.class)
+            public @interface FooDefaultString {
+                String value() default "";
                 String str() default "";
                 String[] strArr() default {};
                 Class<? extends Number> cla() default Number.class;
@@ -70,21 +74,20 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           """
             package org.example;
             import java.lang.annotation.Repeatable;
-            @interface FdsWrapper { FooDefaultString[] value(); }
-            @Repeatable(FdsWrapper.class)
-            public @interface FooDefaultString extends FooDefaultBase {
-                String value() default "";
-                // TODO: need to figure out why it can't see interface inherited methods
-            }
-            """,
-          //language=java
-          """
-            package org.example;
-            import java.lang.annotation.Repeatable;
             @interface FdsaWrapper { FooDefaultStringArray[] value(); }
             @Repeatable(FdsaWrapper.class)
-            public @interface FooDefaultStringArray extends FooDefaultBase {
+            public @interface FooDefaultStringArray {
                 String[] value() default {};
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -93,8 +96,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdcWrapper { FooDefaultClass[] value(); }
             @Repeatable(FdcWrapper.class)
-            public @interface FooDefaultClass extends FooDefaultBase {
+            public @interface FooDefaultClass {
                 Class<? extends Number> value() default Number.class;
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -103,8 +116,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdcaWrapper { FooDefaultClassArray[] value(); }
             @Repeatable(FdcaWrapper.class)
-            public @interface FooDefaultClassArray extends FooDefaultBase {
+            public @interface FooDefaultClassArray {
                 Class<? extends Number>[] value() default {};
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -113,8 +136,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdeWrapper { FooDefaultEnum[] value(); }
             @Repeatable(FdeWrapper.class)
-            public @interface FooDefaultEnum extends FooDefaultBase {
+            public @interface FooDefaultEnum {
                 FooEnum value() default FooEnum.JUNK;
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -123,8 +156,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdeaWrapper { FooDefaultEnumArray[] value(); }
             @Repeatable(FdeaWrapper.class)
-            public @interface FooDefaultEnumArray extends FooDefaultBase {
+            public @interface FooDefaultEnumArray {
                 FooEnum[] value() default {};
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -133,8 +176,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdlWrapper { FooDefaultLong[] value(); }
             @Repeatable(FdlWrapper.class)
-            public @interface FooDefaultLong extends FooDefaultBase {
+            public @interface FooDefaultLong {
                 long value() default 0L;
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -143,8 +196,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdlaWrapper { FooDefaultLongArray[] value(); }
             @Repeatable(FdlaWrapper.class)
-            public @interface FooDefaultLongArray extends FooDefaultBase {
+            public @interface FooDefaultLongArray {
                 long[] value() default {};
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -153,8 +216,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdbWrapper { FooDefaultBoolean[] value(); }
             @Repeatable(FdbWrapper.class)
-            public @interface FooDefaultBoolean extends FooDefaultBase {
+            public @interface FooDefaultBoolean {
                 boolean value() default false;
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """,
           //language=java
@@ -163,8 +236,18 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             import java.lang.annotation.Repeatable;
             @interface FdbaWrapper { FooDefaultBooleanArray[] value(); }
             @Repeatable(FdbaWrapper.class)
-            public @interface FooDefaultBooleanArray extends FooDefaultBase {
+            public @interface FooDefaultBooleanArray {
                 boolean[] value() default {};
+                String str() default "";
+                String[] strArr() default {};
+                Class<? extends Number> cla() default Number.class;
+                Class<? extends Number>[] claArr() default {};
+                FooEnum enu() default FooEnum.JUNK;
+                FooEnum[] enuArr() default {};
+                long lon() default 0L;
+                long[] lonArr() default {};
+                boolean boo() default false;
+                boolean[] booArr() default {};
             }
             """
         ));
@@ -1546,6 +1629,11 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                               @FooDefaultStringArray({Const.X.Y.SECOND_CONST})
                               @FooDefaultStringArray(value = {"c"})
                               @FooDefaultStringArray(value = {Const.X.Y.THIRD_CONST})
+                              // below already contain the value to append
+                              @FooDefaultStringArray("a")
+                              @FooDefaultStringArray(value = "a")
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST})
                               public class A {}
                               """,
                             """
@@ -1559,6 +1647,11 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                               @FooDefaultStringArray({Const.X.Y.SECOND_CONST, "a"})
                               @FooDefaultStringArray({"c", "a"})
                               @FooDefaultStringArray({Const.X.Y.THIRD_CONST, "a"})
+                              // below already contain the value to append
+                              @FooDefaultStringArray("a")
+                              @FooDefaultStringArray("a")
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST})
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST})
                               public class A {}
                               """
                           ),
@@ -1571,6 +1664,10 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                               @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST, strArr = {Const.X.Y.SECOND_CONST})
                               @FooDefaultStringArray(value = {"c"}, strArr = {"c"})
                               @FooDefaultStringArray(value = {Const.X.Y.THIRD_CONST}, strArr = {Const.X.Y.THIRD_CONST})
+                              // below already contain the value to append
+                              @FooDefaultStringArray(value = "a", strArr = {"b"})
+                              @FooDefaultStringArray(value = {"a"}, strArr = {"c"})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST}, strArr = {"d"})
                               public class B {}
                               """,
                             """
@@ -1580,12 +1677,17 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                               @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "a"}, strArr = {Const.X.Y.SECOND_CONST})
                               @FooDefaultStringArray(value = {"c", "a"}, strArr = {"c"})
                               @FooDefaultStringArray(value = {Const.X.Y.THIRD_CONST, "a"}, strArr = {Const.X.Y.THIRD_CONST})
+                              // below already contain the value to append
+                              @FooDefaultStringArray(value = "a", strArr = {"b"})
+                              @FooDefaultStringArray(value = {"a"}, strArr = {"c"})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "a", Const.X.Y.THIRD_CONST}, strArr = {"d"})
                               public class B {}
                               """
                           )
                         );
                     }
 
+                    // TODO: revisit
                     @Test
                     void literalArrayAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstRef_updatesSafelyOnlyMatched() {
                         rewriteRun(
@@ -1624,24 +1726,102 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                               @FooDefaultStringArray({Const.X.Y.SECOND_CONST, "b", Const.X.Y.THIRD_CONST})
                               public class A {}
                               """
-                          )/*,
+                          ),
                           //language=java
                           java(
                             """
                               import org.example.Const;
-                              import org.example.FooDefaultString;
-                              @FooDefaultString(value = Const.X.Y.FIRST_CONST, a = Const.X.Y.FIRST_CONST)
-                              @FooDefaultString(value = Const.X.Y.SECOND_CONST, a = Const.X.Y.FIRST_CONST)
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(value = Const.X.Y.FIRST_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.FIRST_CONST}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST}, strArr = {Const.X.Y.FIRST_CONST})
                               public class B {}
                               """,
                             """
                               import org.example.Const;
-                              import org.example.FooDefaultString;
-                              @FooDefaultString(value = "b", a = Const.X.Y.FIRST_CONST)
-                              @FooDefaultString(value = Const.X.Y.SECOND_CONST, a = Const.X.Y.FIRST_CONST)
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(value = "b", strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {"b"}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "b", Const.X.Y.THIRD_CONST}, strArr = {Const.X.Y.FIRST_CONST})
                               public class B {}
                               """
-                          )*/
+                          )
+                        );
+                    }
+
+                    // TODO: revisit
+                    @Test
+                    void literalArrayAttribute_existing_asConst_usingProvidedOldAttributeValue_ofConstRef_andAppendArray_appendsSafelyOnlyForMatched() {
+                        rewriteRun(
+                          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultStringArray", null, "b", "Const.X.Y.FIRST_CONST", null, true)),
+                          //language=java
+                          java(
+                            """
+                              import org.example.Const;
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(Const.X.Y.FIRST_CONST)
+                              @FooDefaultStringArray(Const.X.Y.SECOND_CONST)
+                              @FooDefaultStringArray(value = Const.X.Y.FIRST_CONST)
+                              @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST)
+                              @FooDefaultStringArray({})
+                              // TODO: Try to make below consistent
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST})
+                              @FooDefaultStringArray(value = {})
+                              @FooDefaultStringArray(value = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST})
+                              // below already contain the value to append
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b", Const.X.Y.SECOND_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.FIRST_CONST, "b", Const.X.Y.SECOND_CONST})
+                              public class A {}
+                              """,
+                            """
+                              import org.example.Const;
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(Const.X.Y.FIRST_CONST, "b")
+                              @FooDefaultStringArray(Const.X.Y.SECOND_CONST)
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b"})
+                              @FooDefaultStringArray(Const.X.Y.SECOND_CONST)
+                              @FooDefaultStringArray
+                              // TODO: Try to make below consistent
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b"})
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST, "b"})
+                              @FooDefaultStringArray
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b"})
+                              @FooDefaultStringArray({Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST, "b"})
+                              // below already contain the value to append
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b", Const.X.Y.SECOND_CONST})
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b", Const.X.Y.SECOND_CONST})
+                              public class A {}
+                              """
+                          ),
+                          //language=java
+                          java(
+                            """
+                              import org.example.Const;
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(value = Const.X.Y.FIRST_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.FIRST_CONST}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, Const.X.Y.FIRST_CONST, Const.X.Y.THIRD_CONST}, strArr = {Const.X.Y.FIRST_CONST})
+                              public class B {}
+                              """,
+                            """
+                              import org.example.Const;
+                              import org.example.FooDefaultStringArray;
+                              @FooDefaultStringArray(value = "b", strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = Const.X.Y.SECOND_CONST, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {"b"}, strArr = {Const.X.Y.FIRST_CONST})
+                              @FooDefaultStringArray(value = {Const.X.Y.SECOND_CONST, "b", Const.X.Y.THIRD_CONST}, strArr = {Const.X.Y.FIRST_CONST})
+                              public class B {}
+                              """
+                          )
                         );
                     }
                 }
@@ -2787,13 +2967,13 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.FooDefaultStringArray;
 
-              @FooDefaultStringArray(b = {"a"})
+              @FooDefaultStringArray(strArr = {"a"})
               public class A {}
               """,
             """
               import org.example.FooDefaultStringArray;
 
-              @FooDefaultStringArray(b = {"a", "b", "c"})
+              @FooDefaultStringArray(strArr = {"a", "b", "c"})
               public class A {}
               """
           )
@@ -3370,23 +3550,13 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         @Test
         void nomatchClass() {
             rewriteRun(
-              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Integer.class", "Double.class", null, null)),
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultClass", null, "Integer.class", "Double.class", null, null)),
               java(
                 """
-                  package org.example;
-                  public @interface Foo {
-                      Class<?> value();
-                  }
-                  """,
-                SourceSpec::skip
-              ),
-              java(
-                """
-                  import org.example.Foo;
+                  import org.example.FooDefaultClass;
 
-                  @Foo(Long.class)
-                  public class A {
-                  }
+                  @FooDefaultClass(Long.class)
+                  public class A {}
                   """
               )
             );
@@ -3568,7 +3738,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.FooDefaultString", "str", "newValue", "oldValue", null, null)),
           java(
             """
-              import org.example.Foo;
+              import org.example.FooDefaultString;
 
               @FooDefaultString(str = A.OTHER_VALUE)
               public class A {
