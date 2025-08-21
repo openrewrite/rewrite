@@ -36,6 +36,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ClasspathScanningLoaderTest {
@@ -61,7 +62,7 @@ class ClasspathScanningLoaderTest {
         );
 
         Environment fullEnv = Environment.builder()
-          .scanJar(concreteJar, emptyList(), fullClassLoader)
+          .scanJar(concreteJar, singletonList(coreJar), fullClassLoader)
           .build();
 
         assertThat(fullEnv.listRecipes()).hasSize(1);

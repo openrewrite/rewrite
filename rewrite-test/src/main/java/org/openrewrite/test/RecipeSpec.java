@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -150,7 +149,7 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, emptyList(),
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, null,
                         mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
