@@ -136,7 +136,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * actually in effect for a given configuration call getAllConstraints()
      */
     @NonFinal
+    @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     List<GradleDependencyConstraint> constraints;
+
+    public List<GradleDependencyConstraint> getConstraints() {
+        return constraints != null ? constraints : emptyList();
+    }
 
     @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     Map<String, String> attributes;
@@ -239,7 +244,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * parent configurations.
      */
     List<GradleDependencyConstraint> getAllConstraints() {
-        Set<GradleDependencyConstraint> constraintSet = new LinkedHashSet<>(constraints);
+        Set<GradleDependencyConstraint> constraintSet = constraints != null ? new LinkedHashSet<>(constraints) : new LinkedHashSet<>();
         for (GradleDependencyConfiguration parentConfiguration : allExtendsFrom()) {
             constraintSet.addAll(parentConfiguration.getConstraints());
         }
