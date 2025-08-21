@@ -789,7 +789,7 @@ class KotlinTypeMapping(
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
                 }
-            } else if (resolvedSymbol.callableId.classId == null) {
+            } else {
                 declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.getContainingFile()))
             }
         } else {
