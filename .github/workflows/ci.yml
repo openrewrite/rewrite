@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@java25
     with:
-      java_version: 25.0.0-ea.25.0.ea
+      java_version: 25-ea
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
