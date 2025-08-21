@@ -31,9 +31,9 @@ public class AnnotationSignatureLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
+		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4,
+		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11,
+		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19,
 		DOTDOT=20, WS=21, Identifier=22;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
