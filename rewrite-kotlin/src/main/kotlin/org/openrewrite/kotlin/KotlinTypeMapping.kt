@@ -780,7 +780,7 @@ class KotlinTypeMapping(
                     else -> Unknown.getInstance()
                 }
             } else if (resolvedSymbol.callableId.classId == null) {
-                val topLevelFunctions= buildList {
+                val topLevelFunctions = buildList {
                     resolvedSymbol.getContainingFile()?.declarations?.forEach {
                         when (it) {
                             is FirSimpleFunction -> add(it)
