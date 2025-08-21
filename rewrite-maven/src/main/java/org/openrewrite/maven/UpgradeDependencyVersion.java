@@ -374,7 +374,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         versionComparator, ctx);
             }
 
-            public boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+            private boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
                 if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
                     return false;
                 }
