@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -63,7 +64,7 @@ class KTSTest implements RewriteTest {
                     assertThat(m.getDeclaringType())
                       .satisfies(it -> {
                           assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile1Kt");
-                          assertThat(it.getMethods()).hasSize(2);
+                          assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("one", "two");
                       });
                 })
             )

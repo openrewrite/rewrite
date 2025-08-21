@@ -39,9 +39,11 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.firProvider
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toSymbol
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -59,11 +61,11 @@ import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.*
+import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
-import kotlin.collections.ArrayList
 
 @Suppress("DuplicatedCode")
 class KotlinTypeMapping(
@@ -778,10 +780,9 @@ class KotlinTypeMapping(
                     else -> Unknown.getInstance()
                 }
             } else if (resolvedSymbol.callableId.classId == null) {
-                methodDeclarationType(resolvedSymbol.fir, null)
+                val topLevelFunctions = resolvedSymbol.getContainingFile()?.collectTopLevelFunctions() ?: emptyList()
                 declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name.replaceFirst(".kts", "Kt").replaceFirst(".kt", "Kt"))
-                    //.withMethods(mutableListOf(methodDeclarationType(resolvedSymbol.fir, null)))
-                //TODO: <need to add methods information here too
+                    .withMethods(topLevelFunctions.map { methodDeclarationType(it, null) })
             }
         } else {
             declaringType = TypeUtils.asFullyQualified(type(function.typeRef))
@@ -1380,4 +1381,22 @@ class KotlinTypeMapping(
             }
         }
     }
+
+    private fun FirBasedSymbol<*>.getContainingFile() =
+        when (this) {
+            is FirCallableSymbol<*> -> moduleData.session.firProvider.getFirCallableContainerFile(this)
+            is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
+            else -> null
+        }
+
+    fun FirFile.collectTopLevelFunctions(): List<FirSimpleFunction> =
+        buildList {
+            declarations.forEach {
+                when (it) {
+                    is FirSimpleFunction -> add(it)
+                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    else -> {}
+                }
+            }
+        }
 }
