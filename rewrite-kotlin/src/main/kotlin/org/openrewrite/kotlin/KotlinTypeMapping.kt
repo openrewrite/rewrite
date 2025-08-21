@@ -151,7 +151,7 @@ class KotlinTypeMapping(
             }
 
             is FirFile -> {
-                fileType(signature)
+                fileType(type, signature)
             }
 
             is FirFunction -> {
@@ -243,8 +243,18 @@ class KotlinTypeMapping(
         return jt
     }
 
-    private fun fileType(signature: String): JavaType {
+    private fun fileType(file: FirFile, signature: String): JavaType {
+        val functions = buildList {
+            file.declarations.forEach {
+                when (it) {
+                    is FirSimpleFunction -> add(it)
+                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    else -> {}
+                }
+            }
+        }
         val fileType = ShallowClass.build(signature)
+            .withMethods(functions.map { methodDeclarationType(it, null) })
         typeCache.put(signature, fileType)
         return fileType
     }
@@ -779,18 +789,8 @@ class KotlinTypeMapping(
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
                 }
-            } else if (resolvedSymbol.getContainingFile() != firFile && resolvedSymbol.callableId.classId == null) {
-                val topLevelFunctions = buildList {
-                    resolvedSymbol.getContainingFile()?.declarations?.forEach {
-                        when (it) {
-                            is FirSimpleFunction -> add(it)
-                            is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
-                            else -> {}
-                        }
-                    }
-                }
-                declaringType = ShallowClass.build(resolvedSymbol.callableId.packageName.toString() + "." + firFile.name.replaceFirst(".kts", "Kt").replaceFirst(".kt", "Kt"))
-                    .withMethods(topLevelFunctions.map { methodDeclarationType(it, null) })
+            } else if (resolvedSymbol.callableId.classId == null) {
+                declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.getContainingFile()))
             }
         } else {
             declaringType = TypeUtils.asFullyQualified(type(function.typeRef))

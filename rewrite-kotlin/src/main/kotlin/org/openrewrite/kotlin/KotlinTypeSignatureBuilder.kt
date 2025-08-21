@@ -380,8 +380,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 ) {
                     declaringSig = "kotlin.Library"
                 }
-            } else if (resolvedSymbol.getContainingFile() != firFile && resolvedSymbol.callableId.classId == null) {
-                declaringSig = resolvedSymbol.callableId.packageName.toString() + "." + firFile.name.replaceFirst(".kts", "Kt").replaceFirst(".kt", "Kt")
+            } else if (resolvedSymbol.callableId.classId == null) {
+                declaringSig = signature(resolvedSymbol.getContainingFile())
             }
         } else if (sym is FirFunctionSymbol<*>) {
             declaringSig = signature(function.typeRef)
