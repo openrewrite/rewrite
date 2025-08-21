@@ -162,7 +162,7 @@ public interface JavaParser extends Parser {
             version = 8;
         }
 
-        if (version >= 25) {
+        if (version > 21) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java25Parser")
@@ -173,7 +173,7 @@ public interface JavaParser extends Parser {
             }
         }
 
-        if (version >= 21) {
+        if (version > 17) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java21Parser")
@@ -184,7 +184,7 @@ public interface JavaParser extends Parser {
             }
         }
 
-        if (version >= 17) {
+        if (version > 11) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java17Parser")
@@ -195,7 +195,7 @@ public interface JavaParser extends Parser {
             }
         }
 
-        if (version >= 11) {
+        if (version > 8) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java11Parser")
