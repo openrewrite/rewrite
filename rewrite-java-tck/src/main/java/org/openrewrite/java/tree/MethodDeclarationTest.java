@@ -15,9 +15,15 @@
  */
 package org.openrewrite.java.tree;
 
+import org.assertj.core.api.ThrowingConsumer;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class MethodDeclarationTest implements RewriteTest {
@@ -61,6 +67,63 @@ class MethodDeclarationTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void parameterAnnotations() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jspecify")),
+          java(
+            """
+              import org.jspecify.annotations.Nullable;
+              
+              class Test {
+                  public @Nullable Object foo(@Nullable String s) {
+                      return s;
+                  }
+              }
+              """,
+            sourceSpecs -> sourceSpecs.afterRecipe(cu -> {
+                J.MethodDeclaration foo = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assertTypeIsAnnotatedAs(((JavaType.Class) foo.getMethodType().getReturnType()), "org.jspecify.annotations.Nullable");
+                assertTypeIsAnnotatedAs(((JavaType.Class) foo.getMethodType().getParameterTypes().get(0)), "org.jspecify.annotations.Nullable");
+            })
+          )
+        );
+    }
+
+    @Test
+    void parameterAnnotationsFromClasspath() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava-33.*-jre", "jspecify", "error_prone_annotations")),
+          java(
+            """
+              import com.google.common.collect.Maps;
+              import java.util.Comparator;
+              
+              class Test {
+                  private Object bar = Maps.newTreeMap((Comparator<?>) null);
+              }
+              """,
+            sourceSpecs -> sourceSpecs.afterRecipe(cu -> {
+                J.VariableDeclarations bar = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodInvocation newTreeMap = ((J.MethodInvocation) bar.getVariables().get(0).getInitializer());
+                JavaType.Method newTreeMapType = newTreeMap.getMethodType();
+                JavaType.Parameterized comparatorParam = (JavaType.Parameterized) newTreeMapType.getParameterTypes().get(0);
+                assertTypeIsAnnotatedAs(comparatorParam, "java.lang.FunctionalInterface");
+            })
+          )
+        );
+    }
+
+
+    private static void assertTypeIsAnnotatedAs(JavaType.FullyQualified type, String... annotations) {
+        //noinspection rawtypes
+        ThrowingConsumer[] array = Stream.of(annotations)
+          .<ThrowingConsumer<JavaType.FullyQualified>>map(ann -> a -> assertThat(a.getFullyQualifiedName()).isEqualTo(ann))
+          .collect(Collectors.toList()).toArray(new ThrowingConsumer[0]);
+        //noinspection,unchecked
+        assertThat(type.getAnnotations()).satisfiesExactly(array);
     }
 
     @Test
