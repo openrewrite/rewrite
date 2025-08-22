@@ -104,12 +104,12 @@ async function main() {
         );
 
         if (options.verbose) {
-            connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
+            await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
                 // Handle any unexpected errors during trace configuration
                 logger.error(`Failed to set trace: ${err}\n`);
             });
         } else {
-            connection.trace(Trace.Off, {} as Tracer);
+            await connection.trace(Trace.Off, {} as Tracer);
         }
 
         connection.onError(err => {

@@ -25,8 +25,8 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
+import org.openrewrite.javascript.rpc.JavaScriptRewriteRpcFactory;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
@@ -39,29 +39,23 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JavaScriptParserTest {
-
-    JavaScriptRewriteRpc rewriteRpc;
     JavaScriptParser parser;
     ExecutionContext ctx;
-    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
     void before() {
-        this.rewriteRpc = JavaScriptRewriteRpc.builder(Environment.builder().build())
-          .nodePath(Path.of("node"))
-          .installationDirectory(Path.of("./rewrite/dist"))
-//          .inspectAndBreak()
-//          .trace(true)
-          .build();
-        this.scope = JavaScriptRewriteRpc.current().using(rewriteRpc);
-        this.parser = JavaScriptParser.builder().rewriteRpc(rewriteRpc).build();
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpcFactory
+          .builder(Environment.builder().build())
+          .trace(true)
+          .build());
+
+        this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();
     }
 
     @AfterEach
     void after() {
-        scope.close();
-        rewriteRpc.close();
+        JavaScriptRewriteRpc.shutdownCurrent();
     }
 
     @Test
@@ -74,7 +68,7 @@ class JavaScriptParserTest {
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(javascript.get()).satisfies(cu ->
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
@@ -104,15 +98,16 @@ class JavaScriptParserTest {
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), Path.of("helloworld.ts").toAbsolutePath().getParent(), ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
+    @SuppressWarnings("TypeScriptUnresolvedReference")
     @Test
     void tsx() {
         @Language("tsx")
         String script = """
           import React from 'react';
-
+          
           const JSXConstructsExample = () => {
             // Props object for spread attribute demonstration
             const buttonProps = {
@@ -120,29 +115,29 @@ class JavaScriptParserTest {
               disabled: false,
               'data-testid': 'spread-button'
             };
-
+          
             const linkProps = {
               href: 'https://example.com',
               target: '_blank',
               rel: 'noopener noreferrer'
             };
-
+          
             return (
               <React.Fragment>
                 {/* Fragment - wrapping multiple elements without extra DOM node */}
-
+          
                 {/* Basic JSX Element with attributes */}
                 <div className="container" id="main-container" data-test="element-example">
                   <h1 title="Main heading">JSX Constructs Test</h1>
-
+          
                   {/* Element with spread attributes */}
                   <button {...buttonProps} onClick={() => alert('Spread attributes work!')}>
                     Button with Spread Props
                   </button>
-
+          
                   {/* Another spread attribute example */}
                   <a {...linkProps}>Link with Spread Props</a>
-
+          
                   {/* Namespace example (commonly used with SVG) */}
                   <svg width="50" height="50" xmlns="http://www.w3.org/2000/svg">
                     <circle
@@ -154,7 +149,7 @@ class JavaScriptParserTest {
                       custom:attribute="namespace-example"
                     />
                   </svg>
-
+          
                   {/* Mixed attributes: regular, spread, and namespaced */}
                   <div
                     className="mixed-example"
@@ -164,7 +159,7 @@ class JavaScriptParserTest {
                   >
                     <p>This div uses regular attributes, spread attributes, and namespaced attributes</p>
                   </div>
-
+          
                   {/* JSX elements with generics */}
                   <DataTable<User> data={[]} />
                   <Component<string, number> prop="value" />
@@ -172,7 +167,7 @@ class JavaScriptParserTest {
                     <Input name="username" />
                   </Form>
                 </div>
-
+          
                 {/* Short fragment syntax */}
                 <>
                   <p>This paragraph is in a short fragment syntax</p>
@@ -181,14 +176,14 @@ class JavaScriptParserTest {
               </React.Fragment>
             );
           };
-
+          
           export default JSXConstructsExample;
           """;
         Parser.Input input = Parser.Input.fromString(Path.of("helloworld.tsx"), script);
         Optional<SourceFile> typescript = parser.parseInputs(List.of(input), null, ctx).findFirst();
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
-            assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+          assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
     @Test
