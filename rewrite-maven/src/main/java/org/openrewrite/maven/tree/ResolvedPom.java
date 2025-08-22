@@ -38,6 +38,7 @@ import org.openrewrite.maven.tree.ManagedDependency.Imported;
 import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
@@ -83,7 +84,7 @@ public class ResolvedPom {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
-        this.dependencyManagement = dependencyManagement;
+        this.dependencyManagement = new CopyOnWriteArrayList<>(dependencyManagement);
         this.dependencyManagementSorted = dependencyManagementSorted;
         if (initialRepositories != null) {
             this.initialRepositories = initialRepositories;
@@ -489,7 +490,7 @@ public class ResolvedPom {
 
             resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
             if (!managedDependencyMap.isEmpty()) {
-                dependencyManagement = new ArrayList<>(managedDependencyMap.values());
+                dependencyManagement = new CopyOnWriteArrayList<>(managedDependencyMap.values());
                 dependencyManagementSorted = false;
             }
         }
