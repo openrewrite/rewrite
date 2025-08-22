@@ -46,6 +46,6 @@
     "ts-node": "^10.9.2"
   },
   "bin": {
-    "rewrite-js": "./dist/rpc/server.js"
+    "rewrite-rpc": "./dist/rpc/server.js"
   }
 }

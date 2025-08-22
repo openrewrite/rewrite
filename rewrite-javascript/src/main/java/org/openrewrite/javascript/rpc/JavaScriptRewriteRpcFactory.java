@@ -106,7 +106,7 @@ public interface JavaScriptRewriteRpcFactory {
 
             String pkg = "--package=@openrewrite/rewrite@" + StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
             String[] cmd = Stream.of(
-                    npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-js",
+                    npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-rpc",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize()
             ).filter(Objects::nonNull).toArray(String[]::new);
 
