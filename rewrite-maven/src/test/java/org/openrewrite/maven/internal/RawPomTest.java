@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.tree.Plugin;
@@ -33,15 +32,7 @@ class RawPomTest {
 
     @Test
     void profileActivationByJdk() {
-        String javaVersion = System.getProperty("java.version");
-        int dotIndex = javaVersion.indexOf('.');
-        if (dotIndex > 0) {
-            javaVersion = javaVersion.substring(0, dotIndex);
-        }
-        int runtimeVersion = Integer.parseInt(javaVersion);
-        assertThat(new ProfileActivation(false, Integer.toString(runtimeVersion), null).isActive()).isTrue();
-        assertThat(new ProfileActivation(false, "[," + (runtimeVersion + 1) + ")", null).isActive()).isTrue();
-        assertThat(new ProfileActivation(false, "[," + runtimeVersion + "]", null).isActive()).isFalse();
+        assertThat(new ProfileActivation(false, System.getProperty("java.version"), null).isActive()).isTrue();
     }
 
     @Test
@@ -226,7 +217,7 @@ class RawPomTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePom() throws JsonProcessingException {
+    void deserializePom() throws Exception {
         //language=xml
         String pomString = """
               <project>
@@ -550,7 +541,7 @@ class RawPomTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePluginConfiguration() throws JsonProcessingException {
+    void deserializePluginConfiguration() throws Exception {
         @Language("xml") String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>

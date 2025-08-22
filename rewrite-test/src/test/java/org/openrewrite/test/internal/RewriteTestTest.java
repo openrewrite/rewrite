@@ -28,7 +28,6 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -146,14 +145,14 @@ class RewriteTestTest implements RewriteTest {
     @Test
     void allowNonWhitespaceInWhitespace() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().allowNonWhitespaceInWhitespace(true).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
           java(
-                """
-          import java.util.List;;
-          interface A {
-              List<String> getList();
-          }
-          """
+            """
+              import java.util.List;;
+              interface A {
+                  List<String> getList();
+              }
+              """
           )
         );
     }
@@ -238,7 +237,8 @@ class ImproperCursorUsage extends Recipe {
         return new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
-                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+                return new TreeVisitor<>() {
+                }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
     }
@@ -257,7 +257,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "A source file's path must be unique. " +
-               "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
+          "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
     }
 
     @Override
@@ -285,7 +285,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
         if (alreadyExists.get()) {
             return emptyList();
         }
-        Path duplicatePath = Paths.get("duplicate.txt");
+        Path duplicatePath = Path.of("duplicate.txt");
         return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)

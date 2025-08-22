@@ -73,7 +73,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
-              buildGradle(String.format(directDependencyTemplate, configuration))
+              buildGradle(directDependencyTemplate.formatted(configuration))
             );
         }
 
@@ -87,7 +87,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                String.format(directDependencyTemplate, existingConfiguration),
+                      directDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + directDependencyTemplate, existingConfiguration)
               )
             );
@@ -104,7 +104,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
-              buildGradle(String.format(directDependencyTemplate, existingConfiguration))
+              buildGradle(directDependencyTemplate.formatted(existingConfiguration))
             );
         }
     }
@@ -129,7 +129,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void withoutDesiredConfigurationSpecifiedNotMarked(String configuration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(null)),
-              buildGradle(String.format(transitiveDependencyTemplate, configuration))
+              buildGradle(transitiveDependencyTemplate.formatted(configuration))
             );
         }
 
@@ -143,7 +143,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                String.format(transitiveDependencyTemplate, existingConfiguration),
+                      transitiveDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + transitiveDependencyTemplate, existingConfiguration)
               )
             );
@@ -160,7 +160,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
         void inDesiredConfigurationNotMarked(String existingConfiguration, String searchingConfiguration) {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
-              buildGradle(String.format(transitiveDependencyTemplate, existingConfiguration))
+              buildGradle(transitiveDependencyTemplate.formatted(existingConfiguration))
             );
         }
     }
