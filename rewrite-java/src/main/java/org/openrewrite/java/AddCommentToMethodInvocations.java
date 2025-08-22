@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
@@ -62,19 +63,29 @@ public class AddCommentToMethodInvocations extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (methodMatcher.matches(m)) {
-                    String prefixWhitespace = m.getPrefix().getWhitespace();
+                return handleMethodCallComment(m, ctx);
+            }
+
+            @Override
+            public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                J.NewClass nc = super.visitNewClass(newClass, ctx);
+                return handleMethodCallComment(nc, ctx);
+            }
+
+            private <T extends MethodCall> T handleMethodCallComment(T t, ExecutionContext ctx) {
+                if (methodMatcher.matches(t)) {
+                    String prefixWhitespace = t.getPrefix().getWhitespace();
                     String newCommentText = comment.trim()
                             /* First Line * Second Line */
                             .replaceAll("\\R", " * ")
                             // Prevent closing the comment early
                             .replace("*/", "*");
-                    if (doesNotHaveComment(newCommentText, m.getComments())) {
+                    if (doesNotHaveComment(newCommentText, t.getComments())) {
                         TextComment textComment = new TextComment(true, " " + newCommentText + " ", prefixWhitespace, Markers.EMPTY);
-                        return m.withComments(ListUtils.concat(m.getComments(), textComment));
+                        return t.withComments(ListUtils.concat(t.getComments(), textComment));
                     }
                 }
-                return m;
+                return t;
             }
 
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {

@@ -51,7 +51,13 @@ public class Dependency implements Serializable, Attributed {
     String optional;
 
     @Builder.Default
+    @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     Map<String, String> attributes = emptyMap();
+
+    @Override
+    public Map<String, String> getAttributes() {
+        return attributes != null ? attributes : emptyMap();
+    }
 
     public @Nullable String getGroupId() {
         return gav.getGroupId();

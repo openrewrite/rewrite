@@ -484,7 +484,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        Optional<MavenSettings> maybeSettings = Optional.ofNullable(mctx.effectiveSettings(getResolutionResult()));
+        List<String> activeProfiles = maybeSettings.map(MavenSettings::getActiveProfiles)
+                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                .orElse(null);
+        return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
@@ -493,7 +498,12 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        Optional<MavenSettings> maybeSettings = Optional.ofNullable(mctx.effectiveSettings(getResolutionResult()));
+        List<String> activeProfiles = maybeSettings.map(MavenSettings::getActiveProfiles)
+                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                .orElse(null);
+        return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
     }
 
