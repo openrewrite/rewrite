@@ -31,7 +31,6 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.groupingBy;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
