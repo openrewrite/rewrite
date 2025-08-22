@@ -40,8 +40,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
-    String MAVEN_SETTINGS_LOAD_FROM_DISK = "org.openrewrite.maven.settings.load-from-disk";
-
+§
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,

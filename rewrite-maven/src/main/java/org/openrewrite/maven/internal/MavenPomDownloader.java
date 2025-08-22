@@ -53,7 +53,6 @@ import java.util.regex.Pattern;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
-import static org.openrewrite.maven.MavenExecutionContextView.MAVEN_SETTINGS_LOAD_FROM_DISK;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
@@ -145,8 +144,8 @@ public class MavenPomDownloader {
         }
         this.mavenSettings = this.ctx.getSettings();
         this.mavenCache = this.ctx.getPomCache();
-        this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
-        this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
+        this.addCentralRepository = !Boolean.FALSE.equals(this.ctx.getAddCentralRepository());
+        this.addLocalRepository = !Boolean.FALSE.equals(this.ctx.getAddLocalRepository());
         this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 

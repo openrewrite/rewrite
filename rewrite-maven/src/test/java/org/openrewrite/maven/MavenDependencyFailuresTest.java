@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.ExecutionContext.MAVEN_SETTINGS_LOAD_FROM_DISK;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
