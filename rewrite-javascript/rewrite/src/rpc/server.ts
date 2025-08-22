@@ -29,6 +29,9 @@ import "../java";
 import "../javascript";
 import {Writable} from "node:stream";
 
+// Not possible to set the stack size when executing from npx for security reasons
+require('v8').setFlagsFromString('--stack-size=4000');
+
 interface ProgramOptions {
     port?: number;
     logFile?: string;

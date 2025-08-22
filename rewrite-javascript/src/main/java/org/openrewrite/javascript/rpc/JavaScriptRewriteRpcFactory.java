@@ -99,13 +99,12 @@ public interface JavaScriptRewriteRpcFactory {
         public JavaScriptRewriteRpcFactory build() {
             // npx --node-options="--enable-source-maps=4000 --inspect-brk=9229" @openrewrite/rewrite@8.60.2 rewrite-js
             StringJoiner nodeOptions = new StringJoiner(" ", "--node-options=\"", "\"");
-            nodeOptions.add("--stack-size=4000");
             nodeOptions.add("--enable-source-maps");
             if (inspectBrk != null) {
                 nodeOptions.add("--inspect-brk=" + inspectBrk);
             }
 
-            String pkg = "@openrewrite/rewrite@" + StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+            String pkg = "--package=@openrewrite/rewrite@" + StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
             String[] cmd = Stream.of(
                     npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-js",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize()
