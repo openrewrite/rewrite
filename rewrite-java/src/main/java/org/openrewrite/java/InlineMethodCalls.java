@@ -46,7 +46,9 @@ public class InlineMethodCalls extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Apply inlinings defined by Error Prone's [`@InlineMe` annotation](https://errorprone.info/docs/inlineme).";
+        return "Apply inlinings as defined by Error Prone's [`@InlineMe` annotation](https://errorprone.info/docs/inlineme), " +
+                "or compatible annotations. Uses the template and method arguments to replace method calls. " +
+                "Supports both methods invocations and constructor calls, with optional new imports.";
     }
 
     @Override
