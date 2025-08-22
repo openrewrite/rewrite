@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.lang.String.format;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
@@ -163,7 +164,7 @@ public class InlineMethodCalls extends Recipe {
                         // Check if this is a static method invocation without a select (meaning it might be statically imported)
                         JavaType.Method methodType = mi.getMethodType();
                         if (mi.getSelect() == null && methodType != null && methodType.hasFlags(Flag.Static)) {
-                            staticImports.add(String.format("%s.%s",
+                            staticImports.add(format("%s.%s",
                                     methodType.getDeclaringType().getFullyQualifiedName(),
                                     methodType.getName()));
                         }
@@ -177,7 +178,7 @@ public class InlineMethodCalls extends Recipe {
                         JavaType.Variable fieldType = id.getFieldType();
                         if (fieldType != null && fieldType.hasFlags(Flag.Static)) {
                             if (fieldType.getOwner() instanceof JavaType.FullyQualified) {
-                                staticImports.add(String.format("%s.%s",
+                                staticImports.add(format("%s.%s",
                                         ((JavaType.FullyQualified) fieldType.getOwner()).getFullyQualifiedName(),
                                         fieldType.getName()));
                             }
@@ -265,9 +266,9 @@ public class InlineMethodCalls extends Recipe {
                     replacement.replaceAll("\\bthis\\b", "#{this:any()}");
             for (String parameterName : originalParameterNames) {
                 // Replace parameter names with their values in the templateString
-                templateString = templateString.replaceAll(
-                        String.format("\\b%s\\b", parameterName),
-                        String.format("#{%s:any()}", parameterName)); // TODO 2nd, 3rd etc should use shorthand `#{a}`
+                templateString = templateString
+                        .replaceFirst(format("\\b%s\\b", parameterName), format("#{%s:any()}", parameterName))
+                        .replaceAll(format("(?<!\\{)\\b%s\\b", parameterName), format("#{%s}", parameterName));
             }
             return templateString;
         }
