@@ -87,11 +87,14 @@ public class LatestRelease implements VersionComparator {
     public int compare(@Nullable String currentVersion, String v1, String v2) {
         if (v1.equalsIgnoreCase(v2)) {
             return 0;
-        } else if ("LATEST".equalsIgnoreCase(v1) || "latest.integration".equalsIgnoreCase(v1)) {
+        }
+        if ("LATEST".equalsIgnoreCase(v1) || "latest.integration".equalsIgnoreCase(v1)) {
             return 1;
-        } else if ("LATEST".equalsIgnoreCase(v2) || "latest.integration".equalsIgnoreCase(v2)) {
+        }
+        if ("LATEST".equalsIgnoreCase(v2) || "latest.integration".equalsIgnoreCase(v2)) {
             return -1;
-        } else if ("RELEASE".equalsIgnoreCase(v1) || "latest.release".equalsIgnoreCase(v1)) {
+        }
+        if ("RELEASE".equalsIgnoreCase(v1) || "latest.release".equalsIgnoreCase(v1)) {
             return 1;
         } else if ("RELEASE".equalsIgnoreCase(v2) || "latest.release".equalsIgnoreCase(v2)) {
             return -1;
@@ -136,7 +139,8 @@ public class LatestRelease implements VersionComparator {
                 String v2Part = v2Gav.group(i);
                 if (v1Part == null) {
                     return v2Part == null ? normalized1.compareTo(normalized2) : -1;
-                } else if (v2Part == null) {
+                }
+                if (v2Part == null) {
                     return 1;
                 }
 

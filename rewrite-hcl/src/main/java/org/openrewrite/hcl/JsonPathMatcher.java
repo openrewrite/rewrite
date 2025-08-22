@@ -87,9 +87,8 @@ public class JsonPathMatcher {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
                 return !disjoint(l, cursorPath) && l.contains(cursor.getValue());
-            } else {
-                return Objects.equals(o, cursor.getValue());
             }
+            return Objects.equals(o, cursor.getValue());
         }).orElse(false);
     }
 
@@ -181,13 +180,12 @@ public class JsonPathMatcher {
                 }
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
-            } else {
-                JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, scope, null, true);
-                for (int i = 1; i < ctx.getChildCount(); i++) {
-                    result = v.visit(ctx.getChild(i));
-                    if (result != null) {
-                        break;
-                    }
+            }
+            JsonPathParserHclVisitor v = new JsonPathParserHclVisitor(cursorPath, scope, null, true);
+            for (int i = 1; i < ctx.getChildCount(); i++) {
+                result = v.visit(ctx.getChild(i));
+                if (result != null) {
+                    break;
                 }
             }
             return result;
@@ -204,11 +202,14 @@ public class JsonPathMatcher {
                 return ctx.property().stream()
                         .map(this::visitProperty)
                         .collect(toList());
-            } else if (ctx.slice() != null) {
+            }
+            if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
-            } else if (ctx.indexes() != null) {
+            }
+            if (ctx.indexes() != null) {
                 return visitIndexes(ctx.indexes());
-            } else if (ctx.filter() != null) {
+            }
+            if (ctx.filter() != null) {
                 return visitFilter(ctx.filter());
             }
 
@@ -296,7 +297,8 @@ public class JsonPathMatcher {
                         matches.add(result);
                     }
                     return getResultFromList(matches);
-                } else if (key.equals(name)) {
+                }
+                if (key.equals(name)) {
                     if (stop != null && getExpressionContext(ctx) == stop) {
                         return block;
                     }
@@ -346,7 +348,8 @@ public class JsonPathMatcher {
             if (scope instanceof Hcl.Attribute) {
                 Hcl.Attribute attr = (Hcl.Attribute) scope;
                 return attr.getValue();
-            } else if (scope instanceof List) {
+            }
+            if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
                             scope = o;
@@ -371,7 +374,8 @@ public class JsonPathMatcher {
                 }
 
                 return getResultFromList(matches);
-            } else if (scope instanceof Hcl.Block) {
+            }
+            if (scope instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) scope;
                 if (stop != null && getExpressionContext(ctx) == stop) {
                     return block;
@@ -425,7 +429,8 @@ public class JsonPathMatcher {
                                 unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                         if (block.getType() instanceof Hcl.Identifier && block.getType().getName().equals(name)) {
                             return block;
-                        } else if (body instanceof Hcl.Attribute) {
+                        }
+                        if (body instanceof Hcl.Attribute) {
                             Hcl.Attribute attr = (Hcl.Attribute) body;
                             if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
                                 String key = attr.getSimpleName();
@@ -482,9 +487,8 @@ public class JsonPathMatcher {
                     }
                 }
                 return matches;
-            } else {
-                return getOperatorResult(lhs, operator, rhs);
             }
+            return getOperatorResult(lhs, operator, rhs);
         }
 
         // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
@@ -556,7 +560,8 @@ public class JsonPathMatcher {
                 if ("&&".equals(operator) &&
                         ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) && (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
-                } else if ("||".equals(operator) &&
+                }
+                if ("||".equals(operator) &&
                         ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) || (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
@@ -586,14 +591,13 @@ public class JsonPathMatcher {
                         }
                     }
                     return matches;
-                } else {
-                    if (originalScope instanceof Hcl.Attribute) {
-                        if (getOperatorResult(lhs, operator, rhs) != null) {
-                            return originalScope;
-                        }
-                    } else {
-                        return getOperatorResult(lhs, operator, rhs);
+                }
+                if (originalScope instanceof Hcl.Attribute) {
+                    if (getOperatorResult(lhs, operator, rhs) != null) {
+                        return originalScope;
                     }
+                } else {
+                    return getOperatorResult(lhs, operator, rhs);
                 }
             }
 
@@ -703,7 +707,8 @@ public class JsonPathMatcher {
                 List<Object> matches = (List<Object>) results;
                 if (matches.isEmpty()) {
                     return null;
-                } else if (matches.size() == 1) {
+                }
+                if (matches.size() == 1) {
                     return matches.get(0);
                 }
             }
@@ -714,14 +719,17 @@ public class JsonPathMatcher {
         private @Nullable Object getValue(Object result) {
             if (result instanceof Hcl.Attribute) {
                 return getValue(((Hcl.Attribute) result).getValue());
-            } else if (result instanceof Hcl.Block) {
+            }
+            if (result instanceof Hcl.Block) {
                 return ((Hcl.Block) result).getBody();
-            } else if (result instanceof List) {
+            }
+            if (result instanceof List) {
                 return ((List<Object>) result).stream()
                         .map(this::getValue)
                         .filter(Objects::nonNull)
                         .collect(toList());
-            } else if (result instanceof Hcl.Literal) {
+            }
+            if (result instanceof Hcl.Literal) {
                 return ((Hcl.Literal) result).getValue();
             } else if (result instanceof String) {
                 return result;

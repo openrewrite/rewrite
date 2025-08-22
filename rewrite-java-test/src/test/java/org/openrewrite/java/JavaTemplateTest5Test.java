@@ -186,7 +186,8 @@ class JavaTemplateTest5Test implements RewriteTest {
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
             if ("SuppressWarnings".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
-            } else if ("A1".equals(annotation.getSimpleName())) {
+            }
+            if ("A1".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
             return super.visitAnnotation(annotation, ctx);

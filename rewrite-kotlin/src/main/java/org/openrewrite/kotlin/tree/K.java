@@ -1000,7 +1000,8 @@ public interface K extends J {
             J j = v.visit(getExpression(), p);
             if (j instanceof ExpressionStatement) {
                 return j;
-            } else if (j instanceof Expression) {
+            }
+            if (j instanceof Expression) {
                 return withExpression((Expression) j);
             }
             return j;
@@ -1660,7 +1661,8 @@ public interface K extends J {
             J j = v.visit(getStatement(), p);
             if (j instanceof StatementExpression) {
                 return j;
-            } else if (j instanceof Statement) {
+            }
+            if (j instanceof Statement) {
                 return withStatement((Statement) j);
             }
             return j;
@@ -2019,7 +2021,8 @@ public interface K extends J {
             J j = v.visit(getTypeParameter(), p);
             if (j instanceof TypeParameterExpression) {
                 return j;
-            } else if (j instanceof TypeParameter) {
+            }
+            if (j instanceof TypeParameter) {
                 return withTypeParameter((TypeParameter) j);
             }
             return j;

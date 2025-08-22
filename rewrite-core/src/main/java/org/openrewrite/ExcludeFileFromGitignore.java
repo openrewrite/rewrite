@@ -212,9 +212,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 if (rule.isMatch(path)) {
                     if (rule.getResult()) {
                         return IGNORED;
-                    } else {
-                        return NOT_IGNORED;
                     }
+                    return NOT_IGNORED;
                 }
             }
             return CHECK_PARENT;
@@ -245,10 +244,12 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 // If this rule has nothing to do with the path to remove, we keep it.
                 // OR if this rule is a negation, we keep it.
                 return singletonList(rule);
-            } else if (text.equals(nestedPath)) {
+            }
+            if (text.equals(nestedPath)) {
                 // If this rule is an exact match to the path to remove, we remove it.
                 return emptyList();
-            } else if (isMatch(nestedPath)) {
+            }
+            if (isMatch(nestedPath)) {
                 if (text.contains("*")) {
                     return getWildcardRules(nestedPath);
                 }
@@ -378,7 +379,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             if (originalRule.contains("*")) {
                 if (pathToTraverse.isEmpty() && wildcardSuffix != null) {
                     return Arrays.asList(new FastIgnoreRule("!" + rule), new FastIgnoreRule(originalRule + (originalRule.endsWith("/") ? "*" : "/*")));
-                } else if (pathToTraverse.isEmpty() && wildcardPrefix != null) {
+                }
+                if (pathToTraverse.isEmpty() && wildcardPrefix != null) {
                     return Arrays.asList(new FastIgnoreRule("!" + rule), new FastIgnoreRule(originalRule));
                 }
             } else {

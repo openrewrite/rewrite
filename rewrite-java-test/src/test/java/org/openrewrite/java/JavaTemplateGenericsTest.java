@@ -313,9 +313,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                     JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
-                    } else {
-                        return super.visitMemberReference(memberRef, ctx);
                     }
+                    return super.visitMemberReference(memberRef, ctx);
                 }
             })),
           //language=java
@@ -370,9 +369,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                     JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
-                    } else {
-                        return super.visitLambda(lambda, ctx);
                     }
+                    return super.visitLambda(lambda, ctx);
                 }
             })),
           //language=java
@@ -426,9 +424,8 @@ class JavaTemplateGenericsTest implements RewriteTest {
                     JavaTemplate.Matcher matcher = refTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
-                    } else {
-                        return super.visitMemberReference(memberRef, ctx);
                     }
+                    return super.visitMemberReference(memberRef, ctx);
                 }
             })),
           //language=java

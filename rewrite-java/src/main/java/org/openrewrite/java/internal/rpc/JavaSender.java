@@ -623,7 +623,8 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
                 c -> {
                     if (c instanceof TextComment) {
                         return ((TextComment) c).getText() + c.getSuffix();
-                    } else if (c instanceof Javadoc.DocComment) {
+                    }
+                    if (c instanceof Javadoc.DocComment) {
                         return ((Javadoc.DocComment) c).getId();
                     }
                     throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());

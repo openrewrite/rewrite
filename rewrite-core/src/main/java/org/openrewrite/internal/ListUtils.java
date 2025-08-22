@@ -102,7 +102,8 @@ public final class ListUtils {
         //noinspection DuplicatedCode
         if (ls == null && t == null) {
             return emptyList();
-        } else if (t == null) {
+        }
+        if (t == null) {
             return ls;
         }
 
@@ -400,7 +401,8 @@ public final class ListUtils {
         //noinspection DuplicatedCode
         if (t == null && ls == null) {
             return emptyList();
-        } else if (t == null) {
+        }
+        if (t == null) {
             return ls;
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
@@ -422,7 +424,8 @@ public final class ListUtils {
         if (t == null && ls == null) {
             //noinspection ConstantConditions
             return null;
-        } else if (t == null) {
+        }
+        if (t == null) {
             return ls;
         }
         List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
@@ -445,9 +448,11 @@ public final class ListUtils {
     public static <T> @Nullable List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
         if (ls == null && t == null) {
             return null;
-        } else if (t == null || t.isEmpty()) {
+        }
+        if (t == null || t.isEmpty()) {
             return ls;
-        } else if (ls == null || ls.isEmpty()) {
+        }
+        if (ls == null || ls.isEmpty()) {
             //noinspection unchecked
             return (List<T>) t;
         }
@@ -470,10 +475,12 @@ public final class ListUtils {
     public static <T> List<T> insertAll(@Nullable List<T> ls, int index, @Nullable List<T> t) {
         if (ls == null && t == null) {
             return emptyList();
-        } else if (t == null || t.isEmpty()) {
+        }
+        if (t == null || t.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
-        } else if (ls == null || ls.isEmpty()) {
+        }
+        if (ls == null || ls.isEmpty()) {
             return t;
         }
 

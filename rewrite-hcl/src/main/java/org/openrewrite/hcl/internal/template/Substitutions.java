@@ -49,12 +49,13 @@ public class Substitutions {
         if (parameter instanceof Hcl) {
             if (parameter instanceof Expression) {
                 return "/*__p" + index + "__*/{}";
-            } else {
-                throw new IllegalArgumentException("'" + parameter.getClass().getSimpleName() + "' cannot be a parameter to a template.");
             }
-        } else if (parameter instanceof HclRightPadded) {
+            throw new IllegalArgumentException("'" + parameter.getClass().getSimpleName() + "' cannot be a parameter to a template.");
+        }
+        if (parameter instanceof HclRightPadded) {
             return substituteSingle(((HclRightPadded<?>) parameter).getElement(), index);
-        } else if (parameter instanceof HclLeftPadded) {
+        }
+        if (parameter instanceof HclLeftPadded) {
             return substituteSingle(((HclLeftPadded<?>) parameter).getElement(), index);
         }
         return parameter.toString();

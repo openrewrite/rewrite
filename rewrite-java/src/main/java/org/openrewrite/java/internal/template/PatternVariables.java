@@ -195,15 +195,18 @@ final class PatternVariables {
     private static boolean alwaysCompletesAbnormally0(@Nullable Statement statement, Set<String> labelsToIgnore) {
         if (statement instanceof J.Return || statement instanceof J.Throw) {
             return true;
-        } else if (statement instanceof J.Break) {
+        }
+        if (statement instanceof J.Break) {
             J.Break breakStatement = (J.Break) statement;
             return breakStatement.getLabel() != null && !labelsToIgnore.contains(breakStatement.getLabel().getSimpleName()) ||
-                   breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
-        } else if (statement instanceof J.Continue) {
+                    breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+        }
+        if (statement instanceof J.Continue) {
             J.Continue continueStatement = (J.Continue) statement;
             return continueStatement.getLabel() != null && !labelsToIgnore.contains(continueStatement.getLabel().getSimpleName()) ||
-                   continueStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
-        } else if (statement instanceof J.Block) {
+                    continueStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+        }
+        if (statement instanceof J.Block) {
             return alwaysCompletesAbnormally0(getLastStatement(statement), labelsToIgnore);
         } else if (statement instanceof J.MethodInvocation) {
             J.MethodInvocation method = (J.MethodInvocation) statement;
@@ -214,8 +217,8 @@ final class PatternVariables {
         } else if (statement instanceof J.If) {
             J.If if_ = (J.If) statement;
             return if_.getElsePart() != null &&
-                   alwaysCompletesAbnormally0(if_.getThenPart(), labelsToIgnore) &&
-                   alwaysCompletesAbnormally0(if_.getElsePart().getBody(), labelsToIgnore);
+                    alwaysCompletesAbnormally0(if_.getThenPart(), labelsToIgnore) &&
+                    alwaysCompletesAbnormally0(if_.getElsePart().getBody(), labelsToIgnore);
         } else if (statement instanceof J.Switch) {
             J.Switch switch_ = (J.Switch) statement;
             if (switch_.getCases().getStatements().isEmpty()) {
@@ -244,12 +247,12 @@ final class PatternVariables {
         } else if (statement instanceof J.Try) {
             J.Try try_ = (J.Try) statement;
             if (try_.getFinally() != null && !try_.getFinally().getStatements().isEmpty() &&
-                alwaysCompletesAbnormally0(try_.getFinally(), labelsToIgnore)) {
+                    alwaysCompletesAbnormally0(try_.getFinally(), labelsToIgnore)) {
                 return true;
             }
             boolean bodyHasExit = false;
             if (!try_.getBody().getStatements().isEmpty() &&
-                !(bodyHasExit = alwaysCompletesAbnormally0(try_.getBody(), labelsToIgnore))) {
+                    !(bodyHasExit = alwaysCompletesAbnormally0(try_.getBody(), labelsToIgnore))) {
                 return false;
             }
             for (J.Try.Catch catch_ : try_.getCatches()) {
@@ -272,10 +275,12 @@ final class PatternVariables {
         if (loop instanceof J.ForLoop) {
             J.ForLoop forLoop = (J.ForLoop) loop;
             return alwaysTrue(forLoop.getControl().getCondition()) && !containsBreak(forLoop.getBody(), labelsToIgnore);
-        } else if (loop instanceof J.WhileLoop) {
+        }
+        if (loop instanceof J.WhileLoop) {
             J.WhileLoop whileLoop = (J.WhileLoop) loop;
             return alwaysTrue(whileLoop.getCondition().getTree()) && !containsBreak(whileLoop.getBody(), labelsToIgnore);
-        } else if (loop instanceof J.DoWhileLoop) {
+        }
+        if (loop instanceof J.DoWhileLoop) {
             J.DoWhileLoop doWhileLoop = (J.DoWhileLoop) loop;
             return alwaysTrue(doWhileLoop.getWhileCondition().getTree()) && !containsBreak(doWhileLoop.getBody(), labelsToIgnore);
         }
@@ -286,8 +291,9 @@ final class PatternVariables {
         if (statement instanceof J.Break) {
             J.Break breakStatement = (J.Break) statement;
             return breakStatement.getLabel() != null && !labelsToIgnore.contains(breakStatement.getLabel().getSimpleName()) ||
-                   breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
-        } else if (statement instanceof J.Block) {
+                    breakStatement.getLabel() == null && !labelsToIgnore.contains(DEFAULT_LABEL);
+        }
+        if (statement instanceof J.Block) {
             J.Block block = (J.Block) statement;
             for (Statement blockStatement : block.getStatements()) {
                 if (containsBreak(blockStatement, labelsToIgnore)) {
@@ -300,7 +306,7 @@ final class PatternVariables {
         } else if (statement instanceof J.If) {
             J.If if_ = (J.If) statement;
             return containsBreak(if_.getThenPart(), labelsToIgnore) &&
-                   (if_.getElsePart() == null || containsBreak(if_.getElsePart().getBody(), labelsToIgnore));
+                    (if_.getElsePart() == null || containsBreak(if_.getElsePart().getBody(), labelsToIgnore));
         } else if (statement instanceof J.Switch) {
             J.Switch switch_ = (J.Switch) statement;
             for (Statement case_ : switch_.getCases().getStatements()) {
@@ -318,11 +324,11 @@ final class PatternVariables {
         } else if (statement instanceof J.Try) {
             J.Try try_ = (J.Try) statement;
             if (try_.getFinally() != null && !try_.getFinally().getStatements().isEmpty() &&
-                containsBreak(try_.getFinally(), labelsToIgnore)) {
+                    containsBreak(try_.getFinally(), labelsToIgnore)) {
                 return true;
             }
             if (!try_.getBody().getStatements().isEmpty() &&
-                containsBreak(try_.getBody(), labelsToIgnore)) {
+                    containsBreak(try_.getBody(), labelsToIgnore)) {
                 return true;
             }
             for (J.Try.Catch catch_ : try_.getCatches()) {
@@ -369,10 +375,12 @@ final class PatternVariables {
         if (statement instanceof J.Block) {
             List<Statement> statements = ((J.Block) statement).getStatements();
             return statements.isEmpty() ? null : getLastStatement(statements.get(statements.size() - 1));
-        } else if (statement instanceof J.Case) {
+        }
+        if (statement instanceof J.Case) {
             List<Statement> statements = ((J.Case) statement).getStatements();
             return statements.isEmpty() ? null : getLastStatement(statements.get(statements.size() - 1));
-        } else if (statement instanceof Loop) {
+        }
+        if (statement instanceof Loop) {
             return getLastStatement(((Loop) statement).getBody());
         }
         return statement;

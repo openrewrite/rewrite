@@ -139,7 +139,8 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
-                } else if (tree instanceof SourceFileWithReferences) {
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
@@ -242,14 +243,17 @@ public class ChangePackage extends Recipe {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
                 JavaType.Method mt = updateType(m.getMethodType());
                 return m.withMethodType(mt).withName(m.getName().withType(mt));
-            } else if (j instanceof J.MethodInvocation) {
+            }
+            if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) j;
                 JavaType.Method mt = updateType(m.getMethodType());
                 return m.withMethodType(mt).withName(m.getName().withType(mt));
-            } else if (j instanceof J.NewClass) {
+            }
+            if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 return n.withConstructorType(updateType(n.getConstructorType()));
-            } else if (j instanceof TypedTree) {
+            }
+            if (j instanceof TypedTree) {
                 return ((TypedTree) j).withType(updateType(((TypedTree) j).getType()));
             } else if (j instanceof JavaSourceFile) {
                 JavaSourceFile sf = (JavaSourceFile) j;
@@ -307,7 +311,8 @@ public class ChangePackage extends Recipe {
 
                 oldNameToChangedType.put(oldType, pt);
                 return pt;
-            } else if (oldType instanceof JavaType.FullyQualified) {
+            }
+            if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getClassName()));

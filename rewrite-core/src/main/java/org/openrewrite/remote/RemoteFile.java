@@ -72,9 +72,8 @@ public class RemoteFile implements Remote {
                 HttpSender.Response response = httpSender.get(uri.toString()).send();
                 if (response.isSuccessful()) {
                     return response.getBody();
-                } else {
-                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
                 }
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
             }, ctx.getOnError());
 
             if (localFile == null) {

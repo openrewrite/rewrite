@@ -176,7 +176,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                     JavaType usedType = usedTypes.get(simpleName);
                     if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
                         return !fieldAccess.getPrefix().isEmpty() ? fieldAccess.getName().withPrefix(fieldAccess.getPrefix()) : fieldAccess.getName();
-                    } else if (!usedTypes.containsKey(simpleName)) {
+                    }
+                    if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
                         if (!fullyQualifiedName.startsWith("java.lang.")) {
                             maybeAddImport(fullyQualifiedName);

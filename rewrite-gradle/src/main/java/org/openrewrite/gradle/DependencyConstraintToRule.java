@@ -130,8 +130,7 @@ public class DependencyConstraintToRule extends Recipe {
                     }
                     AtomicReference<String> because = new AtomicReference<>(null);
                     new JavaIsoVisitor<Integer>() {
-                        @Override
-                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                        @Override public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             J.MethodInvocation m1 = super.visitMethodInvocation(method, integer);
                             if ("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
                                 because.set(((J.Literal) m1.getArguments().get(0)).getValue().toString());
@@ -146,9 +145,8 @@ public class DependencyConstraintToRule extends Recipe {
                 // If nothing remains in the constraints{} it can be removed entirely
                 if (withoutConvertableConstraints.isEmpty()) {
                     return null;
-                } else {
-                    return m.withArguments(singletonList(closure.withBody(((J.Block) closure.getBody()).withStatements(withoutConvertableConstraints))));
                 }
+                return m.withArguments(singletonList(closure.withBody(((J.Block) closure.getBody()).withStatements(withoutConvertableConstraints))));
             }
             return m;
         }
@@ -387,55 +385,54 @@ public class DependencyConstraintToRule extends Recipe {
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
                     return cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
-                } else {
-                    K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
-                    assert cu != null;
-                    J.Block block = (J.Block) cu.getStatements().get(0);
-                    int insertionIndex = 0;
-                    while (insertionIndex < block.getStatements().size()) {
-                        Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
-                            break;
-                        }
-                        insertionIndex++;
-                    }
-                    J.MethodInvocation m = GradleParser.builder()
-                            .build()
-                            .parseInputs(singletonList(
-                                    new Parser.Input(
-                                            Paths.get("build.gradle.kts"),
-                                            () -> new ByteArrayInputStream(
-                                                    ("\n" +
-                                                            "configurations.all {\n" +
-                                                            "    resolutionStrategy.eachDependency { details ->}\n" +
-                                                            "}").getBytes(StandardCharsets.UTF_8)))
-                            ), null, ctx)
-                            .map(K.CompilationUnit.class::cast)
-                            .map(k -> (J.Block) k.getStatements().get(0))
-                            .map(J.Block::getStatements)
-                            .map(it -> it.get(0))
-                            .map(J.MethodInvocation.class::cast)
-                            .findFirst()
-                            .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
-                                J.Lambda lambda1 = (J.Lambda) arg;
-                                J.Block block1 = (J.Block) lambda1.getBody();
-                                return lambda1.withBody(block1.withStatements(ListUtils.mapFirst(block1.getStatements(), arg2 -> {
-                                    J.MethodInvocation m3 = (J.MethodInvocation) arg2;
-                                    return m3.withArguments(ListUtils.mapFirst(m3.getArguments(), arg3 -> {
-                                        J.Lambda lambda2 = (J.Lambda) arg3;
-                                        return lambda2.withBody(((J.Block) lambda2.getBody()).withEnd(Space.format("\n")));
-                                    }));
-                                })));
-                            })))
-                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    final int finalInsertionIndex = insertionIndex;
-                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
-                        if (arg == block) {
-                            return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
-                        }
-                        return arg;
-                    }));
                 }
+                K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+                assert cu != null;
+                J.Block block = (J.Block) cu.getStatements().get(0);
+                int insertionIndex = 0;
+                while (insertionIndex < block.getStatements().size()) {
+                    Statement s = block.getStatements().get(insertionIndex);
+                    if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
+                        break;
+                    }
+                    insertionIndex++;
+                }
+                J.MethodInvocation m = GradleParser.builder()
+                        .build()
+                        .parseInputs(singletonList(
+                                new Parser.Input(
+                                        Paths.get("build.gradle.kts"),
+                                        () -> new ByteArrayInputStream(
+                                                ("\n" +
+                                                        "configurations.all {\n" +
+                                                        "    resolutionStrategy.eachDependency { details ->}\n" +
+                                                        "}").getBytes(StandardCharsets.UTF_8)))
+                        ), null, ctx)
+                        .map(K.CompilationUnit.class::cast)
+                        .map(k -> (J.Block) k.getStatements().get(0))
+                        .map(J.Block::getStatements)
+                        .map(it -> it.get(0))
+                        .map(J.MethodInvocation.class::cast)
+                        .findFirst()
+                        .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
+                            J.Lambda lambda1 = (J.Lambda) arg;
+                            J.Block block1 = (J.Block) lambda1.getBody();
+                            return lambda1.withBody(block1.withStatements(ListUtils.mapFirst(block1.getStatements(), arg2 -> {
+                                J.MethodInvocation m3 = (J.MethodInvocation) arg2;
+                                return m3.withArguments(ListUtils.mapFirst(m3.getArguments(), arg3 -> {
+                                    J.Lambda lambda2 = (J.Lambda) arg3;
+                                    return lambda2.withBody(((J.Block) lambda2.getBody()).withEnd(Space.format("\n")));
+                                }));
+                            })));
+                        })))
+                        .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
+                final int finalInsertionIndex = insertionIndex;
+                return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
+                    if (arg == block) {
+                        return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
+                    }
+                    return arg;
+                }));
             }
             return super.visit(tree, ctx);
         }

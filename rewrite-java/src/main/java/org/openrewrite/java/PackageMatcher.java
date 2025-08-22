@@ -56,7 +56,8 @@ public class PackageMatcher implements Reference.Matcher {
         if (oldValue != null) {
             if (value.equals(oldValue)) {
                 return newValue;
-            } else if (value.startsWith(oldValue)) {
+            }
+            if (value.startsWith(oldValue)) {
                 if (recursive || value.length() > oldValue.length() + 1 && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
                     return newValue + value.substring(oldValue.length());
                 }

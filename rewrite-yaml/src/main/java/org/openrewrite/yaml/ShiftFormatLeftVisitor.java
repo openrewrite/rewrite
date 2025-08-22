@@ -63,7 +63,8 @@ public class ShiftFormatLeftVisitor<P> extends YamlIsoVisitor<P> {
                 // Specifically, we're trying to avoid comments in a prefix from being formatted in a way that mangles the yaml.
                 // Otherwise, just leave this line be. It's worse to remove an overrun of whitespace than it is to do nothing to this prefix line.
                 // If the prefix line only contains whitespace, make sure there's enough room to remove it as well.
-            } else if (StringUtils.indexOfNonWhitespace(s) >= shift || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() >= shift)) {
+            }
+            if (StringUtils.indexOfNonWhitespace(s) >= shift || (StringUtils.indexOfNonWhitespace(s) == -1 && s.length() >= shift)) {
                 return s.substring(shift);
             }
             return s;

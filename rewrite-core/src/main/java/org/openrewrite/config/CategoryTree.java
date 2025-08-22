@@ -177,9 +177,8 @@ public class CategoryTree<G> {
                 if (split[0].equals(test)) {
                     if (split.length == 1) {
                         return t;
-                    } else {
-                        return t.getCategory(split[1]);
                     }
+                    return t.getCategory(split[1]);
                 }
             }
         }
@@ -269,7 +268,7 @@ public class CategoryTree<G> {
 
         // subcategory of this category
         if (packageName.isEmpty() || (categoryPackage.startsWith(packageName + ".") &&
-                                      categoryPackage.charAt(packageName.length()) == '.')) {
+                categoryPackage.charAt(packageName.length()) == '.')) {
             for (CategoryTree<G> subtree : subtrees) {
                 String subtreePackage = subtree.getDescriptor().getPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
@@ -316,13 +315,12 @@ public class CategoryTree<G> {
             CategoryTree<G> subtree = new CategoryTree<>(group, category);
             subtrees.add(subtree);
             return subtree;
-        } else {
-            throw new IllegalStateException("Attempted to add a category with package '" +
-                                            category.getPackageName() + "' as a subcategory of '" +
-                                            packageName + "'. This represents a bug in CategoryTree, as " +
-                                            "it should not be possible to add a category to a CategoryTree root " +
-                                            "that cannot be placed somewhere in the tree.");
         }
+        throw new IllegalStateException("Attempted to add a category with package '" +
+                category.getPackageName() + "' as a subcategory of '" +
+                packageName + "'. This represents a bug in CategoryTree, as " +
+                "it should not be possible to add a category to a CategoryTree root " +
+                "that cannot be placed somewhere in the tree.");
     }
 
     void addRecipe(G group, RecipeDescriptor recipe) {

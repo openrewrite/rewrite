@@ -67,11 +67,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (spaceBefore && notSingleSpace(j.getPrefix().getWhitespace())) {
             return j.withPrefix(j.getPrefix().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(j.getPrefix().getWhitespace())) {
-            return j.withPrefix(j.getPrefix().withWhitespace(""));
-        } else {
-            return j;
         }
+        if (!spaceBefore && onlySpacesAndNotEmpty(j.getPrefix().getWhitespace())) {
+            return j.withPrefix(j.getPrefix().withWhitespace(""));
+        }
+        return j;
     }
 
     <T> JContainer<T> spaceBefore(JContainer<T> container, boolean spaceBefore) {
@@ -83,11 +83,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
         }
+        if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
+            return container.withBefore(container.getBefore().withWhitespace(""));
+        }
+        return container;
     }
 
     <T extends J> JLeftPadded<T> spaceBefore(JLeftPadded<T> container, boolean spaceBefore) {
@@ -97,11 +97,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
-            return container.withBefore(container.getBefore().withWhitespace(""));
-        } else {
-            return container;
         }
+        if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
+            return container.withBefore(container.getBefore().withWhitespace(""));
+        }
+        return container;
     }
 
     <T extends J> JLeftPadded<T> spaceBeforeLeftPaddedElement(JLeftPadded<T> container, boolean spaceBefore) {
@@ -121,11 +121,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (spaceAfter && notSingleSpace(container.getAfter().getWhitespace())) {
             return container.withAfter(container.getAfter().withWhitespace(" "));
-        } else if (!spaceAfter && onlySpacesAndNotEmpty(container.getAfter().getWhitespace())) {
-            return container.withAfter(container.getAfter().withWhitespace(""));
-        } else {
-            return container;
         }
+        if (!spaceAfter && onlySpacesAndNotEmpty(container.getAfter().getWhitespace())) {
+            return container.withAfter(container.getAfter().withWhitespace(""));
+        }
+        return container;
     }
 
     private static List<Comment> spaceLastCommentSuffix(List<Comment> comments, boolean spaceSuffix) {
@@ -136,11 +136,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     private static Comment spaceSuffix(Comment comment, boolean spaceSuffix) {
         if (spaceSuffix && notSingleSpace(comment.getSuffix())) {
             return comment.withSuffix(" ");
-        } else if (!spaceSuffix && onlySpacesAndNotEmpty(comment.getSuffix())) {
-            return comment.withSuffix("");
-        } else {
-            return comment;
         }
+        if (!spaceSuffix && onlySpacesAndNotEmpty(comment.getSuffix())) {
+            return comment.withSuffix("");
+        }
+        return comment;
     }
 
     Space updateSpace(Space s, boolean haveSpace) {
@@ -150,11 +150,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (haveSpace && notSingleSpace(s.getWhitespace())) {
             return s.withWhitespace(" ");
-        } else if (!haveSpace && onlySpacesAndNotEmpty(s.getWhitespace())) {
-            return s.withWhitespace("");
-        } else {
-            return s;
         }
+        if (!haveSpace && onlySpacesAndNotEmpty(s.getWhitespace())) {
+            return s.withWhitespace("");
+        }
+        return s;
     }
 
     /**

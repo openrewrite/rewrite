@@ -40,7 +40,8 @@ public class FindScm extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
                     return super.visitTag(tag, ctx);
-                } else if ("scm".equals(tag.getName())) {
+                }
+                if ("scm".equals(tag.getName())) {
                     return SearchResult.found(tag);
                 }
                 return tag;

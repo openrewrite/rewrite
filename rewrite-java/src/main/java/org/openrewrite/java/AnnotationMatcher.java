@@ -93,7 +93,8 @@ public class AnnotationMatcher {
         if (fqn != null) {
             if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {
                 return true;
-            } else if (matchMetaAnnotations) {
+            }
+            if (matchMetaAnnotations) {
                 for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
                     //noinspection ConstantValue
                     if (annotation == null) {
@@ -105,7 +106,7 @@ public class AnnotationMatcher {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                            matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
                         return true;
                     }
                 }

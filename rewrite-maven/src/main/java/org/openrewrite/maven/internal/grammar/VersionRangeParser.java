@@ -138,9 +138,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitVersionRequirement(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitVersionRequirement(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final VersionRequirementContext versionRequirement() throws RecognitionException {
@@ -204,9 +204,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitRange(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitRange(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RangeContext range() throws RecognitionException {
@@ -276,9 +276,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitBounds(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitBounds(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final BoundsContext bounds() throws RecognitionException {
@@ -339,9 +339,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitExactly(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitExactly(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ExactlyContext exactly() throws RecognitionException {
@@ -386,9 +386,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitBoundedLower(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitBoundedLower(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final BoundedLowerContext boundedLower() throws RecognitionException {
@@ -445,9 +445,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitUnboundedLower(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitUnboundedLower(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final UnboundedLowerContext unboundedLower() throws RecognitionException {
@@ -503,9 +503,9 @@ public class VersionRangeParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof VersionRangeParserVisitor ) return ((VersionRangeParserVisitor<? extends T>)visitor).visitVersion(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof VersionRangeParserVisitor) return ((VersionRangeParserVisitor<? extends T>) visitor).visitVersion(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final VersionContext version() throws RecognitionException {

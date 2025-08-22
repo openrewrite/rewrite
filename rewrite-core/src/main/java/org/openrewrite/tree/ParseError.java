@@ -115,11 +115,10 @@ public class ParseError implements SourceFile, RpcCodec<ParseError> {
     public IllegalStateException toException() {
         if (getErroneous() != null) {
             return new IllegalStateException("Failed to parse " + getSourcePath() + " because of parse-to-print idempotence on: " + getText());
-        } else {
-            ParseExceptionResult ex = getMarkers().findFirst(ParseExceptionResult.class)
-                    .orElseThrow(() -> new IllegalStateException("No ParseExceptionResult marker on parser failure"));
-            return new IllegalStateException(ex.getExceptionType() + ": " + ex.getMessage());
         }
+        ParseExceptionResult ex = getMarkers().findFirst(ParseExceptionResult.class)
+                .orElseThrow(() -> new IllegalStateException("No ParseExceptionResult marker on parser failure"));
+        return new IllegalStateException(ex.getExceptionType() + ": " + ex.getMessage());
     }
 
     @Override

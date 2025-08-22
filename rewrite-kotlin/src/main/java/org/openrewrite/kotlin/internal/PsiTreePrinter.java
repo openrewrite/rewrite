@@ -544,13 +544,16 @@ public class PsiTreePrinter {
     public static @Nullable String firElementToString(FirElement firElement) {
         if (firElement instanceof FirFile) {
             return ((FirFile) firElement).getName();
-        } else if (firElement instanceof FirProperty) {
+        }
+        if (firElement instanceof FirProperty) {
             return ((FirProperty) firElement).getName().toString();
-        } else if (firElement instanceof FirResolvedTypeRef) {
+        }
+        if (firElement instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) firElement;
             ConeKotlinType coneKotlinType = resolvedTypeRef.getType();
             return printConeKotlinType(coneKotlinType);
-        } else if (firElement instanceof FirResolvedNamedReference) {
+        }
+        if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
         } else if (firElement instanceof FirResolvedQualifier) {
             FirResolvedQualifier qualifier = (FirResolvedQualifier) firElement;
@@ -561,9 +564,8 @@ public class PsiTreePrinter {
             if (functionCall.getExplicitReceiver() != null) {
                 return firElementToString(functionCall.getExplicitReceiver()) + "." +
                         ((FirFunctionCall) firElement).getCalleeReference().getName() + "(" + firElementToString(((FirFunctionCall) firElement).getArgumentList()) + ")";
-            } else {
-                return ((FirFunctionCall) firElement).getCalleeReference().getName() + "(" + firElementToString(((FirFunctionCall) firElement).getArgumentList()) + ")";
             }
+            return ((FirFunctionCall) firElement).getCalleeReference().getName() + "(" + firElementToString(((FirFunctionCall) firElement).getArgumentList()) + ")";
         } else if (firElement instanceof FirArgumentList) {
             List<FirExpression> args = ((FirArgumentList) firElement).getArguments();
             if (!args.isEmpty()) {

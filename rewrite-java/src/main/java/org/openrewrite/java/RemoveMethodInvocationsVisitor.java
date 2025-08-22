@@ -98,21 +98,22 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
             if (m.getSelect() == null) {
                 return null;
-            } else if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
+            }
+            if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
                 boolean keepSelect = depth != 0;
                 if (keepSelect) {
                     selectAfter.add(getSelectAfter(m));
                     return m.getSelect();
-                } else {
-                    if (isStatement) {
-                        return null;
-                    } else if (isLambdaBody) {
-                        return ToBeRemoved.withMarker(J.Block.createEmptyBlock());
-                    } else {
-                        return m.getSelect();
-                    }
                 }
-            } else if (m.getSelect() instanceof J.MethodInvocation) {
+                if (isStatement) {
+                    return null;
+                }
+                if (isLambdaBody) {
+                    return ToBeRemoved.withMarker(J.Block.createEmptyBlock());
+                }
+                return m.getSelect();
+            }
+            if (m.getSelect() instanceof J.MethodInvocation) {
                 return removeMethods(m.getSelect(), depth, isLambdaBody, selectAfter);
             }
         }

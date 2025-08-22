@@ -101,18 +101,19 @@ public class EncodingDetectingInputStream extends InputStream {
         if (charset == null) {
             // we need to read the bytes one-by-one to determine the encoding
             return super.read(b, off, len);
-        } else if (charset == StandardCharsets.UTF_8 && !bomChecked) {
+        }
+        if (charset == StandardCharsets.UTF_8 && !bomChecked) {
             int read = checkAndSkipUtf8Bom();
             if (read == -1) {
                 return -1;
-            } else if (!charsetBomMarked) {
+            }
+            if (!charsetBomMarked) {
                 b[off++] = (byte) read;
             }
             read = inputStream.read(b, off, len - 1);
             return read == -1 ? charsetBomMarked ? -1 : 1 : (charsetBomMarked ? 0 : 1) + read;
-        } else {
-            return inputStream.read(b, off, len);
         }
+        return inputStream.read(b, off, len);
     }
 
     private void guessCharset(int aByte) {

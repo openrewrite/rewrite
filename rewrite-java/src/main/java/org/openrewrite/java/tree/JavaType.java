@@ -91,7 +91,8 @@ public interface JavaType {
                 }
             }
             return false;
-        } else if (this instanceof GenericTypeVariable) {
+        }
+        if (this instanceof GenericTypeVariable) {
             GenericTypeVariable generic = (GenericTypeVariable) this;
             for (JavaType bound : generic.getBounds()) {
                 if (bound.isAssignableFrom(pattern)) {
@@ -274,26 +275,28 @@ public interface JavaType {
                     long peekFlags = flags.apply(peek);
                     if (((Flag.Public.getBitMask() | Flag.Protected.getBitMask()) & peekFlags) != 0) {
                         return true;
-                    } else if ((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
+                    }
+                    if ((Flag.Private.getBitMask() & peekFlags) == 0 && rec.getPackageName().equals(visibleFromPackage)) {
                         // package private in the same package
                         return true;
                     }
 
                     return true;
-                } else {
-                    if (supertype == null) {
-                        supertype = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
-                        current = supertype;
-                        rec = fq.getSupertype();
-                        return hasNext();
-                    } else if (interfaces == null) {
-                        interfaces = fq.getInterfaces().iterator();
-                        return hasNext();
-                    } else if (interfaces.hasNext()) {
-                        rec = interfaces.next();
-                        current = recursive.apply(rec);
-                        return hasNext();
-                    }
+                }
+                if (supertype == null) {
+                    supertype = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
+                    current = supertype;
+                    rec = fq.getSupertype();
+                    return hasNext();
+                }
+                if (interfaces == null) {
+                    interfaces = fq.getInterfaces().iterator();
+                    return hasNext();
+                }
+                if (interfaces.hasNext()) {
+                    rec = interfaces.next();
+                    current = recursive.apply(rec);
+                    return hasNext();
                 }
                 return false;
             }
@@ -333,9 +336,10 @@ public interface JavaType {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                       isAssignableFrom(clazz.getSupertype()) ||
-                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
-            } else if (type instanceof GenericTypeVariable) {
+                        isAssignableFrom(clazz.getSupertype()) ||
+                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+            }
+            if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 for (JavaType bound : generic.getBounds()) {
                     if (isAssignableFrom(bound)) {
@@ -742,9 +746,8 @@ public interface JavaType {
             public static SingleElementValue from(JavaType element, Object value) {
                 if (value instanceof JavaType) {
                     return new SingleElementValue(element, null, (JavaType) value);
-                } else {
-                    return new SingleElementValue(element, value, null);
                 }
+                return new SingleElementValue(element, value, null);
             }
 
             @Override
@@ -762,9 +765,8 @@ public interface JavaType {
             public static ArrayElementValue from(JavaType element, Object[] values) {
                 if (values.length > 0 && values[0] instanceof JavaType) {
                     return new ArrayElementValue(element, null, (JavaType[]) values);
-                } else {
-                    return new ArrayElementValue(element, values, null);
                 }
+                return new ArrayElementValue(element, values, null);
             }
 
             @Override

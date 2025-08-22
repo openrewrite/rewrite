@@ -295,16 +295,15 @@ public interface G extends J {
                 List<JRightPadded<ClassDeclaration>> originalClasses = t.getPadding().getClasses();
                 if (originalClasses.size() != classes.size()) {
                     return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
-                } else {
-                    boolean hasChanges = false;
-                    for (int i = 0; i < originalClasses.size(); i++) {
-                        if (originalClasses.get(i) != classes.get(i)) {
-                            hasChanges = true;
-                            break;
-                        }
-                    }
-                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 }
+                boolean hasChanges = false;
+                for (int i = 0; i < originalClasses.size(); i++) {
+                    if (originalClasses.get(i) != classes.get(i)) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
 
             @Transient
@@ -330,16 +329,15 @@ public interface G extends J {
                 List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
                 if (originalImports.size() != imports.size()) {
                     return new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
-                } else {
-                    boolean hasChanges = false;
-                    for (int i = 0; i < originalImports.size(); i++) {
-                        if (originalImports.get(i) != imports.get(i)) {
-                            hasChanges = true;
-                            break;
-                        }
-                    }
-                    return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
                 }
+                boolean hasChanges = false;
+                for (int i = 0; i < originalImports.size(); i++) {
+                    if (originalImports.get(i) != imports.get(i)) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                return !hasChanges ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -384,9 +382,10 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
-            if(j instanceof ExpressionStatement) {
+            if (j instanceof ExpressionStatement) {
                 return j;
-            } else if (j instanceof Expression) {
+            }
+            if (j instanceof Expression) {
                 return withExpression((Expression) j);
             }
             return j;

@@ -81,7 +81,8 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
             public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext ctx) {
                 if (configFile.getSourcePath().equals(from)) {
                     return super.visitConfigFile(configFile, ctx);
-                } else if (configFile.getSourcePath().equals(dest)) {
+                }
+                if (configFile.getSourcePath().equals(dest)) {
                     acc.destinationExists = true;
                 }
                 return configFile;
@@ -129,7 +130,8 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
                     // delete the block from the original file
                     //noinspection ConstantConditions
                     return null;
-                } else if (sourcePath.equals(dest) && pathMatcher.matches(getCursor())) {
+                }
+                if (sourcePath.equals(dest) && pathMatcher.matches(getCursor())) {
                     return acc.toMove;
                 }
                 return b;

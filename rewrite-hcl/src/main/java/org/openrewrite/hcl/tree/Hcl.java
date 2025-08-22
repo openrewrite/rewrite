@@ -461,7 +461,8 @@ public interface Hcl extends Tree {
                     if (attr.getValue() instanceof Literal) {
                         Literal l = (Literal) attr.getValue();
                         return attr.withValue(l.withValue(value.toString()).withValueSource("\"" + value + "\""));
-                    } else if (attr.getValue() instanceof QuotedTemplate) {
+                    }
+                    if (attr.getValue() instanceof QuotedTemplate) {
                         QuotedTemplate q = (QuotedTemplate) attr.getValue();
                         return attr.withValue(q.withExpressions(singletonList(new Literal(Tree.randomId(),
                                 Space.EMPTY, Markers.EMPTY, value, value.toString()))));

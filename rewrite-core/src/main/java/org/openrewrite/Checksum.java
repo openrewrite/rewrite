@@ -72,7 +72,8 @@ public class Checksum implements RpcCodec<Checksum> {
         String uriStr = uri.toString();
         if (uriStr.endsWith(".sha256")) {
             return fromUri(httpSender, uri, "SHA-256");
-        } else if (uriStr.endsWith(".md5")) {
+        }
+        if (uriStr.endsWith(".md5")) {
             return fromUri(httpSender, uri, "MD5");
         }
         throw new IllegalArgumentException("Unable to automatically determine checksum type from URI: " + uriStr);

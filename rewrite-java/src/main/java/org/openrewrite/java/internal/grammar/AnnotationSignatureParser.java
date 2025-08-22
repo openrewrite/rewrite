@@ -147,9 +147,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotation(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotation(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final AnnotationContext annotation() throws RecognitionException {
@@ -231,9 +231,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitAnnotationName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitAnnotationName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final AnnotationNameContext annotationName() throws RecognitionException {
@@ -285,9 +285,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitQualifiedName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitQualifiedName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final QualifiedNameContext qualifiedName() throws RecognitionException {
@@ -362,9 +362,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePairs(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePairs(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ElementValuePairsContext elementValuePairs() throws RecognitionException {
@@ -426,9 +426,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValuePair(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValuePair(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ElementValuePairContext elementValuePair() throws RecognitionException {
@@ -475,9 +475,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitElementValue(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitElementValue(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ElementValueContext elementValue() throws RecognitionException {
@@ -523,9 +523,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitPrimary(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitPrimary(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final PrimaryContext primary() throws RecognitionException {
@@ -595,9 +595,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeContext type() throws RecognitionException {
@@ -666,9 +666,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitClassOrInterfaceType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitClassOrInterfaceType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ClassOrInterfaceTypeContext classOrInterfaceType() throws RecognitionException {
@@ -738,9 +738,9 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof AnnotationSignatureParserVisitor ) return ((AnnotationSignatureParserVisitor<? extends T>)visitor).visitLiteral(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof AnnotationSignatureParserVisitor) return ((AnnotationSignatureParserVisitor<? extends T>) visitor).visitLiteral(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final LiteralContext literal() throws RecognitionException {

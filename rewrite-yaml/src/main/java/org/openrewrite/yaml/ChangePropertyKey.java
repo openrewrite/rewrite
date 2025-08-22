@@ -173,14 +173,13 @@ public class ChangePropertyKey extends Recipe {
     private boolean hasNonExcludedValues(Yaml.Mapping.Entry propertyEntry) {
         if (!(propertyEntry.getValue() instanceof Yaml.Mapping)) {
             return true;
-        } else {
-            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
-                if (noneMatch(entry, excludedSubKeys())) {
-                    return true;
-                }
-            }
-            return false;
         }
+        for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) propertyEntry.getValue()).getEntries()) {
+            if (noneMatch(entry, excludedSubKeys())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hasExcludedValues(Yaml.Mapping.Entry propertyEntry) {
@@ -302,16 +301,15 @@ public class ChangePropertyKey extends Recipe {
         private Yaml.Block removeExclusions(Yaml.Block block) {
             if (!(block instanceof Yaml.Mapping)) {
                 return block;
-            } else {
-                Yaml.Mapping mapping = (Yaml.Mapping) block;
-                List<Yaml.Mapping.Entry> list = new ArrayList<>();
-                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                    if (noneMatch(entry, excludedSubKeys())) {
-                        list.add(entry);
-                    }
-                }
-                return mapping.withEntries(list);
             }
+            Yaml.Mapping mapping = (Yaml.Mapping) block;
+            List<Yaml.Mapping.Entry> list = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                if (noneMatch(entry, excludedSubKeys())) {
+                    list.add(entry);
+                }
+            }
+            return mapping.withEntries(list);
         }
     }
 

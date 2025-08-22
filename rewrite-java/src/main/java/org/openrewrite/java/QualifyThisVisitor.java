@@ -49,9 +49,8 @@ public class QualifyThisVisitor extends JavaVisitor<ExecutionContext> {
                     JLeftPadded.build(ident),
                     type
             );
-        } else {
-            return ident;
         }
+        return ident;
     }
 
     private boolean isAlreadyQualified(J.Identifier ident) {

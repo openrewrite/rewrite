@@ -58,16 +58,20 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
                 return array(clazz, signature);
-            } else if (clazz.isPrimitive()) {
+            }
+            if (clazz.isPrimitive()) {
                 //noinspection ConstantConditions
                 return JavaType.Primitive.fromKeyword(clazz.getName());
             }
             return classType((Class<?>) type, signature);
-        } else if (type instanceof GenericArrayType) {
+        }
+        if (type instanceof GenericArrayType) {
             return array((GenericArrayType) type, signature);
-        } else if (type instanceof TypeVariable) {
+        }
+        if (type instanceof TypeVariable) {
             return generic((TypeVariable<?>) type, signature);
-        } else if (type instanceof WildcardType) {
+        }
+        if (type instanceof WildcardType) {
             return generic((WildcardType) type, signature);
         } else if (type instanceof ParameterizedType) {
             return parameterized((ParameterizedType) type, signature);

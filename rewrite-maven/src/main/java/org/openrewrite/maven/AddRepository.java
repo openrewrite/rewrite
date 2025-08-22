@@ -266,11 +266,10 @@ public class AddRepository extends Recipe {
         Xml.Tag releases = repo.getChild("releases").orElse(null);
         if (releases == null) {
             return isNoReleases();
-        } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
-                   Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
-                   Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
+        return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
+                Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
+                Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
     }
 
     private boolean isNoReleases() {
@@ -281,11 +280,10 @@ public class AddRepository extends Recipe {
         Xml.Tag snapshots = repo.getChild("snapshots").orElse(null);
         if (snapshots == null) {
             return isNoSnapshots();
-        } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
-                   Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
-                   Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
+        return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
+                Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
+                Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
     }
 
     private boolean isNoSnapshots() {

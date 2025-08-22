@@ -133,9 +133,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitJson5(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitJson5(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final Json5Context json5() throws RecognitionException {
@@ -192,9 +192,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitObj(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitObj(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ObjContext obj() throws RecognitionException {
@@ -289,9 +289,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitMember(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitMember(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MemberContext member() throws RecognitionException {
@@ -337,9 +337,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final KeyContext key() throws RecognitionException {
@@ -399,9 +399,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitValue(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ValueContext value() throws RecognitionException {
@@ -485,9 +485,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitArr(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitArr(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ArrContext arr() throws RecognitionException {
@@ -579,9 +579,9 @@ public class JSON5Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JSON5Visitor ) return ((JSON5Visitor<? extends T>)visitor).visitNumber(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JSON5Visitor) return ((JSON5Visitor<? extends T>) visitor).visitNumber(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final NumberContext number() throws RecognitionException {

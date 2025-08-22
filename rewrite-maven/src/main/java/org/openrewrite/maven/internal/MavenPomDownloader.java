@@ -199,9 +199,8 @@ public class MavenPomDownloader {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
         if (parentPom == null) {
             return singletonList(projectPom);
-        } else {
-            return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
         }
+        return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
     }
 
     private @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
@@ -371,9 +370,8 @@ public class MavenPomDownloader {
 
             if (versioning == null) {
                 return null;
-            } else {
-                return new MavenMetadata(versioning);
             }
+            return new MavenMetadata(versioning);
         } catch (HttpSenderResponseException e) {
             if (e.isClientSideException() && e.getResponseCode() != null && e.getResponseCode() != 404) {
                 // If access was denied, do not attempt to derive metadata from this repository in the future.
@@ -437,9 +435,8 @@ public class MavenPomDownloader {
 
         if (version.endsWith("/")) {
             return version.substring(0, version.length() - 1);
-        } else {
-            return version;
         }
+        return version;
     }
 
     protected MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
@@ -467,11 +464,11 @@ public class MavenPomDownloader {
         // apparently the snapshot timestamp is not always present in the metadata
         if (s1 == null || s1.getTimestamp() == null) {
             return s2;
-        } else if (s2 == null || s2.getTimestamp() == null) {
-            return s1;
-        } else {
-            return (s1.getTimestamp().compareTo(s2.getTimestamp())) >= 0 ? s1 : s2;
         }
+        if (s2 == null || s2.getTimestamp() == null) {
+            return s1;
+        }
+        return (s1.getTimestamp().compareTo(s2.getTimestamp())) >= 0 ? s1 : s2;
     }
 
     public Pom download(GroupArtifactVersion gav,
@@ -497,7 +494,7 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (!projectPom.getGroupId().equals(gav.getGroupId()) ||
-                !projectPom.getArtifactId().equals(gav.getArtifactId())) {
+                    !projectPom.getArtifactId().equals(gav.getArtifactId())) {
                 continue;
             }
 
@@ -513,7 +510,7 @@ public class MavenPomDownloader {
         }
 
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
+                !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
                 Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
@@ -522,9 +519,9 @@ public class MavenPomDownloader {
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
                 if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                        gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                        gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                        gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }
@@ -559,10 +556,10 @@ public class MavenPomDownloader {
 
             if (result == null) {
                 URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                                     gav.getArtifactId() + '/' +
-                                     gav.getVersion() + '/' +
-                                     gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
+                        requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                        gav.getArtifactId() + '/' +
+                        gav.getVersion() + '/' +
+                        gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
                 uris.add(uri.toString());
                 if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
@@ -703,12 +700,11 @@ public class MavenPomDownloader {
             ctx.getResolutionListener().downloadSuccess(foundResolvedGav, containingPom);
             sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
             return pom;
-        } else {
-            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
-            sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-            throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
-                    .setRepositoryResponses(repositoryResponses);
         }
+        ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
+        sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
+        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
+                .setRepositoryResponses(repositoryResponses);
     }
 
     private RawPom rawPomFromGav(GroupArtifactVersion gav) {
@@ -794,7 +790,8 @@ public class MavenPomDownloader {
 
             if (RELEASE.equals(version)) {
                 return gav.withVersion(mavenMetadata.getVersioning().getRelease());
-            } else if (LATEST.equals(version)) {
+            }
+            if (LATEST.equals(version)) {
                 return gav.withVersion(mavenMetadata.getVersioning().getLatest());
             }
         }
@@ -1053,9 +1050,8 @@ public class MavenPomDownloader {
         } catch (HttpSenderResponseException e) {
             if (hasCredentials(repo) && e.isClientSideException()) {
                 return retryRequestAnonymously(uriString, e);
-            } else {
-                throw e;
             }
+            throw e;
         }
     }
 
@@ -1065,9 +1061,8 @@ public class MavenPomDownloader {
         } catch (HttpSenderResponseException retryException) {
             if (retryException.isAccessDenied()) {
                 throw originalException;
-            } else {
-                throw retryException;
             }
+            throw retryException;
         }
     }
 
@@ -1166,7 +1161,8 @@ public class MavenPomDownloader {
         if (version.endsWith("-SNAPSHOT")) {
             String snapshotsRaw = containingPom == null ? repo.getSnapshots() : containingPom.getValue(repo.getSnapshots());
             return snapshotsRaw == null || Boolean.parseBoolean(snapshotsRaw.trim());
-        } else if ("https://repo.spring.io/milestone".equalsIgnoreCase(repo.getUri())) {
+        }
+        if ("https://repo.spring.io/milestone".equalsIgnoreCase(repo.getUri())) {
             // special case this repository since it will be so commonly used
             return version.matches(".*(M|RC)\\d+$");
         }

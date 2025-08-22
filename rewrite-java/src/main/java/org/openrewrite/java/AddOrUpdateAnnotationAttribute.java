@@ -129,11 +129,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     a = a.withArguments(ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
                             return update((J.Assignment) it, finalA, newAttributeValue);
-                        } else if (it instanceof J.Literal) {
+                        }
+                        if (it instanceof J.Literal) {
                             return update((J.Literal) it, finalA, newAttributeValue);
-                        } else if (it instanceof J.FieldAccess) {
+                        }
+                        if (it instanceof J.FieldAccess) {
                             return update((J.FieldAccess) it, finalA, newAttributeValue);
-                        } else if (it instanceof J.NewArray) {
+                        }
+                        if (it instanceof J.NewArray) {
                             return update((J.NewArray) it, finalA, newAttributeValue);
                         }
                         return it;
@@ -334,11 +337,14 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {
         if (expression == null) {
             return oldAttributeValue == null;
-        } else if (oldAttributeValue == null) { // null means wildcard
+        }
+        if (oldAttributeValue == null) { // null means wildcard
             return true;
-        } else if (expression instanceof J.Literal) {
+        }
+        if (expression instanceof J.Literal) {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
-        } else if (expression instanceof J.FieldAccess) {
+        }
+        if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
             if (!(fa.getTarget() instanceof J.Identifier)) {
                 return oldAttributeValue.equals(fa.toString());

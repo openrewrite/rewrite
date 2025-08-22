@@ -317,9 +317,11 @@ public class UpdateJavaCompatibility extends Recipe {
             JavaType.Primitive type = argument.getType();
             if (type == JavaType.Primitive.String) {
                 return getMajorVersion((String) argument.getValue());
-            } else if (type == JavaType.Primitive.Int) {
+            }
+            if (type == JavaType.Primitive.Int) {
                 return (int) requireNonNull(argument.getValue());
-            } else if (type == JavaType.Primitive.Double) {
+            }
+            if (type == JavaType.Primitive.Double) {
                 return getMajorVersion(requireNonNull(argument.getValue()).toString());
             }
         } else if (expression instanceof J.FieldAccess) {
@@ -342,9 +344,11 @@ public class UpdateJavaCompatibility extends Recipe {
             JavaType.Primitive type = argument.getType();
             if (type == JavaType.Primitive.String) {
                 return DeclarationStyle.String;
-            } else if (type == JavaType.Primitive.Int) {
+            }
+            if (type == JavaType.Primitive.Int) {
                 return DeclarationStyle.Number;
-            } else if (type == JavaType.Primitive.Double) {
+            }
+            if (type == JavaType.Primitive.Double) {
                 return DeclarationStyle.Number;
             }
         } else if (expression instanceof J.FieldAccess) {
@@ -384,7 +388,8 @@ public class UpdateJavaCompatibility extends Recipe {
             if (style == null) {
                 if (literal.getType() == JavaType.Primitive.String) {
                     return changeJavaVersion(literal, DeclarationStyle.String);
-                } else if (literal.getType() == JavaType.Primitive.Int || literal.getType() == JavaType.Primitive.Double) {
+                }
+                if (literal.getType() == JavaType.Primitive.Int || literal.getType() == JavaType.Primitive.Double) {
                     return changeJavaVersion(literal, DeclarationStyle.Number);
                 }
             } else if (style == DeclarationStyle.String) {
@@ -418,7 +423,8 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (arg instanceof J.Literal) {
                         if (arg.getType() == JavaType.Primitive.String) {
                             return changeJavaVersion(arg, DeclarationStyle.String);
-                        } else if (arg.getType() == JavaType.Primitive.Int || arg.getType() == JavaType.Primitive.Double) {
+                        }
+                        if (arg.getType() == JavaType.Primitive.Int || arg.getType() == JavaType.Primitive.Double) {
                             return changeJavaVersion(arg, DeclarationStyle.Number);
                         }
                     }
@@ -464,9 +470,11 @@ public class UpdateJavaCompatibility extends Recipe {
     private String styleMissingCompatibilityVersion(@Nullable DeclarationStyle declarationStyle) {
         if (declarationStyle == DeclarationStyle.String) {
             return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
-        } else if (declarationStyle == DeclarationStyle.Enum) {
+        }
+        if (declarationStyle == DeclarationStyle.Enum) {
             return version <= 8 ? "JavaVersion.VERSION_1_" + version : "JavaVersion.VERSION_" + version;
-        } else if (version <= 8) {
+        }
+        if (version <= 8) {
             return "1." + version;
         }
         return String.valueOf(version);

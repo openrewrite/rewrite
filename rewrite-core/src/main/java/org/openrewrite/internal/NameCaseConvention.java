@@ -109,7 +109,8 @@ public enum NameCaseConvention {
                     char c = str.charAt(i);
                     if (Character.isUpperCase(c) && Character.isUpperCase(p)) {
                         return false;
-                    } else if (c == '_') {
+                    }
+                    if (c == '_') {
                         return false;
                     }
                 }
@@ -123,7 +124,8 @@ public enum NameCaseConvention {
                     char c = str.charAt(i);
                     if (Character.isUpperCase(c) && Character.isUpperCase(p)) {
                         return false;
-                    } else if (c == '_') {
+                    }
+                    if (c == '_') {
                         return false;
                     }
                 }
@@ -149,7 +151,8 @@ public enum NameCaseConvention {
                     char c = str.charAt(i);
                     if (Character.isAlphabetic(c) && Character.isUpperCase(c)) {
                         return false;
-                    } else if (c == '_') {
+                    }
+                    if (c == '_') {
                         return false;
                     }
                 }

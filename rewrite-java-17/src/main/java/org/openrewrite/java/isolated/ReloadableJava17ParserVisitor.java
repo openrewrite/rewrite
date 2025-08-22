@@ -1361,7 +1361,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (!annotationPosTable.isEmpty()) {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
-            } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
+            }
+            if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
             }
         }
@@ -1934,9 +1935,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     String whitespace = source.substring(start, end);
                     if (whitespace.contains("\n")) {
                         return EMPTY;
-                    } else {
-                        return Space.build(source.substring(start, end), emptyList());
                     }
+                    return Space.build(source.substring(start, end), emptyList());
                 }
                 return sourceBefore(";");
             case YIELD:
@@ -2043,11 +2043,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private static @Nullable Symbol extractSymbol(Tree tree) {
         if (tree instanceof JCIdent) {
             return ((JCIdent) tree).sym;
-        } else if (tree instanceof JCTree.JCMethodDecl) {
+        }
+        if (tree instanceof JCTree.JCMethodDecl) {
             return ((JCTree.JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCClassDecl) {
+        }
+        if (tree instanceof JCTree.JCClassDecl) {
             return ((JCTree.JCClassDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCVariableDecl) {
+        }
+        if (tree instanceof JCTree.JCVariableDecl) {
             return ((JCTree.JCVariableDecl) tree).sym;
         }
         return null;

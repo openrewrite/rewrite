@@ -84,20 +84,22 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         if (needsParentheses(b, parent.getValue())) {
             return parenthesize(b);
-        } else if (parent.getValue() instanceof J.InstanceOf) {
+        }
+        if (parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(b);
-        } else if (parent.getValue() instanceof J.Binary) {
+        }
+        if (parent.getValue() instanceof J.Binary) {
             J.Binary parentBinary = parent.getValue();
 
             // Special handling for string concatenation cases
             if (b.getOperator() == J.Binary.Type.Addition && parentBinary.getOperator() == J.Binary.Type.Addition) {
                 // Only apply string concatenation rules if we're actually dealing with strings
                 boolean isStringContext = isStringType(b.getType()) ||
-                                          isStringType(parentBinary.getType()) ||
-                                          isStringType(b.getLeft().getType()) ||
-                                          isStringType(b.getRight().getType()) ||
-                                          isStringType(parentBinary.getLeft().getType()) ||
-                                          isStringType(parentBinary.getRight().getType());
+                        isStringType(parentBinary.getType()) ||
+                        isStringType(b.getLeft().getType()) ||
+                        isStringType(b.getRight().getType()) ||
+                        isStringType(parentBinary.getLeft().getType()) ||
+                        isStringType(parentBinary.getRight().getType());
 
                 if (isStringContext) {
                     return handleStringConcatenation(b, parentBinary);
@@ -149,7 +151,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
     private boolean isStringType(@Nullable JavaType type) {
         if (type == JavaType.Primitive.String) {
             return true;
-        } else if (type == null || type instanceof JavaType.Primitive) {
+        }
+        if (type == null || type instanceof JavaType.Primitive) {
             return false;
         }
 
@@ -222,9 +225,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         if (needsParentheses(tc, parent.getValue())) {
             return parenthesize(tc);
-        } else if (parent.getValue() instanceof J.Binary ||
-                   parent.getValue() instanceof J.Unary ||
-                   parent.getValue() instanceof J.InstanceOf) {
+        }
+        if (parent.getValue() instanceof J.Binary ||
+                parent.getValue() instanceof J.Unary ||
+                parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(tc);
         }
         return tc;
@@ -243,9 +247,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         if (u.getOperator() == J.Unary.Type.Not && parent.getValue() instanceof J.Unary) {
             // no parens for `!!true` but for `-(-1)` and for `+(+1)`
             return u;
-        } else if (needsParentheses(u, parent.getValue())) {
+        }
+        if (needsParentheses(u, parent.getValue())) {
             return parenthesize(u);
-        } else if (parent.getValue() instanceof J.Unary) {
+        }
+        if (parent.getValue() instanceof J.Unary) {
             J.Unary parentUnary = parent.getValue();
             // Ensure proper precedence for nested unary operations
             if (parentUnary.getOperator() != u.getOperator()) {
@@ -268,8 +274,9 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (needsParentheses(t, parent.getValue())) {
             return parenthesize(t);
-        } else if (parent.getValue() instanceof J.Binary ||
-                   parent.getValue() instanceof J.InstanceOf) {
+        }
+        if (parent.getValue() instanceof J.Binary ||
+                parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(t);
         }
 

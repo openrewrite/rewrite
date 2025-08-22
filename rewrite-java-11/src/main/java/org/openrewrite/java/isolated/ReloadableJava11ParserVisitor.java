@@ -1277,7 +1277,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (!annotationPosTable.isEmpty()) {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
-            } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
+            }
+            if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
             }
         }
@@ -1838,9 +1839,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
             if (expTree instanceof ErroneousTree) {
                 return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), emptyList());
-            } else {
-                return sourceBefore(";");
             }
+            return sourceBefore(";");
         }
 
         if (t instanceof JCVariableDecl) {
@@ -1851,9 +1851,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 String whitespace = source.substring(start, end);
                 if (whitespace.contains("\n")) {
                     return EMPTY;
-                } else {
-                    return Space.build(source.substring(start, end), emptyList());
                 }
+                return Space.build(source.substring(start, end), emptyList());
             }
             return sourceBefore(";");
         }
@@ -1862,9 +1861,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             JCMethodDecl m = (JCMethodDecl) t;
             if (m.body == null || m.defaultValue != null) {
                 return sourceBefore(";");
-            } else {
-                return sourceBefore("");
             }
+            return sourceBefore("");
         }
 
         return EMPTY;
@@ -1959,11 +1957,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     private static @Nullable Symbol extractSymbol(Tree tree) {
         if (tree instanceof JCIdent) {
             return ((JCIdent) tree).sym;
-        } else if (tree instanceof JCTree.JCMethodDecl) {
+        }
+        if (tree instanceof JCTree.JCMethodDecl) {
             return ((JCTree.JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCClassDecl) {
+        }
+        if (tree instanceof JCTree.JCClassDecl) {
             return ((JCTree.JCClassDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCVariableDecl) {
+        }
+        if (tree instanceof JCTree.JCVariableDecl) {
             return ((JCTree.JCVariableDecl) tree).sym;
         }
         return null;

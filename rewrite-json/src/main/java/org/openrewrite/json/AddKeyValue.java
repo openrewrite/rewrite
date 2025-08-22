@@ -125,7 +125,8 @@ public class AddKeyValue extends Recipe {
             private boolean keyMatches(JsonKey jsonKey, String key) {
                 if (jsonKey instanceof Json.Literal) {
                     return key.equals(((Json.Literal) jsonKey).getValue());
-                } else if (jsonKey instanceof Json.Identifier) {
+                }
+                if (jsonKey instanceof Json.Identifier) {
                     return key.equals(((Json.Identifier) jsonKey).getName());
                 }
                 return false;

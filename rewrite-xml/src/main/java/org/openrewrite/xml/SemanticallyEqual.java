@@ -60,19 +60,19 @@ public class SemanticallyEqual {
 
         @Override
         public @Nullable Xml visitTag(Xml.Tag tag, Xml other) {
-            if(tag == other) {
+            if (tag == other) {
                 return null;
             }
-            if(!(other instanceof Xml.Tag)) {
+            if (!(other instanceof Xml.Tag)) {
                 areEqual = false;
                 return null;
             }
-            Xml.Tag otherTag = (Xml.Tag)other;
+            Xml.Tag otherTag = (Xml.Tag) other;
             if (!tag.getName().equals(otherTag.getName())) {
                 areEqual = false;
                 return null;
             }
-            if(tag.getAttributes().size() != otherTag.getAttributes().size()) {
+            if (tag.getAttributes().size() != otherTag.getAttributes().size()) {
                 areEqual = false;
                 return null;
             }
@@ -82,15 +82,16 @@ public class SemanticallyEqual {
             List<Xml.Attribute> thoseAttributes = otherTag.getAttributes().stream()
                     .sorted(comparing(Xml.Attribute::getKeyAsString))
                     .collect(toList());
-            for(int i = 0; i < theseAttributes.size(); i++) {
+            for (int i = 0; i < theseAttributes.size(); i++) {
                 visitAttribute(theseAttributes.get(i), thoseAttributes.get(i));
-                if(!areEqual) {
+                if (!areEqual) {
                     return null;
                 }
             }
-            if(bothNullOrEmpty(tag.getContent(), otherTag.getContent())) {
+            if (bothNullOrEmpty(tag.getContent(), otherTag.getContent())) {
                 return null;
-            } else if(eitherNullOrEmpty(tag.getContent(), otherTag.getContent())) {
+            }
+            if (eitherNullOrEmpty(tag.getContent(), otherTag.getContent())) {
                 areEqual = false;
                 return null;
             }
@@ -100,13 +101,13 @@ public class SemanticallyEqual {
             List<Content> thoseContents = otherTag.getContent().stream()
                     .filter(it -> it != null && !(it instanceof Xml.Comment))
                     .collect(toList());
-            if(theseContents.size() != thoseContents.size()) {
+            if (theseContents.size() != thoseContents.size()) {
                 areEqual = false;
                 return null;
             }
-            for(int i = 0; i < theseContents.size(); i++) {
+            for (int i = 0; i < theseContents.size(); i++) {
                 visit(theseContents.get(i), thoseContents.get(i));
-                if(!areEqual) {
+                if (!areEqual) {
                     return null;
                 }
             }

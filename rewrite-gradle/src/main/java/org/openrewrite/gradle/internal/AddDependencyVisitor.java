@@ -323,7 +323,8 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         for (Statement statement : statements) {
             if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement, true)) {
                 return true;
-            } else if (statement instanceof J.Return &&
+            }
+            if (statement instanceof J.Return &&
                     ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
                     DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) ((J.Return) statement).getExpression(), true)) {
                 return true;
@@ -394,15 +395,15 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
         DependencyStyle style = autodetectDependencyStyle(body);
         if (isKotlinDsl) {
             return escapeIfNecessary(configuration) + "(" + templatePlatform(templateDependencyNotation(KOTLIN_MAP_SEPARATOR, style)) + ")";
-        } else {
-            return escapeIfNecessary(configuration) + " " + templatePlatform(templateDependencyNotation(GROOVY_MAP_SEPARATOR, style));
         }
+        return escapeIfNecessary(configuration) + " " + templatePlatform(templateDependencyNotation(GROOVY_MAP_SEPARATOR, style));
     }
 
     private String templatePlatform(String dependencyNotation) {
         if (dependencyModifier == PLATFORM) {
             return "platform(" + dependencyNotation + ")";
-        } else if (dependencyModifier == ENFORCED_PLATFORM) {
+        }
+        if (dependencyModifier == ENFORCED_PLATFORM) {
             return "enforcedPlatform(" + dependencyNotation + ")";
         }
         return dependencyNotation;
@@ -411,9 +412,8 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
     private String templateDependencyNotation(String mapSeparator, DependencyStyle style) {
         if (style == DependencyStyle.String) {
             return "\"" + groupId + ":" + artifactId + (version == null ? "" : ":" + version) + (version == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"";
-        } else {
-            return "group" + mapSeparator + "\"" + groupId + "\", name" + mapSeparator + "\"" + artifactId + "\"" + (version == null ? "" : ", version" + mapSeparator + "\"" + version + "\"") + (classifier == null ? "" : ", classifier" + mapSeparator + "\"" + classifier + "\"") + (extension == null ? "" : ", ext" + mapSeparator + "\"" + extension + "\"");
         }
+        return "group" + mapSeparator + "\"" + groupId + "\", name" + mapSeparator + "\"" + artifactId + "\"" + (version == null ? "" : ", version" + mapSeparator + "\"" + version + "\"") + (classifier == null ? "" : ", classifier" + mapSeparator + "\"" + classifier + "\"") + (extension == null ? "" : ", ext" + mapSeparator + "\"" + extension + "\"");
     }
 
     private String escapeIfNecessary(String configurationName) {

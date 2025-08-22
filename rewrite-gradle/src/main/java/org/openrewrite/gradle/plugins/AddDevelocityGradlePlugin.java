@@ -318,12 +318,11 @@ public class AddDevelocityGradlePlugin extends Recipe {
         TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         if (style.getUseTabCharacter()) {
             return "\t";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < style.getIndentSize(); i++) {
-                sb.append(" ");
-            }
-            return sb.toString();
         }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < style.getIndentSize(); i++) {
+            sb.append(" ");
+        }
+        return sb.toString();
     }
 }

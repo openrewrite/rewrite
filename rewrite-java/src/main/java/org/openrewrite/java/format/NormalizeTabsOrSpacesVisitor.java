@@ -51,16 +51,14 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                 if (c instanceof Javadoc) {
                     c = c.withSuffix(normalize(c.getSuffix(), false));
                     return (Comment) new JavadocVisitor<Integer>(new JavaVisitor<>()) {
-                        @Override
-                        public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
+                        @Override public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, Integer integer) {
                             return lineBreak.withMargin(normalize(lineBreak.getMargin(), true));
                         }
                     }.visitNonNull((Javadoc) c, 0);
-                } else {
-                    TextComment textComment = (TextComment) c;
-                    if (textComment.getText().contains("\t")) {
-                        c = textComment.withText(normalize(textComment.getText(), true));
-                    }
+                }
+                TextComment textComment = (TextComment) c;
+                if (textComment.getText().contains("\t")) {
+                    c = textComment.withText(normalize(textComment.getText(), true));
                 }
             }
 

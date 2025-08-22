@@ -61,13 +61,15 @@ public class XRange extends LatestRelease {
 
         if ("*".equals(minor)) {
             return true;
-        } else if (gav.group(2) == null || !gav.group(2).equals(minor)) {
+        }
+        if (gav.group(2) == null || !gav.group(2).equals(minor)) {
             return false;
         }
 
         if ("*".equals(patch)) {
             return true;
-        } else if (gav.group(3) == null || !gav.group(3).equals(patch)) {
+        }
+        if (gav.group(3) == null || !gav.group(3).equals(patch)) {
             return false;
         }
 
@@ -87,9 +89,11 @@ public class XRange extends LatestRelease {
 
         if ("*".equals(major) && (matcher.group(2) != null || matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
-        } else if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
+        }
+        if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
-        } else if ("*".equals(patch) && matcher.group(4) != null) {
+        }
+        if ("*".equals(patch) && matcher.group(4) != null) {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
         }
 

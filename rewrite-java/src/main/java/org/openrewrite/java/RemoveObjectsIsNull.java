@@ -48,7 +48,8 @@ public class RemoveObjectsIsNull extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (IS_NULL.matches(m)) {
                     return replace(m, "(#{any()}) == null", ctx);
-                } else if (NON_NULL.matches(m)) {
+                }
+                if (NON_NULL.matches(m)) {
                     return replace(m, "(#{any()}) != null", ctx);
                 }
                 return m;

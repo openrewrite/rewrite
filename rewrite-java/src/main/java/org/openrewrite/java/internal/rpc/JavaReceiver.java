@@ -630,7 +630,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     if (t instanceof J) {
                         //noinspection unchecked
                         return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
+                    }
+                    if (t instanceof Space) {
                         //noinspection unchecked
                         return (T) visitSpace((Space) t, q);
                     }
@@ -652,7 +653,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     if (t instanceof J) {
                         //noinspection unchecked
                         return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
+                    }
+                    if (t instanceof Space) {
                         //noinspection unchecked
                         return (T) visitSpace((Space) t, q);
                     }

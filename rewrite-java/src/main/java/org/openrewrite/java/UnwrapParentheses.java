@@ -48,20 +48,22 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
         }
         Tree parent = parensScope.getParentTreeCursor().getValue();
         if (parent instanceof J.If ||
-            parent instanceof J.Switch ||
-            parent instanceof J.Synchronized ||
-            parent instanceof J.Try.Catch ||
-            parent instanceof J.TypeCast ||
-            parent instanceof J.WhileLoop) {
+                parent instanceof J.Switch ||
+                parent instanceof J.Synchronized ||
+                parent instanceof J.Try.Catch ||
+                parent instanceof J.TypeCast ||
+                parent instanceof J.WhileLoop) {
             return false;
-        } else if (parent instanceof J.DoWhileLoop) {
+        }
+        if (parent instanceof J.DoWhileLoop) {
             return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition());
-        } else if (parent instanceof J.Unary) {
+        }
+        if (parent instanceof J.Unary) {
             J innerJ = ((J.Parentheses<?>) parensScope.getValue()).getTree();
             return !(innerJ instanceof J.Assignment) &&
-                   !(innerJ instanceof J.Binary) &&
-                   !(innerJ instanceof J.Ternary) &&
-                   !(innerJ instanceof J.InstanceOf);
+                    !(innerJ instanceof J.Binary) &&
+                    !(innerJ instanceof J.Ternary) &&
+                    !(innerJ instanceof J.InstanceOf);
         }
         return true;
     }

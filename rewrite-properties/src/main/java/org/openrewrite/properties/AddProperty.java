@@ -122,9 +122,10 @@ public class AddProperty extends Recipe {
 
                 // First entry in the file does not need a newline, but every other entry does
                 contentList = ListUtils.map(contentList, (i, c) -> {
-                    if(i == 0) {
+                    if (i == 0) {
                         return (Properties.Content) c.withPrefix("");
-                    } else if(!c.getPrefix().contains("\n")) {
+                    }
+                    if (!c.getPrefix().contains("\n")) {
                         return (Properties.Content) c.withPrefix("\n" + c.getPrefix());
                     }
                     return c;

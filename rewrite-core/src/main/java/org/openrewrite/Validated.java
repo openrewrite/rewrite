@@ -341,15 +341,15 @@ public interface Validated<T> extends Iterable<Validated<T>> {
             //If only one side is valid, this short circuits the invalid path.
             if (left.isValid() && right.isInvalid()) {
                 return stream(left.spliterator(), false).iterator();
-            } else if (left.isInvalid() && right.isValid()) {
-                return stream(right.spliterator(), false).iterator();
-            } else {
-                //If both are valid/invalid, concat all validations.
-                return Stream.concat(
-                        stream(left.spliterator(), false),
-                        stream(right.spliterator(), false)
-                ).iterator();
             }
+            if (left.isInvalid() && right.isValid()) {
+                return stream(right.spliterator(), false).iterator();
+            }
+            //If both are valid/invalid, concat all validations.
+            return Stream.concat(
+                    stream(left.spliterator(), false),
+                    stream(right.spliterator(), false)
+            ).iterator();
         }
     }
 

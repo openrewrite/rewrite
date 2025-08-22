@@ -156,11 +156,14 @@ public abstract class OperatingSystemProvenance implements Marker {
         String osName = os.toLowerCase();
         if (osName.contains("windows")) {
             return WINDOWS;
-        } else if (osName.contains("mac os x") || osName.contains("darwin") || osName.contains("osx")) {
+        }
+        if (osName.contains("mac os x") || osName.contains("darwin") || osName.contains("osx")) {
             return MAC_OS;
-        } else if (osName.contains("sunos") || osName.contains("solaris")) {
+        }
+        if (osName.contains("sunos") || osName.contains("solaris")) {
             return SOLARIS;
-        } else if (osName.contains("linux")) {
+        }
+        if (osName.contains("linux")) {
             return LINUX;
         } else if (osName.contains("freebsd")) {
             return FREE_BSD;
@@ -427,9 +430,8 @@ public abstract class OperatingSystemProvenance implements Marker {
             int pos = libraryName.lastIndexOf('/');
             if (pos >= 0) {
                 return libraryName.substring(0, pos + 1) + "lib" + libraryName.substring(pos + 1) + suffix;
-            } else {
-                return "lib" + libraryName + suffix;
             }
+            return "lib" + libraryName + suffix;
         }
 
         @Override

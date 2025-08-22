@@ -154,7 +154,8 @@ public class ResolvedDependency implements Serializable {
     private @Nullable ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
-        } else if (!visited.add(this)) {
+        }
+        if (!visited.add(this)) {
             return null;
         }
         outer:

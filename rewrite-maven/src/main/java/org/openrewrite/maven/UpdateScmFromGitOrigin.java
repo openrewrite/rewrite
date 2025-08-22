@@ -99,7 +99,8 @@ public class UpdateScmFromGitOrigin extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if ("project".equals(tag.getName())) {
                     return super.visitTag(tag, ctx);
-                } else if ("scm".equals(tag.getName())) {
+                }
+                if ("scm".equals(tag.getName())) {
                     // Update existing tags, preserving their URL structure
                     tag = updateScmTag(tag, "url", ctx);
                     tag = updateScmTag(tag, "connection", ctx);

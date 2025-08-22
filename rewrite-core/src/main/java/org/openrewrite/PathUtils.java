@@ -90,23 +90,23 @@ public class PathUtils {
         List<String> excludedPatterns = getExcludedPatterns(globPattern);
         if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
             return matchesGlob(globPattern, relativePath);
-        } else if (!eitherOrPatterns.isEmpty()) {
+        }
+        if (!eitherOrPatterns.isEmpty()) {
             for (String eitherOrPattern : eitherOrPatterns) {
                 if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
                     return true;
                 }
             }
             return false;
-        } else {
-            // When only a segment of a path is negated the other segments must still match
-            String wildcard = convertNegationToWildcard(globPattern);
-            if (!matchesGlob(wildcard, relativePath)) {
+        }
+        // When only a segment of a path is negated the other segments must still match
+        String wildcard = convertNegationToWildcard(globPattern);
+        if (!matchesGlob(wildcard, relativePath)) {
+            return false;
+        }
+        for (String excludedPattern : excludedPatterns) {
+            if (matchesGlob(excludedPattern, relativePath)) {
                 return false;
-            }
-            for (String excludedPattern : excludedPatterns) {
-                if (matchesGlob(excludedPattern, relativePath)) {
-                    return false;
-                }
             }
         }
         return true;
@@ -145,7 +145,8 @@ public class PathUtils {
                 }
             }
             return true;
-        } else if (pattIdxStart > pattIdxEnd) {
+        }
+        if (pattIdxStart > pattIdxEnd) {
             // Path not exhausted, but pattern is. Failure.
             return false;
         }
@@ -159,7 +160,7 @@ public class PathUtils {
                 return false;
             }
             if (pattIdxEnd == (pattTokens.length - 1) &&
-                (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                    (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;

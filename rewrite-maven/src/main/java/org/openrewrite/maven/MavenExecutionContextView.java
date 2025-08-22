@@ -301,17 +301,16 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                                     knownRepo.getTimeout(),
                                     knownRepo.getDeriveMetadataIfMissing()
                             );
-                        } else {
-                            return new MavenRepository(
-                                    repo.getId(),
-                                    repo.getUrl(),
-                                    repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
-                                    repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
-                                    null,
-                                    null,
-                                    null
-                            );
                         }
+                        return new MavenRepository(
+                                repo.getId(),
+                                repo.getUrl(),
+                                repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
+                                repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
+                                null,
+                                null,
+                                null
+                        );
                     } catch (Exception exception) {
                         //noinspection DataFlowIssue
                         this.getOnError().accept(new MavenParsingException(

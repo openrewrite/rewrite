@@ -30,11 +30,10 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
     public static GeneralFormatStyle autodetectGeneralFormatStyle(Xml.Document x) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(x, count);
-        if(count.lf >= count.crlf) {
+        if (count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
-        } else {
-            return new GeneralFormatStyle(true);
         }
+        return new GeneralFormatStyle(true);
     }
 
     @Override

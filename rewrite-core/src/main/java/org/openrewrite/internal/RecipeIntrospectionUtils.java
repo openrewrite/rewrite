@@ -71,15 +71,15 @@ public class RecipeIntrospectionUtils {
         if (constructors.length == 0) {
             // kotlin object declarations have no constructors at all
             throw new RecipeIntrospectionException("Unable to locate primary constructor for Recipe " + recipeClass);
-        } else if (recipeClass.getConstructors().length == 1) {
-            return recipeClass.getConstructors()[0];
-        } else {
-            Constructor<?> constructor = findJsonCreator(constructors);
-            if (constructor != null) {
-                return constructor;
-            }
-            throw new RecipeIntrospectionException("Unable to locate primary constructor for Recipe " + recipeClass);
         }
+        if (recipeClass.getConstructors().length == 1) {
+            return recipeClass.getConstructors()[0];
+        }
+        Constructor<?> constructor = findJsonCreator(constructors);
+        if (constructor != null) {
+            return constructor;
+        }
+        throw new RecipeIntrospectionException("Unable to locate primary constructor for Recipe " + recipeClass);
     }
 
     private static @Nullable Constructor<?> findJsonCreator(Constructor<?>[] constructors) {
@@ -153,29 +153,28 @@ public class RecipeIntrospectionUtils {
                 return constructor;
             }
             return getPrimaryConstructor(clazz);
-        } else {
-            Constructor<?>[] constructors = clazz.getConstructors();
-            Constructor<?> jsonCreator = findJsonCreator(constructors);
-            if (jsonCreator != null) {
-                return jsonCreator;
-            }
+        }
+        Constructor<?>[] constructors = clazz.getConstructors();
+        Constructor<?> jsonCreator = findJsonCreator(constructors);
+        if (jsonCreator != null) {
+            return jsonCreator;
+        }
 
-            int argCount = args.size();
-            OUTER:
-            for (Constructor<?> constructor : constructors) {
-                if (constructor.getParameterCount() >= argCount) {
-                    for (int i = 0; i < constructor.getParameterCount(); i++) {
-                        Parameter param = constructor.getParameters()[i];
-                        if (!args.containsKey(param.getName())) {
-                            continue OUTER;
-                        }
-                        Class<?> paramType = getParamType(param);
-                        if (!paramType.isInstance(args.get(param.getName()))) {
-                            continue OUTER;
-                        }
+        int argCount = args.size();
+        OUTER:
+        for (Constructor<?> constructor : constructors) {
+            if (constructor.getParameterCount() >= argCount) {
+                for (int i = 0; i < constructor.getParameterCount(); i++) {
+                    Parameter param = constructor.getParameters()[i];
+                    if (!args.containsKey(param.getName())) {
+                        continue OUTER;
                     }
-                    return constructor;
+                    Class<?> paramType = getParamType(param);
+                    if (!paramType.isInstance(args.get(param.getName()))) {
+                        continue OUTER;
+                    }
                 }
+                return constructor;
             }
         }
         throw new RecipeIntrospectionException("Unable to locate matching constructor for Recipe " + clazz.getName());
@@ -219,7 +218,8 @@ public class RecipeIntrospectionUtils {
     private static Object convert(Object o, Class<?> type) {
         if (type == String.class) {
             return Objects.toString(o, null);
-        } else if (o instanceof String && type.isEnum()) {
+        }
+        if (o instanceof String && type.isEnum()) {
             Object[] values = type.getEnumConstants();
             for (Object value : values) {
                 if (value.toString().equalsIgnoreCase((String) o)) {
@@ -262,11 +262,14 @@ public class RecipeIntrospectionUtils {
     private static Object getPrimitiveDefault(Class<?> t) {
         if (t.equals(byte.class)) {
             return (byte) 0;
-        } else if (t.equals(short.class)) {
+        }
+        if (t.equals(short.class)) {
             return (short) 0;
-        } else if (t.equals(int.class)) {
+        }
+        if (t.equals(int.class)) {
             return 0;
-        } else if (t.equals(long.class)) {
+        }
+        if (t.equals(long.class)) {
             return 0L;
         } else if (t.equals(float.class)) {
             return 0.0f;

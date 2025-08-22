@@ -124,9 +124,8 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             }
             if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withAfter(Space.build(newAfter, emptyList()));
-            } else {
-                return elem;
             }
+            return elem;
         });
     }
 

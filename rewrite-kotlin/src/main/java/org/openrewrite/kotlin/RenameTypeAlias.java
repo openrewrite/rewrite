@@ -82,13 +82,16 @@ public class RenameTypeAlias extends Recipe {
         if (value instanceof J.MethodInvocation) {
             J.MethodInvocation m = (J.MethodInvocation) value;
             return m.getName() != ident;
-        } else if (value instanceof J.NewClass) {
+        }
+        if (value instanceof J.NewClass) {
             J.NewClass m = (J.NewClass) value;
             return m.getClazz() != ident;
-        } else if (value instanceof J.NewArray) {
+        }
+        if (value instanceof J.NewArray) {
             J.NewArray a = (J.NewArray) value;
             return a.getTypeExpression() != ident;
-        } else if (value instanceof J.VariableDeclarations) {
+        }
+        if (value instanceof J.VariableDeclarations) {
             J.VariableDeclarations v = (J.VariableDeclarations) value;
             return ident != v.getTypeExpression();
         } else if (value instanceof J.VariableDeclarations.NamedVariable) {

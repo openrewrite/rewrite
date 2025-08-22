@@ -96,9 +96,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
-        } else {
-            return super.visitMisc(ctx);
         }
+        return super.visitMisc(ctx);
     }
 
     @Override
@@ -106,12 +105,14 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         if (ctx.CDATA() != null) {
             return convert(ctx.CDATA(), (cdata, prefix) ->
                     charData(cdata.getText(), true, prefix));
-        } else if (ctx.chardata() != null) {
+        }
+        if (ctx.chardata() != null) {
             Xml.CharData charData = convert(ctx.chardata(), (chardata, prefix) ->
                     charData(chardata.getText(), false, prefix));
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
-        } else if (ctx.reference() != null) {
+        }
+        if (ctx.reference() != null) {
             if (ctx.reference().EntityRef() != null) {
                 String prefix = prefix(ctx);
                 cursor = ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
@@ -121,7 +122,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         false,
                         ctx.reference().EntityRef().getText(),
                         "");
-            } else if (ctx.reference().CharRef() != null) {
+            }
+            if (ctx.reference().CharRef() != null) {
                 String prefix = prefix(ctx);
                 cursor = ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
                 return new Xml.CharData(randomId(),

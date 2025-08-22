@@ -206,9 +206,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             String methodName = methodInvocation.getSimpleName();
             if ("classpath".equals(methodName)) {
                 return gradleProject.getBuildscript().getConfiguration(methodName);
-            } else {
-                return gradleProject.getConfiguration(methodName);
             }
+            return gradleProject.getConfiguration(methodName);
         }
 
         private boolean withinDependenciesBlock(Cursor cursor) {
@@ -223,7 +222,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
-            } else if (argument instanceof G.GString) {
+            }
+            if (argument instanceof G.GString) {
                 G.GString gstring = (G.GString) argument;
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {

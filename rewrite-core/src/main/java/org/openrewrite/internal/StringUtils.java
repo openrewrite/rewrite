@@ -333,16 +333,15 @@ public class StringUtils {
         int start = text.indexOf(match);
         if (match.isEmpty() || text.isEmpty() || start == -1) {
             return text;
-        } else {
-            StringBuilder newValue = new StringBuilder(text.length());
-            newValue.append(text, 0, start);
-            newValue.append(replacement);
-            int end = start + match.length();
-            if (end < text.length()) {
-                newValue.append(text, end, text.length());
-            }
-            return newValue.toString();
         }
+        StringBuilder newValue = new StringBuilder(text.length());
+        newValue.append(text, 0, start);
+        newValue.append(replacement);
+        int end = start + match.length();
+        if (end < text.length()) {
+            newValue.append(text, end, text.length());
+        }
+        return newValue.toString();
     }
 
     public static String repeat(String s, int count) {
@@ -387,7 +386,8 @@ public class StringUtils {
     public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
         if ("*".equals(pattern)) {
             return true;
-        } else if (pattern == null) {
+        }
+        if (pattern == null) {
             return false;
         }
 
@@ -397,7 +397,8 @@ public class StringUtils {
 
         if (str.isEmpty() && !pattern.isEmpty()) {
             return allStars(pattern, 0, pattern.length() - 1);
-        } else if (pattern.isEmpty()) {
+        }
+        if (pattern.isEmpty()) {
             return str.isEmpty();
         }
 
@@ -422,7 +423,8 @@ public class StringUtils {
             // All characters in the string are used. Check if only '*'s are
             // left in the pattern. If so, we succeeded. Otherwise failure.
             return allStars(pattern, patIdxStart, patIdxEnd);
-        } else if (patIdxStart > patIdxEnd) {
+        }
+        if (patIdxStart > patIdxEnd) {
             // String not exhausted by pattern is. Failure
             return false;
         }
@@ -514,7 +516,8 @@ public class StringUtils {
             char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
                 return indent.toString();
-            } else if (Character.isWhitespace(c)) {
+            }
+            if (Character.isWhitespace(c)) {
                 indent.append(c);
             } else {
                 return indent.toString();
@@ -543,10 +546,9 @@ public class StringUtils {
                 } else if (i > 0) {
                     if (margin.length() == 0) {
                         return "";
-                    } else {
-                        gcm = commonMargin(gcm, margin);
-                        margin = new StringBuilder();
                     }
+                    gcm = commonMargin(gcm, margin);
+                    margin = new StringBuilder();
                 }
                 skipRestOfLine = false;
             } else if (Character.isWhitespace(c) && !skipRestOfLine) {

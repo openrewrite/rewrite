@@ -596,9 +596,10 @@ class JavaTemplateTest implements RewriteTest {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) binary.getLeft();
                       return JavaTemplate.builder("!#{any(java.util.List)}.isEmpty()")
-                        .build()
-                        .apply(getCursor(), mi.getCoordinates().replace(), mi.getSelect());
-                  } else if (binary.getLeft() instanceof J.Unary) {
+                              .build()
+                              .apply(getCursor(), mi.getCoordinates().replace(), mi.getSelect());
+                  }
+                  if (binary.getLeft() instanceof J.Unary) {
                       return binary.getLeft();
                   }
                   return binary;
@@ -758,10 +759,9 @@ class JavaTemplateTest implements RewriteTest {
               public J visitFieldAccess(J.FieldAccess fa, ExecutionContext ctx) {
                   if ("f".equals(fa.getSimpleName())) {
                       return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
-                        getCursor(), fa.getCoordinates().replace(), fa);
-                  } else {
-                      return fa;
+                              getCursor(), fa.getCoordinates().replace(), fa);
                   }
+                  return fa;
               }
           }).withMaxCycles(1)),
           java(
@@ -1197,13 +1197,12 @@ class JavaTemplateTest implements RewriteTest {
 
                     if (args.size() == 2) {
                         return JavaTemplate.builder("assertThat(#{any()}).isEqualTo(#{any()});")
-                          .staticImports("org.assertj.core.api.Assertions.assertThat")
-                          .javaParser(assertionsParser)
-                          .build()
-                          .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
-                    } else {
-                        return super.visitMethodInvocation(method, ctx);
+                                .staticImports("org.assertj.core.api.Assertions.assertThat")
+                                .javaParser(assertionsParser)
+                                .build()
+                                .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
                     }
+                    return super.visitMethodInvocation(method, ctx);
                 }
             })),
           java(
@@ -1252,13 +1251,12 @@ class JavaTemplateTest implements RewriteTest {
 
                   if (args.size() == 2) {
                       return JavaTemplate.builder("requireNonNull(#{any()}).equals(#{any()});")
-                        .staticImports("java.util.Objects.requireNonNull")
-                        .javaParser(JavaParser.fromJavaVersion())
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
-                  } else {
-                      return super.visitMethodInvocation(method, ctx);
+                              .staticImports("java.util.Objects.requireNonNull")
+                              .javaParser(JavaParser.fromJavaVersion())
+                              .build()
+                              .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
                   }
+                  return super.visitMethodInvocation(method, ctx);
               }
           })),
           java(

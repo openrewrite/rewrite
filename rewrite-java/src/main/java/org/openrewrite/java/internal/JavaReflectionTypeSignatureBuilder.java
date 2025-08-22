@@ -36,9 +36,11 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             Class<?> clazz = (Class<?>) t;
             if (clazz.isArray()) {
                 return arraySignature(clazz);
-            } else if (clazz.isPrimitive()) {
+            }
+            if (clazz.isPrimitive()) {
                 return primitiveSignature(clazz);
-            } else if (clazz.getTypeParameters().length == 0) {
+            }
+            if (clazz.getTypeParameters().length == 0) {
                 return classSignature(clazz);
             }
 
@@ -53,11 +55,14 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             }
 
             return s.toString();
-        } else if (t instanceof ParameterizedType) {
+        }
+        if (t instanceof ParameterizedType) {
             return parameterizedSignature(t);
-        } else if (t instanceof WildcardType) {
+        }
+        if (t instanceof WildcardType) {
             return genericSignature(t);
-        } else if (t instanceof TypeVariable) {
+        }
+        if (t instanceof TypeVariable) {
             return genericSignature(t);
         } else if (t instanceof GenericArrayType) {
             return arraySignature(t);
@@ -70,7 +75,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
     public String arraySignature(Object type) {
         if (type instanceof GenericArrayType) {
             return signature(((GenericArrayType) type).getGenericComponentType()) + "[]";
-        } else if (type instanceof Class) {
+        }
+        if (type instanceof Class) {
             Class<?> array = (Class<?>) type;
             return signature(array.getComponentType()) + "[]";
         }
@@ -109,7 +115,8 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
             typeVariableNameStack.remove(name);
 
             return s.append('}').toString();
-        } else if (type instanceof WildcardType) {
+        }
+        if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
             StringBuilder s = new StringBuilder("Generic{?");
 

@@ -104,7 +104,8 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 return identifier
                         .withSimpleName(realName)
                         .withFieldType(fieldType.withOwner(newOwningType).withName(realName));
-            } else if (expression instanceof J.FieldAccess) {
+            }
+            if (expression instanceof J.FieldAccess) {
                 if (hasNoConflictingImport) {
                     maybeAddImport(newOwningType.getFullyQualifiedName(), false);
                 }

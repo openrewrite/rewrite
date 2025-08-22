@@ -107,7 +107,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                                         .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry))
                         )
                 ));
-            } else if (incoming instanceof Yaml.Sequence) {
+            }
+            if (incoming instanceof Yaml.Sequence) {
                 return mergeSequence(existingSeq, (Yaml.Sequence) incoming, p, getCursor());
             }
         }

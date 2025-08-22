@@ -174,9 +174,11 @@ public class DependencyUseStringNotation extends Recipe {
             private @Nullable String coerceToStringNotation(Expression expression) {
                 if (expression instanceof J.Literal) {
                     return (String) ((J.Literal) expression).getValue();
-                } else if (expression instanceof J.Identifier) {
+                }
+                if (expression instanceof J.Identifier) {
                     return "$" + ((J.Identifier) expression).getSimpleName();
-                } else if (expression instanceof G.GString) {
+                }
+                if (expression instanceof G.GString) {
                     List<J> str = ((G.GString) expression).getStrings();
                     StringBuilder sb = new StringBuilder();
                     for (J valuePart : str) {

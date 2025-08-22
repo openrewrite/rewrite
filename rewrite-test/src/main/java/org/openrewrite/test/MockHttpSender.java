@@ -51,9 +51,8 @@ public class MockHttpSender implements HttpSender {
         if (responseCode != 200) {
             return new Response(responseCode, null, responseHeaders, () -> {
             });
-        } else {
-            return new Response(responseCode, is.get(), responseHeaders, () -> {
-            });
         }
+        return new Response(responseCode, is.get(), responseHeaders, () -> {
+        });
     }
 }

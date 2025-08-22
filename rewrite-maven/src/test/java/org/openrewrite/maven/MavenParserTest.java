@@ -1003,13 +1003,13 @@ class MavenParserTest implements RewriteTest {
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
                     if (!Objects.equals(
-                      request.getHeader("Authorization"),
-                      "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
+                            request.getHeader("Authorization"),
+                            "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
                         return resp.setResponseCode(401);
-                    } else {
-                        if (!"HEAD".equalsIgnoreCase(request.getMethod())) {
-                            //language=xml
-                            resp.setBody("""
+                    }
+                    if (!"HEAD".equalsIgnoreCase(request.getMethod())) {
+                        //language=xml
+                        resp.setBody("""
                               <project>
                                 <modelVersion>4.0.0</modelVersion>
 
@@ -1019,10 +1019,9 @@ class MavenParserTest implements RewriteTest {
 
                               </project>
                               """
-                            );
-                        }
-                        return resp.setResponseCode(200);
+                        );
                     }
+                    return resp.setResponseCode(200);
                 }
             });
 

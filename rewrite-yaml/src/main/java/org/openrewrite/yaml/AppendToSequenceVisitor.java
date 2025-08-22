@@ -60,29 +60,26 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
         if (null == this.existingSequenceValues) {
             return true;
-        } else {
-            final List<String> values = seq.getEntries()
-                    .stream()
-                    .map(Yaml.Sequence.Entry::getBlock)
-                    .map(block -> convertBlockToString(block, cursor))
-                    .sorted()
-                    .collect(toList());
-            if (this.matchExistingSequenceValuesInAnyOrder) {
-                List<String> sorted = new ArrayList<>(this.existingSequenceValues);
-                sort(sorted);
-                return values.equals(sorted);
-            } else {
-                return values.equals(this.existingSequenceValues);
-            }
         }
+        final List<String> values = seq.getEntries()
+                .stream()
+                .map(Yaml.Sequence.Entry::getBlock)
+                .map(block -> convertBlockToString(block, cursor))
+                .sorted()
+                .collect(toList());
+        if (this.matchExistingSequenceValuesInAnyOrder) {
+            List<String> sorted = new ArrayList<>(this.existingSequenceValues);
+            sort(sorted);
+            return values.equals(sorted);
+        }
+        return values.equals(this.existingSequenceValues);
     }
 
     private String convertBlockToString(Yaml.Block block, Cursor cursor) {
         if (block instanceof Yaml.Scalar) {
             return ((Yaml.Scalar) block).getValue();
-        } else {
-            return block.printTrimmed(cursor);
         }
+        return block.printTrimmed(cursor);
     }
 
     private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext ctx) {

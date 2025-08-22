@@ -88,27 +88,24 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             if (i2 == -1) {
                 return canonicalOrdering.indexOf(t1.getName()) -
                         canonicalOrdering.indexOf(t2.getName());
-            } else {
-                // trying to place a new t1
-                for (int i = 0; i < canonicalOrdering.indexOf(t2.getName()); i++) {
-                    if (canonicalOrdering.get(i).equals(t1.getName())) {
-                        return -1;
-                    }
-                }
-                return 1;
             }
-        } else {
-            if (i2 == -1) {
-                // trying to place a new t2
-                for (int i = 0; i < canonicalOrdering.indexOf(t1.getName()); i++) {
-                    if (canonicalOrdering.get(i).equals(t2.getName())) {
-                        return 1;
-                    }
+            // trying to place a new t1
+            for (int i = 0; i < canonicalOrdering.indexOf(t2.getName()); i++) {
+                if (canonicalOrdering.get(i).equals(t1.getName())) {
+                    return -1;
                 }
-                return -1;
-            } else {
-                return i1 - i2;
             }
+            return 1;
         }
+        if (i2 == -1) {
+            // trying to place a new t2
+            for (int i = 0; i < canonicalOrdering.indexOf(t1.getName()); i++) {
+                if (canonicalOrdering.get(i).equals(t2.getName())) {
+                    return 1;
+                }
+            }
+            return -1;
+        }
+        return i1 - i2;
     }
 }

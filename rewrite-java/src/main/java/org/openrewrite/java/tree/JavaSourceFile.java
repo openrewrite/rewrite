@@ -70,11 +70,14 @@ public interface JavaSourceFile extends J, SourceFile {
             // use name indirection due to possibility of multiple class loaders being used
             if (ImportService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
-            } else if (AutoFormatService.class.getName().equals(service.getName())) {
+            }
+            if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
-            } else if (AnnotationService.class.getName().equals(service.getName())) {
+            }
+            if (AnnotationService.class.getName().equals(service.getName())) {
                 return (T) service.getConstructor().newInstance();
-            } else if (WhitespaceValidationService.class.getName().equals(service.getName())) {
+            }
+            if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 // Only unit tests should need to use this service, so no classloading concerns
                 return (T) new JavaWhitespaceValidationService();
             } else if (NamingService.class.getName().equals(service.getName())) {

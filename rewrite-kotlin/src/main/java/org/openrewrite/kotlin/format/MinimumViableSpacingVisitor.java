@@ -373,11 +373,11 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (haveSpace && notSingleSpace(s.getWhitespace())) {
             return s.withWhitespace(" ");
-        } else if (!haveSpace && onlySpacesAndNotEmpty(s.getWhitespace())) {
-            return s.withWhitespace("");
-        } else {
-            return s;
         }
+        if (!haveSpace && onlySpacesAndNotEmpty(s.getWhitespace())) {
+            return s.withWhitespace("");
+        }
+        return s;
     }
 
     /**

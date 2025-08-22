@@ -52,9 +52,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         if (!(tree instanceof K)) {
             // re-route printing to the java printer
             return delegate.visit(tree, p);
-        } else {
-            return super.visit(tree, p);
         }
+        return super.visit(tree, p);
     }
 
     @Override
@@ -489,9 +488,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (tree instanceof K) {
                 // re-route printing back up to groovy
                 return kotlinPrinter.visit(tree, p);
-            } else {
-                return super.visit(tree, p);
             }
+            return super.visit(tree, p);
         }
 
         @Override

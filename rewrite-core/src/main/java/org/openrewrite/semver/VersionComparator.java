@@ -69,9 +69,11 @@ public interface VersionComparator extends Comparator<String> {
         String versionMeta = matcher.group(6);
         if (requireMeta) {
             return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
+        }
+        if (versionMeta == null) {
             return true;
-        } else if (requireRelease) {
+        }
+        if (requireRelease) {
             String lowercaseVersionMeta = versionMeta.toLowerCase();
             for (String suffix : RELEASE_SUFFIXES) {
                 if (suffix.equals(lowercaseVersionMeta)) {

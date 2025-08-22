@@ -196,9 +196,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitProto(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitProto(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ProtoContext proto() throws RecognitionException {
@@ -291,9 +291,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitStringLiteral(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitStringLiteral(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final StringLiteralContext stringLiteral() throws RecognitionException {
@@ -339,9 +339,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdentOrReserved(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdentOrReserved(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final IdentOrReservedContext identOrReserved() throws RecognitionException {
@@ -410,9 +410,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitSyntax(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitSyntax(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final SyntaxContext syntax() throws RecognitionException {
@@ -465,9 +465,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitImportStatement(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitImportStatement(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ImportStatementContext importStatement() throws RecognitionException {
@@ -535,9 +535,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPackageStatement(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPackageStatement(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final PackageStatementContext packageStatement() throws RecognitionException {
@@ -599,9 +599,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OptionNameContext optionName() throws RecognitionException {
@@ -685,9 +685,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOption(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOption(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OptionContext option() throws RecognitionException {
@@ -736,9 +736,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionDef(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionDef(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OptionDefContext optionDef() throws RecognitionException {
@@ -794,9 +794,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOptionList(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOptionList(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OptionListContext optionList() throws RecognitionException {
@@ -871,9 +871,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitTopLevelDef(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitTopLevelDef(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TopLevelDefContext topLevelDef() throws RecognitionException {
@@ -943,9 +943,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitIdent(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitIdent(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final IdentContext ident() throws RecognitionException {
@@ -992,9 +992,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessage(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessage(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MessageContext message() throws RecognitionException {
@@ -1044,9 +1044,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageField(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageField(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MessageFieldContext messageField() throws RecognitionException {
@@ -1153,9 +1153,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMessageBody(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMessageBody(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MessageBodyContext messageBody() throws RecognitionException {
@@ -1288,9 +1288,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitExtend(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitExtend(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ExtendContext extend() throws RecognitionException {
@@ -1374,9 +1374,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumDefinition(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumDefinition(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final EnumDefinitionContext enumDefinition() throws RecognitionException {
@@ -1440,9 +1440,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumBody(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumBody(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final EnumBodyContext enumBody() throws RecognitionException {
@@ -1529,9 +1529,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEnumField(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEnumField(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final EnumFieldContext enumField() throws RecognitionException {
@@ -1605,9 +1605,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitService(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitService(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ServiceContext service() throws RecognitionException {
@@ -1671,9 +1671,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitServiceBody(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitServiceBody(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ServiceBodyContext serviceBody() throws RecognitionException {
@@ -1765,9 +1765,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpc(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpc(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RpcContext rpc() throws RecognitionException {
@@ -1840,9 +1840,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcInOut(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcInOut(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RpcInOutContext rpcInOut() throws RecognitionException {
@@ -1910,9 +1910,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRpcBody(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRpcBody(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RpcBodyContext rpcBody() throws RecognitionException {
@@ -1991,9 +1991,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReserved(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReserved(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ReservedContext reserved() throws RecognitionException {
@@ -2063,9 +2063,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRanges(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRanges(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RangesContext ranges() throws RecognitionException {
@@ -2127,9 +2127,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitRange(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitRange(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RangeContext range() throws RecognitionException {
@@ -2192,9 +2192,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFieldNames(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFieldNames(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FieldNamesContext fieldNames() throws RecognitionException {
@@ -2264,9 +2264,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullyQualifiedType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullyQualifiedType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	@SuppressWarnings("CheckReturnValue")
@@ -2297,9 +2297,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitPrimitiveType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitPrimitiveType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeContext type() throws RecognitionException {
@@ -2376,9 +2376,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitField(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitField(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FieldContext field() throws RecognitionException {
@@ -2455,9 +2455,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitOneOf(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitOneOf(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final OneOfContext oneOf() throws RecognitionException {
@@ -2575,9 +2575,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitMapField(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitMapField(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MapFieldContext mapField() throws RecognitionException {
@@ -2658,9 +2658,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitKeyType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitKeyType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final KeyTypeContext keyType() throws RecognitionException {
@@ -2718,9 +2718,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitReservedWord(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitReservedWord(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ReservedWordContext reservedWord() throws RecognitionException {
@@ -2779,9 +2779,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitFullIdent(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitFullIdent(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FullIdentContext fullIdent() throws RecognitionException {
@@ -2852,9 +2852,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitEmptyStatement(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitEmptyStatement(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final EmptyStatementContext emptyStatement() throws RecognitionException {
@@ -2901,9 +2901,9 @@ public class Protobuf2Parser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof Protobuf2ParserVisitor ) return ((Protobuf2ParserVisitor<? extends T>)visitor).visitConstant(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof Protobuf2ParserVisitor) return ((Protobuf2ParserVisitor<? extends T>) visitor).visitConstant(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ConstantContext constant() throws RecognitionException {

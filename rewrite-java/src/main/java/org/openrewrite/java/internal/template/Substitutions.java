@@ -155,16 +155,17 @@ public class Substitutions {
     private String getTypeName(@Nullable JavaType type) {
         if (type == null) {
             return "java.lang.Object";
-        } else if (type instanceof JavaType.GenericTypeVariable) {
+        }
+        if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (!"?".equals(genericType.getName())) {
                 return genericType.getName();
-            } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
+            }
+            if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
-            } else {
-                return TypeUtils.toString(genericType.getBounds().get(0));
             }
+            return TypeUtils.toString(genericType.getBounds().get(0));
         }
         return TypeUtils.toString(type).replace("$", ".");
     }
@@ -173,16 +174,18 @@ public class Substitutions {
         if (parameter instanceof J) {
             if (parameter instanceof J.Annotation) {
                 return "@SubAnnotation(" + index + ")";
-            } else if (parameter instanceof J.Block) {
+            }
+            if (parameter instanceof J.Block) {
                 return "/*__p" + index + "__*/{}";
-            } else if (parameter instanceof J.Literal || parameter instanceof J.VariableDeclarations) {
+            }
+            if (parameter instanceof J.Literal || parameter instanceof J.VariableDeclarations) {
                 //noinspection deprecation
                 return ((J) parameter).printTrimmed();
-            } else {
-                throw new IllegalArgumentException("Template parameter " + index + " cannot be used in an untyped template substitution. " +
-                                                   "Instead of \"#{}\", indicate the template parameter's type with \"#{any(" + typeHintFor(parameter) + ")}\".");
             }
-        } else if (parameter instanceof JRightPadded) {
+            throw new IllegalArgumentException("Template parameter " + index + " cannot be used in an untyped template substitution. " +
+                    "Instead of \"#{}\", indicate the template parameter's type with \"#{any(" + typeHintFor(parameter) + ")}\".");
+        }
+        if (parameter instanceof JRightPadded) {
             return substituteUntyped(((JRightPadded<?>) parameter).getElement(), index);
         } else if (parameter instanceof JLeftPadded) {
             return substituteUntyped(((JLeftPadded<?>) parameter).getElement(), index);
@@ -295,7 +298,8 @@ public class Substitutions {
                 J param = maybeParameter(method.getName());
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
-                } else if (param != null) {
+                }
+                if (param != null) {
                     return param;
                 }
                 return super.visitMethodInvocation(method, integer);
@@ -306,7 +310,8 @@ public class Substitutions {
                 J param = maybeParameter(parens.getTree());
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
-                } else if (param != null) {
+                }
+                if (param != null) {
                     return param;
                 }
                 return super.visitParentheses(parens, integer);
@@ -317,7 +322,8 @@ public class Substitutions {
                 J param = maybeParameter(literal);
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
-                } else if (param != null) {
+                }
+                if (param != null) {
                     return param;
                 }
                 return super.visitLiteral(literal, integer);

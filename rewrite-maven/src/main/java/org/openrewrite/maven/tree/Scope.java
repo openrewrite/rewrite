@@ -126,13 +126,14 @@ public enum Scope {
     public static @Nullable Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
         if (scope1 == null) {
             return scope2;
-        } else if (scope2 == null) {
-            return scope1;
-        } else if (scope1.ordinal() <= scope2.ordinal()) {
-            return scope1;
-        } else {
-            return scope2;
         }
+        if (scope2 == null) {
+            return scope1;
+        }
+        if (scope1.ordinal() <= scope2.ordinal()) {
+            return scope1;
+        }
+        return scope2;
     }
 
     /**

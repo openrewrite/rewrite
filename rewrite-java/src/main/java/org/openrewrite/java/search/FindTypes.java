@@ -76,7 +76,8 @@ public class FindTypes extends Recipe {
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
-                } else if (tree instanceof SourceFileWithReferences) {
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);

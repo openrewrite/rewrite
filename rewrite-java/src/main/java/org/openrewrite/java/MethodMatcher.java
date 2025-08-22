@@ -257,7 +257,8 @@ public class MethodMatcher {
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
         if (argumentPattern == ANY_ARGUMENTS_PATTERN) {
             return true;
-        } else if (argumentPattern == EMPTY_ARGUMENTS_PATTERN) {
+        }
+        if (argumentPattern == EMPTY_ARGUMENTS_PATTERN) {
             return parameterTypes.isEmpty();
         }
 
@@ -356,14 +357,13 @@ public class MethodMatcher {
             List<J.VariableDeclarations.NamedVariable> variables = vd.getVariables();
             if (!variables.isEmpty() && variables.get(0).getType() != null) {
                 return variables.get(0).getType();
-            } else if (vd.getTypeAsFullyQualified() != null) {
-                return vd.getTypeAsFullyQualified();
-            } else {
-                return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
             }
-        } else {
-            return null;
+            if (vd.getTypeAsFullyQualified() != null) {
+                return vd.getTypeAsFullyQualified();
+            }
+            return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
         }
+        return null;
     }
 
     /**
@@ -440,15 +440,17 @@ public class MethodMatcher {
     public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
         if (methodName != null && !methodName.equals(fieldAccess.getName().getSimpleName())) {
             return false;
-        } else if (methodNamePattern != null && !methodNamePattern.matcher(fieldAccess.getName().getSimpleName()).matches()) {
+        }
+        if (methodNamePattern != null && !methodNamePattern.matcher(fieldAccess.getName().getSimpleName()).matches()) {
             return false;
         }
 
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
-                   targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
-        } else if (target instanceof J.FieldAccess) {
+                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+        }
+        if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
         }
         return false;
@@ -460,11 +462,14 @@ public class MethodMatcher {
                 return ((JavaType.Primitive) type).getClassName();
             }
             return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.Unknown) {
+        }
+        if (type instanceof JavaType.Unknown) {
             return "*";
-        } else if (type instanceof JavaType.FullyQualified) {
+        }
+        if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.Array) {
+        }
+        if (type instanceof JavaType.Array) {
             JavaType elemType = ((JavaType.Array) type).getElemType();
             return typePattern(elemType) + "[]";
         }
@@ -513,10 +518,9 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
             String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
             if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
                 return className;
-            } else {
-                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
-                    return "java.lang." + className;
-                }
+            }
+            if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
+                return "java.lang." + className;
             }
         }
 

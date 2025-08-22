@@ -817,18 +817,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (pattern instanceof JCBindingPattern b) {
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
-        } else if (pattern instanceof DeconstructionPatternTree r) {
-            return visitDeconstructionPattern(r, whitespace());
-        } else {
-            if (pattern == null) {
-                return null;
-            }
-            int saveCursor = cursor;
-            int endCursor = max(endPos(pattern), cursor);
-            cursor = endCursor;
-            return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
-
         }
+        if (pattern instanceof DeconstructionPatternTree r) {
+            return visitDeconstructionPattern(r, whitespace());
+        }
+        if (pattern == null) {
+            return null;
+        }
+        int saveCursor = cursor;
+        int endCursor = max(endPos(pattern), cursor);
+        cursor = endCursor;
+        return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
+
     }
 
     @Override
@@ -1388,7 +1388,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (!annotationPosTable.isEmpty()) {
             if (node.getUnderlyingType() instanceof JCFieldAccess) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
-            } else if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
+            }
+            if (node.getUnderlyingType() instanceof JCArrayTypeTree) {
                 return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations, arrayTypeTree(node, annotationPosTable));
             }
         }
@@ -1960,9 +1961,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     String whitespace = source.substring(start, end);
                     if (whitespace.contains("\n")) {
                         return EMPTY;
-                    } else {
-                        return Space.build(source.substring(start, end), emptyList());
                     }
+                    return Space.build(source.substring(start, end), emptyList());
                 }
                 return sourceBefore(";");
             case YIELD:
@@ -2069,11 +2069,14 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private static @Nullable Symbol extractSymbol(Tree tree) {
         if (tree instanceof JCIdent) {
             return ((JCIdent) tree).sym;
-        } else if (tree instanceof JCTree.JCMethodDecl) {
+        }
+        if (tree instanceof JCTree.JCMethodDecl) {
             return ((JCTree.JCMethodDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCClassDecl) {
+        }
+        if (tree instanceof JCTree.JCClassDecl) {
             return ((JCTree.JCClassDecl) tree).sym;
-        } else if (tree instanceof JCTree.JCVariableDecl) {
+        }
+        if (tree instanceof JCTree.JCVariableDecl) {
             return ((JCTree.JCVariableDecl) tree).sym;
         }
         return null;

@@ -45,9 +45,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         if (!(tree instanceof G)) {
             // re-route printing to the java printer
             return delegate.visit(tree, p);
-        } else {
-            return super.visit(tree, p);
         }
+        return super.visit(tree, p);
     }
 
     @Override
@@ -262,9 +261,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (tree instanceof G) {
                 // re-route printing back up to groovy
                 return GroovyPrinter.this.visit(tree, p);
-            } else {
-                return super.visit(tree, p);
             }
+            return super.visit(tree, p);
         }
 
         @Override

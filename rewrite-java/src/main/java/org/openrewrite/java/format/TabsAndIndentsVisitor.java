@@ -398,9 +398,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
             return getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
-        } else {
-            return computeColumnPosition(method, firstArg, getCursor());
         }
+        return computeColumnPosition(method, firstArg, getCursor());
     }
 
     @Override

@@ -51,9 +51,8 @@ public interface Expression extends J {
     static @Nullable Expression unwrap(@Nullable Expression expr) {
         if (expr instanceof J.Parentheses<?> && ((J.Parentheses<?>) expr).getTree() instanceof Expression) {
             return ((Expression) ((J.Parentheses<?>) expr).getTree()).unwrap();
-        } else {
-            return expr;
         }
+        return expr;
     }
 
     CoordinateBuilder.Expression getCoordinates();

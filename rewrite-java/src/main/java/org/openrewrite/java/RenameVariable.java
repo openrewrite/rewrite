@@ -95,7 +95,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
                     parent.putMessage("renamed", true);
                     return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
-                } else if (parent.getValue() instanceof J.FieldAccess &&
+                }
+                if (parent.getValue() instanceof J.FieldAccess &&
                         !ident.equals(((J.FieldAccess) parent.getValue()).getTarget())) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         if (ident.getFieldType() != null) {
@@ -111,8 +112,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
-                                methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
-                                ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
+                                    methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
+                                    ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
                                 doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
                             }
                         }
@@ -151,13 +152,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (value instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) value;
                 return m.getName() != ident;
-            } else if(value instanceof J.NewClass) {
+            }
+            if (value instanceof J.NewClass) {
                 J.NewClass m = (J.NewClass) value;
                 return m.getClazz() != ident;
-            } else if(value instanceof J.NewArray) {
+            }
+            if (value instanceof J.NewArray) {
                 J.NewArray a = (J.NewArray) value;
                 return a.getTypeExpression() != ident;
-            } else if(value instanceof J.VariableDeclarations) {
+            }
+            if (value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
             } else return !(value instanceof J.ParameterizedType);

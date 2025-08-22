@@ -102,10 +102,9 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         String value = getLiteralValue();
         if (value == null) {
             return TreeVisitor.noop();
-        } else {
-            assert fullyQualifiedConstantName != null : "Validation should have failed if constant name is null";
-            return new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
         }
+        assert fullyQualifiedConstantName != null : "Validation should have failed if constant name is null";
+        return new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {

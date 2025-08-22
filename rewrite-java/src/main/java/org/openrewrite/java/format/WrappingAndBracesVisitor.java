@@ -211,7 +211,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (prefix.getComments().isEmpty() && annotationsStyle != null) {
             if (annotationsStyle.getWrap() == DoNotWrap && (hasLineBreak(prefix.getWhitespace()) || prefix.isEmpty())) {
                 return prefix.withWhitespace(Space.SINGLE_SPACE.getWhitespace());
-            } else if (annotationsStyle.getWrap() == WrapAlways) {
+            }
+            if (annotationsStyle.getWrap() == WrapAlways) {
                 return prefix.withWhitespace((whitespace.startsWith("\n") ? "" : "\n") + whitespace);
             }
         }
@@ -221,7 +222,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private Space withNewline(Space prefix) {
         if (prefix.getComments().isEmpty()) {
             return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? "" : "\n") + prefix.getWhitespace());
-        } else if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
+        }
+        if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
             return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> requireNonNull(c).withSuffix("\n")));
         }
         return prefix;

@@ -98,7 +98,8 @@ public class Semver {
     public static @Nullable String max(@Nullable String version1, @Nullable String version2) {
         if (!isVersion(version1)) {
             return StringUtils.isBlank(version2) ? null : version2;
-        } else if (!isVersion(version2)) {
+        }
+        if (!isVersion(version2)) {
             return version1;
         }
 

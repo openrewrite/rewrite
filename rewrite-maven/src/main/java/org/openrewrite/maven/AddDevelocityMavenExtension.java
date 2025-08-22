@@ -354,12 +354,11 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                         publishing,
                         fileFingerprints != null ? new Capture(null, fileFingerprints) : null
                 );
-            } else {
-                return new BuildScanConfiguration(uploadInBackground,
-                        publishCriteria != null ? publishCriteria.xmlName : null,
-                        null,
-                        fileFingerprints != null ? new Capture(fileFingerprints, null) : null);
             }
+            return new BuildScanConfiguration(uploadInBackground,
+                    publishCriteria != null ? publishCriteria.xmlName : null,
+                    null,
+                    fileFingerprints != null ? new Capture(fileFingerprints, null) : null);
         }
         return null;
     }

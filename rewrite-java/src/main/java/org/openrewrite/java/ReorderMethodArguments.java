@@ -206,11 +206,11 @@ public class ReorderMethodArguments extends Recipe {
         private List<JRightPadded<Expression>> getPaddedArguments(MethodCall m) {
             if (m instanceof J.MethodInvocation) {
                 return ((J.MethodInvocation) m).getPadding().getArguments().getPadding().getElements();
-            } else if (m instanceof J.NewClass) {
-                return ((J.NewClass) m).getPadding().getArguments().getPadding().getElements();
-            } else {
-                throw new IllegalArgumentException("Unknown MethodCall type");
             }
+            if (m instanceof J.NewClass) {
+                return ((J.NewClass) m).getPadding().getArguments().getPadding().getElements();
+            }
+            throw new IllegalArgumentException("Unknown MethodCall type");
         }
 
         private MethodCall withPaddedArguments(MethodCall m, List<JRightPadded<Expression>> reordered) {
@@ -219,14 +219,14 @@ public class ReorderMethodArguments extends Recipe {
                 return mi.getPadding().withArguments(
                         mi.getPadding().getArguments().getPadding().withElements(reordered)
                 );
-            } else if (m instanceof J.NewClass) {
+            }
+            if (m instanceof J.NewClass) {
                 J.NewClass nc = (J.NewClass) m;
                 return nc.getPadding().withArguments(
                         nc.getPadding().getArguments().getPadding().withElements(reordered)
                 );
-            } else {
-                throw new IllegalArgumentException("Unknown MethodCall type");
             }
+            throw new IllegalArgumentException("Unknown MethodCall type");
         }
     }
 }

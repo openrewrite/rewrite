@@ -249,9 +249,8 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
                     } // fail quietly
                 }
                 return tag;
-            } else {
-                return super.visitTag(tag, ctx);
             }
+            return super.visitTag(tag, ctx);
         }
     }
 

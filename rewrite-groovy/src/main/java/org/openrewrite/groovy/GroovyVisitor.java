@@ -57,9 +57,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(g, p);
         if (!(temp instanceof G.GString)) {
             return temp;
-        } else {
-            g = (G.GString) temp;
         }
+        g = (G.GString) temp;
         g = g.withStrings(ListUtils.map(g.getStrings(), s -> visit(s, p)));
         return g.withType(visitType(gString.getType(), p));
     }
@@ -78,9 +77,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(l, p);
         if (!(temp instanceof G.ListLiteral)) {
             return temp;
-        } else {
-            l = (G.ListLiteral) temp;
         }
+        l = (G.ListLiteral) temp;
         l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), GContainer.Location.LIST_LITERAL_ELEMENTS, p));
         return l.withType(visitType(l.getType(), p));
     }
@@ -92,9 +90,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(m, p);
         if (!(temp instanceof G.MapEntry)) {
             return temp;
-        } else {
-            m = (G.MapEntry) temp;
         }
+        m = (G.MapEntry) temp;
         m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), GRightPadded.Location.MAP_ENTRY_KEY, p));
         m = m.withValue((Expression) visit(m.getValue(), p));
         return m.withType(visitType(m.getType(), p));
@@ -107,9 +104,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(m, p);
         if (!(temp instanceof G.MapLiteral)) {
             return temp;
-        } else {
-            m = (G.MapLiteral) temp;
         }
+        m = (G.MapLiteral) temp;
         m = m.getPadding().withElements(visitContainer(m.getPadding().getElements(), GContainer.Location.MAP_LITERAL_ELEMENTS, p));
         return m.withType(visitType(m.getType(), p));
     }
@@ -121,9 +117,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(u, p);
         if (!(temp instanceof G.Unary)) {
             return temp;
-        } else {
-            u = (G.Unary) temp;
         }
+        u = (G.Unary) temp;
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), GLeftPadded.Location.UNARY_OPERATOR, p));
         u = u.withExpression(visitAndCast(u.getExpression(), p));
         return u.withType(visitType(u.getType(), p));
@@ -136,9 +131,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(b, p);
         if (!(temp instanceof G.Binary)) {
             return temp;
-        } else {
-            b = (G.Binary) temp;
         }
+        b = (G.Binary) temp;
         b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), GLeftPadded.Location.BINARY_OPERATOR, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
@@ -152,9 +146,8 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(r, p);
         if (!(temp instanceof G.Range)) {
             return temp;
-        } else {
-            r = (G.Range) temp;
         }
+        r = (G.Range) temp;
         r = r.withFrom(visitAndCast(r.getFrom(), p));
         r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, p));
         r = r.withTo(visitAndCast(r.getTo(), p));

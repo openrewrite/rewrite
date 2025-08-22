@@ -203,9 +203,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
                             return true;
-                        } else {
-                            return compare == 0;
                         }
+                        return compare == 0;
                     }
 
                     @Override
@@ -253,7 +252,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                                     acc.needsWrapperUpdate = true;
                                 }
                                 return true;
-                            } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_DOWNLOADER_LOCATION)) {
+                            }
+                            if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_DOWNLOADER_LOCATION)) {
                                 acc.addMavenWrapperDownloader = false;
                                 if (mavenWrapper.getWrapperDistributionType() != DistributionType.Source) {
                                     acc.needsWrapperUpdate = true;
@@ -266,7 +266,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                                 acc.addMavenBatchScript = false;
                                 return true;
-                            } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                            }
+                            if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                                 acc.addMavenShellScript = false;
                                 return true;
                             }
@@ -437,7 +438,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         if (attributes == null) {
             ZonedDateTime now = ZonedDateTime.now();
             return sourceFile.withFileAttributes(new FileAttributes(now, now, now, true, true, true, 1L));
-        } else if (!attributes.isExecutable()) {
+        }
+        if (!attributes.isExecutable()) {
             return sourceFile.withFileAttributes(attributes.withExecutable(true));
         }
         return sourceFile;

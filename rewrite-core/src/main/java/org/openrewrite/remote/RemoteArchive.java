@@ -100,9 +100,8 @@ public class RemoteArchive implements Remote {
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
                 if (response.isSuccessful()) {
                     return response.getBody();
-                } else {
-                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
                 }
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
             }, ctx.getOnError());
 
             if (localArchive == null) {
@@ -130,22 +129,19 @@ public class RemoteArchive implements Remote {
                 if (pattern.matcher(entry.getName()).matches()) {
                     if (paths.size() == index + 1) {
                         return new InputStream() {
-                            @Override
-                            public int read() throws IOException {
+                            @Override public int read() throws IOException {
                                 return zis.read();
                             }
 
-                            @Override
-                            public void close() throws IOException {
+                            @Override public void close() throws IOException {
                                 zis.closeEntry();
                                 zis.close();
                             }
                         };
-                    } else {
-                        InputStream maybeInputStream = readIntoArchive(zis, paths, index + 1);
-                        if (maybeInputStream != null) {
-                            return maybeInputStream;
-                        }
+                    }
+                    InputStream maybeInputStream = readIntoArchive(zis, paths, index + 1);
+                    if (maybeInputStream != null) {
+                        return maybeInputStream;
                     }
                 }
             }

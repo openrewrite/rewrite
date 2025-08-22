@@ -209,9 +209,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(gradleWrapperVersion);
                             return true;
-                        } else {
-                            return compare == 0;
                         }
+                        return compare == 0;
                     }
 
                     @Override
@@ -266,7 +265,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                                 acc.addGradleBatchScript = false;
                                 return true;
-                            } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                            }
+                            if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                                 acc.addGradleShellScript = false;
                                 return true;
                             }
@@ -417,7 +417,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         if (attributes == null) {
             ZonedDateTime now = ZonedDateTime.now();
             return sourceFile.withFileAttributes(new FileAttributes(now, now, now, true, true, true, 1));
-        } else if (!attributes.isExecutable()) {
+        }
+        if (!attributes.isExecutable()) {
             return sourceFile.withFileAttributes(attributes.withExecutable(true));
         }
         return sourceFile;
@@ -448,7 +449,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
         if (gradle53VersionComparator.isValid(null, gradleWrapper.getVersion())) {
             return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
+        }
+        if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
             return "\"-Xmx64m\"";
         }
         return "";

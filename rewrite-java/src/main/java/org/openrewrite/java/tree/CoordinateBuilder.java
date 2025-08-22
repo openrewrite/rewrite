@@ -101,9 +101,8 @@ public abstract class CoordinateBuilder {
         public JavaCoordinates firstStatement() {
             if (((J.Block) tree).getStatements().isEmpty()) {
                 return lastStatement();
-            } else {
-                return ((J.Block) tree).getStatements().get(0).getCoordinates().before();
             }
+            return ((J.Block) tree).getStatements().get(0).getCoordinates().before();
         }
 
         public JavaCoordinates addStatement(Comparator<org.openrewrite.java.tree.Statement> idealOrdering) {

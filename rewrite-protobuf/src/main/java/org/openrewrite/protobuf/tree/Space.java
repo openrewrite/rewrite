@@ -61,7 +61,8 @@ public class Space {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
-            } else if (whitespace.length() <= 100) {
+            }
+            if (whitespace.length() <= 100) {
                 //noinspection StringOperationCanBeSimplified
                 return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
             }
@@ -90,7 +91,8 @@ public class Space {
         int lastNewline = whitespace.lastIndexOf('\n');
         if (lastNewline >= 0) {
             return whitespace.substring(lastNewline + 1);
-        } else if (lastNewline == whitespace.length() - 1) {
+        }
+        if (lastNewline == whitespace.length() - 1) {
             return "";
         }
         return whitespace;

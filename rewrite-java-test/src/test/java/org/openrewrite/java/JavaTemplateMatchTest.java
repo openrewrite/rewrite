@@ -915,11 +915,11 @@ class JavaTemplateMatchTest implements RewriteTest {
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                     if (valueOfLong.matches(getCursor())) {
                         return SearchResult.found(method, "long");
-                    } else if (valueOfDouble.matches(getCursor())) {
-                        return SearchResult.found(method, "double");
-                    } else {
-                        return super.visitMethodInvocation(method, executionContext);
                     }
+                    if (valueOfDouble.matches(getCursor())) {
+                        return SearchResult.found(method, "double");
+                    }
+                    return super.visitMethodInvocation(method, executionContext);
                 }
             })),
           //language=java
@@ -1066,9 +1066,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                     var matcher = refTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return lambdaTemplate.apply(getCursor(), memberRef.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
-                    } else {
-                        return super.visitMemberReference(memberRef, executionContext);
                     }
+                    return super.visitMemberReference(memberRef, executionContext);
                 }
 
                 @Override
@@ -1076,9 +1075,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                     var matcher = lambdaTemplate.matcher(getCursor());
                     if (matcher.find()) {
                         return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
-                    } else {
-                        return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
                     }
+                    return lambdaTemplate.matches(getCursor()) ? SearchResult.found(lambda, "lambda") : super.visitLambda(lambda, executionContext);
                 }
             })),
           //language=java

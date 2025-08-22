@@ -51,13 +51,12 @@ public class TabsAndIndentsStyle implements JsonStyle {
     public String singleIndent() {
         if (getUseTabCharacter()) {
             return "\t";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int j = 0; j < getIndentSize(); j++) {
-                sb.append(" ");
-            }
-            return sb.toString();
         }
+        StringBuilder sb = new StringBuilder();
+        for (int j = 0; j < getIndentSize(); j++) {
+            sb.append(" ");
+        }
+        return sb.toString();
     }
 
     @Override

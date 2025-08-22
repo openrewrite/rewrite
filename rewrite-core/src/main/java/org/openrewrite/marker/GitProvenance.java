@@ -217,13 +217,12 @@ public class GitProvenance extends Reference implements Marker {
                 if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
                     return fromGitConfig(projectDir, gitRemoteParser);
-                } else {
-                    //there is not .git config
-                    try {
-                        return environment.buildGitProvenance();
-                    } catch (IncompleteGitConfigException e) {
-                        return fromGitConfig(projectDir, gitRemoteParser);
-                    }
+                }
+                //there is not .git config
+                try {
+                    return environment.buildGitProvenance();
+                } catch (IncompleteGitConfigException e) {
+                    return fromGitConfig(projectDir, gitRemoteParser);
                 }
             }
         } else {
@@ -310,7 +309,8 @@ public class GitProvenance extends Reference implements Marker {
     private static @Nullable String localBranchName(Repository repository, @Nullable String remoteBranch) throws IOException, GitAPIException {
         if (remoteBranch == null) {
             return null;
-        } else if (remoteBranch.startsWith("remotes/")) {
+        }
+        if (remoteBranch.startsWith("remotes/")) {
             // Remote branch names retrieved from git are prefixed with "remotes/"
             remoteBranch = remoteBranch.substring(8);
         }
@@ -453,9 +453,8 @@ public class GitProvenance extends Reference implements Marker {
                 @Nullable @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
             if (commitsByDay != null) {
                 return new Committer(name, email, commitsByDay);
-            } else {
-                return new Committer(name, email, requireNonNull(data));
             }
+            return new Committer(name, email, requireNonNull(data));
         }
 
         public Committer(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {

@@ -39,9 +39,8 @@ public class ImportReorderingVisitor<P> extends KotlinIsoVisitor<P> {
 
         if (referentialIdentical(importList, ordered)) {
             return cu;
-        } else {
-            return cu.getPadding().withImports(ordered);
         }
+        return cu.getPadding().withImports(ordered);
     }
 
     private <T> boolean referentialIdentical(List<T> l1, List<T> l2) {

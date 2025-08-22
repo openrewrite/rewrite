@@ -65,7 +65,8 @@ public class MoveFile extends Recipe {
             return validated
                     .and(Validated.invalid("folder", folder, "folder or fileMatcher must be set"))
                     .and(Validated.invalid("fileMatcher", fileMatcher, "folder or fileMatcher must be set"));
-        } else if (!(StringUtils.isNullOrEmpty(folder)) && !(StringUtils.isNullOrEmpty(fileMatcher))) {
+        }
+        if (!(StringUtils.isNullOrEmpty(folder)) && !(StringUtils.isNullOrEmpty(fileMatcher))) {
             return validated
                     .and(Validated.invalid("folder", folder, "folder and fileMatcher cannot both be set"))
                     .and(Validated.invalid("fileMatcher", fileMatcher, "folder and fileMatcher cannot both be set"));
@@ -101,11 +102,11 @@ public class MoveFile extends Recipe {
                         if (!destination.equals(sourcePath)) {
                             if (isFileOnRoot) {
                                 return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToSystem(destination.toString())));
-                            } else if (isWindowsPath) {
-                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToWindows(destination.toString())));
-                            } else {
-                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToUnix(destination.toString())));
                             }
+                            if (isWindowsPath) {
+                                return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToWindows(destination.toString())));
+                            }
+                            return ((SourceFile) tree).withSourcePath(Paths.get(separatorsToUnix(destination.toString())));
                         }
                     }
                 }
@@ -145,9 +146,8 @@ public class MoveFile extends Recipe {
                     }
                     if (destination != null) {
                         return destination.resolve(subFolders);
-                    } else {
-                        return null;
                     }
+                    return null;
                 }
                 return sourcePath;
             }
@@ -160,11 +160,14 @@ public class MoveFile extends Recipe {
                     Path currentFolder = sourcePath.getParent();
                     if (destinationPattern.startsWith("/")) {
                         return moveToAbsolutePath();
-                    } else if (destinationPattern.startsWith("../")) {
+                    }
+                    if (destinationPattern.startsWith("../")) {
                         return moveToRelativePath(currentFolder, destinationPattern);
-                    } else if (currentFolder != null && !currentFolder.endsWith(destinationPattern)) {
+                    }
+                    if (currentFolder != null && !currentFolder.endsWith(destinationPattern)) {
                         return currentFolder.resolve(destinationPattern);
-                    } else if (currentFolder == null) {
+                    }
+                    if (currentFolder == null) {
                         return Paths.get(destinationPattern);
                     }
                 }

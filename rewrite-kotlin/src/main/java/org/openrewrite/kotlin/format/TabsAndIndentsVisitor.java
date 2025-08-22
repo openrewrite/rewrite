@@ -709,7 +709,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     public @Nullable J visit(@Nullable Tree tree, P p) {
         if (tree instanceof J && tree.getMarkers().findFirst(Implicit.class).isPresent()) {
             return (J) tree;
-        } else if (getCursor().getNearestMessage("stop") != null) {
+        }
+        if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }
         return super.visit(tree, p);

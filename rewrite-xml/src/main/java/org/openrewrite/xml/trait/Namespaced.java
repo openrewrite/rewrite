@@ -122,7 +122,8 @@ public class Namespaced implements Trait<Xml> {
         if (cursor.getValue() instanceof Xml.Tag) {
             Xml.Tag tag = cursor.getValue();
             return tag.getAttributes();
-        } else if (cursor.getValue() instanceof Xml.Attribute) {
+        }
+        if (cursor.getValue() instanceof Xml.Attribute) {
             return singletonList(cursor.getValue());
         }
         return emptyList();

@@ -75,10 +75,9 @@ public class ChangeType extends Recipe {
             return String.format("`%s` to `%s`",
                     oldFullyQualifiedTypeName,
                     newFullyQualifiedTypeName);
-        } else {
-            return String.format("`%s` to `%s`",
-                    oldShort, newShort);
         }
+        return String.format("`%s` to `%s`",
+                oldShort, newShort);
     }
 
     @Override
@@ -98,7 +97,8 @@ public class ChangeType extends Recipe {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
-                } else if (tree instanceof SourceFileWithReferences) {
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
@@ -117,7 +117,8 @@ public class ChangeType extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof J) {
                     return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
-                } else if (tree instanceof SourceFileWithReferences) {
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
@@ -290,7 +291,8 @@ public class ChangeType extends Recipe {
                         doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
                     }
                     return fa;
-                } else if (targetType instanceof JavaType.Primitive) {
+                }
+                if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
                             fieldAccess.getPrefix(),
@@ -324,7 +326,8 @@ public class ChangeType extends Recipe {
                         e = i.withType(targetType);
                     }
                     return e;
-                } else if (maybeClass.toString().equals(oldType.getFullyQualifiedName().replace('$', '.'))) {
+                }
+                if (maybeClass.toString().equals(oldType.getFullyQualifiedName().replace('$', '.'))) {
                     maybeRemoveImport(oldType.getOwningClass());
                     return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
@@ -356,12 +359,11 @@ public class ChangeType extends Recipe {
                             return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getClassName())
                                     .withType(null)
                                     .withPrefix(ident.getPrefix()));
+                        }
+                        if (hasNoConflictingImport(sf)) {
+                            ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
                         } else {
-                            if (hasNoConflictingImport(sf)) {
-                                ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getClassName());
-                            } else {
-                                ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
-                            }
+                            ident = ident.withSimpleName(((JavaType.FullyQualified) targetType).getFullyQualifiedName());
                         }
                     } else if (targetType instanceof JavaType.Primitive) {
                         ident = ident.withSimpleName(((JavaType.Primitive) targetType).getKeyword());
@@ -500,7 +502,8 @@ public class ChangeType extends Recipe {
                 oldNameToChangedType.put(oldType, pt);
                 oldNameToChangedType.put(pt, pt);
                 return pt;
-            } else if (oldType instanceof JavaType.FullyQualified) {
+            }
+            if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
                     oldNameToChangedType.put(oldType, targetType);
@@ -656,10 +659,9 @@ public class ChangeType extends Recipe {
                             getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
                             //noinspection DataFlowIssue
                             return null;
-                        } else {
-                            String newPkg = targetType.getPackageName();
-                            return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
                         }
+                        String newPkg = targetType.getPackageName();
+                        return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
                     }
                 }
             }

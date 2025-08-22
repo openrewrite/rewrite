@@ -123,7 +123,8 @@ public class InsertDependencyComparator implements Comparator<Statement> {
         String classifier2 = getEntry("classifier", d2).orElse(null);
         if (classifier1 == null && classifier2 != null) {
             return -1;
-        } else if (classifier1 != null) {
+        }
+        if (classifier1 != null) {
             if (classifier2 == null) {
                 return 1;
             }

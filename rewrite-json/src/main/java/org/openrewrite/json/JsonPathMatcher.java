@@ -87,9 +87,8 @@ public class JsonPathMatcher {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
                 return !disjoint(l, cursorPath) && l.contains(cursor.getValue());
-            } else {
-                return Objects.equals(o, cursor.getValue());
             }
+            return Objects.equals(o, cursor.getValue());
         }).orElse(false);
     }
 
@@ -189,13 +188,12 @@ public class JsonPathMatcher {
                 }
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
-            } else {
-                JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, null, true);
-                for (int i = 1; i < ctx.getChildCount(); i++) {
-                    result = v.visit(ctx.getChild(i));
-                    if (result != null) {
-                        break;
-                    }
+            }
+            JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, scope, null, true);
+            for (int i = 1; i < ctx.getChildCount(); i++) {
+                result = v.visit(ctx.getChild(i));
+                if (result != null) {
+                    break;
                 }
             }
             return result;
@@ -212,11 +210,14 @@ public class JsonPathMatcher {
                 return ctx.property().stream()
                         .map(this::visitProperty)
                         .collect(toList());
-            } else if (ctx.slice() != null) {
+            }
+            if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
-            } else if (ctx.indexes() != null) {
+            }
+            if (ctx.indexes() != null) {
                 return visitIndexes(ctx.indexes());
-            } else if (ctx.filter() != null) {
+            }
+            if (ctx.filter() != null) {
                 return visitFilter(ctx.filter());
             }
 
@@ -310,28 +311,29 @@ public class JsonPathMatcher {
                         matches.add(result);
                     }
                     return getResultFromList(matches);
-                } else if (((member.getValue() instanceof Json.Literal))) {
+                }
+                if (((member.getValue() instanceof Json.Literal))) {
                     return key.equals(name) ? member : null;
                 }
 
                 scope = member.getValue();
                 return visitProperty(ctx);
-            } else if (scope instanceof Json.JsonObject) {
+            }
+            if (scope instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) scope;
                 if (isRecursiveDescent) {
                     scope = jsonObject.getMembers();
                     return getResultFromList(visitProperty(ctx));
-                } else {
-                    String name = ctx.StringLiteral() != null ?
-                            unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
-                    for (JsonRightPadded<Json> padded : jsonObject.getPadding().getMembers()) {
-                        Json json = padded.getElement();
-                        if (json instanceof Json.Member) {
-                            Json.Member member = (Json.Member) json;
-                            String key = ((Json.Literal) member.getKey()).getValue().toString();
-                            if (key.equals(name)) {
-                                return member;
-                            }
+                }
+                String name = ctx.StringLiteral() != null ?
+                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                for (JsonRightPadded<Json> padded : jsonObject.getPadding().getMembers()) {
+                    Json json = padded.getElement();
+                    if (json instanceof Json.Member) {
+                        Json.Member member = (Json.Member) json;
+                        String key = ((Json.Literal) member.getKey()).getValue().toString();
+                        if (key.equals(name)) {
+                            return member;
                         }
                     }
                 }
@@ -373,7 +375,8 @@ public class JsonPathMatcher {
             if (scope instanceof Json.Member) {
                 Json.Member member = (Json.Member) scope;
                 return member.getValue();
-            } else if (scope instanceof List) {
+            }
+            if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
                             scope = o;
@@ -398,10 +401,12 @@ public class JsonPathMatcher {
                 }
 
                 return getResultFromList(matches);
-            } else if (scope instanceof Json.JsonObject) {
+            }
+            if (scope instanceof Json.JsonObject) {
                 Json.JsonObject jsonObject = (Json.JsonObject) scope;
                 return jsonObject.getMembers();
-            } else if (scope instanceof Json.Array) {
+            }
+            if (scope instanceof Json.Array) {
                 return ((Json.Array) scope).getValues().stream()
                         .map(o -> {
                             scope = o;
@@ -517,9 +522,8 @@ public class JsonPathMatcher {
                     }
                 }
                 return matches;
-            } else {
-                return getOperatorResult(lhs, operator, rhs);
             }
+            return getOperatorResult(lhs, operator, rhs);
         }
 
         // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
@@ -580,7 +584,7 @@ public class JsonPathMatcher {
 
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
-                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                switch (ctx.LOGICAL_OPERATOR().getText()) {
                     case ("&&"):
                         operator = "&&";
                         break;
@@ -601,7 +605,8 @@ public class JsonPathMatcher {
                     // Return the result of the evaluated expression.
                     if (lhs instanceof Json) {
                         return rhs;
-                    } else if (rhs instanceof Json) {
+                    }
+                    if (rhs instanceof Json) {
                         return lhs;
                     }
 
@@ -610,7 +615,8 @@ public class JsonPathMatcher {
                         return ((List<?>) lhs).size() < ((List<?>) rhs).size() ? lhs : rhs;
                     }
                     return scopeOfLogicalOp;
-                } else if ("||".equals(operator) &&
+                }
+                if ("||".equals(operator) &&
                         ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) || (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
@@ -640,14 +646,13 @@ public class JsonPathMatcher {
                         }
                     }
                     return matches;
-                } else {
-                    if (originalScope instanceof Json.Member) {
-                        if (getOperatorResult(lhs, operator, rhs) != null) {
-                            return originalScope;
-                        }
-                    } else {
-                        return getOperatorResult(lhs, operator, rhs);
+                }
+                if (originalScope instanceof Json.Member) {
+                    if (getOperatorResult(lhs, operator, rhs) != null) {
+                        return originalScope;
                     }
+                } else {
+                    return getOperatorResult(lhs, operator, rhs);
                 }
             }
 
@@ -755,7 +760,8 @@ public class JsonPathMatcher {
                 List<Object> matches = (List<Object>) results;
                 if (matches.isEmpty()) {
                     return null;
-                } else if (matches.size() == 1) {
+                }
+                if (matches.size() == 1) {
                     return matches.get(0);
                 }
             }
@@ -766,14 +772,17 @@ public class JsonPathMatcher {
         private @Nullable Object getValue(Object result) {
             if (result instanceof Json.Member) {
                 return getValue(((Json.Member) result).getValue());
-            } else if (result instanceof Json.JsonObject) {
+            }
+            if (result instanceof Json.JsonObject) {
                 return ((Json.JsonObject) result).getMembers();
-            } else if (result instanceof List) {
+            }
+            if (result instanceof List) {
                 return ((List<Object>) result).stream()
                         .map(this::getValue)
                         .filter(Objects::nonNull)
                         .collect(toList());
-            } else if (result instanceof Json.Array) {
+            }
+            if (result instanceof Json.Array) {
                 return ((Json.Array) result).getValues();
             } else if (result instanceof Json.Literal) {
                 return ((Json.Literal) result).getValue();

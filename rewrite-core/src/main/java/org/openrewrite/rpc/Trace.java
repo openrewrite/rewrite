@@ -75,9 +75,8 @@ public class Trace {
                 int lineNum = element.getLineNumber();
                 if (lineNum <= lines.size()) {
                     return lines.get(lineNum - 1);
-                } else {
-                    return "Line number " + lineNum + " is out of bounds for " + sourcePath;
                 }
+                return "Line number " + lineNum + " is out of bounds for " + sourcePath;
             } catch (IOException ignored) {
                 return "Source code unavailable";
             }

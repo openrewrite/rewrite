@@ -30,11 +30,10 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
     public static GeneralFormatStyle autodetectGeneralFormatStyle(JavaSourceFile j) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(j, count);
-        if(count.lf >= count.crlf) {
+        if (count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
-        } else {
-            return new GeneralFormatStyle(true);
         }
+        return new GeneralFormatStyle(true);
     }
 
     @Override

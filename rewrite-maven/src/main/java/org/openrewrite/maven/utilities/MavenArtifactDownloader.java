@@ -138,7 +138,8 @@ public class MavenArtifactDownloader {
                 }
             }
             return request.withBasicAuthentication(authInfo.getUsername(), authInfo.getPassword());
-        } else if (repository.getUsername() != null && repository.getPassword() != null) {
+        }
+        if (repository.getUsername() != null && repository.getPassword() != null) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;

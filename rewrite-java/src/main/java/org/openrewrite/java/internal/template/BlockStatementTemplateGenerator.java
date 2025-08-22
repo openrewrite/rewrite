@@ -213,14 +213,16 @@ public class BlockStatementTemplateGenerator {
         if (j instanceof J.Lambda && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
-                    "specify the type by calling JavaTemplate.Builder#bindType()");
-        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                            "specify the type by calling JavaTemplate.Builder#bindType()");
+        }
+        if (j instanceof J.MemberReference && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
-                    "specify the type by calling JavaTemplate.Builder#bindType()");
-        } else if (j instanceof J.MethodInvocation) {
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                            "specify the type by calling JavaTemplate.Builder#bindType()");
+        }
+        if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
@@ -232,8 +234,8 @@ public class BlockStatementTemplateGenerator {
             before.append(bindType).append(" o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
-                   cursor.getValue() instanceof J.Block &&
-                   (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
+                cursor.getValue() instanceof J.Block &&
+                (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
             before.insert(0, String.format("class %s {\n", classDeclaration));
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
@@ -244,7 +246,7 @@ public class BlockStatementTemplateGenerator {
             // incorrect, and it would not be obvious to the recipe author why.
             throw new IllegalArgumentException(
                     "Templating a class declaration requires context from which package declaration and imports may be reached. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             after.append("\n}}");
@@ -275,7 +277,8 @@ public class BlockStatementTemplateGenerator {
             }
 
             return;
-        } else if (j instanceof J.Block) {
+        }
+        if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) parent;
@@ -294,9 +297,9 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 before.insert(0, m.withBody(null)
-                                         .withLeadingAnnotations(emptyList())
-                                         .withPrefix(Space.EMPTY)
-                                         .printTrimmed(cursor).trim() + '{');
+                        .withLeadingAnnotations(emptyList())
+                        .withPrefix(Space.EMPTY)
+                        .printTrimmed(cursor).trim() + '{');
             } else {
                 J.Block b = (J.Block) j;
 
@@ -480,7 +483,7 @@ public class BlockStatementTemplateGenerator {
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
                 if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
-                    firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
+                        firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
                     after.append(")");

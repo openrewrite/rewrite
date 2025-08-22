@@ -107,11 +107,14 @@ public class Assertions {
                     .filter(missingType -> {
                         if (missingType.getJ() instanceof J.Identifier) {
                             return typeValidation.identifiers();
-                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                        }
+                        if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();
-                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                        }
+                        if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
                             return typeValidation.methodInvocations();
-                        } else if (missingType.getJ() instanceof J.NewClass) {
+                        }
+                        if (missingType.getJ() instanceof J.NewClass) {
                             return typeValidation.constructorInvocations();
                         } else if (missingType.getJ() instanceof J.MethodDeclaration) {
                             return typeValidation.methodDeclarations();

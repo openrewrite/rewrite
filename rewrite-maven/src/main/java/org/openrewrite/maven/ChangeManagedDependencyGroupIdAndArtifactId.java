@@ -184,9 +184,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 ResolvedManagedDependency managedDependency = findManagedDependency(groupId, artifactId);
                 if (managedDependency != null) {
                     return compareVersions(version, managedDependency.getVersion());
-                } else {
-                    return false;
                 }
+                return false;
             }
 
             private boolean compareVersions(@Nullable String targetVersion, @Nullable String foundVersion) {
@@ -195,9 +194,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 if ((versionComparator != null) && (foundVersion != null)) {
                     return versionComparator.isValid(targetVersion, foundVersion);
-                } else {
-                    return targetVersion.equals(foundVersion);
                 }
+                return targetVersion.equals(foundVersion);
             }
 
             @SuppressWarnings("ConstantConditions")

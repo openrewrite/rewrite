@@ -88,11 +88,11 @@ class TypeUtilsAssertions extends AutoCloseableSoftAssertions {
     private String describe(TypeUtils.ComparisonContext mode) {
         if (mode == BOUND) {
             return "BOUND";
-        } else if (mode == INFER) {
-            return "INFER";
-        } else {
-            return String.valueOf(mode);
         }
+        if (mode == INFER) {
+            return "INFER";
+        }
+        return String.valueOf(mode);
     }
 
     public StringAssert toString(String type) {

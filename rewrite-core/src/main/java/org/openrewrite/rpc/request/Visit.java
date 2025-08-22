@@ -97,7 +97,8 @@ public class Visit implements RpcRequest {
                 Object acc = recipe.getAccumulator(recipeCursors.computeIfAbsent(recipe, r -> new Cursor(null, Cursor.ROOT_VALUE)),
                         (ExecutionContext) p);
                 return recipe.getScanner(acc);
-            } else if (visitorName.startsWith("edit:")) {
+            }
+            if (visitorName.startsWith("edit:")) {
                 Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
                 return recipe.getVisitor();
             }

@@ -42,11 +42,14 @@ public class AnnotationService {
         J j = cursor.getValue();
         if (j instanceof J.VariableDeclarations) {
             return getAllAnnotations((J.VariableDeclarations) j);
-        } else if (j instanceof J.MethodDeclaration) {
+        }
+        if (j instanceof J.MethodDeclaration) {
             return ((J.MethodDeclaration) j).getAllAnnotations();
-        } else if (j instanceof J.ClassDeclaration) {
+        }
+        if (j instanceof J.ClassDeclaration) {
             return ((J.ClassDeclaration) j).getAllAnnotations();
-        } else if (j instanceof J.TypeParameter) {
+        }
+        if (j instanceof J.TypeParameter) {
             return ((J.TypeParameter) j).getAnnotations();
         } else if (j instanceof J.TypeParameters) {
             return ((J.TypeParameters) j).getAnnotations();
@@ -67,11 +70,14 @@ public class AnnotationService {
     private List<J.Annotation> getAllAnnotations(J j) {
         if (j instanceof J.AnnotatedType) {
             return getAllAnnotations((J.AnnotatedType) j);
-        } else if (j instanceof J.ArrayType) {
+        }
+        if (j instanceof J.ArrayType) {
             return getAllAnnotations((J.ArrayType) j);
-        } else if (j instanceof J.Identifier) {
+        }
+        if (j instanceof J.Identifier) {
             return getAllAnnotations((J.Identifier) j);
-        } else if (j instanceof J.FieldAccess) {
+        }
+        if (j instanceof J.FieldAccess) {
             return getAllAnnotations((J.FieldAccess) j);
         } else if (j instanceof J.VariableDeclarations) {
             return getAllAnnotations((J.VariableDeclarations) j);

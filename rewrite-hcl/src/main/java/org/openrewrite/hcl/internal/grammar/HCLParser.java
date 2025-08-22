@@ -189,7 +189,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitConfigFile(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -244,7 +244,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitBody(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -313,7 +313,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitBodyContent(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -390,7 +390,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitAttribute(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -465,7 +465,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitBlock(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -546,7 +546,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitBlockLabel(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -631,7 +631,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitOperationExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -671,7 +671,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitConditionalExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -699,7 +699,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitExpressionTerm(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -827,7 +827,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitParentheticalExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -861,7 +861,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitAttributeAccessExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -889,7 +889,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitLiteralExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -917,7 +917,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitTemplateExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -945,7 +945,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitVariableExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -977,7 +977,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitSplatExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1009,7 +1009,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitIndexAccessExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1043,7 +1043,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitLegacyIndexAttributeExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1071,7 +1071,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1099,7 +1099,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitFunctionCallExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1129,7 +1129,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitCollectionValueExpression(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1311,7 +1311,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitBlockExpr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1375,7 +1375,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitLiteralValue(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1439,7 +1439,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitCollectionValue(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1525,7 +1525,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitTuple(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1630,7 +1630,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitObject(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1747,7 +1747,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitObjectelem(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1872,7 +1872,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForExpr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -1959,7 +1959,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForTupleExpr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2062,7 +2062,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForObjectExpr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2163,7 +2163,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForIntro(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2236,7 +2236,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitForCond(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2290,7 +2290,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitVariableExpr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2354,7 +2354,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitFunctionCall(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2437,7 +2437,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitArguments(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2533,7 +2533,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitIndex(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2593,7 +2593,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitGetAttr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2651,7 +2651,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitLegacyIndexAttr(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2708,7 +2708,7 @@ public class HCLParser extends Parser {
         @Override
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor) return ((HCLParserVisitor<? extends T>) visitor).visitSplat(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2787,7 +2787,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitAttrSplat(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2882,7 +2882,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitFullSplat(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -2971,7 +2971,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitOperation(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3044,7 +3044,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitUnaryOp(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3122,7 +3122,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitBinaryOp(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3223,7 +3223,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitBinaryOperator(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3327,7 +3327,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitCompareOperator(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3403,7 +3403,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitArithmeticOperator(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3467,7 +3467,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitLogicOperator(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3553,7 +3553,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitQuotedTemplate(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3605,7 +3605,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitHeredoc(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3727,7 +3727,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitHeredocTemplatePart(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3794,7 +3794,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitHeredocLiteral(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3850,7 +3850,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitQuotedTemplatePart(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3917,7 +3917,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitStringLiteral(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 
@@ -3977,7 +3977,7 @@ public class HCLParser extends Parser {
         public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
             if (visitor instanceof HCLParserVisitor)
                 return ((HCLParserVisitor<? extends T>) visitor).visitTemplateInterpolation(this);
-            else return visitor.visitChildren(this);
+            return visitor.visitChildren(this);
         }
     }
 

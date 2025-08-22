@@ -498,7 +498,8 @@ class AnnotationDeserializer {
             if (matchesAtPosition("true")) {
                 pos += 4; // consume "true"
                 return Boolean.TRUE;
-            } else if (matchesAtPosition("false")) {
+            }
+            if (matchesAtPosition("false")) {
                 pos += 5; // consume "false"
                 return Boolean.FALSE;
             }
@@ -874,11 +875,14 @@ class AnnotationSerializer {
     public static String serializeNumber(Number value) {
         if (value instanceof Byte) {
             return "B" + value;
-        } else if (value instanceof Short) {
+        }
+        if (value instanceof Short) {
             return "S" + value;
-        } else if (value instanceof Integer) {
+        }
+        if (value instanceof Integer) {
             return "I" + value;
-        } else if (value instanceof Long) {
+        }
+        if (value instanceof Long) {
             return "J" + value;
         } else if (value instanceof Float) {
             return "F" + value;
@@ -989,11 +993,14 @@ class AnnotationSerializer {
     private static String serializeValueInternal(@Nullable Object value) {
         if (value == null) {
             return "null";
-        } else if (value instanceof String) {
+        }
+        if (value instanceof String) {
             return "s\"" + escapeStringContentForTsv((String) value) + "\"";
-        } else if (value instanceof Type) {
+        }
+        if (value instanceof Type) {
             return serializeClassConstant((Type) value);
-        } else if (value.getClass().isArray()) {
+        }
+        if (value.getClass().isArray()) {
             return serializeArrayValue(value);
         } else if (value instanceof Boolean) {
             return serializeBoolean((Boolean) value);
@@ -1091,13 +1098,14 @@ class AnnotationSerializer {
     private static String serializeNumericValue(Number value) {
         if (value instanceof Long) {
             return serializeLong((Long) value);
-        } else if (value instanceof Float) {
-            return serializeFloat((Float) value);
-        } else if (value instanceof Double) {
-            return serializeDouble((Double) value);
-        } else {
-            return serializeNumber(value);
         }
+        if (value instanceof Float) {
+            return serializeFloat((Float) value);
+        }
+        if (value instanceof Double) {
+            return serializeDouble((Double) value);
+        }
+        return serializeNumber(value);
     }
 
     public static void processAnnotationDefaultValue(AnnotationVisitor annotationDefaultVisitor, Object value) {

@@ -411,12 +411,10 @@ public class RawPom {
             if (currentVersion == null) {
                 if (parent == null) {
                     return null;
-                } else {
-                    return parent.getVersion();
                 }
-            } else {
-                return currentVersion;
+                return parent.getVersion();
             }
+            return currentVersion;
         }
         return version;
     }

@@ -132,12 +132,14 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
+                    }
+                    if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) ||
                             TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
                             spaceForNextImport.set(import_.getPrefix());
                             return null;
-                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
+                        }
+                        if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
                                 methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
                             return unfoldStarImport(import_, methodsAndFieldsUsed);
@@ -157,9 +159,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     if (otherTypesInPackageUsed.isEmpty()) {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
-                    } else {
-                        return unfoldStarImport(import_, otherTypesInPackageUsed);
                     }
+                    return unfoldStarImport(import_, otherTypesInPackageUsed);
                 }
                 return import_;
             }));

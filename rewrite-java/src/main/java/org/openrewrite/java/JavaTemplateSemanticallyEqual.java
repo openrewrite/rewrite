@@ -114,11 +114,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         String matcherName = typedPattern.patternType().matcherName().Identifier().getText();
         if ("any".equals(matcherName)) {
             return TypeParameter.toJavaType(typedPattern.patternType().type(), generics);
-        } else if ("anyArray".equals(matcherName)) {
-            return new JavaType.Array(null, TypeParameter.toJavaType(typedPattern.patternType().type(), generics), null);
-        } else {
-            throw new IllegalArgumentException("Unsupported template matcher '" + key + "'");
         }
+        if ("anyArray".equals(matcherName)) {
+            return new JavaType.Array(null, TypeParameter.toJavaType(typedPattern.patternType().type(), generics), null);
+        }
+        throw new IllegalArgumentException("Unsupported template matcher '" + key + "'");
     }
 
     private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {

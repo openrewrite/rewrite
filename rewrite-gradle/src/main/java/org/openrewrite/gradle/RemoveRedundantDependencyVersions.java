@@ -494,11 +494,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         int comparison = new LatestIntegration(null).compare(null, managedVersion, requestedVersion);
         if (comparison < 0) {
             return comparator == LT || comparator == LTE;
-        } else if (comparison > 0) {
-            return comparator == GT || comparator == GTE;
-        } else {
-            return comparator == EQ || comparator == LTE || comparator == GTE;
         }
+        if (comparison > 0) {
+            return comparator == GT || comparator == GTE;
+        }
+        return comparator == EQ || comparator == LTE || comparator == GTE;
     }
 
     private boolean isExact(String managedVersion) {

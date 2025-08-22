@@ -103,7 +103,8 @@ public class CommentOutProperty extends Recipe {
                 indentation = entry.getPrefix();
                 if (Boolean.FALSE.equals(commentOutProperty)) {
                     return addBockCommentIfNecessary(entry, ctx);
-                } else if (!comment.isEmpty()) {
+                }
+                if (!comment.isEmpty()) {
                     // add comment and return
                     String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
                     comment = "";

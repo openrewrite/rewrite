@@ -50,7 +50,8 @@ public class Literal implements Trait<Expression> {
     public boolean isNull() {
         if (getTree() instanceof J.Literal) {
             return ((J.Literal) getTree()).getValue() == null;
-        } else if(getTree() instanceof J.NewArray) {
+        }
+        if (getTree() instanceof J.NewArray) {
             J.NewArray newArray = (J.NewArray) getTree();
             return newArray.getInitializer() == null;
         }
@@ -105,13 +106,14 @@ public class Literal implements Trait<Expression> {
             J.Literal literal = (J.Literal) lit;
             if (literal.getValue() == null) {
                 return null;
-            } else if (type.isCollectionLikeType()) {
+            }
+            if (type.isCollectionLikeType()) {
                 List<?> l = singletonList(literal.getValue());
                 return mapper.convertValue(l, type);
-            } else {
-                return mapper.convertValue(literal.getValue(), type);
             }
-        } else if (lit instanceof J.NewArray) {
+            return mapper.convertValue(literal.getValue(), type);
+        }
+        if (lit instanceof J.NewArray) {
             List<Object> untyped = untypedInitializerLiterals((J.NewArray) lit);
             return mapper.convertValue(untyped, type);
         }

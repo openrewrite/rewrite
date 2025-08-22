@@ -623,22 +623,21 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         paramContainer,
                         methodRefType
                 );
-            } else {
-                if (qualifier == null) {
-                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
-                }
-                return new J.MemberReference(
-                        randomId(),
-                        qualifier.getPrefix(),
-                        Markers.EMPTY,
-                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
-                        JContainer.empty(),
-                        JLeftPadded.build(name),
-                        null,
-                        methodRefType,
-                        fieldRefType
-                );
             }
+            if (qualifier == null) {
+                return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+            }
+            return new J.MemberReference(
+                    randomId(),
+                    qualifier.getPrefix(),
+                    Markers.EMPTY,
+                    JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                    JContainer.empty(),
+                    JLeftPadded.build(name),
+                    null,
+                    methodRefType,
+                    fieldRefType
+            );
         }
 
         assert qualifier != null;
@@ -663,7 +662,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
 
             return method;
-        } else if (type instanceof JavaType.GenericTypeVariable) {
+        }
+        if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
                 JavaType.Method method = methodReferenceType(ref, bound);
@@ -711,11 +711,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
             }
             return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
-        } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
+        }
+        if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
             return paramTypeMatches(((JavaType.GenericTypeVariable) parameterType).getBounds().get(0), mappedJavadocType);
-        } else if (parameterType instanceof JavaType.GenericTypeVariable) {
+        }
+        if (parameterType instanceof JavaType.GenericTypeVariable) {
             return TypeUtils.isObject(mappedJavadocType);
-        } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
+        }
+        if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
             return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
         }
         return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
@@ -1030,9 +1033,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, ""));
                 }
                 return end;
-            } else {
-                cursor = tempCursor;
             }
+            cursor = tempCursor;
         }
         return emptyList();
     }

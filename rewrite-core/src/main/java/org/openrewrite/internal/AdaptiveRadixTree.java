@@ -216,10 +216,9 @@ public class AdaptiveRadixTree<V> {
                             value, keyTable);
                     InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
                     return grown != null ? grown : newNode;
-                } else {
-                    newNode.value = value;
-                    return newNode;
                 }
+                newNode.value = value;
+                return newNode;
             }
 
             depth += keyLength;

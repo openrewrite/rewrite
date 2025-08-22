@@ -68,9 +68,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(a, p);
         if (!(temp instanceof Hcl.AttributeAccess)) {
             return temp;
-        } else {
-            a = (Hcl.AttributeAccess) temp;
         }
+        a = (Hcl.AttributeAccess) temp;
         a = a.withAttribute((Expression) visit(a.getAttribute(), p));
         return a.getPadding().withName(visitLeftPadded(a.getPadding().getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p));
     }
@@ -82,9 +81,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(li, p);
         if (!(temp instanceof Hcl.LegacyIndexAttributeAccess)) {
             return temp;
-        } else {
-            li = (Hcl.LegacyIndexAttributeAccess) temp;
         }
+        li = (Hcl.LegacyIndexAttributeAccess) temp;
         li = li.getPadding().withBase(
                 visitRightPadded(li.getPadding().getBase(), HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, p));
         return li.withIndex((Hcl.Literal) visitLiteral(li.getIndex(), p));
@@ -98,9 +96,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(b, p);
         if (!(temp instanceof Hcl.Binary)) {
             return temp;
-        } else {
-            b = (Hcl.Binary) temp;
         }
+        b = (Hcl.Binary) temp;
         b = b.withLeft((Expression) visit(b.getLeft(), p));
         b = b.getPadding().withOperator(b.getPadding().getOperator().withBefore(visitSpace(b.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p)));
         return b.withRight((Expression) visit(b.getRight(), p));
@@ -113,9 +110,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitBodyContent(b, p);
         if (!(temp instanceof Hcl.Block)) {
             return temp;
-        } else {
-            b = (Hcl.Block) temp;
         }
+        b = (Hcl.Block) temp;
         b = b.withType((Hcl.Identifier) visit(b.getType(), p));
         b = b.withLabels(ListUtils.map(b.getLabels(), l -> (Label) visit(l, p)));
         b = b.withOpen(visitSpace(b.getOpen(), Space.Location.BLOCK_OPEN, p));
@@ -134,9 +130,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(c, p);
         if (!(temp instanceof Hcl.Conditional)) {
             return temp;
-        } else {
-            c = (Hcl.Conditional) temp;
         }
+        c = (Hcl.Conditional) temp;
         c = c.withCondition((Expression) visit(c.getCondition(), p));
         c = c.getPadding().withTruePart(visitLeftPadded(c.getPadding().getTruePart(), HclLeftPadded.Location.CONDITIONAL_TRUE, p));
         return c.getPadding().withFalsePart(visitLeftPadded(c.getPadding().getFalsePart(), HclLeftPadded.Location.CONDITIONAL_FALSE, p));
@@ -171,9 +166,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(f, p);
         if (!(temp instanceof Hcl.ForObject)) {
             return temp;
-        } else {
-            f = (Hcl.ForObject) temp;
         }
+        f = (Hcl.ForObject) temp;
         f = f.withIntro((Hcl.ForIntro) visit(f.getIntro(), p));
         f = f.getPadding().withUpdateName(visitLeftPadded(f.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p));
         f = f.getPadding().withUpdateValue(visitLeftPadded(f.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p));
@@ -191,9 +185,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(f, p);
         if (!(temp instanceof Hcl.ForTuple)) {
             return temp;
-        } else {
-            f = (Hcl.ForTuple) temp;
         }
+        f = (Hcl.ForTuple) temp;
         f = f.withIntro((Hcl.ForIntro) visit(f.getIntro(), p));
         f = f.getPadding().withUpdate(visitLeftPadded(f.getPadding().getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p));
         if (f.getPadding().getCondition() != null) {
@@ -210,9 +203,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(f, p);
         if (!(temp instanceof Hcl.FunctionCall)) {
             return temp;
-        } else {
-            f = (Hcl.FunctionCall) temp;
         }
+        f = (Hcl.FunctionCall) temp;
         f = f.withName((Hcl.Identifier) visit(f.getName(), p));
         return f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), HclContainer.Location.FUNCTION_CALL_ARGUMENTS, p));
     }
@@ -224,9 +216,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(h, p);
         if (!(temp instanceof Hcl.HeredocTemplate)) {
             return temp;
-        } else {
-            h = (Hcl.HeredocTemplate) temp;
         }
+        h = (Hcl.HeredocTemplate) temp;
         h = h.withDelimiter((Hcl.Identifier) visit(h.getDelimiter(), p));
         h = h.withExpressions(ListUtils.map(h.getExpressions(), e -> (Expression) visit(e, p)));
         return h.withEnd(visitSpace(h.getEnd(), Space.Location.HEREDOC_END, p));
@@ -260,9 +251,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(l, p);
         if (!(temp instanceof Hcl.Literal)) {
             return temp;
-        } else {
-            l = (Hcl.Literal) temp;
         }
+        l = (Hcl.Literal) temp;
         return l;
     }
 
@@ -273,9 +263,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(o, p);
         if (!(temp instanceof Hcl.ObjectValue)) {
             return temp;
-        } else {
-            o = (Hcl.ObjectValue) temp;
         }
+        o = (Hcl.ObjectValue) temp;
         return o.getPadding().withAttributes(visitContainer(o.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES, p));
     }
 
@@ -286,9 +275,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(pa, p);
         if (!(temp instanceof Hcl.Parentheses)) {
             return temp;
-        } else {
-            pa = (Hcl.Parentheses) temp;
         }
+        pa = (Hcl.Parentheses) temp;
         return pa.getPadding().withExpression(visitRightPadded(pa.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p));
     }
 
@@ -299,9 +287,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(t, p);
         if (!(temp instanceof Hcl.QuotedTemplate)) {
             return temp;
-        } else {
-            t = (Hcl.QuotedTemplate) temp;
         }
+        t = (Hcl.QuotedTemplate) temp;
         return t.withExpressions(ListUtils.map(t.getExpressions(), e -> (Expression) visit(e, p)));
     }
 
@@ -312,9 +299,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(s, p);
         if (!(temp instanceof Hcl.Splat)) {
             return temp;
-        } else {
-            s = (Hcl.Splat) temp;
         }
+        s = (Hcl.Splat) temp;
         s = s.withSelect((Expression) visit(s.getSelect(), p));
         return s.withOperator((Hcl.Splat.Operator) visit(s.getOperator(), p));
     }
@@ -333,9 +319,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(t, p);
         if (!(temp instanceof Hcl.TemplateInterpolation)) {
             return temp;
-        } else {
-            t = (Hcl.TemplateInterpolation) temp;
         }
+        t = (Hcl.TemplateInterpolation) temp;
         return t.withExpression((Expression) visit(t.getExpression(), p));
     }
 
@@ -346,9 +331,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(t, p);
         if (!(temp instanceof Hcl.Tuple)) {
             return temp;
-        } else {
-            t = (Hcl.Tuple) temp;
         }
+        t = (Hcl.Tuple) temp;
         return t.getPadding().withValues(visitContainer(t.getPadding().getValues(), HclContainer.Location.TUPLE_VALUES, p));
     }
 
@@ -359,9 +343,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(u, p);
         if (!(temp instanceof Hcl.Unary)) {
             return temp;
-        } else {
-            u = (Hcl.Unary) temp;
         }
+        u = (Hcl.Unary) temp;
         return u.withExpression((Expression) visit(u.getExpression(), p));
     }
 
@@ -372,9 +355,8 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         Expression temp = (Expression) visitExpression(v, p);
         if (!(temp instanceof Hcl.VariableExpression)) {
             return temp;
-        } else {
-            v = (Hcl.VariableExpression) temp;
         }
+        v = (Hcl.VariableExpression) temp;
         return v.withName((Hcl.Identifier) visit(v.getName(), p));
     }
 

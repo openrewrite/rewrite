@@ -212,7 +212,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         dependencies.add(new GroupArtifactVersion(notation.substring(0, versionIdx), entry, notation.substring(versionIdx + 1)));
                     }
                     return;
-                } else if (argument instanceof G.MapLiteral) {
+                }
+                if (argument instanceof G.MapLiteral) {
                     gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
                 } else if (argument instanceof G.MapEntry) {
                     gavMap = getGAVMapEntriesForGMapEntries(arguments);
@@ -239,7 +240,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                 String stringNotation = (String) ((J.Literal) argument).getValue();
                 Dependency dependency = stringNotation == null ? null : DependencyStringNotationConverter.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
-            } else if (argument instanceof G.MapLiteral) {
+            }
+            if (argument instanceof G.MapLiteral) {
                 gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
             } else if (argument instanceof G.MapEntry) {
                 gavMap = getGAVMapEntriesForGMapEntries(arguments);
@@ -285,7 +287,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
 
             if ("dependency".equals(method.getSimpleName()) || "mavenBom".equals(method.getSimpleName())) {
                 return updateDependency(m, ctx, gradleProject);
-            } else if ("dependencySet".equals(method.getSimpleName())) {
+            }
+            if ("dependencySet".equals(method.getSimpleName())) {
                 return updateDependencySet(m, ctx);
             }
 
@@ -343,12 +346,15 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         visited = visited.withArguments(ListUtils.map(visited.getArguments(), arg -> {
                             if (arg instanceof J.Literal) {
                                 return ChangeStringLiteral.withStringValue((J.Literal) arg, newGav.getGroupId() + ":" + newGav.getVersion());
-                            } else if (arg instanceof G.MapEntry) {
+                            }
+                            if (arg instanceof G.MapEntry) {
                                 return updateMapEntry((G.MapEntry) arg);
-                            } else if (arg instanceof G.MapLiteral) {
+                            }
+                            if (arg instanceof G.MapLiteral) {
                                 G.MapLiteral mapArg = (G.MapLiteral) arg;
                                 return mapArg.withElements(ListUtils.map(mapArg.getElements(), this::updateMapEntry));
-                            } else if (arg instanceof J.Assignment) {
+                            }
+                            if (arg instanceof J.Assignment) {
                                 J.Assignment ass = (J.Assignment) arg;
                                 if (ass.getVariable() instanceof J.Identifier && ass.getAssignment() instanceof J.Literal) {
                                     J.Identifier identifier = (J.Identifier) ass.getVariable();
@@ -356,7 +362,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                                     if (assignment.getValue() instanceof String) {
                                         if (GROUP.equals(identifier.getSimpleName()) && newGav.getGroupId() != null) {
                                             return ass.withAssignment(ChangeStringLiteral.withStringValue(assignment, newGav.getGroupId()));
-                                        } else if (VERSION.equals(identifier.getSimpleName()) && newGav.getVersion() != null) {
+                                        }
+                                        if (VERSION.equals(identifier.getSimpleName()) && newGav.getVersion() != null) {
                                             return ass.withAssignment(ChangeStringLiteral.withStringValue(assignment, newGav.getVersion()));
                                         }
                                     }
@@ -405,7 +412,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                                 String keyValue = (String) key.getValue();
                                 if (GROUP.equals(keyValue) && newGav.getGroupId() != null) {
                                     return entry.withValue(ChangeStringLiteral.withStringValue(value, newGav.getGroupId()));
-                                } else if (VERSION.equals(keyValue) && newGav.getVersion() != null) {
+                                }
+                                if (VERSION.equals(keyValue) && newGav.getVersion() != null) {
                                     return entry.withValue(ChangeStringLiteral.withStringValue(value, newGav.getVersion()));
                                 }
                             }
@@ -625,7 +633,8 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
         if (expr instanceof J.Literal) {
             Object value = ((J.Literal) expr).getValue();
             return value == null ? "" : value.toString();
-        } else if (expr instanceof J.Identifier) {
+        }
+        if (expr instanceof J.Identifier) {
             return ((J.Identifier) expr).getSimpleName();
         }
         throw new IllegalArgumentException("Expression must be a J.Literal or J.Identifier");

@@ -110,7 +110,8 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         File pomCacheDir = new File(workspace.toFile(), ".rewrite-cache");
         if (!pomCacheDir.exists() && !pomCacheDir.mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven pom cache at " + pomCacheDir);
-        } else if (!pomCacheDir.isDirectory()) {
+        }
+        if (!pomCacheDir.isDirectory()) {
             throw new IllegalStateException("The maven pom cache workspace must be a directory at " + pomCacheDir);
         }
         // In case a stale lock file is left over from a previous run that was interrupted

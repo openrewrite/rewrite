@@ -74,9 +74,8 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
                         List<Comment> comments = eof.getComments();
                         if (comments.isEmpty()) {
                             return cu.withEof(Space.format(lineEnding));
-                        } else {
-                            return cu.withEof(cu.getEof().withComments(ListUtils.mapLast(comments, it -> it.withSuffix(lineEnding))));
                         }
+                        return cu.withEof(cu.getEof().withComments(ListUtils.mapLast(comments, it -> it.withSuffix(lineEnding))));
                     }
                     return cu;
                 }

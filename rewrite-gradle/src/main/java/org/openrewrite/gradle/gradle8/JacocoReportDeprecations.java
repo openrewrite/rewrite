@@ -59,7 +59,8 @@ public class JacocoReportDeprecations extends Recipe {
                     J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
                     String fieldName = getFieldName(fieldAccess);
                     return replaceDeprecations(assignment, index, fieldName);
-                } else if (assignment.getVariable() instanceof J.Identifier) {
+                }
+                if (assignment.getVariable() instanceof J.Identifier) {
                     J.Identifier identifier = (J.Identifier) assignment.getVariable();
                     return replaceDeprecations(assignment, index, identifier.getSimpleName());
                 }
@@ -89,14 +90,16 @@ public class JacocoReportDeprecations extends Recipe {
                         J.FieldAccess fieldAccess = (J.FieldAccess) assignment.getVariable();
                         if ("enabled".equalsIgnoreCase(field) || "isEnabled".equalsIgnoreCase(field)) {
                             return assignment.withVariable(fieldAccess.withName(fieldAccess.getName().withSimpleName("required")));
-                        } else if ("destination".equalsIgnoreCase(field)) {
+                        }
+                        if ("destination".equalsIgnoreCase(field)) {
                             return assignment.withVariable(fieldAccess.withName(fieldAccess.getName().withSimpleName("outputLocation")));
                         }
                     } else if (assignment.getVariable() instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) assignment.getVariable();
                         if ("enabled".equalsIgnoreCase(field) || "isEnabled".equalsIgnoreCase(field)) {
                             return assignment.withVariable(identifier.withSimpleName("required"));
-                        } else if ("destination".equalsIgnoreCase(field)) {
+                        }
+                        if ("destination".equalsIgnoreCase(field)) {
                             return assignment.withVariable(identifier.withSimpleName("outputLocation"));
                         }
                     }

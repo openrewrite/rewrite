@@ -57,8 +57,7 @@ public class ValidationException extends RuntimeException {
     public String getMessage() {
         if (source != null) {
             return "Problem parsing rewrite configuration from: " + source + " \n" + super.getMessage();
-        } else {
-            return super.getMessage();
         }
+        return super.getMessage();
     }
 }

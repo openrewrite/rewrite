@@ -130,7 +130,8 @@ public class GradlePlugin implements Trait<J> {
                         .map(pluginDescriptor -> maybeGradlePlugin(cursor, pluginDescriptor.getId(), pluginDescriptor.getFullyQualifiedClassName(), null, true))
                         .findFirst()
                         .orElse(null);
-            } else if (object instanceof J.MethodInvocation) {
+            }
+            if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) object;
 
                 if (withinPlugins(cursor)) {
@@ -140,7 +141,8 @@ public class GradlePlugin implements Trait<J> {
                         }
 
                         return maybeGradlePlugin(cursor, null, null, null, true);
-                    } else if (APPLY_DSL_MATCHER.matches(m, true)) {
+                    }
+                    if (APPLY_DSL_MATCHER.matches(m, true)) {
                         if (!(m.getArguments().get(0) instanceof J.Literal) || !(m.getSelect() instanceof J.MethodInvocation)) {
                             return null;
                         }
@@ -165,7 +167,8 @@ public class GradlePlugin implements Trait<J> {
                         String version = (String) versionLiteral.getValue();
                         boolean applied = Boolean.TRUE.equals(applyLiteral.getValue());
                         return maybeGradlePlugin(cursor, pluginId, null, version, applied);
-                    } else if (PLUGIN_VERSION_DSL_MATCHER.matches(m, true)) {
+                    }
+                    if (PLUGIN_VERSION_DSL_MATCHER.matches(m, true)) {
                         String version = null;
                         if (m.getArguments().get(0) instanceof J.Literal) {
                             J.Literal versionLiteral = (J.Literal) m.getArguments().get(0);
@@ -185,7 +188,8 @@ public class GradlePlugin implements Trait<J> {
                         J.Literal idLiteral = (J.Literal) select.getArguments().get(0);
                         String pluginId = "kotlin".equals(select.getSimpleName()) ? "org.jetbrains.kotlin." + idLiteral.getValue() : (String) idLiteral.getValue();
                         return maybeGradlePlugin(cursor, pluginId, null, version, !withinBlock(cursor, "pluginManagement"));
-                    } else if (PLUGIN_ID_DSL_MATCHER.matches(m, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(m, true)) {
+                    }
+                    if (PLUGIN_ID_DSL_MATCHER.matches(m, true) || KOTLIN_PLUGIN_DSL_MATCHER.matches(m, true)) {
                         if (!(m.getArguments().get(0) instanceof J.Literal)) {
                             return null;
                         }
@@ -205,7 +209,8 @@ public class GradlePlugin implements Trait<J> {
                         if (entry.getValue() instanceof J.Literal) {
                             String pluginId = (String) ((J.Literal) entry.getValue()).getValue();
                             return maybeGradlePlugin(cursor, pluginId, null, null, true);
-                        } else if (entry.getValue() instanceof J.FieldAccess || entry.getValue() instanceof J.Identifier) {
+                        }
+                        if (entry.getValue() instanceof J.FieldAccess || entry.getValue() instanceof J.Identifier) {
                             return maybeGradlePlugin(cursor, null, null, null, true);
                         }
                     } else if (e instanceof J.Assignment) {

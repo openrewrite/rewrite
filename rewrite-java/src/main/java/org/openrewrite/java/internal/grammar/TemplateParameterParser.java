@@ -139,9 +139,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MatcherPatternContext matcherPattern() throws RecognitionException {
@@ -208,9 +208,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitGenericPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitGenericPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final GenericPatternContext genericPattern() throws RecognitionException {
@@ -289,9 +289,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypedPattern(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypedPattern(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypedPatternContext typedPattern() throws RecognitionException {
@@ -351,9 +351,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitPatternType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitPatternType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final PatternTypeContext patternType() throws RecognitionException {
@@ -429,9 +429,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitType(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitType(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeContext type() throws RecognitionException {
@@ -526,9 +526,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeParameter(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeParameter(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeParameterContext typeParameter() throws RecognitionException {
@@ -595,9 +595,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitVariance(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitVariance(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final VarianceContext variance() throws RecognitionException {
@@ -656,9 +656,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeArray(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeArray(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeArrayContext typeArray() throws RecognitionException {
@@ -701,9 +701,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitParameterName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitParameterName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ParameterNameContext parameterName() throws RecognitionException {
@@ -744,9 +744,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitGenericName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitGenericName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final GenericNameContext genericName() throws RecognitionException {
@@ -788,9 +788,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitTypeName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitTypeName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TypeNameContext typeName() throws RecognitionException {
@@ -840,9 +840,9 @@ public class TemplateParameterParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TemplateParameterParserVisitor ) return ((TemplateParameterParserVisitor<? extends T>)visitor).visitMatcherName(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TemplateParameterParserVisitor) return ((TemplateParameterParserVisitor<? extends T>) visitor).visitMatcherName(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MatcherNameContext matcherName() throws RecognitionException {

@@ -216,12 +216,13 @@ public class JavaTemplateParser {
     private boolean isStatement(Cursor cursor) {
         if (!(cursor.getValue() instanceof Statement)) {
             return false;
-        } else if (cursor.getValue() instanceof Expression) {
+        }
+        if (cursor.getValue() instanceof Expression) {
             J parent = cursor.getParentTreeCursor().getValue();
             return parent instanceof J.Block ||
-                   parent instanceof J.If && ((J.If) parent).getThenPart() == cursor.getValue() ||
-                   parent instanceof J.If.Else && ((J.If.Else) parent).getBody() == cursor.getValue() ||
-                   parent instanceof Loop && ((Loop) parent).getBody() == cursor.getValue();
+                    parent instanceof J.If && ((J.If) parent).getThenPart() == cursor.getValue() ||
+                    parent instanceof J.If.Else && ((J.If.Else) parent).getBody() == cursor.getValue() ||
+                    parent instanceof Loop && ((Loop) parent).getBody() == cursor.getValue();
         }
         return false;
     }

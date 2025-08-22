@@ -245,17 +245,18 @@ public class MergeYaml extends Recipe {
                 .filter(Yaml.Documents.class::isInstance)
                 .map(Yaml.Documents.class::cast)
                 .map(docs -> {
-                    // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                    Yaml.Document doc = docs.getDocuments().get(0);
-                    if (doc.getBlock() instanceof Yaml.Mapping) {
-                        Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                        return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                        Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                        return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                    }
-                    return doc.getBlock().withPrefix(doc.getPrefix());
-                });
+            // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+            Yaml.Document doc = docs.getDocuments().get(0);
+            if (doc.getBlock() instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+            }
+            if (doc.getBlock() instanceof Yaml.Sequence) {
+                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+            }
+            return doc.getBlock().withPrefix(doc.getPrefix());
+        });
     }
 
     static Yaml parse(@Language("yml") String yaml) {

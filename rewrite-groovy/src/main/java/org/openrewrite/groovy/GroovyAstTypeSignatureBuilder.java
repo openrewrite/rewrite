@@ -39,17 +39,22 @@ class GroovyAstTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 ClassNode clazz = (ClassNode) astNode;
                 if (clazz.isArray()) {
                     return arraySignature(clazz);
-                } else if (ClassHelper.isPrimitiveType(clazz)) {
+                }
+                if (ClassHelper.isPrimitiveType(clazz)) {
                     return primitiveSignature(clazz);
-                } else if (clazz.isUsingGenerics()) {
+                }
+                if (clazz.isUsingGenerics()) {
                     return parameterizedSignature(clazz);
                 }
                 return classSignature(astNode);
-            } else if (astNode instanceof GenericsType) {
+            }
+            if (astNode instanceof GenericsType) {
                 return genericSignature(astNode);
-            } else if (astNode instanceof MethodNode) {
+            }
+            if (astNode instanceof MethodNode) {
                 return methodSignature((MethodNode) astNode);
-            } else if (astNode instanceof FieldNode) {
+            }
+            if (astNode instanceof FieldNode) {
                 return variableSignature((FieldNode) astNode);
             }
         } catch (NoClassDefFoundError e) {

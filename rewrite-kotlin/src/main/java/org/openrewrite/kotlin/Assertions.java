@@ -192,9 +192,8 @@ public final class Assertions {
                 if (result.isPresent()) {
                     System.out.println(result.get().getMessage());
                     throw new AssertionFailedError("Parsing error, J.Unknown detected");
-                } else {
-                    throw new UnsupportedOperationException("A J.Unknown should always have a parse exception result.");
                 }
+                throw new UnsupportedOperationException("A J.Unknown should always have a parse exception result.");
             }
 
             @Override
@@ -224,11 +223,14 @@ public final class Assertions {
                     .filter(missingType -> {
                         if (missingType.getJ() instanceof J.Identifier) {
                             return typeValidation.identifiers();
-                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                        }
+                        if (missingType.getJ() instanceof J.ClassDeclaration) {
                             return typeValidation.classDeclarations();
-                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                        }
+                        if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
                             return typeValidation.methodInvocations();
-                        } else if (missingType.getJ() instanceof J.NewClass) {
+                        }
+                        if (missingType.getJ() instanceof J.NewClass) {
                             return typeValidation.constructorInvocations();
                         } else if (missingType.getJ() instanceof J.MethodDeclaration) {
                             return typeValidation.methodDeclarations();
@@ -268,13 +270,16 @@ public final class Assertions {
                     Cursor parentCursor = getCursor().getParentOrThrow();
                     if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Annotation) {
                         return space;
-                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Break &&
+                    }
+                    if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Break &&
                             ((J.Break) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
-                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.Return &&
-                               ((K.Return) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
+                    }
+                    if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.Return &&
+                            ((K.Return) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
                         return space;
-                    } else if (loc == Space.Location.LABEL_SUFFIX) {
+                    }
+                    if (loc == Space.Location.LABEL_SUFFIX) {
                         return space;
                     } else if (getCursor().firstEnclosing(J.Import.class) != null) {
                         return space;

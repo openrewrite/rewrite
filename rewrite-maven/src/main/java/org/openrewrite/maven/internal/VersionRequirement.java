@@ -84,9 +84,11 @@ public class VersionRequirement {
         static VersionSpec build(String requested, boolean direct) {
             if ("LATEST".equals(requested)) {
                 return DynamicVersion.LATEST;
-            } else if ("RELEASE".equals(requested)) {
+            }
+            if ("RELEASE".equals(requested)) {
                 return DynamicVersion.RELEASE;
-            } else if (requested.contains("[") || requested.contains("(")) {
+            }
+            if (requested.contains("[") || requested.contains("(")) {
                 // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
                 // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
                 if (!(requested.contains("]") || requested.contains(")"))) {
@@ -100,8 +102,7 @@ public class VersionRequirement {
                 parser.addErrorListener(new PrintingErrorListener());
 
                 return new VersionRangeParserBaseVisitor<VersionSpec>() {
-                    @Override
-                    public VersionSpec visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) {
+                    @Override public VersionSpec visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) {
                         return new RangeSet(ctx.range().stream()
                                 .map(range -> {
                                     Version lower, upper;
@@ -244,7 +245,8 @@ public class VersionRequirement {
             if (spec instanceof DirectRequirement) {
                 // dependencies defined in the project POM always win
                 return ((DirectRequirement) spec).getVersion();
-            } else if (spec instanceof SoftRequirement) {
+            }
+            if (spec instanceof SoftRequirement) {
                 nearestSoftRequirement = ((SoftRequirement) spec).version;
             } else {
                 nearestHardRequirement = next;

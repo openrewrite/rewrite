@@ -1038,7 +1038,8 @@ public class ResolvedPom {
                                     .getResolutionListener()
                                     .clear();
                             return resolveDependencies(scope, requirements, downloader, ctx);
-                        } else if (contains(dependencies, ga, d.getClassifier())) {
+                        }
+                        if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
                             continue;

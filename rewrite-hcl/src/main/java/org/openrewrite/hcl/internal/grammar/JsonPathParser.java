@@ -152,9 +152,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitJsonPath(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitJsonPath(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final JsonPathContext jsonPath() throws RecognitionException {
@@ -234,9 +234,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ExpressionContext expression() throws RecognitionException {
@@ -309,9 +309,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitDotOperator(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitDotOperator(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DotOperatorContext dotOperator() throws RecognitionException {
@@ -378,9 +378,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRecursiveDecent(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitRecursiveDecent(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RecursiveDecentContext recursiveDecent() throws RecognitionException {
@@ -439,9 +439,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBracketOperator(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitBracketOperator(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final BracketOperatorContext bracketOperator() throws RecognitionException {
@@ -533,9 +533,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilter(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitFilter(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FilterContext filter() throws RecognitionException {
@@ -606,9 +606,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitFilterExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitFilterExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FilterExpressionContext filterExpression() throws RecognitionException {
@@ -701,9 +701,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitBinaryExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitBinaryExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final BinaryExpressionContext binaryExpression() throws RecognitionException {
@@ -894,9 +894,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitContainsExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitContainsExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ContainsExpressionContext containsExpression() throws RecognitionException {
@@ -975,9 +975,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitRegexExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitRegexExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final RegexExpressionContext regexExpression() throws RecognitionException {
@@ -1032,9 +1032,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitUnaryExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitUnaryExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final UnaryExpressionContext unaryExpression() throws RecognitionException {
@@ -1132,9 +1132,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitLiteralExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitLiteralExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final LiteralExpressionContext literalExpression() throws RecognitionException {
@@ -1185,9 +1185,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitProperty(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitProperty(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final PropertyContext property() throws RecognitionException {
@@ -1237,9 +1237,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitWildcard(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitWildcard(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final WildcardContext wildcard() throws RecognitionException {
@@ -1291,9 +1291,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitSlice(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitSlice(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final SliceContext slice() throws RecognitionException {
@@ -1380,9 +1380,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitStart(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitStart(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final StartContext start() throws RecognitionException {
@@ -1423,9 +1423,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitEnd(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitEnd(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final EndContext end() throws RecognitionException {
@@ -1469,9 +1469,9 @@ public class JsonPathParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof JsonPathParserVisitor ) return ((JsonPathParserVisitor<? extends T>)visitor).visitIndexes(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof JsonPathParserVisitor) return ((JsonPathParserVisitor<? extends T>) visitor).visitIndexes(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final IndexesContext indexes() throws RecognitionException {

@@ -51,9 +51,8 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
                     if (removeEmptyAncestors && contents.isEmpty() && t.getAttributes().isEmpty()) {
                         if (getCursor().getParentOrThrow().getValue() instanceof Xml.Document) {
                             return t.withContent(null).withClosing(null);
-                        } else {
-                            doAfterVisit(new RemoveContentVisitor<>(t, true, removePrecedingComment));
                         }
+                        doAfterVisit(new RemoveContentVisitor<>(t, true, removePrecedingComment));
                     } else {
                         return t.withContent(contents);
                     }

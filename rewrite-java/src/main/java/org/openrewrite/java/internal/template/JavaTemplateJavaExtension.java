@@ -59,16 +59,17 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer p) {
                 if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
-                    isScope(annotation)) {
+                        isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     if (gen.isEmpty()) {
                         throw new IllegalStateException("Unable to parse annotation from template: \n" +
-                                                        substitutedTemplate +
-                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                                substitutedTemplate +
+                                "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
                     }
                     return gen.get(0).withPrefix(annotation.getPrefix());
-                } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
-                           isScope(annotation)) {
+                }
+                if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
+                        isScope(annotation)) {
                     List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
@@ -219,18 +220,19 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc == FIELD_ACCESS_PREFIX && isScope(fa)) {
                     return autoFormat(unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    substitutions.getTypeVariables(),
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            substitutions.getTypeVariables(),
+                            loc))
                             .withPrefix(fa.getPrefix()), p);
-                } else if (loc == STATEMENT_PREFIX && isScope(fa)) {
+                }
+                if (loc == STATEMENT_PREFIX && isScope(fa)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    substitutions.getTypeVariables(),
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            substitutions.getTypeVariables(),
+                            loc))
                             .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);

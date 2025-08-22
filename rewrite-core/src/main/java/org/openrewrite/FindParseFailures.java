@@ -133,7 +133,8 @@ public class FindParseFailures extends Recipe {
             private Tree report(Tree tree, ParseExceptionResult exceptionResult, ExecutionContext ctx) {
                 if (parserType != null && !Objects.equals(exceptionResult.getParserType(), parserType)) {
                     return tree;
-                } else if (stackTrace != null && !exceptionResult.getMessage().contains(stackTrace)) {
+                }
+                if (stackTrace != null && !exceptionResult.getMessage().contains(stackTrace)) {
                     return tree;
                 }
 

@@ -446,11 +446,10 @@ public interface Xml extends Tree {
                                         indentedClosingTagPrefix : "",
                                 Markers.EMPTY,
                                 name, ""));
-                    } else {
-                        return tag.withClosing(new Closing(randomId(),
-                                indentedClosingTagPrefix, Markers.EMPTY,
-                                name, ""));
                     }
+                    return tag.withClosing(new Closing(randomId(),
+                            indentedClosingTagPrefix, Markers.EMPTY,
+                            name, ""));
                 }
             }
 

@@ -72,9 +72,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(ae, p);
         if (!(temp instanceof K.AnnotatedExpression)) {
             return temp;
-        } else {
-            ae = (K.AnnotatedExpression) temp;
         }
+        ae = (K.AnnotatedExpression) temp;
         return ae;
     }
 
@@ -93,9 +92,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(b, p);
         if (!(temp instanceof K.Binary)) {
             return temp;
-        } else {
-            b = (K.Binary) temp;
         }
+        b = (K.Binary) temp;
         b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), KLeftPadded.Location.BINARY_OPERATOR, p));
         b = b.withRight(visitAndCast(b.getRight(), p));
@@ -139,9 +137,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(d, p);
         if (!(temp instanceof K.DestructuringDeclaration)) {
             return temp;
-        } else {
-            d = (K.DestructuringDeclaration) temp;
         }
+        d = (K.DestructuringDeclaration) temp;
         d = d.withInitializer(visitAndCast(d.getInitializer(), p));
         return d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), KContainer.Location.DESTRUCT_ASSIGNMENTS, p));
     }
@@ -175,9 +172,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(l, p);
         if (!(temp instanceof K.ListLiteral)) {
             return temp;
-        } else {
-            l = (K.ListLiteral) temp;
         }
+        l = (K.ListLiteral) temp;
         l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS, p));
         return l.withType(visitType(l.getType(), p));
     }
@@ -205,9 +201,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(pr, p);
         if (!(temp instanceof K.Property)) {
             return temp;
-        } else {
-            pr = (K.Property) temp;
         }
+        pr = (K.Property) temp;
 
         pr = pr.getPadding().withVariableDeclarations(visitRightPadded(pr.getPadding().getVariableDeclarations(), p));
         pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), p));
@@ -221,15 +216,13 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(r, p);
         if (!(temp instanceof K.Return)) {
             return temp;
-        } else {
-            r = (K.Return) temp;
         }
+        r = (K.Return) temp;
         Expression temp2 = (Expression) visitExpression(r, p);
         if (!(temp2 instanceof K.Return)) {
             return temp2;
-        } else {
-            r = (K.Return) temp2;
         }
+        r = (K.Return) temp2;
         r = r.withExpression(visitAndCast(r.getExpression(), p));
         return r.withLabel(visitAndCast(r.getLabel(), p));
     }
@@ -241,9 +234,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(s, p);
         if (!(temp instanceof K.SpreadArgument)) {
             return temp;
-        } else {
-            s = (K.SpreadArgument) temp;
         }
+        s = (K.SpreadArgument) temp;
         return s.withExpression(visitAndCast(s.getExpression(), p));
     }
 
@@ -254,9 +246,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(k, p);
         if (!(temp instanceof K.StringTemplate)) {
             return temp;
-        } else {
-            k = (K.StringTemplate) temp;
         }
+        k = (K.StringTemplate) temp;
         k = k.withStrings(ListUtils.map(k.getStrings(), s -> visit(s, p)));
         return k.withType(visitType(k.getType(), p));
     }
@@ -276,9 +267,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Expression temp = (Expression) visitExpression(k, p);
         if (!(temp instanceof K.This)) {
             return temp;
-        } else {
-            k = (K.This) temp;
         }
+        k = (K.This) temp;
         return k.withType(visitType(k.getType(), p));
     }
 
@@ -289,9 +279,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(t, p);
         if (!(temp instanceof K.TypeAlias)) {
             return temp;
-        } else {
-            t = (K.TypeAlias) temp;
         }
+        t = (K.TypeAlias) temp;
         t = t.withLeadingAnnotations(ListUtils.map(t.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         t = t.withModifiers(ListUtils.map(t.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
@@ -320,15 +309,13 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(u, p);
         if (!(temp instanceof K.Unary)) {
             return temp;
-        } else {
-            u = (K.Unary) temp;
         }
+        u = (K.Unary) temp;
         Expression temp2 = (Expression) visitExpression(u, p);
         if (!(temp2 instanceof K.Unary)) {
             return temp2;
-        } else {
-            u = (K.Unary) temp2;
         }
+        u = (K.Unary) temp2;
         u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p));
         u = u.withExpression(visitAndCast(u.getExpression(), p));
         return u.withType(visitType(u.getType(), p));
@@ -341,9 +328,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(w, p);
         if (!(temp instanceof K.When)) {
             return temp;
-        } else {
-            w = (K.When) temp;
         }
+        w = (K.When) temp;
         w = w.withSelector(visitAndCast(w.getSelector(), p));
         w = w.withBranches(visitAndCast(w.getBranches(), p));
         return w.withType(visitType(w.getType(), p));
@@ -356,9 +342,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         Statement temp = (Statement) visitStatement(w, p);
         if (!(temp instanceof K.WhenBranch)) {
             return temp;
-        } else {
-            w = (K.WhenBranch) temp;
         }
+        w = (K.WhenBranch) temp;
         w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, p));
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
     }

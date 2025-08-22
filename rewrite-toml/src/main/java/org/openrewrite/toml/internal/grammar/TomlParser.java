@@ -154,9 +154,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDocument(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitDocument(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DocumentContext document() throws RecognitionException {
@@ -240,9 +240,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitExpression(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitExpression(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ExpressionContext expression() throws RecognitionException {
@@ -329,9 +329,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitComment(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitComment(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final CommentContext comment() throws RecognitionException {
@@ -378,9 +378,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitKeyValue(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitKeyValue(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final KeyValueContext keyValue() throws RecognitionException {
@@ -430,9 +430,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final KeyContext key() throws RecognitionException {
@@ -491,9 +491,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitSimpleKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitSimpleKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final SimpleKeyContext simpleKey() throws RecognitionException {
@@ -550,9 +550,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitUnquotedKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitUnquotedKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final UnquotedKeyContext unquotedKey() throws RecognitionException {
@@ -594,9 +594,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitQuotedKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitQuotedKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final QuotedKeyContext quotedKey() throws RecognitionException {
@@ -655,9 +655,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDottedKey(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitDottedKey(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DottedKeyContext dottedKey() throws RecognitionException {
@@ -735,9 +735,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitValue(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitValue(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ValueContext value() throws RecognitionException {
@@ -842,9 +842,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitString(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitString(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final StringContext string() throws RecognitionException {
@@ -897,9 +897,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitInteger(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitInteger(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final IntegerContext integer() throws RecognitionException {
@@ -951,9 +951,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitFloatingPoint(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitFloatingPoint(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final FloatingPointContext floatingPoint() throws RecognitionException {
@@ -1003,9 +1003,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitBool(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitBool(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final BoolContext bool() throws RecognitionException {
@@ -1049,9 +1049,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitDateTime(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitDateTime(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DateTimeContext dateTime() throws RecognitionException {
@@ -1102,9 +1102,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitCommentOrNl(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitCommentOrNl(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final CommentOrNlContext commentOrNl() throws RecognitionException {
@@ -1173,9 +1173,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitArray(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitArray(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ArrayContext array() throws RecognitionException {
@@ -1323,9 +1323,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitTable(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitTable(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final TableContext table() throws RecognitionException {
@@ -1397,9 +1397,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitStandardTable(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitStandardTable(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final StandardTableContext standardTable() throws RecognitionException {
@@ -1493,9 +1493,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitInlineTable(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitInlineTable(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final InlineTableContext inlineTable() throws RecognitionException {
@@ -1654,9 +1654,9 @@ public class TomlParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof TomlParserVisitor ) return ((TomlParserVisitor<? extends T>)visitor).visitArrayTable(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof TomlParserVisitor) return ((TomlParserVisitor<? extends T>) visitor).visitArrayTable(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ArrayTableContext arrayTable() throws RecognitionException {

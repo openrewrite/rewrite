@@ -233,51 +233,50 @@ public class Version implements Comparable<Version> {
             int n = this.version.length();
             if (this.index >= n) {
                 return false;
-            } else {
-                int state = -2;
-                int start = this.index;
-                int end = n;
+            }
+            int state = -2;
+            int start = this.index;
+            int end = n;
 
-                for (this.terminatedByNumber = false; this.index < n; ++this.index) {
-                    char c = this.version.charAt(this.index);
-                    if (c == '.' || c == '-' || c == '_') {
-                        end = this.index++;
+            for (this.terminatedByNumber = false; this.index < n; ++this.index) {
+                char c = this.version.charAt(this.index);
+                if (c == '.' || c == '-' || c == '_') {
+                    end = this.index++;
+                    break;
+                }
+
+                int digit = Character.digit(c, 10);
+                if (digit >= 0) {
+                    if (state == -1) {
+                        end = this.index;
+                        this.terminatedByNumber = true;
                         break;
                     }
 
-                    int digit = Character.digit(c, 10);
-                    if (digit >= 0) {
-                        if (state == -1) {
-                            end = this.index;
-                            this.terminatedByNumber = true;
-                            break;
-                        }
-
-                        if (state == 0) {
-                            ++start;
-                        }
-
-                        state = state <= 0 && digit <= 0 ? 0 : 1;
-                    } else {
-                        if (state >= 0) {
-                            end = this.index;
-                            break;
-                        }
-
-                        state = -1;
+                    if (state == 0) {
+                        ++start;
                     }
-                }
 
-                if (end > start) {
-                    this.token = this.version.substring(start, end);
-                    this.number = state >= 0;
+                    state = state <= 0 && digit <= 0 ? 0 : 1;
                 } else {
-                    this.token = "0";
-                    this.number = true;
-                }
+                    if (state >= 0) {
+                        end = this.index;
+                        break;
+                    }
 
-                return true;
+                    state = -1;
+                }
             }
+
+            if (end > start) {
+                this.token = this.version.substring(start, end);
+                this.number = state >= 0;
+            } else {
+                this.token = "0";
+                this.number = true;
+            }
+
+            return true;
         }
 
         @Override

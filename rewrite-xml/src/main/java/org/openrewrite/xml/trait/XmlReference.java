@@ -33,7 +33,8 @@ public abstract class XmlReference implements Reference {
         if (getTree() instanceof Xml.Attribute) {
             Xml.Attribute attribute = (Xml.Attribute) getTree();
             return attribute.getValueAsString();
-        } else if (getTree() instanceof Xml.Tag) {
+        }
+        if (getTree() instanceof Xml.Tag) {
             Xml.Tag tag = (Xml.Tag) getTree();
             if (tag.getValue().isPresent()) {
                 return tag.getValue().get();
@@ -54,7 +55,8 @@ public abstract class XmlReference implements Reference {
             Xml.Attribute attribute = (Xml.Attribute) tree;
             String renamed = renamer.rename(this);
             return attribute.withValue(attribute.getValue().withValue(renamed));
-        } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
+        }
+        if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
             String renamed = renamer.rename(this);
             return ((Xml.Tag) tree).withValue(renamed);
         }

@@ -150,9 +150,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDocument(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitDocument(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DocumentContext document() throws RecognitionException {
@@ -220,9 +220,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProlog(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitProlog(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final PrologContext prolog() throws RecognitionException {
@@ -310,9 +310,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitXmldecl(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitXmldecl(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final XmldeclContext xmldecl() throws RecognitionException {
@@ -376,9 +376,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMisc(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitMisc(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MiscContext misc() throws RecognitionException {
@@ -456,9 +456,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDoctypedecl(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitDoctypedecl(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DoctypedeclContext doctypedecl() throws RecognitionException {
@@ -547,9 +547,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitIntsubset(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitIntsubset(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final IntsubsetContext intsubset() throws RecognitionException {
@@ -632,9 +632,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitMarkupdecl(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitMarkupdecl(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final MarkupdeclContext markupdecl() throws RecognitionException {
@@ -736,9 +736,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitDeclSep(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitDeclSep(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final DeclSepContext declSep() throws RecognitionException {
@@ -779,9 +779,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitExternalid(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitExternalid(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ExternalidContext externalid() throws RecognitionException {
@@ -836,9 +836,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitProcessinginstruction(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitProcessinginstruction(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ProcessinginstructionContext processinginstruction() throws RecognitionException {
@@ -909,9 +909,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitContent(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitContent(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ContentContext content() throws RecognitionException {
@@ -1020,9 +1020,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitElement(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitElement(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ElementContext element() throws RecognitionException {
@@ -1148,9 +1148,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitJspdirective(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitJspdirective(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final JspdirectiveContext jspdirective() throws RecognitionException {
@@ -1215,9 +1215,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitReference(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitReference(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ReferenceContext reference() throws RecognitionException {
@@ -1269,9 +1269,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitAttribute(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitAttribute(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final AttributeContext attribute() throws RecognitionException {
@@ -1318,9 +1318,9 @@ public class XMLParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-			if ( visitor instanceof XMLParserVisitor ) return ((XMLParserVisitor<? extends T>)visitor).visitChardata(this);
-			else return visitor.visitChildren(this);
-		}
+            if (visitor instanceof XMLParserVisitor) return ((XMLParserVisitor<? extends T>) visitor).visitChardata(this);
+            return visitor.visitChildren(this);
+        }
 	}
 
 	public final ChardataContext chardata() throws RecognitionException {

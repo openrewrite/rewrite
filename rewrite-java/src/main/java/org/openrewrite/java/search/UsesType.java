@@ -209,7 +209,8 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         public boolean test(JavaType type) {
             if (type instanceof JavaType.FullyQualified) {
                 return pattern.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
-            } else if (type instanceof JavaType.Primitive) {
+            }
+            if (type instanceof JavaType.Primitive) {
                 return pattern.matcher(((JavaType.Primitive) type).getKeyword()).matches();
             }
             return false;

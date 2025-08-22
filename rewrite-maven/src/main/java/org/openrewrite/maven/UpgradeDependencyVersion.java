@@ -355,15 +355,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
                 if (newerVersion == null) {
                     return null;
-                } else if (isProperty(requestedVersion)) {
+                }
+                if (isProperty(requestedVersion)) {
                     //noinspection unchecked
                     return (TreeVisitor<Xml, ExecutionContext>) new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false)
                             .getVisitor();
-                } else {
-                    Xml.Tag childVersionTag = tag.getChild("version").orElse(null);
-                    if (childVersionTag != null) {
-                        return new ChangeTagValueVisitor<>(childVersionTag, newerVersion);
-                    }
+                }
+                Xml.Tag childVersionTag = tag.getChild("version").orElse(null);
+                if (childVersionTag != null) {
+                    return new ChangeTagValueVisitor<>(childVersionTag, newerVersion);
                 }
                 return null;
             }

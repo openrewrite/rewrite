@@ -257,9 +257,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         protected void validateImport(String typeName) {
             if (StringUtils.isBlank(typeName)) {
                 throw new IllegalArgumentException("Imports must not be blank");
-            } else if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
+            }
+            if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                 throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
-            } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
+            }
+            if (typeName.endsWith(";") || typeName.endsWith("\n")) {
                 throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
             }
         }

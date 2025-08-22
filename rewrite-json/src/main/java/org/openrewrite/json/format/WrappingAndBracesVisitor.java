@@ -117,9 +117,8 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             }
             if (!newPrefixString.equals(prefix.getWhitespace()) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
-            } else {
-                return elem;
             }
+            return elem;
         });
     }
 
@@ -140,9 +139,8 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             }
             if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withAfter(Space.build(newAfter, elem.getAfter().getComments()));
-            } else {
-                return elem;
             }
+            return elem;
         });
     }
 

@@ -74,7 +74,8 @@ public class ChangePropertyValue extends Recipe {
                 boolean trust = Boolean.TRUE.equals(trustParent);
                 if (!trust && !newValue.equals(currentValue)) {
                     return SearchResult.found(document);
-                } else if (trust) {
+                }
+                if (trust) {
                     String myValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
                     if (myValue != null && !myValue.equals(newValue)) {
                         return SearchResult.found(document);

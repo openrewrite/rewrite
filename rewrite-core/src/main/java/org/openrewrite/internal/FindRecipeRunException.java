@@ -43,7 +43,8 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     public @Nullable Tree preVisit(Tree tree, Integer integer) {
         if (nearestTree == null) {
             return null;
-        } else if (tree == nearestTree) {
+        }
+        if (tree == nearestTree) {
             stopAfterPreVisit();
             return Markup.error(tree, vt);
         }

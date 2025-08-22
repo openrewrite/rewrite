@@ -97,7 +97,8 @@ public class InsertDependencyComparator implements Comparator<Content> {
 
         if (classifier1 == null && classifier2 != null) {
             return -1;
-        } else if (classifier1 != null) {
+        }
+        if (classifier1 != null) {
             if (classifier2 == null) {
                 return 1;
             }

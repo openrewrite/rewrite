@@ -268,21 +268,22 @@ public class ImportLayoutStyle implements JavaStyle {
                 return i == starFoldFrom.get() ?
                         finalToAdd /* only add the star import once */ :
                         null;
-            } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
+            }
+            if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
                 if (starFold.get()) {
                     // The added import is always folded, and is the first package occurrence in the imports.
                     if (starFoldFrom.get() == starFoldTo.get()) {
                         return Arrays.asList(finalToAdd, finalAfter);
-                    } else {
-                        return finalAfter;
                     }
-                } else if (isNewBlock.get()) {
+                    return finalAfter;
+                }
+                if (isNewBlock.get()) {
                     return anImport.getElement().isStatic() && !finalToAdd.getElement().isStatic() ?
                             Arrays.asList(finalToAdd, finalAfter) : Arrays.asList(finalAfter, finalToAdd);
-                } else {
-                    return Arrays.asList(finalToAdd, finalAfter);
                 }
-            } else if (i == originalImports.size() - 1 && (finalAfter == null)) {
+                return Arrays.asList(finalToAdd, finalAfter);
+            }
+            if (i == originalImports.size() - 1 && (finalAfter == null)) {
                 return Arrays.asList(anImport, finalToAdd);
             }
             return anImport;
@@ -785,12 +786,11 @@ public class ImportLayoutStyle implements JavaStyle {
         String typeName = anImport.getElement().getTypeName();
         if (anImport.getElement().isStatic()) {
             return typeName;
-        } else {
-            if (typeName.contains("$")) {
-                return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');
-            }
-            return anImport.getElement().getPackageName();
         }
+        if (typeName.contains("$")) {
+            return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');
+        }
+        return anImport.getElement().getPackageName();
     }
 }
 
@@ -893,10 +893,12 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                 .map(block -> {
                     if (block instanceof ImportLayoutStyle.Block.BlankLines) {
                         return "<blank line>";
-                    } else if (block instanceof ImportLayoutStyle.Block.AllOthers) {
+                    }
+                    if (block instanceof ImportLayoutStyle.Block.AllOthers) {
                         return "import " + (((ImportLayoutStyle.Block.AllOthers) block).isStatic() ? "static " : "") +
                                 "all other imports";
-                    } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
+                    }
+                    if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
                         String withSubpackages = importPackage.getPackageWildcard().pattern().contains("[^.]+") ? " without subpackages" : "";
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()

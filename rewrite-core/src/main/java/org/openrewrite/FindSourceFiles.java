@@ -91,7 +91,8 @@ public class FindSourceFiles extends Recipe {
     private static String normalize(String filePattern) {
         if (filePattern.startsWith("./") || filePattern.startsWith(".\\")) {
             return filePattern.substring(2);
-        } else if (filePattern.startsWith("/") || filePattern.startsWith("\\")) {
+        }
+        if (filePattern.startsWith("/") || filePattern.startsWith("\\")) {
             return filePattern.substring(1);
         }
         return filePattern;

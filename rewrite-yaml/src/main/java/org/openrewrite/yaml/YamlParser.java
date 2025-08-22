@@ -509,7 +509,8 @@ public class YamlParser implements org.openrewrite.Parser {
             } else {
                 if (anyOf.contains(c)) {
                     return i;
-                } else if (c == '#') {
+                }
+                if (c == '#') {
                     inComment = true;
                 }
             }
@@ -709,9 +710,9 @@ public class YamlParser implements org.openrewrite.Parser {
                     if (sequenceWithPrefix.getOpeningBracketPrefix() != null) {
                         // For inline sequence, the prefix got already transferred to the left-hand neighbor
                         return super.visitSequence(sequenceWithPrefix.toSequence(), p);
-                    } else {
-                        // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
-                        return super.visitSequence(
+                    }
+                    // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
+                    return super.visitSequence(
                             new Yaml.Sequence(
                                     sequenceWithPrefix.getId(),
                                     sequenceWithPrefix.getMarkers(),
@@ -721,7 +722,6 @@ public class YamlParser implements org.openrewrite.Parser {
                                     sequenceWithPrefix.getAnchor(),
                                     sequenceWithPrefix.getTag()
                             ), p);
-                    }
                 }
                 return super.visitSequence(sequence, p);
             }

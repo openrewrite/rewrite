@@ -205,7 +205,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 if (imp.getTypeName().equals(fullyQualifiedName)) {
                     if (ending.equals(member)) {
                         return ImportStatus.EXPLICITLY_IMPORTED;
-                    } else if ("*".equals(ending)) {
+                    }
+                    if ("*".equals(ending)) {
                         return ImportStatus.IMPLICITLY_IMPORTED;
                     }
                 }
@@ -216,7 +217,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 String impTypeName = imp.getTypeName().replace('$', '.');
                 if (fullyQualifiedName.equals(impTypeName)) {
                     return ImportStatus.EXPLICITLY_IMPORTED;
-                } else if ("*".equals(ending)) {
+                }
+                if ("*".equals(ending)) {
                     String prefix = impTypeName.substring(0, impTypeName.length() - 1);
                     if (fullyQualifiedName.startsWith(prefix) && !fullyQualifiedName.substring(prefix.length()).contains(".")) {
                         return ImportStatus.IMPLICITLY_IMPORTED;

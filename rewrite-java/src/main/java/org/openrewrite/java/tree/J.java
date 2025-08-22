@@ -209,12 +209,12 @@ public interface J extends Tree, RpcCodec<J> {
         public String getSimpleName() {
             if (annotationType instanceof Identifier) {
                 return ((Identifier) annotationType).getSimpleName();
-            } else if (annotationType instanceof J.FieldAccess) {
-                return ((J.FieldAccess) annotationType).getSimpleName();
-            } else {
-                // allow for extending languages like Kotlin to supply a different representation
-                return annotationType.printTrimmed();
             }
+            if (annotationType instanceof J.FieldAccess) {
+                return ((J.FieldAccess) annotationType).getSimpleName();
+            }
+            // allow for extending languages like Kotlin to supply a different representation
+            return annotationType.printTrimmed();
         }
 
         @Nullable
@@ -922,7 +922,8 @@ public interface J extends Tree, RpcCodec<J> {
                 if (parentBlock != null && next instanceof J.Block) {
                     // If we find an outer block before a ClassDeclaration or NewClass, we're not in an initializer block.
                     return false;
-                } else if (next instanceof J.Block) {
+                }
+                if (next instanceof J.Block) {
                     parentBlock = (J.Block) next;
                     if (!parentBlock.getStatements().contains(block)) {
                         return false;
@@ -1074,9 +1075,8 @@ public interface J extends Tree, RpcCodec<J> {
             if (caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
                 //noinspection unchecked
                 return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, (List<J>) (List<?>) expressions)));
-            } else {
-                throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
             }
+            throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
         }
 
         JContainer<J> caseLabels;
@@ -1217,7 +1217,8 @@ public interface J extends Tree, RpcCodec<J> {
             public Case withExpressions(JContainer<Expression> expressions) {
                 if (t.getExpressions() == expressions) {
                     return t;
-                } else if (t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                }
+                if (t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
                     return new Case(t.id, t.prefix, t.markers, t.type, null, expressions, null, t.guard, t.statements, t.body);
                 }
                 throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
@@ -1282,9 +1283,8 @@ public interface J extends Tree, RpcCodec<J> {
             Kind k = getPadding().getKind();
             if (k.type == type) {
                 return this;
-            } else {
-                return getPadding().withKind(k.withType(type));
             }
+            return getPadding().withKind(k.withType(type));
         }
 
         @With
@@ -2144,7 +2144,8 @@ public interface J extends Tree, RpcCodec<J> {
                     !(getName().getType() instanceof JavaType.Unknown) &&
                     TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
                 return true;
-            } else if (!className.contains(".")) {
+            }
+            if (!className.contains(".")) {
                 return false;
             }
             return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
@@ -3935,18 +3936,15 @@ public interface J extends Tree, RpcCodec<J> {
             if (typeParameters == null) {
                 if (annotations.getTypeParameters() == null) {
                     return this;
-                } else {
-                    return annotations.withTypeParameters(null);
                 }
-            } else {
-                TypeParameters currentTypeParameters = annotations.getTypeParameters();
-                if (currentTypeParameters == null) {
-                    return annotations.withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                            null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
-                } else {
-                    return annotations.withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
-                }
+                return annotations.withTypeParameters(null);
             }
+            TypeParameters currentTypeParameters = annotations.getTypeParameters();
+            if (currentTypeParameters == null) {
+                return annotations.withTypeParameters(new TypeParameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        null, typeParameters.stream().map(JRightPadded::build).collect(toList())));
+            }
+            return annotations.withTypeParameters(currentTypeParameters.withTypeParameters(typeParameters));
         }
 
         /**
@@ -4280,9 +4278,8 @@ public interface J extends Tree, RpcCodec<J> {
         public MethodInvocation withDeclaringType(JavaType.FullyQualified type) {
             if (this.methodType == null) {
                 return this;
-            } else {
-                return withMethodType(this.methodType.withDeclaringType(type));
             }
+            return withMethodType(this.methodType.withDeclaringType(type));
         }
 
         @Override

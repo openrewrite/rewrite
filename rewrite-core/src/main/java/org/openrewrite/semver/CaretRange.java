@@ -59,7 +59,8 @@ public class CaretRange extends LatestRelease {
 
         if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
             return Validated.invalid("caretRange", pattern, "not a caret range: nothing can follow a wildcard");
-        } else if ("*".equals(patch) && (matcher.group(4) != null)) {
+        }
+        if ("*".equals(patch) && (matcher.group(4) != null)) {
             return Validated.invalid("caretRange", pattern, "not a caret range: nothing can follow a wildcard");
         }
 

@@ -165,13 +165,13 @@ public class DependencyVersionSelector {
         try {
             if (versionComparator instanceof ExactVersion) {
                 return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
-            } else if (versionComparator instanceof LatestPatch && !Semver.isVersion(gav.getVersion())) {
+            }
+            if (versionComparator instanceof LatestPatch && !Semver.isVersion(gav.getVersion())) {
                 // in the case of "latest.patch", a new version can only be derived if the
                 // current version is a semantic version
                 return null;
-            } else {
-                return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
             }
+            return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
         } catch (IllegalStateException e) {
             // this can happen when we encounter exotic versions
             return null;

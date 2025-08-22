@@ -148,7 +148,8 @@ public class AnnotationTemplateGenerator {
                 after.append("\n@interface $Placeholder {}");
             }
             return;
-        } else if (j instanceof J.ClassDeclaration) {
+        }
+        if (j instanceof J.ClassDeclaration) {
             classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, prior);
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();

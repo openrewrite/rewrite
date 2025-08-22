@@ -96,7 +96,8 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                     m = m.withModifiers(ListUtils.map(m.getModifiers(), (i, mod2) -> {
                         if (i == 0) {
                             return mod2.withPrefix(method.getModifiers().get(0).getPrefix());
-                        } else if (i == 1) {
+                        }
+                        if (i == 1) {
                             return mod2.withPrefix(Space.format(" "));
                         }
                         return mod2;

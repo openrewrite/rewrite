@@ -51,9 +51,8 @@ public class EndOfLineAtEndOfFile extends Recipe {
                 if (!plainText.getText().endsWith("\n")) {
                     if (whitespaceContainsCRLF) {
                         return plainText.withText(plainText.getText() + "\r\n");
-                    } else {
-                        return plainText.withText(plainText.getText() + '\n');
                     }
+                    return plainText.withText(plainText.getText() + '\n');
                 }
                 return sourceFile;
             }

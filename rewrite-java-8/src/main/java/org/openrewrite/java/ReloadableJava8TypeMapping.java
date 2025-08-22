@@ -59,11 +59,14 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
 
         if (type instanceof Type.IntersectionClassType) {
             return intersectionType((Type.IntersectionClassType) type, signature);
-        } else if (type instanceof Type.ClassType) {
+        }
+        if (type instanceof Type.ClassType) {
             return classType((Type.ClassType) type, signature);
-        } else if (type instanceof Type.TypeVar) {
+        }
+        if (type instanceof Type.TypeVar) {
             return generic((Type.TypeVar) type, signature);
-        } else if (type instanceof Type.JCPrimitiveType) {
+        }
+        if (type instanceof Type.JCPrimitiveType) {
             return primitive(type.getTag());
         } else if (type instanceof Type.JCVoidType) {
             return JavaType.Primitive.Void;
@@ -711,7 +714,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
     private Object annotationElementValue(Object value) {
         if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
             return value;
-        } else if (value instanceof Symbol.VarSymbol) {
+        }
+        if (value instanceof Symbol.VarSymbol) {
             JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
             if (mapped != null) {
                 return mapped;

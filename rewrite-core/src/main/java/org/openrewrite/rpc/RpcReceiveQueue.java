@@ -132,9 +132,8 @@ public class RpcReceiveQueue {
                     if (refs.containsKey(ref)) {
                         //noinspection unchecked
                         return (T) refs.get(ref);
-                    } else {
-                        throw new IllegalStateException("Received a reference to an object that was not previously sent: " + ref);
                     }
+                    throw new IllegalStateException("Received a reference to an object that was not previously sent: " + ref);
                 } else {
                     // This is either a new object or a forward declaration with ref
                     before = message.getValueType() == null ?

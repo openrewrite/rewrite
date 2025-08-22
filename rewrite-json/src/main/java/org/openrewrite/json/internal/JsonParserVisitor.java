@@ -241,7 +241,8 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 return new Json.Literal(randomId(), prefix, Markers.EMPTY, source,
                         source.substring(1, source.length() - 1));
             });
-        } else if (ctx.LITERAL() != null) {
+        }
+        if (ctx.LITERAL() != null) {
             return convert(ctx.LITERAL(), (literal, prefix) -> {
                 String source = literal.getText();
                 Object value = null;

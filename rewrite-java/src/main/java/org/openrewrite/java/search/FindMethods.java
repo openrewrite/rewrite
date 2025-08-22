@@ -220,7 +220,8 @@ public class FindMethods extends Recipe {
                                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
                                 if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
                                     return SearchResult.found(method);
-                                } else if (methodMatcher.matches(method.getMethodType())) {
+                                }
+                                if (methodMatcher.matches(method.getMethodType())) {
                                     return SearchResult.found(method);
                                 }
                                 return super.visitMethodDeclaration(method, ctx);

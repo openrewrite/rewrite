@@ -143,7 +143,8 @@ public class JvmTestSuite implements Trait<Statement> {
         for (String suffix : JVM_TEST_SUITE_SUFFIXES) {
             if (configuration.equals(suffix)) {
                 return true;
-            } else if (configuration.equals(name + Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1))) {
+            }
+            if (configuration.equals(name + Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1))) {
                 return true;
             }
         }
@@ -216,24 +217,22 @@ public class JvmTestSuite implements Trait<Statement> {
                     }
 
                     return maybeJvmTestSuite(cursor, (String) literal.getValue());
-                } else {
-                    return maybeJvmTestSuite(cursor, m.getSimpleName());
                 }
-            } else {
-                J.VariableDeclarations variables = cursor.getValue();
-                J.VariableDeclarations.NamedVariable variable = variables.getVariables().get(0);
-
-                if (!(variable.getInitializer() instanceof J.MethodInvocation)) {
-                    return null;
-                }
-
-                J.MethodInvocation initializer = (J.MethodInvocation) variable.getInitializer();
-                if (!"getting".equals(initializer.getSimpleName()) && !"registering".equals(initializer.getSimpleName())) {
-                    return null;
-                }
-
-                return maybeJvmTestSuite(cursor, variable.getSimpleName());
+                return maybeJvmTestSuite(cursor, m.getSimpleName());
             }
+            J.VariableDeclarations variables = cursor.getValue();
+            J.VariableDeclarations.NamedVariable variable = variables.getVariables().get(0);
+
+            if (!(variable.getInitializer() instanceof J.MethodInvocation)) {
+                return null;
+            }
+
+            J.MethodInvocation initializer = (J.MethodInvocation) variable.getInitializer();
+            if (!"getting".equals(initializer.getSimpleName()) && !"registering".equals(initializer.getSimpleName())) {
+                return null;
+            }
+
+            return maybeJvmTestSuite(cursor, variable.getSimpleName());
         }
 
         private @Nullable JvmTestSuite maybeJvmTestSuite(Cursor cursor, String simpleName) {
@@ -301,7 +300,8 @@ public class JvmTestSuite implements Trait<Statement> {
             for (String suffix : JVM_TEST_SUITE_SUFFIXES) {
                 if (configuration.equals(suffix)) {
                     return "main";
-                } else if (configuration.endsWith(Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1))) {
+                }
+                if (configuration.endsWith(Character.toUpperCase(suffix.charAt(0)) + suffix.substring(1))) {
                     return configuration.substring(0, configuration.length() - suffix.length());
                 }
             }

@@ -41,11 +41,14 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         if (type instanceof JavaType.Class) {
             return classSignature(type);
-        } else if (type instanceof JavaType.Array) {
+        }
+        if (type instanceof JavaType.Array) {
             return arraySignature(type);
-        } else if (type instanceof JavaType.Parameterized) {
+        }
+        if (type instanceof JavaType.Parameterized) {
             return parameterizedSignature(type);
-        } else if (type instanceof JavaType.GenericTypeVariable) {
+        }
+        if (type instanceof JavaType.GenericTypeVariable) {
             return genericSignature(type);
         } else if (type instanceof JavaType.Primitive) {
             return primitiveSignature(type);

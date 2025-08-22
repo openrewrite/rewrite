@@ -62,7 +62,8 @@ public class Space {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
-            } else if (whitespace.length() <= 100) {
+            }
+            if (whitespace.length() <= 100) {
                 //noinspection StringOperationCanBeSimplified
                 return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
             }
@@ -91,7 +92,8 @@ public class Space {
         int lastNewline = whitespace.lastIndexOf('\n');
         if (lastNewline >= 0) {
             return whitespace.substring(lastNewline + 1);
-        } else if (lastNewline == whitespace.length() - 1) {
+        }
+        if (lastNewline == whitespace.length() - 1) {
             return "";
         }
         return whitespace;
@@ -149,11 +151,11 @@ public class Space {
     public static Space format(String formatting, int beginIndex, int toIndex) {
         if (beginIndex == toIndex) {
             return Space.EMPTY;
-        } else if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
-            return Space.SINGLE_SPACE;
-        } else {
-            rangeCheck(formatting.length(), beginIndex, toIndex);
         }
+        if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
+            return Space.SINGLE_SPACE;
+        }
+        rangeCheck(formatting.length(), beginIndex, toIndex);
 
         StringBuilder prefix = new StringBuilder();
         StringBuilder comment = new StringBuilder();

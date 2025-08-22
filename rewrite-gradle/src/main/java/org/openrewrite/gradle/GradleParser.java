@@ -93,16 +93,18 @@ public class GradleParser implements Parser {
 
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
-                    Path sourcePath = source.getPath();
-                    if (sourcePath.endsWith("settings.gradle.kts")) {
-                        return kotlinSettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
-                    } else if (sourcePath.endsWith("settings.gradle")) {
-                        return groovySettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
-                    } else if (sourcePath.toString().endsWith(".gradle.kts")) {
-                        return kotlinBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
-                    }
-                    return groovyBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
-                });
+            Path sourcePath = source.getPath();
+            if (sourcePath.endsWith("settings.gradle.kts")) {
+                return kotlinSettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
+            }
+            if (sourcePath.endsWith("settings.gradle")) {
+                return groovySettingsParser.parseInputs(singletonList(source), relativeTo, ctx);
+            }
+            if (sourcePath.toString().endsWith(".gradle.kts")) {
+                return kotlinBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
+            }
+            return groovyBuildParser.parseInputs(singletonList(source), relativeTo, ctx);
+        });
     }
 
     @Override

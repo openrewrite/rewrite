@@ -221,7 +221,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         rawNumber,
                         Double.NaN
                 );
-            } else if (c.INF() != null) {
+            }
+            if (c.INF() != null) {
                 return new Toml.Literal(
                         randomId(),
                         prefix,
@@ -288,7 +289,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         dateTime,
                         dateTime.contains("T") ? OffsetDateTime.parse(dateTime) : OffsetDateTime.parse(dateTime, RFC3339_OFFSET_DATE_TIME)
                 );
-            } else if (c.LOCAL_DATE_TIME() != null) {
+            }
+            if (c.LOCAL_DATE_TIME() != null) {
                 return new Toml.Literal(
                         randomId(),
                         prefix,
@@ -297,7 +299,8 @@ public class TomlParserVisitor extends TomlParserBaseVisitor<Toml> {
                         dateTime,
                         LocalDateTime.parse(dateTime)
                 );
-            } else if (c.LOCAL_DATE() != null) {
+            }
+            if (c.LOCAL_DATE() != null) {
                 return new Toml.Literal(
                         randomId(),
                         prefix,

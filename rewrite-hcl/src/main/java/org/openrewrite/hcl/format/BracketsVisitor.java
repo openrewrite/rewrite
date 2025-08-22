@@ -76,16 +76,14 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
             final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(), ((i, attr) -> {
                 if (!attr.getPrefix().getLastWhitespace().contains("\n")) {
                     return attr.withPrefix(attr.getPrefix().withLastWhitespace("\n"));
-                } else {
-                    return attr;
                 }
+                return attr;
             }));
             return super.visitObjectValue(ov.withArguments(newAttributes), p);
-        } else {
-            final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(),
-                    ((i, attr) -> attr.withPrefix(attr.getPrefix().withWhitespace(" "))));
-            return super.visitObjectValue(ov.withArguments(newAttributes), p);
         }
+        final List<Expression> newAttributes = ListUtils.map(ov.getAttributes(),
+                ((i, attr) -> attr.withPrefix(attr.getPrefix().withWhitespace(" "))));
+        return super.visitObjectValue(ov.withArguments(newAttributes), p);
     }
 
     private boolean isMultiline(final Hcl.ObjectValue ov) {

@@ -142,10 +142,11 @@ public class ChangePropertyValue extends Recipe {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
             return StringUtils.isNullOrEmpty(oldValue) ||
-                   (Boolean.TRUE.equals(regex) ?
-                           Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
-                           scalar.getValue().equals(oldValue));
-        } else if (value instanceof Yaml.Sequence) {
+                    (Boolean.TRUE.equals(regex) ?
+                            Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
+                            scalar.getValue().equals(oldValue));
+        }
+        if (value instanceof Yaml.Sequence) {
             for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) value).getEntries()) {
                 if (matchesOldValue(entry.getBlock())) {
                     return true;

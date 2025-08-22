@@ -85,7 +85,8 @@ public class NamedStyles implements Marker {
     public static @Nullable NamedStyles merge(List<NamedStyles> styles) {
         if (styles.isEmpty()) {
             return null;
-        } else if (styles.size() == 1) {
+        }
+        if (styles.size() == 1) {
             return styles.get(0);
         }
         Set<Class<? extends Style>> styleClasses = new HashSet<>();

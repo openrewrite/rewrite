@@ -41,9 +41,11 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String signature(@Nullable Type type) {
         if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
-        } else if (type instanceof Type.IntersectionClassType) {
+        }
+        if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
-        } else if (type instanceof Type.ClassType) {
+        }
+        if (type instanceof Type.ClassType) {
             try {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
             } catch (Symbol.CompletionFailure ignored) {
@@ -125,9 +127,11 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String classSignature(Object type) {
         if (type instanceof Type.JCVoidType) {
             return "void";
-        } else if (type instanceof Type.JCPrimitiveType) {
+        }
+        if (type instanceof Type.JCPrimitiveType) {
             return primitiveSignature(type);
-        } else if (type instanceof Type.JCNoType) {
+        }
+        if (type instanceof Type.JCNoType) {
             return "{undefined}";
         }
 
@@ -294,9 +298,11 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 }
             }
             return resolvedArgumentTypes.toString();
-        } else if (selectType instanceof Type.ForAll) {
+        }
+        if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
+        }
+        if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
             return "{undefined}";
         }
 

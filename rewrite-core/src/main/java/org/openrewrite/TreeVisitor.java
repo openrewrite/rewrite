@@ -314,7 +314,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     public Markers visitMarkers(@Nullable Markers markers, P p) {
         if (markers == null || markers == Markers.EMPTY) {
             return Markers.EMPTY;
-        } else if (markers.getMarkers().isEmpty()) {
+        }
+        if (markers.getMarkers().isEmpty()) {
             // avoid unnecessary method handle allocation
             return markers;
         }
@@ -368,7 +369,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         if (adaptTo.isAssignableFrom(getClass())) {
             //noinspection unchecked
             return (V) this;
-        } else if (!isAdaptableTo(adaptTo)) {
+        }
+        if (!isAdaptableTo(adaptTo)) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
         return TreeVisitorAdapter.adapt(this, adaptTo);

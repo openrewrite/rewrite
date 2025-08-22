@@ -78,11 +78,13 @@ public class UseHttpsForRepositories extends Recipe {
                         m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                             if (arg instanceof J.Literal) {
                                 return fixupLiteralIfNeeded((J.Literal) arg);
-                            } else if (arg instanceof G.GString) {
+                            }
+                            if (arg instanceof G.GString) {
                                 G.GString garg = (G.GString) arg;
                                 return garg.withStrings(ListUtils.mapFirst(garg.getStrings(),
                                         lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));
-                            } else if (arg instanceof K.StringTemplate) {
+                            }
+                            if (arg instanceof K.StringTemplate) {
                                 K.StringTemplate karg = (K.StringTemplate) arg;
                                 return karg.withStrings(ListUtils.mapFirst(karg.getStrings(),
                                         lit -> lit instanceof J.Literal ? fixupLiteralIfNeeded((J.Literal) lit) : lit));

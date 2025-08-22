@@ -824,7 +824,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                         return m.withArguments(newArgs);
-                    } else if (versionExp instanceof J.Identifier) {
+                    }
+                    if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
                         replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
                     } else if (versionExp instanceof G.GString) {
@@ -891,7 +892,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                         return m.withArguments(newArgs);
-                    } else if (versionExp instanceof J.Identifier) {
+                    }
+                    if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
                         replaceVariableValue(versionVariableName, m, (String) groupLiteral.getValue(), (String) artifactLiteral.getValue());
                     } else if (versionExp instanceof K.StringTemplate) {

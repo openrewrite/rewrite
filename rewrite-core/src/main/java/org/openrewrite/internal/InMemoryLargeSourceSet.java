@@ -107,7 +107,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         if (t == null || t.isEmpty()) {
             //noinspection ConstantConditions
             return this;
-        } else if (ls.isEmpty()) {
+        }
+        if (ls.isEmpty()) {
             //noinspection unchecked
             return withChanges(deletions, (List<SourceFile>) t);
         }

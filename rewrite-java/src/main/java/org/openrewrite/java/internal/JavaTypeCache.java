@@ -97,13 +97,12 @@ public class JavaTypeCache implements Cloneable {
                 if (coder == 0) {
                     // Latin1, use directly
                     return bytes;
-                } else {
-                    // UTF-8: append NUL byte to avoid collisions
-                    byte[] prefixed = new byte[bytes.length + 1];
-                    System.arraycopy(bytes, 0, prefixed, 0, bytes.length);
-                    prefixed[bytes.length] = 0;
-                    return prefixed;
                 }
+                // UTF-8: append NUL byte to avoid collisions
+                byte[] prefixed = new byte[bytes.length + 1];
+                System.arraycopy(bytes, 0, prefixed, 0, bytes.length);
+                prefixed[bytes.length] = 0;
+                return prefixed;
             } catch (Exception ignored) {
             }
         }

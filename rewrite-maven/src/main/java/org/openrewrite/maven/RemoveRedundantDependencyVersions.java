@@ -328,11 +328,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 Objects.requireNonNull(getResolutionResult().getPom().getValue(requestedVersion)));
                 if (comparison < 0) {
                     return comparator == Comparator.LT || comparator == Comparator.LTE;
-                } else if (comparison > 0) {
-                    return comparator == Comparator.GT || comparator == Comparator.GTE;
-                } else {
-                    return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
                 }
+                if (comparison > 0) {
+                    return comparator == Comparator.GT || comparator == Comparator.GTE;
+                }
+                return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
             }
 
             private boolean isExact(String managedVersion) {

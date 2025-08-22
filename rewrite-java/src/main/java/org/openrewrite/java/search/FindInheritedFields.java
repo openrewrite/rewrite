@@ -68,16 +68,18 @@ public class FindInheritedFields {
     private static boolean hasElementTypeAssignable(@Nullable JavaType type, String fullyQualifiedName) {
         if (type instanceof JavaType.Array) {
             return hasElementTypeAssignable(((JavaType.Array) type).getElemType(), fullyQualifiedName);
-        } else if (type instanceof JavaType.Class) {
+        }
+        if (type instanceof JavaType.Class) {
             return TypeUtils.isAssignableTo(JavaType.ShallowClass.build(fullyQualifiedName), type);
-        } else if (type instanceof JavaType.GenericTypeVariable) {
+        }
+        if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
                 if (hasElementTypeAssignable(bound, fullyQualifiedName)) {
                     return true;
                 }
             }
-        } else if(type instanceof JavaType.Parameterized) {
+        } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             return hasElementTypeAssignable(parameterized.getType(), fullyQualifiedName);
         }

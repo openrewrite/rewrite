@@ -56,10 +56,9 @@ public class NormalizeLineBreaksVisitor<P> extends KotlinIsoVisitor<P> {
                 if (c instanceof Javadoc) {
                     c = c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
                     return (Comment) lineBreakJavadocVisitor.visitNonNull((Javadoc) c, 0);
-                } else {
-                    TextComment textComment = (TextComment) c;
-                    c = textComment.withText(normalizeNewLines(textComment.getText(), style.isUseCRLFNewLines()));
                 }
+                TextComment textComment = (TextComment) c;
+                c = textComment.withText(normalizeNewLines(textComment.getText(), style.isUseCRLFNewLines()));
             }
 
             return c.withSuffix(normalizeNewLines(c.getSuffix(), style.isUseCRLFNewLines()));
