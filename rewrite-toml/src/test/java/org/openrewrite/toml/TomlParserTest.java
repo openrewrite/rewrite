@@ -23,12 +23,54 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class TomlParserTest implements RewriteTest {
+
     @Test
-    void keyValueString() {
+    void multiLineString() {
         rewriteRun(
           toml(
             """
-              str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              # Multi-line string with preserved newlines
+              description = ""\"
+              This is a
+              multi-line string
+              with preserved newlines""\"
+              
+              # Multi-line string with escaped newline (line-ending backslash)
+              one-line = ""\"
+              The quick brown \\
+              fox jumps over \\
+              the lazy dog.\\
+              ""\"
+              
+              # Multi-line string containing quotes
+              quotes = ""\"
+              This has a single " quote
+              This has double "" quotes
+              This has escaped \\" quote""\"
+              
+              # Multi-line string with leading newline trimmed
+              trimmed = ""\"
+              First line after opening quotes""\"
+              
+              # Multi-line literal string (no escapes processed)
+              regex = '''
+              \\d{2}-\\d{2}-\\d{4}
+              Line with \\ backslash
+              Line with ' single quote
+              Line with '' two quotes'''
+              
+              # Multi-line literal string with various quotes
+              literal-quotes = '''
+              Single ' quote
+              Double '' quotes
+              Almost ''\\' but not quite'''
+              
+              # Multi-line basic string with escape sequences
+              escaped = ""\"
+              Tab:\\there
+              Newline:\\nhere
+              Quote:\\" Unicode:\\u00E9
+              Backslash:\\\\""\"
               """
           )
         );
