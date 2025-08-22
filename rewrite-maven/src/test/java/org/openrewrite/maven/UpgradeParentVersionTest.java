@@ -39,10 +39,10 @@ class UpgradeParentVersionTest implements RewriteTest {
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
+                .setMavenSettings(new MavenSettings(null, null, null, null, null))
                 .setRepositories(List.of(
                   MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
                 ))
-                .setMavenSettings(new MavenSettings(null, null, null, null, null))
             ),
           pomXml(
             """

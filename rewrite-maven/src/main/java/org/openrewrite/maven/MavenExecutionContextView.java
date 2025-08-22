@@ -93,7 +93,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
+        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration() && !Objects.equals(mavenSettings, getSettings())) {
             return mapMirrors(mavenSettings);
         }
         return getMirrors();
@@ -119,7 +119,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         //Prefer any credentials defined in the mavenSettings passed to this method, but also consider any credentials
         //defined in the context as well.
         List<MavenRepositoryCredentials> credentials = new ArrayList<>();
-        if (mavenSettings != null) {
+        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration()) {
             credentials.addAll(mapCredentials(mavenSettings));
         }
         credentials.addAll(getMessage(MAVEN_CREDENTIALS, emptyList()));
@@ -188,7 +188,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      */
     public List<MavenRepository> getRepositories(@Nullable MavenSettings mavenSettings,
                                                  @Nullable List<String> activeProfiles) {
-        if (mavenSettings != null) {
+        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration()) {
             return mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
         }
         return getMessage(MAVEN_REPOSITORIES, emptyList());

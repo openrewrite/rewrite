@@ -219,6 +219,10 @@ public class MavenSettings {
         return mavenLocal;
     }
 
+    public boolean hasDefinedConfiguration() {
+        return localRepository != null || profiles != null || activeProfiles != null || mirrors != null || servers != null;
+    }
+
     private static String asUriString(final String pathname) {
         return pathname.startsWith("file://") ? pathname : Paths.get(pathname).toUri().toString();
     }
