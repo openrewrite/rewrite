@@ -3,6 +3,9 @@ plugins {
     id("org.openrewrite.build.java8-text-blocks")
 }
 
+group = "org.openrewrite.gradle.tooling"
+description = "A model for extracting semantic information out of Gradle build files necessary for refactoring them."
+
 val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 
 dependencies {
