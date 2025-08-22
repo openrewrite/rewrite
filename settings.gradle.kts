@@ -29,7 +29,7 @@ val allProjects = listOf(
     "rewrite-java-25",
     "rewrite-javascript",
     "rewrite-json",
-//    "rewrite-kotlin", // Pending https://youtrack.jetbrains.com/projects/KT/issues/KT-77518/Kotlin-CLI-JavaVersion.parse-fails-on-25-beta
+    "rewrite-kotlin",
     "rewrite-maven",
     "rewrite-properties",
     "rewrite-protobuf",
