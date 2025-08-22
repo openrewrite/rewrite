@@ -28,7 +28,7 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -256,7 +256,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               s -> {
                   //noinspection DataFlowIssue
                   assertThat(s.getAfter()).isNotNull();
-                  assertThat(s.getAfter().getSourcePath()).isEqualTo(Paths.get("test.txt"));
+                  assertThat(s.getAfter().getSourcePath()).isEqualTo(Path.of("test.txt"));
               }
             ))
             .expectedCyclesThatMakeChanges(1),

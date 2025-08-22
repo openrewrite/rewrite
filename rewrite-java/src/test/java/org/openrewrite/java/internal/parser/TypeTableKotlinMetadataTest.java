@@ -47,8 +47,8 @@ class TypeTableKotlinMetadataTest {
         assertThat(info.getAttributes()).hasSize(3);
 
         // Verify attribute parsing
-        assertThat(info.getAttributes().get(0).getName()).isEqualTo("k");
-        assertThat(info.getAttributes().get(0).getValue()).isEqualTo(1);
+        assertThat(info.getAttributes().getFirst().getName()).isEqualTo("k");
+        assertThat(info.getAttributes().getFirst().getValue()).isEqualTo(1);
 
         assertThat(info.getAttributes().get(1).getName()).isEqualTo("d1");
         Object[] d1Array = (Object[]) info.getAttributes().get(1).getValue();
@@ -78,7 +78,7 @@ class TypeTableKotlinMetadataTest {
         // Create a test case with a very long string that might reproduce the position 3517 error
         StringBuilder longBinaryData = new StringBuilder();
         for (int i = 0; i < 100; i++) {
-            longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
+            longBinaryData.append("\\u").append("%04x".formatted(i % 65536));
         }
 
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";
@@ -95,7 +95,7 @@ class TypeTableKotlinMetadataTest {
         StringBuilder longBinaryData = new StringBuilder();
         // Generate enough data to reach position ~3500
         for (int i = 0; i < 600; i++) {
-            longBinaryData.append("\\u").append(String.format("%04x", i % 65536));
+            longBinaryData.append("\\u").append("%04x".formatted(i % 65536));
         }
 
         String metadataAnnotation = "@Lkotlin/Metadata;(k=I1,d1=[s\"" + longBinaryData + "\"],d2=[s\"Collection\",s\"ExecutableStream\",s\"kotlin-stdlib\"])";

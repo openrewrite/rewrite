@@ -54,7 +54,8 @@ public class ResolvedDependency implements Serializable {
      */
     @NonFinal
     @EqualsAndHashCode.Exclude
-    List<ResolvedDependency> dependencies;
+    @Builder.Default
+    List<ResolvedDependency> dependencies = emptyList();
 
     @Builder.Default
     List<License> licenses = emptyList();

@@ -41,7 +41,6 @@ import org.openrewrite.tree.ParseError;
 
 import java.net.InetAddress;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -1029,7 +1028,7 @@ class MavenParserTest implements RewriteTest {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>

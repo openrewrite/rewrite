@@ -1173,11 +1173,13 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) node;
             Expression selected = (Expression) scan(fieldAccess.selected, Space.EMPTY);
             sourceBefore(".");
+            // Capture any whitespace (including newlines) between the dot and the name
+            String whitespaceAfterDot = whitespaceBeforeAsString();
             cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
                     JLeftPadded.build(new J.Identifier(randomId(),
-                            Space.EMPTY,
+                            Space.build(whitespaceAfterDot, emptyList()),
                             Markers.EMPTY,
                             emptyList(),
                             fieldAccess.name.toString(), null, null)),

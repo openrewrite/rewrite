@@ -28,7 +28,6 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -286,7 +285,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
         if (alreadyExists.get()) {
             return emptyList();
         }
-        Path duplicatePath = Paths.get("duplicate.txt");
+        Path duplicatePath = Path.of("duplicate.txt");
         return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)
