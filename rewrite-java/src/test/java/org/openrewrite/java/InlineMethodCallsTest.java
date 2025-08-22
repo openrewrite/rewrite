@@ -433,4 +433,53 @@ class InlineMethodCallsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void sameArgumentUsedTwice() {
+        //language=java
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MathUtils {
+
+                  public int square(int n) {
+                      return n * n;
+                  }
+
+                  @Deprecated
+                  @InlineMe(replacement = "this.square(x + x)")
+                  public int doubleAndSquare(int x) {
+                      return square(x + x);
+                  }
+
+                  void usage() {
+                      int result = doubleAndSquare(5);
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MathUtils {
+
+                  public int square(int n) {
+                      return n * n;
+                  }
+
+                  @Deprecated
+                  @InlineMe(replacement = "this.square(x + x)")
+                  public int doubleAndSquare(int x) {
+                      return square(x + x);
+                  }
+
+                  void usage() {
+                      int result = square(5 + 5);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
