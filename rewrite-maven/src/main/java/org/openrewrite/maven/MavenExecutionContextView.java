@@ -224,12 +224,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         }
 
         putMessage(MAVEN_SETTINGS, settings);
-        List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
-        setActiveProfiles(effectiveActiveProfiles);
-        setCredentials(mapCredentials(settings));
-        setMirrors(mapMirrors(settings));
-        setLocalRepository(settings.getMavenLocal());
-        setRepositories(mapRepositories(settings, effectiveActiveProfiles));
+        if (settings.getLocalRepository() != null || settings.getProfiles() != null || settings.getActiveProfiles() != null || settings.getMirrors() != null || settings.getServers() != null) {
+            List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
+            setActiveProfiles(effectiveActiveProfiles);
+            setCredentials(mapCredentials(settings));
+            setMirrors(mapMirrors(settings));
+            setLocalRepository(settings.getMavenLocal());
+            setRepositories(mapRepositories(settings, effectiveActiveProfiles));
+        }
 
         return this;
     }

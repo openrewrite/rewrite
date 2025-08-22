@@ -152,19 +152,19 @@ class MavenDependencyFailuresTest implements RewriteTest {
           .snapshots(false).knownToExist(true).build();
 
         rewriteRun(
-          spec -> {
-              var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-              ctx.setLocalRepository(mavenLocal);
-              ctx.setPomCache(new InMemoryMavenPomCache());
-              ctx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
-
-              spec
-                .recipe(updateModel())
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()).setLocalRepository(mavenLocal))
-                .recipeExecutionContext(ctx)
-                .cycles(1)
-                .expectedCyclesThatMakeChanges(1);
-          },
+          spec -> spec
+            .recipe(updateModel())
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setLocalRepository(mavenLocal)
+              .setMavenSettings(new MavenSettings(null, null, null, null, null))
+            )
+            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setLocalRepository(mavenLocal)
+              .setPomCache(new InMemoryMavenPomCache())
+              .setMavenSettings(new MavenSettings(null, null, null, null, null))
+            )
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>

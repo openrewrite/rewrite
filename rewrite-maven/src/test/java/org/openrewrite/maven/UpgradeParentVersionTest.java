@@ -26,7 +26,6 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
-import static org.openrewrite.ExecutionContext.MAVEN_SETTINGS_LOAD_FROM_DISK;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeParentVersionTest implements RewriteTest {
@@ -35,17 +34,16 @@ class UpgradeParentVersionTest implements RewriteTest {
     @Test
     void nonMavenCentralRepository() {
         rewriteRun(
-          spec -> {
-              var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
-              ctx.setRepositories(List.of(
-                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
-              ));
-              ctx.putMessage(MAVEN_SETTINGS_LOAD_FROM_DISK, false);
-
-              spec
-                .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
-                .executionContext(ctx);
-          },
+          spec -> spec
+            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
+            .executionContext(
+              MavenExecutionContextView
+                .view(new InMemoryExecutionContext())
+                .setRepositories(List.of(
+                  MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
+                ))
+                .setMavenSettings(new MavenSettings(null, null, null, null, null))
+            ),
           pomXml(
             """
               <project>
