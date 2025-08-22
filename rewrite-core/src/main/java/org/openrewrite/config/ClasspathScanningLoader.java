@@ -38,7 +38,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 public class ClasspathScanningLoader implements ResourceLoader {
@@ -69,7 +68,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
             scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
             scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
                     properties,
-                    emptyList(),
+                    null,
+                    null,
                     null);
         };
     }
@@ -93,12 +93,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
                             .overrideClassLoaders(classLoader)
                             .acceptPaths("META-INF/rewrite"),
                     properties,
-                    emptyList(),
-                    classLoader);
+                    null,
+                    classLoader,
+                    null);
         };
     }
 
-    public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
+    public ClasspathScanningLoader(Path jar, Properties properties, @Nullable ResourceLoader dependencyResourceLoader, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
 
@@ -109,17 +110,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     .overrideClassLoaders(classLoader), classLoader, jar);
 
             scanYaml(new ClassGraph()
-                    .acceptJars(jar.toFile().getName())
                     .ignoreParentClassLoaders()
                     .overrideClassLoaders(classLoader)
-                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoader, classLoader, jar);
         };
     }
 
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, emptyList(), null);
+                properties, null, null, null);
         return classpathScanningLoader;
     }
 
@@ -132,14 +132,20 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * This must be called _after_ scanClasses or the descriptors of declarative recipes will be missing any
      * non-declarative recipes they depend on that would be discovered by scanClasses
      */
-    private void scanYaml(ClassGraph classGraph, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
+    private void scanYaml(ClassGraph classGraph, Properties properties, @Nullable ResourceLoader dependencyResourceLoader, @Nullable ClassLoader classLoader, @Nullable Path targetJar) {
         try (ScanResult scanResult = classGraph.scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+                if (targetJar == null || isFromJar(res.getClasspathElementURI(), targetJar)) {
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoader));
+                }
+            });
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
+                if (targetJar == null || isFromJar(res.getClasspathElementURI(), targetJar)) {
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoader));
+                }
+            });
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {

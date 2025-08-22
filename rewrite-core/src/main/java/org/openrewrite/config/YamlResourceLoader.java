@@ -58,7 +58,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private final ObjectMapper mapper;
 
-    private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
+    private final @Nullable ResourceLoader dependencyResourceLoader;
 
     @Nullable
     private Map<String, List<Contributor>> contributors;
@@ -115,7 +115,7 @@ public class YamlResourceLoader implements ResourceLoader {
                               URI source,
                               Properties properties,
                               @Nullable ClassLoader classLoader) throws UncheckedIOException {
-        this(yamlInput, source, properties, classLoader, emptyList());
+        this(yamlInput, source, properties, classLoader, null);
     }
 
     /**
@@ -126,15 +126,15 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param source                    Declarative recipe source
      * @param properties                Placeholder properties
      * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
-     * @param dependencyResourceLoaders Optional resource loaders for recipes from dependencies
+     * @param dependencyResourceLoader Optional resource loader for recipes from dependencies
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput,
                               URI source,
                               Properties properties,
                               @Nullable ClassLoader classLoader,
-                              Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
-        this(yamlInput, source, properties, classLoader, dependencyResourceLoaders, jsonMapper -> {
+                              @Nullable ResourceLoader dependencyResourceLoader) throws UncheckedIOException {
+        this(yamlInput, source, properties, classLoader, dependencyResourceLoader, jsonMapper -> {
         });
     }
 
@@ -146,16 +146,16 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param source                    Declarative recipe source
      * @param properties                Placeholder properties
      * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
-     * @param dependencyResourceLoaders Optional resource loaders for recipes from dependencies
+     * @param dependencyResourceLoader Optional resource loader for recipes from dependencies
      * @param mapperCustomizer          Customizer for the ObjectMapper
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties,
                               @Nullable ClassLoader classLoader,
-                              Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                              @Nullable ResourceLoader dependencyResourceLoader,
                               Consumer<ObjectMapper> mapperCustomizer) {
         this.source = source;
-        this.dependencyResourceLoaders = dependencyResourceLoaders;
+        this.dependencyResourceLoader = dependencyResourceLoader;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
         this.recipeLoader = new RecipeLoader(classLoader);
 
@@ -409,7 +409,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         externalRecipes.stream(),
                         internalRecipes.stream()
                 ),
-                dependencyResourceLoaders.stream().flatMap(rl -> rl.listRecipes().stream())
+                dependencyResourceLoader != null ? dependencyResourceLoader.listRecipes().stream() : Stream.empty()
         ).collect(toList());
 
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();

@@ -26,11 +26,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
@@ -347,23 +352,19 @@ public class Environment {
          */
         @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
-            List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
-            for (Path dep : dependencies) {
-                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
+            List<URL> list = new ArrayList<>();
+            for (Path dependency : dependencies) {
+                URI uri = dependency.toUri();
+                try {
+                    list.add(uri.toURL());
+                } catch (MalformedURLException e) {
+                    throw new RuntimeException(e);
+                }
             }
-
-            /*
-             * Second loader creation pass where the firstPassLoaderList is passed as the
-             * dependencyResourceLoaders list to ensure that we can resolve transitive
-             * dependencies using the loaders we just created. This is necessary because
-             * the first pass may have missing recipes since the full list of loaders was
-             * not provided.
-             */
-            List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
-            for (Path dep : dependencies) {
-                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
-            }
-            return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
+            // Single `ClassLoader` representing all dependencies
+            URLClassLoader dependencyClassLoader = new URLClassLoader(list.toArray(new URL[0]), classLoader);
+            ClasspathScanningLoader dependencyLoader = new ClasspathScanningLoader(properties, dependencyClassLoader);
+            return load(new ClasspathScanningLoader(jar, properties, dependencyLoader, classLoader), singletonList(dependencyLoader));
         }
 
         @SuppressWarnings("unused")
