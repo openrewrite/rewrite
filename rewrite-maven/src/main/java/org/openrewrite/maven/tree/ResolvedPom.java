@@ -38,7 +38,6 @@ import org.openrewrite.maven.tree.ManagedDependency.Imported;
 import org.openrewrite.maven.tree.Plugin.Execution;
 
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
@@ -84,7 +83,7 @@ public class ResolvedPom {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
-        this.dependencyManagement = new CopyOnWriteArrayList<>(dependencyManagement);
+        this.dependencyManagement = dependencyManagement;
         this.dependencyManagementSorted = dependencyManagementSorted;
         if (initialRepositories != null) {
             this.initialRepositories = initialRepositories;
@@ -105,6 +104,7 @@ public class ResolvedPom {
     @Builder.Default
     List<ResolvedManagedDependency> dependencyManagement = emptyList();
 
+    // TO-BE-REMOVED(2025-11-30): See comment on `getDependencyManagement()`
     @NonFinal
     @Builder.Default
     @Getter(AccessLevel.NONE)
@@ -140,11 +140,16 @@ public class ResolvedPom {
     List<String> subprojects = emptyList();
 
     // Annotation present to ensure that serialized data is always sorted
+    // TO-BE-REMOVED(2025-11-30): Remove this method and instead do simpler eager sorting in `resolveParentDependenciesRecursively()`.
+    //   This cannot be changed right now, because in older serialized models the data is unsorted.
     @JsonGetter
     public List<ResolvedManagedDependency> getDependencyManagement() {
         if (!dependencyManagementSorted) {
-            dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
-            dependencyManagementSorted = true;
+            // Some use cases require concurrent calls to this method
+            synchronized (this) {
+                dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
+                dependencyManagementSorted = true;
+            }
         }
         return dependencyManagement;
     }
@@ -490,7 +495,7 @@ public class ResolvedPom {
 
             resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
             if (!managedDependencyMap.isEmpty()) {
-                dependencyManagement = new CopyOnWriteArrayList<>(managedDependencyMap.values());
+                dependencyManagement = new ArrayList<>(managedDependencyMap.values());
                 dependencyManagementSorted = false;
             }
         }
