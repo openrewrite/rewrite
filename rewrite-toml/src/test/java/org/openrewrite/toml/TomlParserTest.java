@@ -25,6 +25,17 @@ import static org.openrewrite.toml.Assertions.toml;
 class TomlParserTest implements RewriteTest {
 
     @Test
+    void keyValueString() {
+        rewriteRun(
+          toml(
+            """
+              str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              """
+          )
+        );
+    }
+
+    @Test
     void multiLineString() {
         rewriteRun(
           toml(
