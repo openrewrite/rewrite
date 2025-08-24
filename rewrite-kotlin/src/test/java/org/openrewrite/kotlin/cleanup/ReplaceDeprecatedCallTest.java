@@ -84,7 +84,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
 
                   fun getOrNone(): Option<B> = this
               }
-              
+
               class Usage {
                   fun test(option: Option<String>) {
                       option.orNone()
@@ -101,7 +101,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
 
                   fun getOrNone(): Option<B> = this
               }
-              
+
               class Usage {
                   fun test(option: Option<String>) {
                       option.getOrNone()
@@ -156,7 +156,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
           kotlin(
             """
               import java.time.Duration
-              
+
               class Config {
                   @Deprecated(
                       "Use Duration.ofSeconds instead",
@@ -171,7 +171,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
               """,
             """
               import java.time.Duration
-              
+
               class Config {
                   @Deprecated(
                       "Use Duration.ofSeconds instead",
@@ -240,7 +240,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
 
                   val fullName: String = "John Doe"
               }
-              
+
               class Usage {
                   fun test(person: Person) {
                       println(person.name)
@@ -257,7 +257,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
 
                   val fullName: String = "John Doe"
               }
-              
+
               class Usage {
                   fun test(person: Person) {
                       println(person.fullName)
@@ -278,7 +278,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   ReplaceWith("this.toInt()")
               )
               fun String.convertToInt(): Int = this.toInt()
-              
+
               fun usage() {
                   val result = "42".convertToInt()
               }
@@ -289,7 +289,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   ReplaceWith("this.toInt()")
               )
               fun String.convertToInt(): Int = this.toInt()
-              
+
               fun usage() {
                   val result = "42".toInt()
               }
@@ -417,7 +417,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
             """
               import java.time.Duration
               import java.time.Instant
-              
+
               class Utils {
                   @Deprecated(
                       "Use Duration and Instant directly",
@@ -446,7 +446,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   ReplaceWith("println(message)")
               )
               fun printMessage(message: String) = println(message)
-              
+
               fun main() {
                   printMessage("Hello, World!")
               }
@@ -457,7 +457,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   ReplaceWith("println(message)")
               )
               fun printMessage(message: String) = println(message)
-              
+
               fun main() {
                   println("Hello, World!")
               }
@@ -472,7 +472,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
           kotlin(
             """
               package com.example
-              
+
               class OldApi {
                   @Deprecated(
                       "Use NewApi instead",
@@ -480,11 +480,11 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   )
                   fun handle(data: String): String = NewApi.process(data)
               }
-              
+
               object NewApi {
                   fun process(data: String): String = data
               }
-              
+
               fun usage() {
                   val api = OldApi()
                   api.handle("test")
@@ -492,7 +492,7 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
               """,
             """
               package com.example
-              
+
               class OldApi {
                   @Deprecated(
                       "Use NewApi instead",
@@ -500,11 +500,11 @@ class ReplaceDeprecatedCallTest implements RewriteTest {
                   )
                   fun handle(data: String): String = NewApi.process(data)
               }
-              
+
               object NewApi {
                   fun process(data: String): String = data
               }
-              
+
               fun usage() {
                   val api = OldApi()
                   NewApi.process("test")
