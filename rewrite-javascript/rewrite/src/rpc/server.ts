@@ -29,6 +29,9 @@ import "../java";
 import "../javascript";
 import {Writable} from "node:stream";
 
+// Not possible to set the stack size when executing from npx for security reasons
+require('v8').setFlagsFromString('--stack-size=4000');
+
 interface ProgramOptions {
     port?: number;
     logFile?: string;
@@ -104,12 +107,12 @@ async function main() {
         );
 
         if (options.verbose) {
-            connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
+            await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
                 // Handle any unexpected errors during trace configuration
                 logger.error(`Failed to set trace: ${err}\n`);
             });
         } else {
-            connection.trace(Trace.Off, {} as Tracer);
+            await connection.trace(Trace.Off, {} as Tracer);
         }
 
         connection.onError(err => {

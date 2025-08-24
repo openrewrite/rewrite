@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="node rewrite-rpc" type="ChromiumRemoteDebugType" factoryName="Chromium Remote" port="9229">
+    <method v="2" />
+  </configuration>
+</component>

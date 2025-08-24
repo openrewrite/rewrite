@@ -19,7 +19,6 @@ import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -28,8 +27,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
-import java.nio.file.Path;
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -53,19 +50,12 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               try {
                   PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder(Environment.builder().build())
-                    .nodePath(Path.of("node"))
-                    .installationDirectory(Path.of("./rewrite/dist"))
-//                    .inspectAndBreak()
-//                    .socket(12345)
-                    .timeout(Duration.ofMinutes(10))
-                    .build();
-
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
                   client
                     .traceGetObjectOutput()
                     .traceGetObjectInput(log);
 
-                  assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
+                  assertThat(client.installRecipes(new File("rewrite/dist-test/test/modify-all-trees.js")))
                     .isEqualTo(1);
                   Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -92,5 +82,6 @@ public class JavaToJavaScriptRpcTest {
     @AfterSuite
     static void afterSuite() {
         RecipeSpec.DEFAULTS = RecipeSpec::new;
+        JavaScriptRewriteRpc.shutdownCurrent();
     }
 }

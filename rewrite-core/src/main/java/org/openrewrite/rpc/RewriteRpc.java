@@ -30,6 +30,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.Closeable;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,37 +54,8 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  * Base class for RPC clients with thread-local context support.
  */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc implements AutoCloseable {
-
-    public static Builder<?> from(JsonRpc jsonRpc, Environment marketplace) {
-        //noinspection rawtypes
-        return new Builder(marketplace) {
-            @Override
-            public RewriteRpc build() {
-                return new RewriteRpc(jsonRpc, marketplace, timeout);
-            }
-        };
-    }
-
-    @SuppressWarnings("unchecked")
-    public abstract static class Builder<T extends Builder<T>> {
-        protected final Environment marketplace;
-        protected Duration timeout = Duration.ofMinutes(1);
-
-        protected Builder(Environment marketplace) {
-            this.marketplace = marketplace;
-        }
-
-        public T timeout(Duration timeout) {
-            this.timeout = timeout;
-            return (T) this;
-        }
-
-        public abstract RewriteRpc build();
-    }
-
+public class RewriteRpc implements Closeable {
     private final JsonRpc jsonRpc;
-
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private final Duration timeout;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
@@ -117,9 +89,8 @@ public class RewriteRpc implements AutoCloseable {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    protected RewriteRpc(JsonRpc jsonRpc, Environment marketplace, Duration timeout) {
+    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace, Duration timeout) {
         this.timeout = timeout;
-
         this.jsonRpc = jsonRpc;
 
         Map<String, Recipe> preparedRecipes = new HashMap<>();
@@ -164,8 +135,6 @@ public class RewriteRpc implements AutoCloseable {
         return this;
     }
 
-
-    @Override
     public void close() {
         jsonRpc.shutdown();
     }
@@ -264,7 +233,7 @@ public class RewriteRpc implements AutoCloseable {
         }
 
         if (inputList.isEmpty()) {
-            return Stream.of();
+            return Stream.empty();
         }
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
