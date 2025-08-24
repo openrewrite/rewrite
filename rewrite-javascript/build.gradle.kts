@@ -152,7 +152,7 @@ var npmTestBuild = tasks.register<NpmTask>("npmTestBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(file("rewrite/dist/test/"))
+    outputs.dir(file("rewrite/dist-test/"))
 
     args = listOf("run", "build:test")
 }

@@ -55,7 +55,7 @@ public class JavaToJavaScriptRpcTest {
                     .traceGetObjectOutput()
                     .traceGetObjectInput(log);
 
-                  assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
+                  assertThat(client.installRecipes(new File("rewrite/dist-test/test/modify-all-trees.js")))
                     .isEqualTo(1);
                   Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
