@@ -44,6 +44,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
+    static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
     static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
@@ -276,7 +277,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isTag("project") && PROJECT_MATCHER.matches(getCursor());
     }
 
-    private boolean isTag(String name) {
+    protected boolean isTag(String name) {
         // `XPathMatcher` is still a bit expensive
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
     }
