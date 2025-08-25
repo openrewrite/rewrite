@@ -270,10 +270,6 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return effectiveSettings;
     }
 
-    public boolean hasNoDefinedConfiguration() {
-        return getSettings() == null && getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) && getRepositories().isEmpty() && getActiveProfiles().isEmpty() && getMirrors().isEmpty();
-    }
-
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
         if (settings.getActiveProfiles() == null) {
             return Arrays.asList(activeProfiles);
