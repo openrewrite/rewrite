@@ -139,19 +139,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             if (wrapperUri != null) {
                 return gradleWrapper = GradleWrapper.create(URI.create(wrapperUri), ctx);
             }
-            try {
-                gradleWrapper = GradleWrapper.create(distribution, version, ctx);
-            } catch (Exception e) {
-                // services.gradle.org is unreachable
-                // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
-                // is available from whichever distribution url they were previously using and update the version
-                if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                    return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
-                }
-                throw new IllegalArgumentException(
-                        "Could not reach services.gradle.org. " +
-                        "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
-            }
+            gradleWrapper = GradleWrapper.create(distribution, version);
         }
         return gradleWrapper;
     }
@@ -223,27 +211,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
 
-                        if (gradleWrapper == null) {
-                            getGradleWrapper(ctx);
-                        }
-                        if (StringUtils.isBlank(gradleWrapper.getDistributionUrl()) && !StringUtils.isBlank(version) &&
-                            Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                            String newDownloadUrl = currentDistributionUrl.replace("\\", "")
-                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                            "$1" + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
-                        }
+                        GradleWrapper current = getGradleWrapper(ctx);
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
-                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrapper.getDistributionUrl()) &&
-                            !gradleWrapper.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
-                            String newDownloadUrl = gradleWrapper.getDistributionUrl()
+                        if (StringUtils.isBlank(wrapperUri) && !current.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
+                            String newDownloadUrl = current.getDistributionUrl()
                                     .replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                            wrapperHost + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(gradleWrapper.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
+                                            wrapperHost + current.getVersion() + "$3");
+                            current = gradleWrapper = new GradleWrapper(current.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
                         }
 
-                        if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
+                        if (!current.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;
                         }
                         return entry;

@@ -68,7 +68,7 @@ public class GradleWrapper {
      * Construct a Gradle wrapper from a distribution type and version.
      * Used in contexts where services.gradle.org is available.
      */
-    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version) {
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
@@ -76,14 +76,12 @@ public class GradleWrapper {
         VersionComparator versionComparator = StringUtils.isBlank(version) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
-        GradleVersion gradleVersion = determineGradleVersion(version, versionComparator, distributionType, ctx);
+        GradleWrapperScriptLoader.Version gradleVersion = new GradleWrapperScriptLoader().select(versionComparator);
 
-        try {
-            DistributionInfos infos = DistributionInfos.fetch(distributionType, gradleVersion, ctx);
-            return new GradleWrapper(gradleVersion.version, infos);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        String downloadUrl = distributionType == DistributionType.All ? gradleVersion.getDownloadUrl().replace("-bin.zip", "-all.zip") : gradleVersion.getDownloadUrl();
+        Checksum checksum = Checksum.fromHex("SHA-256", gradleVersion.getChecksum());
+        Checksum wrapperChecksum = StringUtils.isBlank(gradleVersion.getWrapperChecksum()) ? null : Checksum.fromHex("SHA-256", gradleVersion.getWrapperChecksum());
+        return new GradleWrapper(gradleVersion.getVersion(), new DistributionInfos(downloadUrl, checksum, wrapperChecksum));
     }
 
     private static GradleVersion determineGradleVersion(@Nullable String version, VersionComparator versionComparator,
