@@ -140,7 +140,13 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
-        if (this.ctx.getSettings() == null && this.ctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) && this.ctx.getRepositories().isEmpty() && this.ctx.getActiveProfiles().isEmpty() && this.ctx.getMirrors().isEmpty()) {
+        boolean nothingConfigured = this.ctx.getSettings() == null &&
+                this.ctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&
+                this.ctx.getRepositories().isEmpty() &&
+                this.ctx.getActiveProfiles().isEmpty() &&
+                this.ctx.getMirrors().isEmpty();
+        if (nothingConfigured) {
+            // Load Maven settings to pick up any mirrors, proxies etc. that might be required in corporate environments
             this.ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
         }
         this.mavenSettings = this.ctx.getSettings();
