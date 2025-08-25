@@ -98,7 +98,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             @Override
             public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(original, ctx);
-                if (!TypeUtils.isOfClassType(a.getType(), annotationType) || !findMethod(a, attributeName()).isPresent()) {
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType) ||
+                        !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
                     return a;
                 }
 
@@ -340,7 +341,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
-            if (TypeUtils.isAssignableTo("java.lang.String", fa.getType())) {
+            if (!(fa.getTarget() instanceof J.Identifier)) {
                 return oldAttributeValue.equals(fa.toString());
             }
             String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();

@@ -50,9 +50,7 @@ class MavenArtifactDownloaderTest {
 
         MavenParser mavenParser = MavenParser.builder().build();
         SourceFile parsed = mavenParser.parse(ctx,
-          String.format(
-            //language=xml
-            """
+                """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>maven-downloader-test</artifactId>
@@ -65,7 +63,7 @@ class MavenArtifactDownloaderTest {
                       </dependency>
                   </dependencies>
               </project>
-              """.formatted(recipeGav.getGroupId(), recipeGav.getArtifactId(), recipeGav.getVersion()))
+              """.formatted(recipeGav.getGroupId(), recipeGav.getArtifactId(), recipeGav.getVersion()).formatted()
         ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
@@ -76,12 +74,11 @@ class MavenArtifactDownloaderTest {
             if (!("bom".equals(runtimeDependency.getType()))) {
                 assertNotNull(
                   downloader.downloadArtifact(runtimeDependency),
-                  String.format(
-                    "%s:%s:%s:%s failed to download",
-                    runtimeDependency.getGroupId(),
-                    runtimeDependency.getArtifactId(),
-                    runtimeDependency.getVersion(),
-                    runtimeDependency.getType()));
+                        "%s:%s:%s:%s failed to download".formatted(
+                                runtimeDependency.getGroupId(),
+                                runtimeDependency.getArtifactId(),
+                                runtimeDependency.getVersion(),
+                                runtimeDependency.getType()));
             }
         }
     }
@@ -121,12 +118,11 @@ class MavenArtifactDownloaderTest {
             if (!("bom".equals(runtimeDependency.getType()))) {
                 assertNotNull(
                   downloader.downloadArtifact(runtimeDependency),
-                  String.format(
-                    "%s:%s:%s:%s failed to download",
-                    runtimeDependency.getGroupId(),
-                    runtimeDependency.getArtifactId(),
-                    runtimeDependency.getVersion(),
-                    runtimeDependency.getType()));
+                        "%s:%s:%s:%s failed to download".formatted(
+                                runtimeDependency.getGroupId(),
+                                runtimeDependency.getArtifactId(),
+                                runtimeDependency.getVersion(),
+                                runtimeDependency.getType()));
             }
         }
     }

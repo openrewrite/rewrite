@@ -252,4 +252,23 @@ class DeletePropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void retainPrefixAfterDeletedProperty() {
+        rewriteRun(
+          properties(
+            """
+              preserve = foo
+              delete.me = baz
+
+              delete.me.not = bar
+              """,
+            """
+              preserve = foo
+
+              delete.me.not = bar
+              """
+          )
+        );
+    }
 }

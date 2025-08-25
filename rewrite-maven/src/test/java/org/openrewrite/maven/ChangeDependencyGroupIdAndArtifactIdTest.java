@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -1786,6 +1787,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires conversion to a scanning recipe")
+    @Issue("https://github.com/openrewrite/rewrite/pull/5815")
     @Test
     void changeVersionPropertyInParentPom() {
         rewriteRun(

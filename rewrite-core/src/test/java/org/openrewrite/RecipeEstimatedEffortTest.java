@@ -28,7 +28,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.*;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
@@ -224,14 +223,14 @@ class RecipeEstimatedEffortTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-            return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
+            return new CreateFileVisitor(Path.of(relativeFileName), shouldCreate);
         }
 
         @Override
         public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
             if (shouldCreate.get()) {
                 return PlainTextParser.builder().build().parse(fileContents)
-                  .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                  .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Path.of(relativeFileName)))
                   .collect(toList());
             }
             return emptyList();
@@ -239,14 +238,14 @@ class RecipeEstimatedEffortTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
-            Path path = Paths.get(relativeFileName);
+            Path path = Path.of(relativeFileName);
             return new TreeVisitor<SourceFile, ExecutionContext>() {
                 @Override
                 public SourceFile visit(@Nullable Tree tree, ExecutionContext ctx) {
                     SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                     if (Boolean.TRUE.equals(overwriteExisting) && path.equals(sourceFile.getSourcePath())) {
-                        if (sourceFile instanceof PlainText) {
-                            return ((PlainText) sourceFile).withText(fileContents);
+                        if (sourceFile instanceof PlainText text) {
+                            return text.withText(fileContents);
                         }
                         PlainText plainText = PlainText.builder()
                           .id(sourceFile.getId())
