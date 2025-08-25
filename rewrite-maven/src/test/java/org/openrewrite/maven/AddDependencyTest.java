@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -42,12 +43,12 @@ class AddDependencyTest implements RewriteTest {
 
     @Language("java")
     private final String usingGuavaIntMath = """
-          import com.google.common.math.IntMath;
-          public class A {
-              boolean getMap() {
-                  return IntMath.isPrime(5);
-              }
+      import com.google.common.math.IntMath;
+      public class A {
+          boolean getMap() {
+              return IntMath.isPrime(5);
           }
+      }
       """;
 
     @DocumentExample
@@ -1695,6 +1696,236 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @NullSource
+    @ParameterizedTest
+    @ValueSource(strings = { "compile"})
+    void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeProvidedScope(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @NullSource
+    @ParameterizedTest
+    @ValueSource(strings = { "compile"})
+    void addDependencyWithImplicitAndExplicitCompileScopeDoesNotChangeTransitiveProvidedScopeOverride(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.annotation</groupId>
+                            <artifactId>jakarta.annotation-api</artifactId>
+                            <version>2.1.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.annotation</groupId>
+                            <artifactId>jakarta.annotation-api</artifactId>
+                            <version>2.1.1</version>
+                            <scope>provided</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """)
+          )
+        );
+    }
+
+    @NullSource
+    @ParameterizedTest
+    @ValueSource(strings = { "compile"})
+    void addDependencyWithDuplicateDependencyWithImplicitAndExplicitBroaderScopeChangesScopeOfLastDependency(String scope) {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, scope, null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>3.0.0</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithBroaderScopeChangesExistingScopeImplicit() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, null, null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithBroaderScopeChangesExistingScopeExplicit() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, "provided", null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithNarrowerScopeDoesNothing() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("jakarta.annotation", "jakarta.annotation-api", "2.1.1", null, "test", null, null, null, null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.annotation</groupId>
+                          <artifactId>jakarta.annotation-api</artifactId>
+                          <version>2.1.1</version>
+                          <scope>provided</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
