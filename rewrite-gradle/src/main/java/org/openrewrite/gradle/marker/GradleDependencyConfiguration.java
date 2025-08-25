@@ -102,6 +102,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         if (resolutionContext.isResolveRequired()) {
             resolutionContext.resolve();
         }
+        //noinspection ConstantValue
         return directResolved == null ? emptyList() : directResolved;
     }
 
@@ -136,7 +137,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * actually in effect for a given configuration call getAllConstraints()
      */
     @NonFinal
+    @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     List<GradleDependencyConstraint> constraints;
+
+    public List<GradleDependencyConstraint> getConstraints() {
+        return constraints != null ? constraints : emptyList();
+    }
 
     @Nullable // TO-BE-REMOVED(2025-12-31) This annotation and the explicit getter below can be removed in the future
     Map<String, String> attributes;
@@ -216,7 +222,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                         // Since we do not support all possible repositories, fall back on leaving the original resolved dependency in place
                         if (gaToOriginalDirectResolved == null) {
                             gaToOriginalDirectResolved = directResolved.stream()
-                                    .collect(toMap(it -> it.getGav().asGroupArtifact(), it -> it));
+                                    .collect(toMap(it -> it.getGav().asGroupArtifact(), it -> it, GradleDependencyConfiguration::newer));
                         }
                         // If a new dependency was added but could not be resolved there may be no pre-existing resolved dependency available
                         // Add a synthetic resolved dependency so that if a
@@ -234,12 +240,36 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         }
     }
 
+    private static ResolvedDependency newer(ResolvedDependency a, ResolvedDependency b) {
+        if (!Semver.isVersion(a.getVersion()) || !Semver.isVersion(b.getVersion())) {
+            // If we can make no meaningful comparison of version numbers then give up and return _something_
+            return a;
+        }
+        String newer = Semver.max(a.getVersion(), b.getVersion());
+        if (Objects.equals(newer, a.getVersion())) {
+            return a;
+        }
+        return b;
+    }
+
+    private static GradleDependencyConstraint newer(GradleDependencyConstraint a, GradleDependencyConstraint b) {
+        if (!Semver.isVersion(a.approximateEffectiveVersion()) || !Semver.isVersion(b.approximateEffectiveVersion())) {
+            // If we can make no meaningful comparison of version numbers then give up and return _something_
+            return a;
+        }
+        String newer = Semver.max(a.approximateEffectiveVersion(), b.approximateEffectiveVersion());
+        if (Objects.equals(newer, a.approximateEffectiveVersion())) {
+            return a;
+        }
+        return b;
+    }
+
     /**
      * Lists all the constraints in effect for the current configuration, including those constraints inherited from
      * parent configurations.
      */
     List<GradleDependencyConstraint> getAllConstraints() {
-        Set<GradleDependencyConstraint> constraintSet = new LinkedHashSet<>(constraints);
+        Set<GradleDependencyConstraint> constraintSet = constraints != null ? new LinkedHashSet<>(constraints) : new LinkedHashSet<>();
         for (GradleDependencyConfiguration parentConfiguration : allExtendsFrom()) {
             constraintSet.addAll(parentConfiguration.getConstraints());
         }
@@ -386,7 +416,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         if (others == null || others.isEmpty()) {
             return new ArrayList<>(preferred);
         }
-        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it));
+        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it, GradleDependencyConfiguration::newer));
         for (GradleDependencyConstraint lowerPrecedenceConstraint : others) {
             results.putIfAbsent(new GroupArtifact(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
         }
