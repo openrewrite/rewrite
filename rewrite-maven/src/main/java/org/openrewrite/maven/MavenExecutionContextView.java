@@ -93,7 +93,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration() && !Objects.equals(mavenSettings, getSettings())) {
+        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
             return mapMirrors(mavenSettings);
         }
         return getMirrors();
@@ -119,7 +119,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         //Prefer any credentials defined in the mavenSettings passed to this method, but also consider any credentials
         //defined in the context as well.
         List<MavenRepositoryCredentials> credentials = new ArrayList<>();
-        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration()) {
+        if (mavenSettings != null) {
             credentials.addAll(mapCredentials(mavenSettings));
         }
         credentials.addAll(getMessage(MAVEN_CREDENTIALS, emptyList()));
@@ -188,7 +188,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      */
     public List<MavenRepository> getRepositories(@Nullable MavenSettings mavenSettings,
                                                  @Nullable List<String> activeProfiles) {
-        if (mavenSettings != null && mavenSettings.hasDefinedConfiguration()) {
+        if (mavenSettings != null) {
             return mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
         }
         return getMessage(MAVEN_REPOSITORIES, emptyList());
@@ -218,20 +218,35 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_ACTIVE_PROFILES, emptyList());
     }
 
+    /**
+     * Replaces the current Maven execution settings with the provided {@link MavenSettings}.
+     * <p>
+     * This method does <strong>not</strong> merge with or preserve any existing configuration.
+     * All previously configured repositories, mirrors, credentials, active profiles,
+     * and local repository settings will be discarded and replaced entirely with those
+     * derived from the given {@code settings}.
+     * </p>
+     *
+     * <p>If {@code settings} is {@code null}, this call is a no-op and the current
+     * configuration remains unchanged.</p>
+     *
+     * @param settings        the Maven settings to apply; if {@code null}, no changes are made
+     * @param activeProfiles  additional active profiles to consider; these are resolved
+     *                        against the provided settings to determine the effective profiles
+     * @return this execution context view with the updated Maven settings applied
+     */
     public MavenExecutionContextView setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
         if (settings == null) {
             return this;
         }
 
         putMessage(MAVEN_SETTINGS, settings);
-        if (settings.hasDefinedConfiguration()) {
-            List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
-            setActiveProfiles(effectiveActiveProfiles);
-            setCredentials(mapCredentials(settings));
-            setMirrors(mapMirrors(settings));
-            setLocalRepository(settings.getMavenLocal());
-            setRepositories(mapRepositories(settings, effectiveActiveProfiles));
-        }
+        List<String> effectiveActiveProfiles = mapActiveProfiles(settings, activeProfiles);
+        setActiveProfiles(effectiveActiveProfiles);
+        setCredentials(mapCredentials(settings));
+        setMirrors(mapMirrors(settings));
+        setLocalRepository(settings.getMavenLocal());
+        setRepositories(mapRepositories(settings, effectiveActiveProfiles));
 
         return this;
     }
@@ -253,6 +268,10 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
             effectiveSettings = effectiveSettings.merge(mrr.getMavenSettings());
         }
         return effectiveSettings;
+    }
+
+    public boolean hasNoDefinedConfiguration() {
+        return getSettings() == null && getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) && getRepositories().isEmpty() && getActiveProfiles().isEmpty() && getMirrors().isEmpty();
     }
 
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {

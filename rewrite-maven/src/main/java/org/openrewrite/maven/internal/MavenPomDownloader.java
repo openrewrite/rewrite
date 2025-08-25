@@ -139,7 +139,7 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
-        if (this.ctx.getSettings() == null) {
+        if (this.ctx.hasNoDefinedConfiguration()) {
             this.ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
         }
         this.mavenSettings = this.ctx.getSettings();
