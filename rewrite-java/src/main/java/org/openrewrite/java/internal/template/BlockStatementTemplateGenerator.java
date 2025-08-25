@@ -77,7 +77,7 @@ public class BlockStatementTemplateGenerator {
                     if (contextSensitive) {
                         contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after);
+                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after, mode);
                     }
 
                     return before.toString().trim() +
@@ -207,7 +207,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     @SuppressWarnings("DataFlowIssue")
-    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after, JavaCoordinates.Mode mode) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
                 "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
         if (j instanceof J.Lambda && "Object".equals(bindType)) {
@@ -223,13 +223,15 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
+            if (mode == REPLACEMENT && (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void)) {
                 before.append(bindType).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append(bindType).append(" o = ");
+            if (mode == REPLACEMENT) {
+                before.append(bindType).append(" o = ");
+            }
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
