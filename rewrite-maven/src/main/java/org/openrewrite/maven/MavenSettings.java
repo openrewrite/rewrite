@@ -150,6 +150,17 @@ public class MavenSettings {
         }
     }
 
+    /**
+     * @deprecated The concept of property `org.openrewrite.test.readMavenSettingsFromDisk` is no longer in use.
+     *
+     * @return True property `org.openrewrite.test.readMavenSettingsFromDisk` is true, false otherwise.
+     */
+    @Deprecated
+    public static boolean readFromDiskEnabled() {
+        final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
+        return propertyValue != null && !"false".equalsIgnoreCase(propertyValue);
+    }
+
     private static Path userSettingsPath() {
         return Paths.get(System.getProperty("user.home")).resolve(".m2/settings.xml");
     }
