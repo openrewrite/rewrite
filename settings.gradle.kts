@@ -29,6 +29,7 @@ val allProjects = listOf(
     "rewrite-javascript",
     "rewrite-json",
     "rewrite-kotlin",
+    "rewrite-kotlin2",
     "rewrite-maven",
     "rewrite-properties",
     "rewrite-protobuf",
