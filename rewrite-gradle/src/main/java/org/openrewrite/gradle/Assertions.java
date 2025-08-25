@@ -124,7 +124,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
-                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
+                                          Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle.kts");
         spec.accept(gradle);
@@ -174,7 +174,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
-                                                Consumer<SourceSpec<K.CompilationUnit>> spec) {
+                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle.kts");
         spec.accept(gradle);
