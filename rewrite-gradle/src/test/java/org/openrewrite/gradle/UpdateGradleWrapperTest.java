@@ -921,7 +921,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void supportsSemverAgainstJFrogArtifactory() {
         HttpSender customDistributionHost = request -> {
             String url = request.getUrl().toString();
-            if (url.equals("https://company.com/artifactory/api/storage/gradle-distributions")) {
+            if ("https://company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
                 return new HttpSender.Response(200, new ByteArrayInputStream("""
                   {
                     "repo" : "gradle-distributions",
@@ -944,7 +944,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
                   }
                   """.getBytes(StandardCharsets.UTF_8)), () -> {});
-            } else if (url.equals("https://company.com/artifactory/gradle-distributions/gradle-8.8-all.zip")) {
+            } else if ("https://company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
                 });
             }
@@ -984,7 +984,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void supportsSemverAgainstJFrogArtifactoryWithPath() {
         HttpSender customDistributionHost = request -> {
             String url = request.getUrl().toString();
-            if (url.equals("https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions")) {
+            if ("https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions".equals(url)) {
                 return new HttpSender.Response(200, new ByteArrayInputStream("""
                   {
                     "repo" : "gradle-distributions",
@@ -1007,7 +1007,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions"
                   }
                   """.getBytes(StandardCharsets.UTF_8)), () -> {});
-            } else if (url.equals("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip")) {
+            } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
                 });
             }
