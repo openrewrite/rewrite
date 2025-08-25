@@ -288,9 +288,100 @@ class CoalescePropertiesTest implements RewriteTest {
     }
 
     @Test
+    void usingYamlTest() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            //language=yaml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.testing.TestRecipe
+              displayName: Test Recipe
+              description: "Test recipe."
+              recipeList:
+                - org.openrewrite.yaml.CoalesceProperties
+              
+              """,
+            "com.testing.TestRecipe"
+          ),
+          //language=yaml
+          yaml(
+            """
+              dynatrace:
+                info:
+                  application: default
+                  organization: default-org
+                  teams:
+                    group:
+                      another_level:
+                        a:
+                          - email: a@example.com
+                  tags:
+                    - a
+                    - b
+              """,
+            """
+              dynatrace.info:
+                application: default
+                organization: default-org
+                teams.group.another_level.a:
+                  - email: a@example.com
+                tags:
+                  - a
+                  - b
+              """
+          )
+        );
+    }
+
+    @Test
     void exclusion() {
         rewriteRun(
           spec -> spec.recipe(new CoalesceProperties(List.of("$..logging", "$..some"), null)),
+          yaml(
+            """
+              a:
+                first:
+                  logging:
+                    level:
+                      com.company.extern.service: DEBUG
+                      com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """,
+            """
+              a.first:
+                logging:
+                  level:
+                    com.company.extern.service: DEBUG
+                    com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusionUsingYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            //language=yaml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.testing.TestRecipe
+              displayName: Test Recipe
+              description: "Test recipe."
+              recipeList:
+                - org.openrewrite.yaml.CoalesceProperties:
+                    exclusions:
+                      - $..logging
+                      - $..some
+              """,
+            "com.testing.TestRecipe"
+          ),
+          //language=yaml
           yaml(
             """
               a:
@@ -346,9 +437,98 @@ class CoalescePropertiesTest implements RewriteTest {
     }
 
     @Test
+    void applyToUsingYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            //language=yaml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.testing.TestRecipe
+              displayName: Test Recipe
+              description: "Test recipe."
+              recipeList:
+                - org.openrewrite.yaml.CoalesceProperties:
+                    applyTo: ["$..logging", "$..some"]
+              """,
+            "com.testing.TestRecipe"
+          ),
+          //language=yaml
+          yaml(
+            """
+              a:
+                first:
+                  logging:
+                    level:
+                      com.company.extern.service: DEBUG
+                      com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """,
+            """
+              a:
+                first:
+                  logging.level:
+                    com.company.extern.service: DEBUG
+                    com.another.package: INFO
+              some.things.else: value
+              """
+          )
+        );
+    }
+
+    @Test
     void applyToWithExclusion() {
         rewriteRun(
           spec -> spec.recipe(new CoalesceProperties(List.of("$..endpoint"), List.of("$.management2"))),
+          yaml(
+            """
+              management:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              management2:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              """,
+            """
+              management:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              management2:
+                  metrics.enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyToWithExclusionUsingYaml() {
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+              //language=yaml
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: com.testing.TestRecipe
+                displayName: Test Recipe
+                description: "Test recipe."
+                recipeList:
+                  - org.openrewrite.yaml.CoalesceProperties:
+                      exclusions: ["$..endpoint"]
+                      applyTo:
+                        - $.management2
+                """,
+              "com.testing.TestRecipe"
+            ),
+          //language=yaml
           yaml(
             """
               management:

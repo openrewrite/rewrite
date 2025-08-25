@@ -34,13 +34,15 @@ public class CoalesceProperties extends Recipe {
 
     @Option(displayName = "Exclusions",
             description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
-            example = "$..[org.springframework.security]")
+            example = "$..[org.springframework.security]",
+            required = false)
     List<String> exclusions;
 
     @Option(displayName = "Apply to",
             description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions that specify which keys the recipe should target only. " +
                     "Only the properties matching these expressions will be unfolded.",
-            example = "$..[org.springframework.security]")
+            example = "$..[org.springframework.security]",
+            required = false)
     List<String> applyTo;
 
     public CoalesceProperties() {
