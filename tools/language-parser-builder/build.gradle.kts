@@ -1,3 +1,14 @@
+buildscript {
+    configurations.all {
+        resolutionStrategy {
+            eachDependency {
+                if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-compiler-embeddable") {
+                    useTarget("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.10")
+                }
+            }
+        }
+    }
+}
 plugins {
     id("org.openrewrite.build.language-library") version("latest.release")
 }
