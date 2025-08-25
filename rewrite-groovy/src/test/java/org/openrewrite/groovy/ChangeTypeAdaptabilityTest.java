@@ -118,6 +118,23 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
+    @Test
+    void clashingNamesShouldKeeFqn() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.A", "x.y.A", true)),
+          groovy(
+            """
+              class A implements a.b.A {
+              }
+              """,
+            """
+              class A implements x.y.A {
+              }
+              """
+          )
+        );
+    }
+
     @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
     @SuppressWarnings("DataFlowIssue")
