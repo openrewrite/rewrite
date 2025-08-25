@@ -17,45 +17,25 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
-import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
-
 public class Assertions {
 
     private Assertions() {
-    }
-
-    static void customizeExecutionContext(ExecutionContext ctx) {
-        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        boolean nothingConfigured = mctx.getSettings() == null &&
-                                    mctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&
-                                    mctx.getRepositories().isEmpty() &&
-                                    mctx.getActiveProfiles().isEmpty() &&
-                                    mctx.getMirrors().isEmpty();
-        if (nothingConfigured) {
-            // Load Maven settings to pick up any mirrors, proxies etc. that might be required in corporate environments
-            mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
-        }
     }
 
     private static final Parser.Builder gradleParser = GradleParser.builder()
@@ -107,8 +87,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("build.gradle"));
         spec.accept(gradle);
         return gradle;
@@ -121,8 +100,7 @@ public class Assertions {
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                           Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle");
         spec.accept(gradle);
         return gradle;
@@ -134,8 +112,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("build.gradle.kts"));
         spec.accept(gradle);
         return gradle;
@@ -147,9 +124,8 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
-                                          Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle.kts");
         spec.accept(gradle);
         return gradle;
@@ -161,8 +137,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("settings.gradle"));
         spec.accept(gradle);
         return gradle;
@@ -175,8 +150,7 @@ public class Assertions {
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                              Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle");
         spec.accept(gradle);
         return gradle;
@@ -188,8 +162,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("settings.gradle.kts"));
         spec.accept(gradle);
         return gradle;
@@ -201,9 +174,8 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
-                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+                                                Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle.kts");
         spec.accept(gradle);
         return gradle;
