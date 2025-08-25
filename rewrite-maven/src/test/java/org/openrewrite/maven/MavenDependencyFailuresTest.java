@@ -94,7 +94,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
-              assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
             """
               <project>
@@ -256,9 +256,9 @@ class MavenDependencyFailuresTest implements RewriteTest {
               """,
             spec -> spec
               .afterRecipe(after -> {
-                  Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                  assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
-              })
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
+            })
           )
         );
     }
@@ -342,8 +342,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .matches(deps -> deps.size() == 1)
                 .extracting(deps -> deps.getFirst())
                 .matches(dep -> "org.jvnet.staxex".equals(dep.getGroupId()) &&
-                                "stax-ex".equals(dep.getArtifactId()) &&
-                                "1.0".equals(dep.getVersion()))))
+                  "stax-ex".equals(dep.getArtifactId()) &&
+                  "1.0".equals(dep.getVersion()))))
         );
     }
 
