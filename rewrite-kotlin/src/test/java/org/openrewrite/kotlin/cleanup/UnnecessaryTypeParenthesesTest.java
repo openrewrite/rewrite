@@ -46,7 +46,6 @@ class UnnecessaryTypeParenthesesTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void lambdaParentheses() {
         rewriteRun(

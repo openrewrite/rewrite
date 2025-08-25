@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -24,22 +25,26 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class UsesFieldTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(toRecipe(() -> new UsesField<>("java.util.Collections", "EMPTY_LIST")));
+    }
+
     @DocumentExample
     @Test
     void staticFieldAccess() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesField<>("java.util.Collections", "EMPTY_LIST"))),
           java(
             """
               import java.util.Collections;
-              
+
               class T {
                   Object o = Collections.EMPTY_LIST;
               }
               """,
             """
               /*~~>*/import java.util.Collections;
-              
+
               class T {
                   Object o = Collections.EMPTY_LIST;
               }
@@ -51,18 +56,17 @@ class UsesFieldTest implements RewriteTest {
     @Test
     void staticImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesField<>("java.util.Collections", "EMPTY_LIST"))),
           java(
             """
               import static java.util.Collections.EMPTY_LIST;
-              
+
               class T {
                   Object o = EMPTY_LIST;
               }
               """,
             """
               /*~~>*/import static java.util.Collections.EMPTY_LIST;
-              
+
               class T {
                   Object o = EMPTY_LIST;
               }
@@ -74,7 +78,6 @@ class UsesFieldTest implements RewriteTest {
     @Test
     void noImportStaticField() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesField<>("java.util.Collections", "EMPTY_LIST"))),
           java(
             """
               class T {

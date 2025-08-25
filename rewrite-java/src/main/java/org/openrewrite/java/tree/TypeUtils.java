@@ -779,7 +779,7 @@ public class TypeUtils {
     }
 
     private static boolean isWildcard(JavaType type) {
-        return type instanceof JavaType.GenericTypeVariable && ((JavaType.GenericTypeVariable) type).getName().equals("?");
+        return type instanceof JavaType.GenericTypeVariable && "?".equals(((JavaType.GenericTypeVariable) type).getName());
     }
 
     private static boolean isPseudoType(@Nullable JavaType type) {
@@ -836,7 +836,7 @@ public class TypeUtils {
         } catch (Exception e) {
             return false;
         }
-        return to.equals("java.lang.Object");
+        return "java.lang.Object".equals(to);
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
@@ -1120,7 +1120,7 @@ public class TypeUtils {
             return base + joiner;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
-            if (!genericType.getName().equals("?")) {
+            if (!"?".equals(genericType.getName())) {
                 return genericType.getName();
             } else if (genericType.getVariance() == JavaType.GenericTypeVariable.Variance.INVARIANT ||
                     genericType.getBounds().size() != 1) { // Safe check, wildcards don't allow additional bounds

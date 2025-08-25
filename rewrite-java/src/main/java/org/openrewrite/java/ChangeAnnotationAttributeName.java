@@ -86,7 +86,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
                                 return assignment.withVariable(variable.withSimpleName(newAttributeName));
                             }
                         }
-                    } else if (oldAttributeName.equals("value") && !(arg instanceof J.Empty)) {
+                    } else if ("value".equals(oldAttributeName) && !(arg instanceof J.Empty)) {
                         J.Identifier name = new J.Identifier(randomId(), arg.getPrefix(), Markers.EMPTY, emptyList(), newAttributeName, arg.getType(), null);
                         return new J.Assignment(randomId(), EMPTY, arg.getMarkers(), name, new JLeftPadded<>(SINGLE_SPACE, arg.withPrefix(SINGLE_SPACE), Markers.EMPTY), arg.getType());
                     }

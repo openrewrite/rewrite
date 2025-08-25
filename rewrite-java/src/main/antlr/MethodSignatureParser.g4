@@ -12,8 +12,13 @@ formalParametersPattern
 
 formalsPattern
     :    dotDot (COMMA SPACE* formalsPatternAfterDotDot)* 
-    |    optionalParensTypePattern (COMMA SPACE* formalsPattern)* 
+    |    wildcard (COMMA SPACE* formalsPattern)*
+    |    optionalParensTypePattern (COMMA SPACE* formalsPattern)*
     |    formalTypePattern ELLIPSIS
+    ;
+
+wildcard
+    :   WILDCARD
     ;
 
 dotDot

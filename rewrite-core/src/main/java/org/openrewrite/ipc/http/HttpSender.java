@@ -31,6 +31,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
 
+import static java.util.Collections.emptyMap;
+
 /**
  * A general-purpose interface for controlling how components perform HTTP calls for various purposes.
  * This interface can be used to inject more advanced customization like SSL verification, key loading,
@@ -418,7 +420,7 @@ public interface HttpSender {
         private final Runnable onClose;
 
         public Response(int code, @Nullable InputStream body, Runnable onClose) {
-            this(code, body, Collections.emptyMap(), onClose);
+            this(code, body, emptyMap(), onClose);
         }
 
         public Response(int code, @Nullable InputStream body, Map<String, List<String>> headers, Runnable onClose) {

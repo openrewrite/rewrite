@@ -70,8 +70,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
           .beforeRecipe(withToolingApi());
     }
 
-    @Test
     @DocumentExample("Update existing Gradle wrapper")
+    @Test
     void updateWrapper() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
@@ -774,8 +774,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2651")
+    @Test
     void updateWithCustomDistributionUri() {
         HttpSender customDistributionHost = request -> {
             if (request.getUrl().toString().contains("company.com")) {
@@ -861,7 +861,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
-                Path subdir = Paths.get("subdir");
+                Path subdir = Path.of("subdir");
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
                 assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);

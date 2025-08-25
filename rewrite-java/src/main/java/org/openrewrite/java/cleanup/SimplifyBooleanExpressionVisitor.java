@@ -24,7 +24,7 @@ import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
+import static java.util.Collections.emptyList;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
     @Override
@@ -302,7 +302,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j.getMarkers(),
                 value,
                 String.valueOf(value),
-                Collections.emptyList(),
+                emptyList(),
                 JavaType.Primitive.Boolean);
     }
 

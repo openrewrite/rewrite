@@ -240,6 +240,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
+                        if (cursor.getValue() instanceof J.Block) {
+                            return cursor.getParentOrThrow().getValue() instanceof JavaSourceFile;
+                        }
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
 

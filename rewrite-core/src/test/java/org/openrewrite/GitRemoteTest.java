@@ -20,9 +20,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.net.URI;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
@@ -37,21 +37,21 @@ public class GitRemoteTest {
       git@github.com:1org/1repo.git, github.com, 1org/1repo, 1org, 1repo
       git@github.com:1234/1repo.git, github.com, 1234/1repo, 1234, 1repo
       ssh://github.com/org/repo.git, github.com, org/repo, org, repo
-      
+
       https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
       https://gitlab.com/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       git@gitlab.com:group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       ssh://git@gitlab.com:22/group/subgroup/subergroup/subestgroup/repo.git, gitlab.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      
+
       https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
       git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
       git@bitbucket.org:1PRJ/repo.git, bitbucket.org, 1PRJ/repo, 1PRJ, repo
       ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
-      
+
       https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       https://dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
       git@ssh.dev.azure.com:v3/org/project/repo, dev.azure.com, org/project/repo, org/project, repo
-      
+
       https://github.com/group/repo with spaces, github.com, group/repo with spaces, group, repo with spaces
       """)
     void parseKnownRemotes(String cloneUrl, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
@@ -69,7 +69,7 @@ public class GitRemoteTest {
       https://scm.company.com:1234/stash/scm/org/repo.git, scm.company.com:1234/stash/scm, org/repo, org, repo
       git@scm.company.com:stash/org/repo.git, scm.company.com/stash, org/repo, org, repo
       ssh://scm.company.com/stash/org/repo, scm.company.com/stash, org/repo, org, repo
-      
+
       https://scm.company.com:1234/very/long/context/path/org/repo.git, scm.company.com:1234/very/long/context/path, org/repo, org, repo
       git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, org/repo, org, repo
       """)
@@ -93,11 +93,11 @@ public class GitRemoteTest {
       ssh://scm.company.com/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
       ssh://scm.company.com:22/stash/org/repo, scm.company.com/stash, Bitbucket, scm.company.com/stash, org/repo, org, repo
       ssh://scm.company.com:7999/stash/org/repo, ssh://scm.company.com:7999/stash, Bitbucket, scm.company.com:7999/stash, org/repo, org, repo
-      
+
       https://scm.company.com/very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, scm.company.com/very/long/context/path, org/repo, org, repo
       https://scm.company.com:1234/very/long/context/path/org/repo.git, https://scm.company.com:1234/very/long/context/path, Bitbucket, scm.company.com:1234/very/long/context/path, org/repo, org, repo
       git@scm.company.com:very/long/context/path/org/repo.git, scm.company.com/very/long/context/path, Bitbucket, scm.company.com/very/long/context/path, org/repo, org, repo
-      
+
       https://scm.company.com/group/subgroup/subergroup/subestgroup/repo, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       https://scm.company.com:1234/group/subgroup/subergroup/subestgroup/repo, https://scm.company.com:1234, GitLab, scm.company.com:1234, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       git@scm.company.com/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
@@ -105,7 +105,7 @@ public class GitRemoteTest {
       https://scm.company.com:443/group/subgroup/subergroup/subestgroup/repo.git, scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       ssh://scm.company.com:22/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com, GitLab, scm.company.com, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       ssh://scm.company.com:222/group/subgroup/subergroup/subestgroup/repo.git, ssh://scm.company.com:222, GitLab, scm.company.com:222, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
-      
+
       https://scm.company.com/very/long/context/path/group/subgroup/subergroup/subestgroup/repo, scm.company.com/very/long/context/path, GitLab, scm.company.com/very/long/context/path, group/subgroup/subergroup/subestgroup/repo, group/subgroup/subergroup/subestgroup, repo
       """)
     void parseRegisteredRemote(String cloneUrl, String originToRegister, GitRemote.Service service, String expectedOrigin, String expectedPath, String expectedOrganization, String expectedRepositoryName) {
@@ -153,17 +153,17 @@ public class GitRemoteTest {
       ssh://github.com/org/repo.git, ssh://github.com/org/repo
       github.com:org/repo.git, ssh://github.com/org/repo
       github.com/org/repo.git, https://github.com/org/repo
-      
+
       https://github.com/org/repo/, https://github.com/org/repo
       ssh://github.com/org/repo/, ssh://github.com/org/repo
-      
+
       https://github.com:443/org/repo.git, https://github.com/org/repo
       ssh://github.com:22/org/repo.git, ssh://github.com/org/repo
       github.com:org/repo.git, ssh://github.com/org/repo
-      
+
       https://github.com:8443/org/repo, https://github.com:8443/org/repo
       ssh://github.com:8022/org/repo, ssh://github.com:8022/org/repo
-      
+
       https://scm.company.com/very/long/context/path/org/repo.git, https://scm.company.com/very/long/context/path/org/repo
       ssh://scm.company.com/very/long/context/path/org/repo.git, ssh://scm.company.com/very/long/context/path/org/repo
       scm.company.com:very/long/context/path/org/repo.git, ssh://scm.company.com/very/long/context/path/org/repo
@@ -185,14 +185,14 @@ public class GitRemoteTest {
       GitHub, github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
       GitHub, https://github.com, org/repo, https, https://github.com/org/repo.git
       GitHub, https://github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
-      
+
       GitLab, gitlab.com, group/subgroup/repo, https, https://gitlab.com/group/subgroup/repo.git
       GitLab, gitlab.com, group/subgroup/repo, ssh, ssh://git@gitlab.com/group/subgroup/repo.git
       AzureDevOps, dev.azure.com, org/project/repo, https, https://dev.azure.com/org/project/_git/repo
       AzureDevOps, dev.azure.com, org/project/repo, ssh, ssh://git@ssh.dev.azure.com/v3/org/project/repo
       BitbucketCloud, bitbucket.org, org/repo, https, https://bitbucket.org/org/repo.git
       BitbucketCloud, bitbucket.org, org/repo, ssh, ssh://git@bitbucket.org/org/repo.git
-      
+
       Bitbucket, scm.company.com/context/bitbucket, org/repo, https, https://scm.company.com/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com/context/bitbucket, org/repo, http, http://scm.company.com/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com/context/bitbucket, org/repo, ssh, ssh://git@scm.company.com:7999/context/bitbucket/org/repo.git
@@ -201,10 +201,10 @@ public class GitRemoteTest {
       GitLab, scm.company.com/context/gitlab, group/subgroup/repo, https, https://scm.company.com/context/gitlab/group/subgroup/repo.git
       GitLab, scm.company.com:8443/context/gitlab, group/subgroup/repo, https, https://scm.company.com:8443/context/gitlab/group/subgroup/repo.git
       GitLab, scm.company.com/context/gitlab, group/subgroup/repo, ssh, ssh://git@scm.company.com:8022/context/gitlab/group/subgroup/repo.git
-      
+
       Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
-      
+
       Unknown, scm.unregistered.com/context/path/, org/repo, https, https://scm.unregistered.com/context/path/org/repo.git
       Unknown, scm.unregistered.com/context/path/, org/repo, ssh, ssh://scm.unregistered.com/context/path/org/repo.git
       """)
@@ -246,7 +246,7 @@ public class GitRemoteTest {
     @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
+          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);

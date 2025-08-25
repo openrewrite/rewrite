@@ -90,7 +90,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
@@ -232,7 +232,7 @@ public class KotlinParser implements Parser {
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), Collections.emptyMap());
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList(), emptyMap());
             } else {
                 sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
                         typeCache, false);
@@ -316,7 +316,7 @@ public class KotlinParser implements Parser {
          */
         public Builder addClasspathEntry(Path entry) {
             if (classpath.isEmpty()) {
-                classpath = Collections.singletonList(entry);
+                classpath = singletonList(entry);
             } else if (!classpath.contains(entry)) {
                 classpath = new ArrayList<>(classpath);
                 classpath.add(entry);

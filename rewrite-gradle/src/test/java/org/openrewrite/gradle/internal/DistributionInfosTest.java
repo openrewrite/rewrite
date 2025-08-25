@@ -24,7 +24,6 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
-import java.io.IOException;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DistributionInfosTest {
 
     @Test
-    void fetch() throws IOException {
+    void fetch() throws Exception {
         HttpSender httpSender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
 
         GradleWrapper.GradleVersion gradleVersion = new GradleWrapper.GradleVersion(

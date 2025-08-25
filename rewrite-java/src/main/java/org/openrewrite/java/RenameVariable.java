@@ -88,6 +88,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     it instanceof SourceFile).getValue() instanceof Javadoc.Parameter) {
                 return ident;
             }
+
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
@@ -126,6 +127,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 }
             }
             return super.visitIdentifier(ident, p);
+        }
+
+        @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if (fieldAccess.getType() instanceof JavaType.Parameterized &&
+                    ((JavaType.Parameterized) fieldAccess.getType()).getType() instanceof JavaType.Class) {
+                return fieldAccess; // Avoid renaming `Foo` in `Foo.class`
+            }
+            return super.visitFieldAccess(fieldAccess, p);
         }
 
         @Override

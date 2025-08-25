@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.rpc.request;
+@NonNullApi
+package org.openrewrite.gradle.toolingapi;
 
-import org.openrewrite.rpc.RpcObjectData;
-
-import java.util.ArrayList;
-
-public class GetRefResponse extends ArrayList<RpcObjectData> {
-}
+import org.gradle.api.NonNullApi;

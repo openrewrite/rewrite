@@ -162,8 +162,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/798")
     @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/798")
     @Test
     void unwrapExpr() {
         rewriteRun(
@@ -879,8 +879,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("SimplifiableConditionalExpression")
+    @Test
     void ternaryCondition() {
         rewriteRun(
           java(
@@ -932,8 +932,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail("Not implemented yet")
+    @Test
     void unwrapBinaryInIf() {
         rewriteRun(
           //language=java
@@ -981,8 +981,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
 
     @Nested
     class DoNotUnwrap {
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3913")
+        @Test
         void negatedAssignment() {
             rewriteRun(
               java(

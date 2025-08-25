@@ -33,7 +33,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -78,8 +77,7 @@ public class DependencyConstraintToRule extends Recipe {
                 }
                 cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
                 cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                cu = (JavaSourceFile) new MaybeRemoveDependencyBlock(cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                return cu;
+                return new MaybeRemoveDependencyBlock().visitNonNull(cu, ctx);
             }
         });
     }
@@ -388,8 +386,7 @@ public class DependencyConstraintToRule extends Recipe {
                             .map(J.MethodInvocation.class::cast)
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    cu = cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
-                    return cu;
+                    return cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
                 } else {
                     K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
                     assert cu != null;
@@ -397,14 +394,14 @@ public class DependencyConstraintToRule extends Recipe {
                     int insertionIndex = 0;
                     while (insertionIndex < block.getStatements().size()) {
                         Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSimpleName().equals("dependencies")) {
+                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
                             break;
                         }
                         insertionIndex++;
                     }
                     J.MethodInvocation m = GradleParser.builder()
                             .build()
-                            .parseInputs(Collections.singletonList(
+                            .parseInputs(singletonList(
                                     new Parser.Input(
                                             Paths.get("build.gradle.kts"),
                                             () -> new ByteArrayInputStream(
@@ -432,23 +429,19 @@ public class DependencyConstraintToRule extends Recipe {
                             })))
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
                     final int finalInsertionIndex = insertionIndex;
-                    cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
+                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
                         if (arg == block) {
                             return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
                         }
                         return arg;
                     }));
-                    return cu;
                 }
             }
             return super.visit(tree, ctx);
         }
     }
 
-    @Value
     static class MaybeRemoveDependencyBlock extends JavaIsoVisitor<ExecutionContext> {
-        boolean isKotlinDsl;
-
         @Override
         public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -460,7 +453,7 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
-        if (!m.getSimpleName().equals("dependencies")) {
+        if (!"dependencies".equals(m.getSimpleName())) {
             return false;
         }
         if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -483,7 +476,7 @@ public class DependencyConstraintToRule extends Recipe {
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                        (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
+                        (value instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) value).getSimpleName())));
         if (!(c.getValue() instanceof J.MethodInvocation)) {
             return false;
         }
@@ -493,7 +486,7 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     private static boolean isInBuildscriptBlock(Cursor c) {
-        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("buildscript")));
+        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) value).getSimpleName())));
         return maybeBuildscript.getValue() != Cursor.ROOT_VALUE;
     }
 

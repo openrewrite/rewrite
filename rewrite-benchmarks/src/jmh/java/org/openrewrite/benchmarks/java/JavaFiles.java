@@ -23,8 +23,9 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.nCopies;
 
 @State(Scope.Benchmark)
 public class JavaFiles {
@@ -41,7 +42,7 @@ public class JavaFiles {
 
         sourceFiles = new ArrayList<>(100);
         // to add some "meat to the bones"
-        String whitespace = String.join("", Collections.nCopies(1_000, " "));
+        String whitespace = String.join("", nCopies(1_000, " "));
         for (int i = 0; i < 100; i++) {
             Path path = test.resolve("Test" + i + ".java");
             Files.writeString(path, "package test; class Test%d {%s}".formatted(i, whitespace));
