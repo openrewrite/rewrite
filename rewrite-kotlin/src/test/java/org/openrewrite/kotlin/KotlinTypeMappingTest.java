@@ -631,19 +631,21 @@ class KotlinTypeMappingTest {
 
         @CsvSource(value = {
           // Method type on overload with no named arguments.
-          "foo(\"\", 1, true)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
+          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
           // Method type on overload with named arguments.
-          "foo(b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.Int,kotlin.Boolean]}",
+          "foo(b = 1)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.Int,kotlin.Boolean]}",
           // Method type when named arguments are declared out of order.
-          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}",
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}",
           // Method type with trailing lambda
-          "foo(b = 1, noDefault = true) {}~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
+          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
         }, delimiter = '~')
         @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
             rewriteRun(
               kotlin(
                 """
+                  package org.example
+                  
                   fun <T> foo(b: T, c: Boolean = true) {
                       foo("", b, true, c) {}
                   }
@@ -656,7 +658,7 @@ class KotlinTypeMappingTest {
                       %s
                   }
                   """.formatted(invocation), spec -> spec.afterRecipe(cu -> {
-                    MethodMatcher matcher = new MethodMatcher("* foo(..)");
+                    MethodMatcher matcher = new MethodMatcher("*..* foo(..)");
                     AtomicBoolean methodFound = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
@@ -670,7 +672,14 @@ class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (matcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo(methodType);
+                                assertThat(method.getMethodType()).satisfies(m -> {
+                                    assertThat(m.toString()).isEqualTo(methodType);
+                                    assertThat(m.getDeclaringType())
+                                      .satisfies(it -> {
+                                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile0Kt");
+                                          assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("foo", "foo", "foo", "m");
+                                      });
+                                });
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);

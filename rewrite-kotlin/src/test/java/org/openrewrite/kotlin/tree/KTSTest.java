@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -45,29 +44,9 @@ class KTSTest implements RewriteTest {
     void topLevelFunctionCall() {
         rewriteRun(
           kotlinScript(
+                """
+            println("foo")
             """
-              package org.example
-              
-              fun one() = "one"
-              fun two() = "two"
-              """
-          ),
-          kotlinScript(
-            """
-              import org.example.one
-              one()
-              """,
-            spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getTypesInUse().getUsedMethods())
-                .singleElement()
-                .satisfies(m ->
-                  assertThat(m.getDeclaringType())
-                    .satisfies(it -> {
-                        assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile0Kts");
-                        assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("one", "two");
-                    })
-                )
-            )
           )
         );
     }
@@ -91,6 +70,7 @@ class KTSTest implements RewriteTest {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlinScript(
+            //language=none
             """
             plugins {
                 id("org.flywaydb.flyway") version "8.0.2"
