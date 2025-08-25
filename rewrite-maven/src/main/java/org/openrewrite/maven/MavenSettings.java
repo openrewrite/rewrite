@@ -150,12 +150,6 @@ public class MavenSettings {
         }
     }
 
-
-    public static boolean readFromDiskEnabled() {
-        final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
-        return propertyValue != null && !"false".equalsIgnoreCase(propertyValue);
-    }
-
     private static Path userSettingsPath() {
         return Paths.get(System.getProperty("user.home")).resolve(".m2/settings.xml");
     }

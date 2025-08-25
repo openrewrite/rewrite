@@ -53,7 +53,6 @@ import java.util.regex.Pattern;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
-import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
@@ -140,19 +139,10 @@ public class MavenPomDownloader {
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
-        boolean nothingConfigured = this.ctx.getSettings() == null &&
-                this.ctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&
-                this.ctx.getRepositories().isEmpty() &&
-                this.ctx.getActiveProfiles().isEmpty() &&
-                this.ctx.getMirrors().isEmpty();
-        if (nothingConfigured) {
-            // Load Maven settings to pick up any mirrors, proxies etc. that might be required in corporate environments
-            this.ctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(ctx));
-        }
         this.mavenSettings = this.ctx.getSettings();
         this.mavenCache = this.ctx.getPomCache();
-        this.addCentralRepository = !Boolean.FALSE.equals(this.ctx.getAddCentralRepository());
-        this.addLocalRepository = !Boolean.FALSE.equals(this.ctx.getAddLocalRepository());
+        this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
         this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 
