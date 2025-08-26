@@ -143,18 +143,18 @@ val npmPack = tasks.register<Tar>("npmPack") {
     destinationDirectory = layout.buildDirectory.dir("distributions")
 }
 
-var npmTestBuild = tasks.register<NpmTask>("npmTestBuild") {
+val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
     inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(npmRunBuild)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("rewrite/test"))
+    inputs.files(fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(file("rewrite/dist-test/"))
+    outputs.dir(file("rewrite/dist-fixtures/"))
 
-    args = listOf("run", "build:test")
+    args = listOf("run", "build:fixtures")
 }
 
 testing {
@@ -165,7 +165,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        dependsOn(npmTestBuild)
+                        dependsOn(npmRunBuild, npmFixturesBuild)
                     }
                 }
             }
@@ -177,8 +177,8 @@ testing {
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
                 implementation("org.assertj:assertj-core:latest.release")
-                implementation("org.junit.platform:junit-platform-suite-api:latest.release")
-                runtimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
+                implementation("org.junit.platform:junit-platform-suite-api")
+                runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
         }
     }

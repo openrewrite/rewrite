@@ -9,7 +9,7 @@ module.exports = {
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.test.json', // Adjust if your tsconfig file is named or located differently
+      tsconfig: 'tsconfig.json'
     }],
   },
   testMatch: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],

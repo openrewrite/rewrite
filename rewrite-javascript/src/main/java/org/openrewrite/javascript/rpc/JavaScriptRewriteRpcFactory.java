@@ -25,10 +25,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.Objects;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -48,6 +46,7 @@ public interface JavaScriptRewriteRpcFactory {
         private @Nullable Path log;
         private Duration timeout = Duration.ofSeconds(30);
         private boolean trace = false;
+        private boolean verboseLogging = true;
         private @Nullable Integer inspectBrk;
 
         /**
@@ -67,6 +66,20 @@ public interface JavaScriptRewriteRpcFactory {
         public Builder log(@Nullable Path log) {
             this.log = log;
             return this;
+        }
+
+        /**
+         * Enables info and debug level logging.
+         *
+         * @return This builder.
+         */
+        public Builder verboseLogging(boolean verboseLogging) {
+            this.verboseLogging = verboseLogging;
+            return this;
+        }
+
+        public Builder verboseLogging() {
+            return verboseLogging(true);
         }
 
         public Builder timeout(Duration timeout) {
@@ -107,7 +120,8 @@ public interface JavaScriptRewriteRpcFactory {
             String pkg = "--package=@openrewrite/rewrite@" + StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
             String[] cmd = Stream.of(
                     npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-rpc",
-                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize()
+                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    verboseLogging ? "--verbose" : null
             ).filter(Objects::nonNull).toArray(String[]::new);
 
             System.out.println(String.join(" ", cmd));

@@ -17,14 +17,16 @@ package org.openrewrite.javascript.rpc;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptParser;
-import org.openrewrite.javascript.internal.rpc.JavaScriptRewriteRpcManager;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
@@ -43,11 +45,26 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
-    JavaScriptRewriteRpc client = JavaScriptRewriteRpcManager.getOrStart();
+    JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
+
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void before() {
+        Path logFile = tempDir.resolve("rpc.log");
+        System.out.println("file://" + logFile);
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpcFactory.builder(Environment.builder().build())
+          .log(logFile)
+          .verboseLogging()
+//          .inspectBrk()
+//          .trace(true)
+          .build());
+    }
 
     @AfterEach
     void after() {
-        JavaScriptRewriteRpc.shutdownCurrent();
+//        JavaScriptRewriteRpc.shutdownCurrent();
     }
 
     @Override
@@ -62,7 +79,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(JavaScriptRewriteRpcManager.getOrStart().prepareRecipe("org.openrewrite.example.npm.change-version",
+            .recipe(JavaScriptRewriteRpc.getOrStart().prepareRecipe("org.openrewrite.example.npm.change-version",
               Map.of("version", "1.0.0")))
             .expectedCyclesThatMakeChanges(1),
           json(
@@ -85,7 +102,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void printJava() {
-        assertThat(client.installRecipes(new File("rewrite/dist-test/test/modify-all-trees.js")))
+        assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
           .isEqualTo(1);
         Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -225,7 +242,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist-test/test/example-recipe.js");
+        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
         assertThat(client.installRecipes(exampleRecipes)).isGreaterThan(0);
     }

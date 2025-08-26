@@ -85,7 +85,6 @@ public class JavaScriptRewriteRpcProcess extends Thread {
         module.addDeserializer(Path.class, new PathDeserializer());
         JsonMessageFormatter formatter = new JsonMessageFormatter(module);
         MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, inputStream, outputStream);
-
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }

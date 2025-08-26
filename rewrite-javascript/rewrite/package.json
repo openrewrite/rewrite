@@ -18,11 +18,11 @@
     "./test": "./dist/test/index.js"
   },
   "scripts": {
-    "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
-    "postbuild": "echo '#!/usr/bin/env node' | cat - dist/rpc/server.js > temp && mv temp dist/rpc/server.js && chmod +x dist/rpc/server.js && npm link",
+    "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
+    "postbuild": "chmod +x dist/rpc/server.js && npm link",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run build && jest",
-    "build:test": "tsc --build tsconfig.test.json",
+    "build:fixtures": "tsc --build tsconfig.fixtures.json",
     "ci:test": "jest",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
