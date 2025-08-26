@@ -25,6 +25,8 @@ recipeList:
   - org.openrewrite.maven.OrderPomElements
   - org.openrewrite.maven.RemoveDuplicateDependencies
   - org.openrewrite.maven.RemoveRedundantDependencyVersions
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      onlyIfValuesMatch: true
   - org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
   - org.openrewrite.maven.UpdateScmFromGitOrigin
 ---

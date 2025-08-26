@@ -520,7 +520,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             packageDecl = new J.Package(randomId(), packagePrefix, Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
         }
-
         return new J.CompilationUnit(
                 randomId(),
                 fmt,
@@ -912,10 +911,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
+                ((JCIdent) jcSelect).sym;
 
         return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, genericSymbol));
+                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
     }
 
     @Override
@@ -1701,9 +1701,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
-        if (t == null) {
-            return null;
-        }
         return convert(t, suffix, j -> Markers.EMPTY);
     }
 
@@ -1942,9 +1939,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
-                        sym.getDeclarationAttributes().stream()
-                                .map(c -> c.type.toString())
-                                .anyMatch(ReloadableJava8ParserVisitor::isLombokAnnotationType);
+                sym.getDeclarationAttributes().stream()
+                        .map(a -> a.type.toString())
+                        .anyMatch(ReloadableJava8ParserVisitor::isLombokAnnotationType);
     }
 
     private static boolean isLombokAnnotationType(String name) {

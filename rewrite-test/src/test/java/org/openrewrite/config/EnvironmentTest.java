@@ -23,7 +23,7 @@ import org.openrewrite.text.PlainText;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
@@ -95,7 +95,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -201,7 +201,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -251,7 +251,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
