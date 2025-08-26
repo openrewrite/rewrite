@@ -119,8 +119,16 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         } else {
                             otherMethodsAndFieldsInTypeUsed.add(method.getName());
                         }
-                    } else if (declaringType.endsWith(".kt") || declaringType.endsWith(".kts")) { // Kotlin top level function
-                        // TODO: <something>
+                    } else if (declaringType.endsWith("Kt") || declaringType.endsWith("Kts")) { // Kotlin top level function
+                        for (JavaType.Method m : method.getDeclaringType().getMethods()) {
+                            if (m.getDeclaringType().getOwningClass() != null) {
+                                String declaringDeclaringType = m.getDeclaringType().getOwningClass().getFullyQualifiedName() + "." + m.getName();
+                                if (fullyQualifiedNamesAreEqual(declaringDeclaringType, types)) {
+                                    methodsAndFieldsUsed.add(method.getName());
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -155,8 +163,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 }
 
                 String typeName = import_.getTypeName();
-                if (import_.isStatic()) {
-                    String imported = import_.getQualid().getSimpleName();
+                String imported = import_.getQualid().getSimpleName();
+                if (import_.isStatic() || (isKotlin && !"*".equals(imported))) {
                     if (fullyQualifiedNamesAreEqual(typeName + "." + imported, types) && (force || !methodsAndFieldsUsed.contains(imported))) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
                         spaceForNextImport.set(import_.getPrefix());
