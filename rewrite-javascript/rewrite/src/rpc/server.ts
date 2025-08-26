@@ -27,8 +27,10 @@ import "../json";
 import "../java";
 import "../javascript";
 
+process.exit(16);
+
 // Not possible to set the stack size when executing from npx for security reasons
-require('v8').setFlagsFromString('--stack-size=4000');
+// require('v8').setFlagsFromString('--stack-size=4000');
 
 interface ProgramOptions {
     logFile?: string;
@@ -131,7 +133,7 @@ async function main() {
     // log uncaught exceptions
     process.on('uncaughtException', (error) => {
         logger.error('Fatal error:' + error.message);
-        process.exit(1);
+        process.exit(8);
     });
 }
 

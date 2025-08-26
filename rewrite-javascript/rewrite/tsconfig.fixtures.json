@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "outDir": "./dist-fixtures",
+    "rootDir": "./fixtures",
+    "paths": {
+      "@openrewrite/rewrite": [
+        "./dist/index"
+      ],
+      "@openrewrite/rewrite/*": [
+        "./dist/*"
+      ]
+    }
+  },
+  "include": [
+    "fixtures/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ]
+}

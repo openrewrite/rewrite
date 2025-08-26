@@ -102,7 +102,7 @@ tasks.named("check") {
     dependsOn(npmTest)
 }
 
-val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
+val npmBuild = tasks.register<NpmTask>("npmBuild") {
     inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
@@ -118,15 +118,14 @@ val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
     }
 
     args = listOf("run", "build")
-
 }
 
 tasks.named("assemble") {
-    dependsOn(npmRunBuild)
+    dependsOn(npmBuild)
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
-    from(npmRunBuild) {
+    from(npmBuild) {
         into("package/dist/src/")
     }
     from(npmVersion) {
@@ -148,7 +147,7 @@ val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(npmRunBuild)
+    inputs.files(npmBuild)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -165,7 +164,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        dependsOn(npmRunBuild, npmFixturesBuild)
+                        dependsOn(npmBuild, npmFixturesBuild)
                     }
                 }
             }

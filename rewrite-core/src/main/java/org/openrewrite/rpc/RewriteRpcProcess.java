@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.rpc;
+package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -32,12 +32,17 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
-public class JavaScriptRewriteRpcProcess extends Thread {
+import static org.openrewrite.internal.StringUtils.readFully;
+
+/**
+ * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
+ */
+public class RewriteRpcProcess extends Thread {
     private final String[] command;
     private final boolean trace;
 
@@ -48,20 +53,46 @@ public class JavaScriptRewriteRpcProcess extends Thread {
     @Getter
     private JsonRpc rpcClient;
 
-    public JavaScriptRewriteRpcProcess(boolean trace, String... command) {
+    public RewriteRpcProcess(boolean trace, String... command) {
         this.trace = trace;
         this.command = command;
+        this.setName("JavaScriptRewriteRpcProcess");
         this.setDaemon(false);
     }
 
     @Override
     public void run() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(command);
-            process = pb.start();
+            process = new ProcessBuilder(command).start();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    public @Nullable RuntimeException getLivenessCheck() {
+        if (process != null && !process.isAlive()) {
+            int exitCode = process.exitValue();
+            String errorOutput = "", stdOutput = "";
+
+            // Read any remaining output from the process
+            try (InputStream errorStream = process.getErrorStream();
+                 InputStream inputStream = process.getInputStream()) {
+                errorOutput = readFully(errorStream);
+                stdOutput = readFully(inputStream);
+            } catch (IOException | UnsupportedOperationException e) {
+                // Ignore errors reading final output
+            }
+
+            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            if (!stdOutput.isEmpty()) {
+                message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
+            }
+            if (!errorOutput.isEmpty()) {
+                message += "\nError output:\n  " + errorOutput.replace("\n", "\n  ");
+            }
+            return new IllegalStateException(message.trim());
+        }
+        return null;
     }
 
     @Override
@@ -76,19 +107,35 @@ public class JavaScriptRewriteRpcProcess extends Thread {
             }
         }
 
-        this.rpcClient = createRpcClient(this.process.getInputStream(), this.process.getOutputStream(), trace);
-    }
-
-    private static JsonRpc createRpcClient(InputStream inputStream, OutputStream outputStream, boolean trace) {
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
         module.addDeserializer(Path.class, new PathDeserializer());
         JsonMessageFormatter formatter = new JsonMessageFormatter(module);
-        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter, inputStream, outputStream);
+        MessageHandler handler = new HeaderDelimitedMessageHandler(formatter,
+                process.getInputStream(), process.getOutputStream());
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        return new JsonRpc(handler);
+        this.rpcClient = new JsonRpc(handler);
+    }
+
+    public void shutdown() {
+        if (process != null && process.isAlive()) {
+            process.destroy();
+            try {
+                boolean exited = process.waitFor(5, TimeUnit.SECONDS);
+                if (!exited) {
+                    process.destroyForcibly();
+                    process.waitFor(2, TimeUnit.SECONDS);
+                }
+                int exitCode = process.exitValue();
+                if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
+                    throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private static class PathSerializer extends JsonSerializer<Path> {

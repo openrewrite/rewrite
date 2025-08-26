@@ -18,6 +18,7 @@ package org.openrewrite.rpc;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
+import io.moderne.jsonrpc.JsonRpcSuccess;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
@@ -30,23 +31,25 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.Closeable;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
@@ -54,10 +57,11 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  * Base class for RPC clients with thread-local context support.
  */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc implements Closeable {
+public class RewriteRpc {
     private final JsonRpc jsonRpc;
     private final AtomicInteger batchSize = new AtomicInteger(200);
-    private final Duration timeout;
+    private Duration timeout = Duration.ofSeconds(30);
+    private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
     private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
     private @Nullable PrintStream traceFile;
 
@@ -89,8 +93,7 @@ public class RewriteRpc implements Closeable {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace, Duration timeout) {
-        this.timeout = timeout;
+    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
 
         Map<String, Recipe> preparedRecipes = new HashMap<>();
@@ -120,6 +123,16 @@ public class RewriteRpc implements Closeable {
         jsonRpc.bind();
     }
 
+    public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
+        this.livenessCheck = livenessCheck;
+        return this;
+    }
+
+    public RewriteRpc timeout(Duration timeout) {
+        this.timeout = timeout;
+        return this;
+    }
+
     public RewriteRpc batchSize(int batchSize) {
         this.batchSize.set(batchSize);
         return this;
@@ -135,7 +148,7 @@ public class RewriteRpc implements Closeable {
         return this;
     }
 
-    public void close() {
+    public void shutdown() {
         jsonRpc.shutdown();
     }
 
@@ -334,7 +347,7 @@ public class RewriteRpc implements Closeable {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
+        remoteObjects.put(id, requireNonNull(remoteObject));
         localObjects.put(id, remoteObject);
 
         //noinspection unchecked
@@ -343,13 +356,40 @@ public class RewriteRpc implements Closeable {
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         try {
-            // TODO handle error
-            return jsonRpc
-                    .send(JsonRpcRequest.newRequest(method, body))
-                    .get(timeout.getSeconds(), TimeUnit.SECONDS)
-                    .getResult(responseType);
-        } catch (ExecutionException | TimeoutException | InterruptedException e) {
+            checkLiveness();
+
+            // Send the request and get the future
+            CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+
+            // Poll for completion while checking if process is alive
+            long totalTimeoutMs = timeout.toMillis();
+            long checkIntervalMs = 500; // Check every 500ms
+            long elapsedMs = 0;
+
+            while (elapsedMs < totalTimeoutMs) {
+                try {
+                    // Try to get the result with a short timeout
+                    return future.get(checkIntervalMs, TimeUnit.MILLISECONDS).getResult(responseType);
+                } catch (TimeoutException e) {
+                    checkLiveness();
+                    elapsedMs += checkIntervalMs;
+                    // Continue waiting if process is still alive and we haven't hit total timeout
+                }
+            }
+
+            // If we get here, we've hit the total timeout
+            throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
+        } catch (ExecutionException | InterruptedException e) {
+            // Check if process crashed during the request
+            checkLiveness();
             throw new RuntimeException(e);
+        }
+    }
+
+    private void checkLiveness() {
+        RuntimeException livenessProblem = livenessCheck.get();
+        if (livenessProblem != null) {
+            throw livenessProblem;
         }
     }
 

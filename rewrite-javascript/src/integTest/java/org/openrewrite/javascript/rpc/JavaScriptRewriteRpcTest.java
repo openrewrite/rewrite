@@ -45,7 +45,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
-    JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
+    JavaScriptRewriteRpc client;
 
     @TempDir
     Path tempDir;
@@ -54,17 +54,18 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void before() {
         Path logFile = tempDir.resolve("rpc.log");
         System.out.println("file://" + logFile);
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpcFactory.builder(Environment.builder().build())
-          .log(logFile)
-          .verboseLogging()
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder(Environment.builder().build())
+            .log(logFile)
+            .verboseLogging()
 //          .inspectBrk()
 //          .trace(true)
-          .build());
+        );
+        client = JavaScriptRewriteRpc.getOrStart();
     }
 
     @AfterEach
     void after() {
-//        JavaScriptRewriteRpc.shutdownCurrent();
+        JavaScriptRewriteRpc.shutdownCurrent();
     }
 
     @Override
@@ -79,7 +80,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         installRecipes();
         rewriteRun(
           spec -> spec
-            .recipe(JavaScriptRewriteRpc.getOrStart().prepareRecipe("org.openrewrite.example.npm.change-version",
+            .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
               Map.of("version", "1.0.0")))
             .expectedCyclesThatMakeChanges(1),
           json(
@@ -160,9 +161,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         // language=javascript
         String source = "const two = 1 + 1";
 
-        SourceFile cu = JavaScriptParser.builder().build()
-          .parseInputs(List.of(Parser.Input.fromString(
-            Path.of("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().orElseThrow();
+        SourceFile cu = JavaScriptParser.builder().build().parseInputs(List.of(Parser.Input.fromString(
+          Path.of("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().orElseThrow();
 
         new JavaIsoVisitor<Integer>() {
             @Override

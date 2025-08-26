@@ -34,7 +34,6 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.time.Duration;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
@@ -53,16 +52,16 @@ class JavaSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env, Duration.ofSeconds(10))
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env, Duration.ofSeconds(10))
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
           .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        server.close();
-        client.close();
+        server.shutdown();
+        client.shutdown();
     }
 
     @Override

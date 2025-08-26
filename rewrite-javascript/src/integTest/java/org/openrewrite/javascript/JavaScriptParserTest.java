@@ -26,7 +26,6 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.config.Environment;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
-import org.openrewrite.javascript.rpc.JavaScriptRewriteRpcFactory;
 import org.openrewrite.javascript.tree.JS;
 
 import java.io.IOException;
@@ -44,10 +43,9 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpcFactory
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc
           .builder(Environment.builder().build())
-          .trace(true)
-          .build());
+          .trace(true));
 
         this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();

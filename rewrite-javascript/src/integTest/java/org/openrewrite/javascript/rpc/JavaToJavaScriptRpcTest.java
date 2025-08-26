@@ -69,7 +69,7 @@ public class JavaToJavaScriptRpcTest {
                               return tree;
                           } finally {
                               log.close();
-                              client.close();
+                              client.shutdown();
                           }
                       }
                   };

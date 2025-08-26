@@ -81,9 +81,6 @@ tasks.named<Jar>("sourcesJar").configure {
 tasks.named<ProcessResources>("processResources").configure {
     dependsOn(testManifestTask)
 }
-tasks.named("rewriteRecipeAuthorAttributionResources").configure {
-    dependsOn(testManifestTask)
-}
 tasks.named("licenseMain").configure {
     dependsOn(testManifestTask)
 }
