@@ -264,13 +264,11 @@ public class InlineMethodCalls extends Recipe {
             String templateString;
             if (original instanceof J.NewClass && replacement.startsWith("this(")) {
                 // For constructor-to-constructor replacement, replace "this" with "new ClassName"
-                JavaType.FullyQualified declaringType = methodType.getDeclaringType();
-                String className = declaringType.getClassName();
-                templateString = "new " + className + replacement.substring(4);
+                templateString = "new " + methodType.getDeclaringType().getClassName() + replacement.substring(4);
             } else if (original instanceof J.MethodInvocation &&
                     ((J.MethodInvocation) original).getSelect() == null &&
                     replacement.startsWith("this.")) {
-                templateString = replacement.replaceFirst("^this\\.\\b", "");
+                templateString = replacement.substring(5);
             } else {
                 templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
             }
