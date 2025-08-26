@@ -978,7 +978,9 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 text.append(c);
                 cursor++;
             }
-            if (i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor)) {
+            // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
+            // So now have to manually account for this.
+            if (i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
                 text.append(whitespaceBeforeAsString());
             }
         }
