@@ -41,6 +41,7 @@ dependencies {
     testImplementation("com.squareup.okhttp3:okhttp-tls:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
     testImplementation("org.mapdb:mapdb:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
