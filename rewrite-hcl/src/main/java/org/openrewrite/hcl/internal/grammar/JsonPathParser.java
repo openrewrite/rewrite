@@ -1777,6 +1777,7 @@ public class JsonPathParser extends Parser {
         return _localctx;
     }
 
+    @Override
     public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
         switch (ruleIndex) {
             case 7:
