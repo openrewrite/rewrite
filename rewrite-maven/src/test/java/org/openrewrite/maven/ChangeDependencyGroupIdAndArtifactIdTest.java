@@ -1804,4 +1804,106 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.psc.jobs",
+            "jobs-configuration",
+            "com.enterprise.jobs",
+            "jobs-config",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.psc.jobs</groupId>
+                          <artifactId>jobs-configuration</artifactId>
+                          <version>2.33.0</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.enterprise.jobs</groupId>
+                          <artifactId>jobs-config</artifactId>
+                          <version>2.33.0</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeManagedDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "com.psc.jobs",
+            "jobs-configuration",
+            "com.enterprise.jobs",
+            "jobs-config",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.psc.jobs</groupId>
+                              <artifactId>jobs-configuration</artifactId>
+                              <version>2.33.0</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.enterprise.jobs</groupId>
+                              <artifactId>jobs-config</artifactId>
+                              <version>2.33.0</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }
