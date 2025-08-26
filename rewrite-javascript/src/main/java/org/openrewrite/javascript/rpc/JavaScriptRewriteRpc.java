@@ -13,7 +13,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
@@ -69,7 +68,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private final Environment environment;
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
-        private Duration timeout = Duration.ofSeconds(30);
         private boolean trace = false;
         private boolean verboseLogging = true;
         private @Nullable Integer inspectBrk;
@@ -105,11 +103,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder verboseLogging() {
             return verboseLogging(true);
-        }
-
-        public Builder timeout(Duration timeout) {
-            this.timeout = timeout;
-            return this;
         }
 
         public Builder trace(boolean trace) {
@@ -154,7 +147,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             process.start();
 
             return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), environment)
-                    .timeout(timeout).livenessCheck(process::getLivenessCheck);
+                    .livenessCheck(process::getLivenessCheck);
         }
     }
 }

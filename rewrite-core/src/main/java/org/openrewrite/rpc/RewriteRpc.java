@@ -31,7 +31,6 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -40,7 +39,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -62,8 +60,6 @@ public class RewriteRpc {
     private final AtomicInteger batchSize = new AtomicInteger(200);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
-    private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream traceFile;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -103,7 +99,7 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs, traceSendPackets));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -135,16 +131,6 @@ public class RewriteRpc {
 
     public RewriteRpc batchSize(int batchSize) {
         this.batchSize.set(batchSize);
-        return this;
-    }
-
-    public RewriteRpc traceGetObjectOutput() {
-        this.traceSendPackets.set(true);
-        return this;
-    }
-
-    public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.traceFile = log;
         return this;
     }
 
@@ -340,7 +326,7 @@ public class RewriteRpc {
         Object localObject = localObjects.get(id);
         String lastKnownId = localObject != null ? id : null;
 
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
                 new GetObject(id, lastKnownId), GetObjectResponse.class));
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {

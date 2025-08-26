@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
-import java.io.PrintStream;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -44,14 +43,11 @@ public class RpcReceiveQueue {
 
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
-    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayDeque<>();
-        this.logFile = logFile;
         this.pull = pull;
     }
 
@@ -82,9 +78,9 @@ public class RpcReceiveQueue {
     }
 
     public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m
+        return requireNonNull(receive(markers, m -> m
                 .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(receiveList(m.getMarkers(), null)));
+                .withMarkers(requireNonNull(receiveList(m.getMarkers(), null)))));
     }
 
     /**
@@ -95,7 +91,7 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     public <T> T receive(@Nullable T before) {
-        return receive(before, null);
+        return requireNonNull(receive(before, null));
     }
 
     /**
@@ -112,13 +108,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-
-        if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
-            logFile.println("  " + message.getTrace());
-            logFile.println("  " + Trace.traceReceiver());
-            logFile.flush();
-        }
+        Trace.traceReceiver(message);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -182,7 +172,7 @@ public class RpcReceiveQueue {
                 List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
-                    after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
+                    after.add(requireNonNull(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange)));
                 }
                 return after;
             default:

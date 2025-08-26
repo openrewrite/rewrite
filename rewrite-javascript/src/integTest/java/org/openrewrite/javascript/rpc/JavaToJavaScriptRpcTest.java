@@ -21,6 +21,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.rpc.Trace;
 import org.openrewrite.test.RecipeSpec;
 
 import java.io.File;
@@ -49,11 +50,9 @@ public class JavaToJavaScriptRpcTest {
         RecipeSpec.DEFAULTS = () -> new RecipeSpec()
           .recipe(toRecipe(() -> {
               try {
-                  PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
+                  Trace.TRACE_SENDER = true;
+                  Trace.TRACE_RECEIVER = new PrintStream(new FileOutputStream("rpc.java.log"));
                   JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
-                  client
-                    .traceGetObjectOutput()
-                    .traceGetObjectInput(log);
 
                   assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
                     .isEqualTo(1);
@@ -68,7 +67,7 @@ public class JavaToJavaScriptRpcTest {
                               stopAfterPreVisit();
                               return tree;
                           } finally {
-                              log.close();
+                              Trace.TRACE_RECEIVER.close();
                               client.shutdown();
                           }
                       }

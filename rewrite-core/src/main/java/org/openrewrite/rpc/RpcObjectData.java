@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.*;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -81,9 +82,15 @@ public class RpcObjectData {
      * The stack trace of the thread that created this object. This is
      * useful in debugging asymmetries between senders/receivers.
      */
-    @With
     @Nullable
-    String trace;
+    @NonFinal
+    String trace = Trace.traceSender();
+
+    public RpcObjectData withTrace(@Nullable String trace) {
+        RpcObjectData d = new RpcObjectData(state, valueType, value, ref);
+        d.trace = null;
+        return d;
+    }
 
     public <V> @Nullable V getValue() {
         if (value instanceof Map && valueType != null) {
