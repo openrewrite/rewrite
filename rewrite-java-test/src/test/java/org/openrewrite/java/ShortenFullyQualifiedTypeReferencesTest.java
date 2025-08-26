@@ -634,4 +634,50 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4371")
+    @Test
+    void conflictWithTypeDefinedInParentInterface() {
+        rewriteRun(
+          java(
+            """
+              interface Parent {
+                  class Set {}
+              }
+              """
+          ),
+          java(
+            """
+              class Main implements Parent {
+                  public void get() {
+                      final java.util.Set set = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4371")
+    @Test
+    void conflictWithTypeDefinedInParentClass() {
+        rewriteRun(
+          java(
+            """
+              class Parent {
+                  class List {}
+              }
+              """
+          ),
+          java(
+            """
+              class Child extends Parent {
+                  public void test() {
+                      java.util.List<String> list = null;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
