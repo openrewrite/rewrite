@@ -42,6 +42,7 @@ val latest = if (project.hasProperty("releasing")) {
 } else {
     "latest.integration"
 }
+val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-groovy")) {
@@ -65,9 +66,8 @@ dependencies {
         exclude("org.slf4j", "slf4j-nop")
     }
     testImplementation(project(":rewrite-toml"))
-
-    testImplementation("org.openrewrite.gradle.tooling:model:$latest")
-
+    testImplementation(project(":rewrite-gradle-tooling-model:model"))
+    "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
@@ -76,6 +76,12 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(pluginLocalTestClasspath)
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
