@@ -1782,7 +1782,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                             """
                               import org.example.Const;
                               import org.example.FooDefaultStringArray;
-                              @FooDefaultStringArray(Const.X.Y.FIRST_CONST, "b")
+                              @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b"})
                               @FooDefaultStringArray(Const.X.Y.SECOND_CONST)
                               @FooDefaultStringArray({Const.X.Y.FIRST_CONST, "b"})
                               @FooDefaultStringArray(Const.X.Y.SECOND_CONST)
