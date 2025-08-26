@@ -700,7 +700,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return ident;
     }
 
-    public Expression visitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx) {
+    @Override
+    public @Nullable Expression visitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx) {
         if (ctx == null) {
             return null;
         }
@@ -708,7 +709,6 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         if (identifiers.size() == 1) {
             return visitIdentifier(identifiers.get(0));
         }
-        
         Expression expr = visitIdentifier(identifiers.get(0));
         for (int i = 1; i < identifiers.size(); i++) {
             expr = new Hcl.AttributeAccess(
