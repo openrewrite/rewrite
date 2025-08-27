@@ -136,12 +136,24 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 nodeOptions.add("--inspect-brk=" + inspectBrk);
             }
 
-            String pkg = "--package=@openrewrite/rewrite@" + StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
-            String[] cmd = Stream.of(
-                    npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-rpc",
-                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    verboseLogging ? "--verbose" : null
-            ).filter(Objects::nonNull).toArray(String[]::new);
+            String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+            String[] cmd;
+            if (version.endsWith("-SNAPSHOT")) {
+                // For SNAPSHOT versions, assume npm link has been run and don't use --package
+                cmd = Stream.of(
+                        npxPath.toString(), nodeOptions.toString(), "rewrite-rpc",
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        verboseLogging ? "--verbose" : null
+                ).filter(Objects::nonNull).toArray(String[]::new);
+            } else {
+                // For release versions, use --package to fetch from npm registry
+                String pkg = "--package=@openrewrite/rewrite@" + version;
+                cmd = Stream.of(
+                        npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-rpc",
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        verboseLogging ? "--verbose" : null
+                ).filter(Objects::nonNull).toArray(String[]::new);
+            }
 
             RewriteRpcProcess process = new RewriteRpcProcess(trace, cmd);
             process.start();

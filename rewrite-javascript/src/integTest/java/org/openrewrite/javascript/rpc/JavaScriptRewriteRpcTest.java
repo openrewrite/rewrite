@@ -17,12 +17,9 @@ package org.openrewrite.javascript.rpc;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -45,23 +42,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
-    JavaScriptRewriteRpc client;
-
-    @TempDir
-    Path tempDir;
-
-    @BeforeEach
-    void before() {
-        Path logFile = tempDir.resolve("rpc.log");
-        System.out.println("file://" + logFile);
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder(Environment.builder().build())
-            .log(logFile)
-            .verboseLogging()
-//          .inspectBrk()
-//          .trace(true)
-        );
-        client = JavaScriptRewriteRpc.getOrStart();
-    }
+    JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
 
     @AfterEach
     void after() {

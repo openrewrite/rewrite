@@ -1,3 +1,5 @@
+// noinspection JSUnusedGlobalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -16,14 +18,13 @@
 import {
     Column,
     DataTable,
-    ExecutionContext, markers, Markers,
+    ExecutionContext, Markers,
     Option, randomId,
     Recipe,
     RecipeRegistry,
     ScanningRecipe,
     SourceFile,
-    Transient, Tree,
-    TreeVisitor
+    Transient, TreeVisitor
 } from "@openrewrite/rewrite";
 import {PlainText, PlainTextParser, PlainTextVisitor} from "@openrewrite/rewrite/text";
 import {Json, JsonVisitor} from "@openrewrite/rewrite/json";

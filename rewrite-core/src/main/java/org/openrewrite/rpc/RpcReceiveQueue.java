@@ -91,7 +91,8 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     public <T> T receive(@Nullable T before) {
-        return requireNonNull(receive(before, null));
+        //noinspection DataFlowIssue
+        return receive(before, null);
     }
 
     /**
@@ -172,7 +173,8 @@ public class RpcReceiveQueue {
                 List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
-                    after.add(requireNonNull(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange)));
+                    //noinspection DataFlowIssue
+                    after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
                 }
                 return after;
             default:
