@@ -106,6 +106,12 @@ export abstract class Recipe {
         }
     }
 
+    /**
+     * Returns the visitor that performs the transformation. This method is called by the
+     * recipe framework during execution and must be overridden by concrete recipe implementations.
+     * 
+     * @returns A visitor that performs the recipe's transformation
+     */
     get editor(): TreeVisitor<any, ExecutionContext> {
         return noopVisitor()
     }

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "../../src";
-import {RewriteRpc} from "../../src/rpc";
-import {PlainText, text} from "../../src/text";
-import {json} from "../../src/json";
-import {RecipeSpec} from "../../src/test";
+import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
+import {RewriteRpc} from "@openrewrite/rewrite/rpc";
+import {PlainText, text} from "@openrewrite/rewrite/text";
+import {json} from "@openrewrite/rewrite/json";
+import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
-import {activate} from "../example-recipe";
-import {javascript, JS} from "../../src/javascript";
+import {activate} from "../../fixtures/example-recipe";
+import {javascript, JS} from "@openrewrite/rewrite/javascript";
 import fs from "node:fs";
 
 describe("Rewrite RPC", () => {

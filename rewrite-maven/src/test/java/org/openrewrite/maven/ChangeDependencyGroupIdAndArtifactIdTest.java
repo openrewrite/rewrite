@@ -36,7 +36,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
@@ -326,7 +328,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "jakarta.activation",
             "jakarta.activation-api",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
@@ -466,7 +470,56 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
-    void changeManagedDependencyGroupIdAndArtifactId() {
+    void changeManagedDependencyArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger.core.v3",
+            "swagger-annotations",
+            null,
+            "swagger-annotations-jakarta",
+            null,
+            null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.swagger.core.v3</groupId>
+                              <artifactId>swagger-annotations</artifactId>
+                              <version>2.1.10</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.swagger.core.v3</groupId>
+                              <artifactId>swagger-annotations-jakarta</artifactId>
+                              <version>2.1.10</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeManagedDependencyGroupIdAndArtifactIdAndVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "javax.activation",
@@ -1395,7 +1448,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
             "io.quarkus",
             "quarkus-arc",
             null,
-            null
+            null,
+            false,
+            false
           )),
           pomXml(
             """
