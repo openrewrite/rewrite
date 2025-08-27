@@ -24,7 +24,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.config.Environment;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
@@ -43,10 +42,7 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc
-          .builder(Environment.builder().build())
-          .trace(true));
-
+//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().trace(true));
         this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();
     }

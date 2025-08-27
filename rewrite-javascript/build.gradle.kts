@@ -120,12 +120,11 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     args = listOf("run", "build")
 }
 
-tasks.named("sourcesJar") {
-    dependsOn(npmBuild)
-}
-
-tasks.named("assemble") {
-    dependsOn(npmBuild)
+// Because each of these sees version.txt as an input
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(npmBuild)
+    }
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
@@ -218,6 +217,7 @@ tasks.named("publish") {
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+    exclude("**/version.txt")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

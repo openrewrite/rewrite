@@ -34,8 +34,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 public class JavaScriptRewriteRpc extends RewriteRpc {
-    private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(
-            builder(Environment.builder().build()));
+    private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
     JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         super(jsonRpc, marketplace);
@@ -74,18 +73,23 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
-    public static Builder builder(Environment environment) {
-        return new Builder(environment);
+    public static Builder builder() {
+        return new Builder();
     }
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<JavaScriptRewriteRpc> {
-        private final Environment environment;
+        private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
         private boolean trace = false;
         private boolean verboseLogging = true;
         private @Nullable Integer inspectBrk;
+
+        public Builder marketplace(Environment marketplace) {
+            this.marketplace = marketplace;
+            return this;
+        }
 
         /**
          * Path to the `npx` executable, not just the directory it is installed in.
@@ -173,7 +177,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             RewriteRpcProcess process = new RewriteRpcProcess(trace, cmd);
             process.start();
 
-            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), environment)
+            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
                     .livenessCheck(process::getLivenessCheck);
         }
     }
