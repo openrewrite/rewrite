@@ -474,15 +474,6 @@ class AnnotationTest implements RewriteTest {
     @Test // Because of `@Deprecated#forRemoval`
     void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
-        /*
-         *     Using these annotations in core library for testing this feature:
-         *
-         *     @Deprecated(since="1.2", forRemoval=true)
-         *     public final void stop()
-         *
-         *     @CallerSensitive
-         *     public ClassLoader getContextClassLoader() {
-         */
         List<SourceFile> sourceFiles = p.parse(
           """
           package a.b;
