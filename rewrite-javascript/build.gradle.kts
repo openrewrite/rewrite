@@ -120,6 +120,10 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     args = listOf("run", "build")
 }
 
+tasks.named("sourcesJar") {
+    dependsOn(npmBuild)
+}
+
 tasks.named("assemble") {
     dependsOn(npmBuild)
 }
