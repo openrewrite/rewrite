@@ -99,7 +99,7 @@ class JavaScriptParserTest {
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
     }
 
-    @SuppressWarnings("TypeScriptUnresolvedReference")
+    @SuppressWarnings({"TypeScriptUnresolvedReference", "HtmlUnknownAttribute"})
     @Test
     void tsx() {
         @Language("tsx")
