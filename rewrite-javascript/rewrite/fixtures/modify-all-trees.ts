@@ -1,3 +1,5 @@
+// noinspection JSUnusedGlobalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -13,9 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ExecutionContext, marker, Marker, randomId, Recipe, RecipeRegistry, Tree, TreeVisitor} from "../src";
+import {
+    ExecutionContext,
+    marker,
+    Marker,
+    randomId,
+    Recipe,
+    RecipeRegistry,
+    Tree,
+    TreeVisitor
+} from "@openrewrite/rewrite";
 
-// noinspection JSUnusedGlobalSymbols
 export function activate(registry: RecipeRegistry) {
     registry.register(ModifyAllTrees);
 }
