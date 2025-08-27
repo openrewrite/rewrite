@@ -356,7 +356,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
                 if (oldAttributeValue == null && newAttributeValue != null && !attributeNameAlreadyPresent(a)) {
                     J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
-                    a = a.withArguments(ListUtils.concat(as, a.getArguments()));
+                    List<Expression> args = a.getArguments();
+                    // Case for existing attribute: `@Foo("q")` -> @Foo(value = "q")
+                    if (args.size() == 1 && !(args.get(0) instanceof J.Assignment)) {
+                        args = singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
+                    }
+                    a = a.withArguments(ListUtils.concat(as, args));
                 }
 
                 if (original != a) {

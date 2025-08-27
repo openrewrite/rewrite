@@ -3907,21 +3907,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             "required",
             "true",
             null,
-            false,
+            true,
             false)
           ),
           java(
             """
               package org.example;
               public @interface Bar {
-              }
-              """
-          ),
-          java(
-            """
-              package org.example;
-              public @interface Foo {
-                  boolean required();
+                String value() default "";
               }
               """
           ),
@@ -3929,14 +3922,14 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
             """
               import org.example.Bar;
 
-              @Bar
+              @Bar("q")
               public class A {
               }
               """,
             """
               import org.example.Foo;
 
-              @Foo(required = true)
+              @Foo(required = true, value = "q")
               public class A {
               }
               """

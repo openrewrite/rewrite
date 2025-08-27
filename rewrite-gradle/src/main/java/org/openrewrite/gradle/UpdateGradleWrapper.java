@@ -21,7 +21,6 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.search.FindGradleProject;
-import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -33,7 +32,6 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
-import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
@@ -134,24 +132,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     transient GradleWrapper gradleWrapper;
 
-    private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
+    private GradleWrapper getGradleWrapper(@Nullable String distributionUrl, ExecutionContext ctx) {
         if (gradleWrapper == null) {
             if (wrapperUri != null) {
                 return gradleWrapper = GradleWrapper.create(URI.create(wrapperUri), ctx);
             }
-            try {
-                gradleWrapper = GradleWrapper.create(distribution, version, ctx);
-            } catch (Exception e) {
-                // services.gradle.org is unreachable
-                // If the user didn't specify a wrapperUri, but they did provide a specific version we assume they know this version
-                // is available from whichever distribution url they were previously using and update the version
-                if (!StringUtils.isBlank(version) && Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                    return gradleWrapper = new GradleWrapper(version, new DistributionInfos("", null, null));
-                }
-                throw new IllegalArgumentException(
-                        "Could not reach services.gradle.org. " +
-                        "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
-            }
+
+            gradleWrapper = GradleWrapper.create(distributionUrl, distribution, version, ctx);
         }
         return gradleWrapper;
     }
@@ -160,6 +147,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
+        BuildTool currentMarker;
+
+        @Nullable
+        String currentDistributionUrl;
 
         @Nullable
         BuildTool updatedMarker;
@@ -200,18 +191,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        String gradleWrapperVersion = getGradleWrapper(ctx).getVersion();
-
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                        int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapperVersion);
-                        // maybe we want to update the distribution type or url
-                        if (compare < 0) {
-                            acc.needsWrapperUpdate = true;
-                            acc.updatedMarker = buildTool.withVersion(gradleWrapperVersion);
-                            return true;
-                        } else {
-                            return compare == 0;
-                        }
+                        acc.currentMarker = buildTool;
+                        return true;
                     }
 
                     @Override
@@ -222,30 +203,22 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
+                        acc.currentDistributionUrl = currentDistributionUrl;
 
-                        if (gradleWrapper == null) {
-                            getGradleWrapper(ctx);
-                        }
-                        if (StringUtils.isBlank(gradleWrapper.getDistributionUrl()) && !StringUtils.isBlank(version) &&
-                            Semver.validate(version, null).getValue() instanceof ExactVersion) {
-                            String newDownloadUrl = currentDistributionUrl.replace("\\", "")
-                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                            "$1" + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
-                        }
-                        String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
-                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrapper.getDistributionUrl()) &&
-                            !gradleWrapper.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
-                            String newDownloadUrl = gradleWrapper.getDistributionUrl()
-                                    .replace("\\", "")
-                                    .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
-                                            wrapperHost + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(gradleWrapper.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
-                        }
+                        GradleWrapper gradleWrapper = getGradleWrapper(currentDistributionUrl, ctx);
+                        String gradleWrapperVersion = gradleWrapper.getVersion();
 
-                        if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
+                        int compare = versionComparator.compare(null, acc.currentMarker.getVersion(), gradleWrapperVersion);
+                        // maybe we want to update the distribution type or url
+                        if (compare < 0) {
+                            acc.needsWrapperUpdate = true;
+                            acc.updatedMarker = acc.currentMarker.withVersion(gradleWrapperVersion);
+                            return entry;
+                        } else if (compare == 0 && !gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
                             acc.needsWrapperUpdate = true;
                         }
+
                         return entry;
                     }
                 },
@@ -301,7 +274,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         List<SourceFile> gradleWrapperFiles = new ArrayList<>();
         ZonedDateTime now = ZonedDateTime.now();
 
-        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
+        GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
 
         if (acc.addGradleWrapperProperties) {
             String checksum = gradleWrapper.getDistributionChecksum() == null ? null : gradleWrapper.getDistributionChecksum().getHexValue();
@@ -384,7 +357,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                 }
 
-                GradleWrapper gradleWrapper = getGradleWrapper(ctx);
+                GradleWrapper gradleWrapper = getGradleWrapper(acc.currentDistributionUrl, ctx);
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);

@@ -329,6 +329,94 @@ class InlineMethodCallsTest implements RewriteTest {
     }
 
     @Test
+    void constructorAddLiteralString() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MyClass {
+                  @Deprecated
+                  @InlineMe(replacement = "this(one, \\"two\\")")
+                  public MyClass(String one) {
+                      this("one", "two");
+                  }
+
+                  public MyClass(String one, String two) {
+                  }
+
+                  void usage() {
+                      MyClass obj = new MyClass("one");
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MyClass {
+                  @Deprecated
+                  @InlineMe(replacement = "this(one, \\"two\\")")
+                  public MyClass(String one) {
+                      this("one", "two");
+                  }
+
+                  public MyClass(String one, String two) {
+                  }
+
+                  void usage() {
+                      MyClass obj = new MyClass("one", "two");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorAddLiteralNull() {
+        rewriteRun(
+          java(
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MyClass {
+                  @Deprecated
+                  @InlineMe(replacement = "this(one, null)")
+                  public MyClass(String one) {
+                      this("one", null);
+                  }
+
+                  public MyClass(String one, String two) {
+                  }
+
+                  void usage() {
+                      MyClass obj = new MyClass("one");
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.java.InlineMe;
+
+              class MyClass {
+                  @Deprecated
+                  @InlineMe(replacement = "this(one, null)")
+                  public MyClass(String one) {
+                      this("one", null);
+                  }
+
+                  public MyClass(String one, String two) {
+                  }
+
+                  void usage() {
+                      MyClass obj = new MyClass("one", null);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleParameters() {
         //language=java
         rewriteRun(

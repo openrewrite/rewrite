@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "../src";
+import {RecipeRegistry} from "@openrewrite/rewrite";
 import {describe} from "@jest/globals";
-import {ChangeText, activate} from "./example-recipe";
+import {ChangeText, activate} from "../fixtures/example-recipe";
 
 describe("recipes", () => {
 

@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,12 +32,21 @@ import java.util.stream.Stream;
 public class Trace {
     private static final Trace.StackElementSourceLookup sourceLookup = new Trace.StackElementSourceLookup();
 
-    public static String traceReceiver() {
-        return trace("Receiver");
+    public static boolean TRACE_SENDER = false;
+    public static @Nullable PrintStream TRACE_RECEIVER = null;
+
+    public static void traceReceiver(RpcObjectData message) {
+        PrintStream logFile = TRACE_RECEIVER;
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withTrace(null));
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + trace("Receiver"));
+            logFile.flush();
+        }
     }
 
-    public static String traceSender() {
-        return trace("Sender");
+    public static @Nullable String traceSender() {
+        return TRACE_SENDER ? trace("Sender") : null;
     }
 
     private static String trace(String type) {

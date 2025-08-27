@@ -255,17 +255,24 @@ public class InlineMethodCalls extends Recipe {
             if (methodType == null) {
                 return null;
             }
-            String templateString = createTemplateString(original, replacement, methodType.getParameterNames());
+            String templateString = createTemplateString(original, replacement, methodType);
             List<Object> parameters = createParameters(templateString, original);
             return new Template(templateString, parameters.toArray(new Object[0]));
         }
 
-        private static String createTemplateString(MethodCall original, String replacement, List<String> originalParameterNames) {
-            String templateString = original instanceof J.MethodInvocation &&
+        private static String createTemplateString(MethodCall original, String replacement, JavaType.Method methodType) {
+            String templateString;
+            if (original instanceof J.NewClass && replacement.startsWith("this(")) {
+                // For constructor-to-constructor replacement, replace "this" with "new ClassName"
+                templateString = "new " + methodType.getDeclaringType().getClassName() + replacement.substring(4);
+            } else if (original instanceof J.MethodInvocation &&
                     ((J.MethodInvocation) original).getSelect() == null &&
-                    replacement.startsWith("this.") ?
-                    replacement.replaceFirst("^this.\\b", "") :
-                    replacement.replaceAll("\\bthis\\b", "#{this:any()}");
+                    replacement.startsWith("this.")) {
+                templateString = replacement.substring(5);
+            } else {
+                templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
+            }
+            List<String> originalParameterNames = methodType.getParameterNames();
             for (String parameterName : originalParameterNames) {
                 // Replace parameter names with their values in the templateString
                 templateString = templateString
