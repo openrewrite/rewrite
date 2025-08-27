@@ -504,7 +504,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
                     if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
                         List<Expression> updatedList = updateInitializer(annotation, singletonList(fieldAccess), getAttributeValues());
-                        Expression flattenedList = createAnnotationLiteralFromString(
+                        return createAnnotationLiteralFromString(
                                 annotation,
                                 wrapValues(updatedList.stream()
                                         .map(e -> {
@@ -517,7 +517,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                         })
                                         .collect(toList()), true)
                         );
-                        return flattenedList;
                     }
                     String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
                             getAttributeValues().stream().map(String::valueOf).collect(joining(",", "{", "}")) :
