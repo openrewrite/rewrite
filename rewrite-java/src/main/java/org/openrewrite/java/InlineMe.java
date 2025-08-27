@@ -13,12 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.toolingapi;
+package org.openrewrite.java;
 
-import org.jspecify.annotations.Nullable;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 
-public interface OpenRewriteModelProxy {
-    byte[] getGradleProjectBytes();
+@Documented
+@Target({ElementType.METHOD, ElementType.CONSTRUCTOR})
+public @interface InlineMe {
+    String replacement();
 
-    byte @Nullable [] getGradleSettingsBytes();
+    String[] imports() default {};
+
+    String[] staticImports() default {};
 }

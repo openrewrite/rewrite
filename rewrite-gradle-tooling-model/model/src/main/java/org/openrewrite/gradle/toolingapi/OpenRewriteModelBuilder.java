@@ -21,15 +21,14 @@ import org.gradle.tooling.ProjectConnection;
 import org.gradle.tooling.internal.consumer.DefaultGradleConnector;
 import org.jspecify.annotations.Nullable;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -139,34 +138,35 @@ public class OpenRewriteModelBuilder {
      * So for our build only use an init script which understands that.
      */
     private static String generateInitScriptFromManifest() throws IOException {
-        try (InputStream is = OpenRewriteModelBuilder.class.getResourceAsStream("/test-manifest.txt")) {
-            if (is == null) {
-                throw new IllegalStateException("Expected to find test-manifest.txt on the classpath");
-            }
-
-            StringBuilder initScript = new StringBuilder();
-            initScript.append("initscript {\n");
-            initScript.append("    dependencies {\n");
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    line = line.trim();
-                    if (!line.isEmpty()) {
-                        // Escape backslashes for Groovy string
-                        String escapedPath = line.replace("\\", "\\\\");
-                        initScript.append("        classpath files('").append(escapedPath).append("')\n");
-                    }
-                }
-            }
-
-            initScript.append("    }\n");
-            initScript.append("}\n\n");
-            initScript.append("allprojects {\n");
-            initScript.append("    apply plugin: org.openrewrite.gradle.toolingapi.ToolingApiOpenRewriteModelPlugin\n");
-            initScript.append("}\n");
-
-            return initScript.toString();
+        String manifestPath = System.getProperty("org.openrewrite.gradle.local.use-embedded-classpath");
+        if (manifestPath == null || manifestPath.isEmpty()) {
+            throw new IllegalStateException("System property org.openrewrite.gradle.local.use-embedded-classpath must be set to the path of test-manifest.txt");
         }
+        Path manifestFile = Paths.get(manifestPath);
+        if (!Files.exists(manifestFile)) {
+            throw new IllegalStateException("Manifest file not found at: " + manifestPath);
+        }
+
+        StringBuilder initScript = new StringBuilder();
+        initScript.append("initscript {\n");
+        initScript.append("    dependencies {\n");
+
+        List<String> lines = Files.readAllLines(manifestFile, StandardCharsets.UTF_8);
+        for (String line : lines) {
+            line = line.trim();
+            if (!line.isEmpty()) {
+                // Escape backslashes for Groovy string
+                String escapedPath = line.replace("\\", "\\\\");
+                initScript.append("        classpath files('").append(escapedPath).append("')\n");
+            }
+        }
+
+        initScript.append("    }\n");
+        initScript.append("}\n\n");
+        initScript.append("allprojects {\n");
+        initScript.append("    apply plugin: org.openrewrite.gradle.toolingapi.ToolingApiOpenRewriteModelPlugin\n");
+        initScript.append("}\n");
+
+        return initScript.toString();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.toolingapi;
+@NullMarked
+@NonNullFields
+package org.openrewrite.java;
 
-import org.jspecify.annotations.Nullable;
-
-public interface OpenRewriteModelProxy {
-    byte[] getGradleProjectBytes();
-
-    byte @Nullable [] getGradleSettingsBytes();
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

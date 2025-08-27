@@ -23,19 +23,15 @@ import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -101,15 +97,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
+        String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
-            // Scan entire classpath to get full inheritance hierarchy, but filter results to target jar
             scanClasses(new ClassGraph()
+                    .acceptJars(jarName)
                     .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader, jar);
+                    .overrideClassLoaders(classLoader), classLoader);
 
             scanYaml(new ClassGraph()
-                    .acceptJars(jar.toFile().getName())
+                    .acceptJars(jarName)
                     .ignoreParentClassLoaders()
                     .overrideClassLoaders(classLoader)
                     .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
@@ -158,56 +155,37 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     private void scanClasses(ClassGraph classGraph, ClassLoader classLoader) {
-        scanClasses(classGraph, classLoader, null);
-    }
-
-    private void scanClasses(ClassGraph classGraph, ClassLoader classLoader, @Nullable Path targetJarName) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            configureRecipes(result, Recipe.class.getName(), targetJarName);
+            configureRecipes(result, Recipe.class.getName());
+            configureRecipes(result, ScanningRecipe.class.getName());
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
-                // Only process styles from the target jar if specified
-                if (targetJarName != null && !isFromJar(classInfo.getClasspathElementURI(), targetJarName)) {
-                    continue;
-                }
                 Class<?> styleClass = classInfo.loadClass();
-                Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                if (constructor != null) {
-                    constructor.setAccessible(true);
-                    try {
-                        styles.add((NamedStyles) constructor.newInstance());
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
+                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                    if (constructor != null) {
+                        constructor.setAccessible(true);
+                        try {
+                            styles.add((NamedStyles) constructor.newInstance());
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
                     }
-                }
+
             }
         }
     }
 
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    private boolean isFromJar(@Nullable URI classpathElementURI, Path jar) {
-        try {
-            return classpathElementURI != null && Files.isSameFile(Paths.get(classpathElementURI), jar);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private void configureRecipes(ScanResult result, String className, @Nullable Path targetJar) {
+    private void configureRecipes(ScanResult result, String className) {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
-            // Only process recipes from the target jar if specified
-            if (targetJar != null && !isFromJar(classInfo.getClasspathElementURI(), targetJar)) {
-                continue;
-            }
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
-                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
@@ -246,9 +224,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private void ensureScanned() {
         if (performScan != null) {
-            Runnable scan = performScan;
+            performScan.run();
             performScan = null;
-            scan.run();
         }
     }
 

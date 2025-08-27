@@ -17,8 +17,6 @@ package org.openrewrite.gradle.marker;
 
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
-import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.artifacts.ResolvedDependency;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.attributes.Attribute;
@@ -31,15 +29,18 @@ import org.gradle.plugin.use.PluginId;
 import org.gradle.util.GradleVersion;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.gradle.attributes.Category;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.*;
-import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.marker.GradleSettingsBuilder.GRADLE_PLUGIN_PORTAL;
 
@@ -287,16 +288,16 @@ public final class GradleProjectBuilder {
     private static org.openrewrite.maven.tree.Dependency dependency(Dependency dep, Configuration configuration) {
         GroupArtifactVersion gav = groupArtifactVersion(dep);
         return requestedCache.computeIfAbsent(gav, it -> {
-            Map<String, String> attributes = attributes(dep);
+                    Map<String, String> attributes = attributes(dep);
 
-            String type = "jar";
-            if(Optional.ofNullable(Category.from(attributes.get(Category.key())))
-                    .filter(cat -> cat == Category.REGULAR_PLATFORM || cat == Category.ENFORCED_PLATFORM)
-                    .isPresent()) {
-                type = "pom";
-            }
+                    String type = "jar";
+                    if (Optional.ofNullable(Category.from(attributes.get(Category.key())))
+                            .filter(cat -> cat == Category.REGULAR_PLATFORM || cat == Category.ENFORCED_PLATFORM)
+                            .isPresent()) {
+                        type = "pom";
+                    }
 
-            return org.openrewrite.maven.tree.Dependency.builder()
+                    return org.openrewrite.maven.tree.Dependency.builder()
                             .gav(gav)
                             .type(type)
                             .scope(configuration.getName())
@@ -330,12 +331,12 @@ public final class GradleProjectBuilder {
         try {
             // ProjectDependency.getPath introduced in gradle 8.11
             Method getPath = ProjectDependency.class.getMethod("getPath");
-            return  (String) getPath.invoke(pd);
+            return (String) getPath.invoke(pd);
         } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
             // ProjectDependency.getDependencyProject() scheduled for removal in Gradle 9.0
             try {
                 Method getDependencyProject = ProjectDependency.class.getMethod("getDependencyProject");
-                return ((Project)getDependencyProject.invoke(pd)).getPath();
+                return ((Project) getDependencyProject.invoke(pd)).getPath();
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
                 // All supported versions of Gradle have getPath(), getDependencyProject(), or both, so this hopefully never happens
                 throw new IllegalStateException(e);
@@ -388,10 +389,10 @@ public final class GradleProjectBuilder {
         return requestedCache.computeIfAbsent(gav, it -> {
             // Synthesize a Category attribute if this is a BOM
             String type = "jar";
-            Map<String, String> attributes = Collections.emptyMap();
+            Map<String, String> attributes = emptyMap();
             // Both enforcedPlatform() and platform() appear the same in this context, so assume platform()
             if (dep.getConfiguration().startsWith("platform-")) {
-                attributes = Collections.singletonMap(Category.key(), "platform");
+                attributes = singletonMap(Category.key(), "platform");
                 type = "pom";
             }
 

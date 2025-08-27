@@ -3,11 +3,8 @@ plugins {
     id("org.openrewrite.build.java8-text-blocks")
 }
 
-// This project's tests to work correctly a corresponding version of :plugin must be published to maven local
-// This is because src/main/resources/init.gradle expects the plugin to be present there
-// And a cross-project task dependency won't work if the projects are evaluated independently
-// This is all messy and non-idiomatic from Gradle's standpoint, so some better way would be ideal
-evaluationDependsOn(":rewrite-gradle-tooling-model:plugin")
+group = "org.openrewrite.gradle.tooling"
+description = "A model for extracting semantic information out of Gradle build files necessary for refactoring them."
 
 val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 
@@ -64,29 +61,23 @@ val testGradle4 = tasks.register<Test>("testGradle4") {
     })
 }
 
-val manifestFile = layout.projectDirectory.file("src/main/resources/test-manifest.txt")
-val testManifestTask =  tasks.register("testManifest") {
-    val classpathText = pluginLocalTestClasspath.files.joinToString(separator = "\n") { it.absolutePath }
-    inputs.property("manifestContents", classpathText)
-    outputs.file(manifestFile)
+val testManifestFile = layout.buildDirectory.file("test-manifest/test-manifest.txt")
+val testManifestTask = tasks.register("testManifest") {
+    inputs.files(pluginLocalTestClasspath)
+    outputs.file(testManifestFile)
     doLast {
-        manifestFile.asFile.parentFile.deleteRecursively()
-        mkdir(manifestFile.asFile.parentFile)
-        manifestFile.asFile.writeText(classpathText)
+        testManifestFile.get().asFile.writeText(pluginLocalTestClasspath.files.joinToString(separator = "\n") { it.absolutePath })
     }
 }
-tasks.named<Jar>("sourcesJar").configure {
-    dependsOn(testManifestTask)
-}
-tasks.named<ProcessResources>("processResources").configure {
-    dependsOn(testManifestTask)
-}
-tasks.named("licenseMain").configure {
-    dependsOn(testManifestTask)
+
+artifacts {
+    // So that rewrite-gradle can retrieve the manifest, too
+    add(pluginLocalTestClasspath.name, testManifestTask)
 }
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", true)
+    dependsOn(testManifestTask)
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", testManifestFile.get().asFile)
 }
 
 tasks.named("check").configure {
