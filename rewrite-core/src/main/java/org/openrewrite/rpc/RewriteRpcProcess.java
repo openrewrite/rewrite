@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Moderne Source Available License (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://docs.moderne.io/licensing/moderne-source-available-license
+ * https://www.apache.org/licenses/LICENSE-2.0
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.MessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
+import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -44,7 +45,9 @@ import static org.openrewrite.internal.StringUtils.readFully;
  */
 public class RewriteRpcProcess extends Thread {
     private final String[] command;
-    private final boolean trace;
+
+    @Setter
+    private boolean trace;
 
     @Nullable
     private Process process;
@@ -53,8 +56,7 @@ public class RewriteRpcProcess extends Thread {
     @Getter
     private JsonRpc rpcClient;
 
-    public RewriteRpcProcess(boolean trace, String... command) {
-        this.trace = trace;
+    public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("JavaScriptRewriteRpcProcess");
         this.setDaemon(false);

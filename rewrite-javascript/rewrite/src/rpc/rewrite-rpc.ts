@@ -55,6 +55,7 @@ export class RewriteRpc {
                 private readonly options: {
                     batchSize?: number,
                     registry?: RecipeRegistry,
+                    logger?: rpc.Logger,
                     traceGetObjectOutput?: boolean,
                     traceGetObjectInput?: Writable,
                     recipeInstallDir?: string
@@ -76,7 +77,7 @@ export class RewriteRpc {
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
 
         this.connection.listen();
     }
@@ -89,7 +90,7 @@ export class RewriteRpc {
     async getObject<P>(id: string): Promise<P> {
         const localObject = this.localObjects.get(id);
         const lastKnownId = localObject ? id : undefined;
-        
+
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
@@ -124,7 +125,6 @@ export class RewriteRpc {
 
     async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
-        // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
             new Parse(inputs, relativeTo)
@@ -253,10 +253,5 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
-    }
-
-    clear() {
-        this.objectMap = new WeakMap<any, string>();
-        this.primitiveMap.clear();
     }
 }

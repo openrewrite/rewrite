@@ -32,7 +32,8 @@ export class InstallRecipes {
     constructor(private readonly recipes: string | { packageName: string, version?: string }) {
     }
 
-    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry): void {
+    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
+                  logger?: rpc.Logger): void {
         connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), async (request) => {
             const beforeInstall = registry.all.size;
             let resolvedPath;
@@ -42,7 +43,6 @@ export class InstallRecipes {
                 const recipePackage = request.recipes;
                 const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
                 await new Promise<void>((resolve, reject) => {
-
                     if (!fs.existsSync(absoluteInstallDir)) {
                         fs.mkdirSync(absoluteInstallDir, {recursive: true});
                         fs.writeFileSync(path.join(absoluteInstallDir, "package.json"),
@@ -52,17 +52,19 @@ export class InstallRecipes {
                     // Rather than using npm on PATH, use `node_cli.js`.
                     // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
                     const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
-                    const installer = spawn("npm", ["install", packageSpec], {
+                    const installer = spawn("npm", ["install", packageSpec, "--no-fund"], {
                         cwd: absoluteInstallDir
                     });
-                    // installer.stdout.on("data", (data: any) => {
-                    //     // TODO write this to rpc log instead
-                    //     console.log(data.toString());
-                    // });
-                    // installer.stderr.on("data", (data: any) => {
-                    //     // TODO write this to rpc log instead
-                    //     console.log(data.toString());
-                    // });
+
+                    if (logger) {
+                        installer.stdout.on("data", (data: any) => {
+                            logger.info(data.toString().trim());
+                        });
+                        installer.stderr.on("data", (data: any) => {
+                            logger.error(data.toString().trim());
+                        });
+                    }
+
                     installer.on("error", reject);
                     installer.on("close", (exitCode: number) => {
                         if (exitCode === 0) {
@@ -117,7 +119,7 @@ function setupSharedDependencies(targetModulePath: string) {
             if (yourModule) {
                 // Find where the target would look for this dependency
                 const targetDir = path.dirname(targetModulePath);
-                const targetDepPath = require.resolve(dep, { paths: [targetDir] });
+                const targetDepPath = require.resolve(dep, {paths: [targetDir]});
 
                 // Make the target use your cached version
                 require.cache[targetDepPath] = yourModule;

@@ -17,8 +17,10 @@ package org.openrewrite.javascript.rpc;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -30,6 +32,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -42,11 +46,24 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
-    JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
+    @TempDir
+    Path tempDir;
+
+    JavaScriptRewriteRpc client;
+
+    @BeforeEach
+    void before() {
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(tempDir.resolve("rpc.log"))
+          .verboseLogging());
+        client = JavaScriptRewriteRpc.getOrStart();
+    }
 
     @AfterEach
-    void after() {
+    void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
+        System.out.println(Files.readString(tempDir.resolve("rpc.log")));
     }
 
     @Override
