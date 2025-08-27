@@ -36,15 +36,15 @@ public class RpcSendQueueTest {
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t).containsExactly(
-              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, null),
-              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1, -1, 2), null, null),
-              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, null) /* A */,
-              new RpcObjectData(RpcObjectData.State.ADD, null, "E", null, null),
-              new RpcObjectData(RpcObjectData.State.ADD, null, "F", null, null),
-              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, null) /* C */
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1, -1, 2), null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* A */,
+              new RpcObjectData(RpcObjectData.State.ADD, null, "E", null),
+              new RpcObjectData(RpcObjectData.State.ADD, null, "F", null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* C */
             );
             latch.countDown();
-        }, new IdentityHashMap<>(), false);
+        }, new IdentityHashMap<>());
 
         q.sendList(after, before, Function.identity(), null);
         q.flush();
@@ -60,13 +60,13 @@ public class RpcSendQueueTest {
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t).containsExactly(
-              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, null),
-              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1), null, null),
-              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, null) /* READ */,
-              new RpcObjectData(RpcObjectData.State.ADD, null, AccessMode.WRITE, null, null)
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1), null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* READ */,
+              new RpcObjectData(RpcObjectData.State.ADD, null, AccessMode.WRITE, null)
             );
             latch.countDown();
-        }, new IdentityHashMap<>(), false);
+        }, new IdentityHashMap<>());
 
         q.sendList(after, before, Function.identity(), null);
         q.flush();
@@ -81,11 +81,11 @@ public class RpcSendQueueTest {
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t).containsExactly(
-              new RpcObjectData(RpcObjectData.State.ADD, null, null, null, null),
-              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(), null, null)
+              new RpcObjectData(RpcObjectData.State.ADD, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(), null)
             );
             latch.countDown();
-        }, new IdentityHashMap<>(), false);
+        }, new IdentityHashMap<>());
 
         q.sendList(after, null, Function.identity(), null);
         q.flush();
