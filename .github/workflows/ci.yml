@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@java25
     with:
       java_version: 25-ea
     secrets:
