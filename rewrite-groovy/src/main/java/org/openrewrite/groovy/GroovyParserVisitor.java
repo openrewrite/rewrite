@@ -204,8 +204,9 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                        ". The surrounding characters in the original source are:\n" +
+                        source.substring(Math.max(0, cursor - 250), cursor) + "~cursor~>" +
+                        source.substring(cursor, Math.min(source.length(), cursor + 250)), t);
             }
         }
 

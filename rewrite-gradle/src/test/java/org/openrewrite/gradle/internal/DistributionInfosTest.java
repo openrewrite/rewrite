@@ -37,10 +37,11 @@ class DistributionInfosTest {
         GradleWrapper.GradleVersion gradleVersion = new GradleWrapper.GradleVersion(
           "7.6",
           "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
+          GradleWrapper.DistributionType.Bin,
           "https://services.gradle.org/distributions/gradle-7.6-bin.zip.sha256",
           "https://services.gradle.org/distributions/gradle-7.6-wrapper.jar.sha256"
         );
-        DistributionInfos infos = DistributionInfos.fetch(GradleWrapper.DistributionType.Bin, gradleVersion,
+        DistributionInfos infos = DistributionInfos.fetch(gradleVersion,
           HttpSenderExecutionContextView.view(new InMemoryExecutionContext()).setHttpSender(httpSender));
 
         assertThat(infos).isEqualTo(new DistributionInfos(

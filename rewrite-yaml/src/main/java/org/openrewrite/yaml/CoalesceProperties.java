@@ -31,18 +31,20 @@ import static java.util.Collections.emptyList;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CoalesceProperties extends Recipe {
-
     @Option(displayName = "Exclusions",
             description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions to specify keys that should not be unfolded.",
-            example = "$..[org.springframework.security]")
-    List<String> exclusions;
+            example = "$..[org.springframework.security]",
+            required = false)
+    @Nullable List<String> exclusions;
 
     @Option(displayName = "Apply to",
             description = "An optional list of [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expressions that specify which keys the recipe should target only. " +
                     "Only the properties matching these expressions will be unfolded.",
-            example = "$..[org.springframework.security]")
-    List<String> applyTo;
+            example = "$..[org.springframework.security]",
+            required = false)
+    @Nullable List<String> applyTo;
 
+    @Deprecated
     public CoalesceProperties() {
         this(null, null);
     }

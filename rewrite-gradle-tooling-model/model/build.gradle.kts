@@ -69,6 +69,7 @@ val testManifestTask = tasks.register("testManifest") {
         testManifestFile.get().asFile.writeText(pluginLocalTestClasspath.files.joinToString(separator = "\n") { it.absolutePath })
     }
 }
+
 artifacts {
     // So that rewrite-gradle can retrieve the manifest, too
     add(pluginLocalTestClasspath.name, testManifestTask)

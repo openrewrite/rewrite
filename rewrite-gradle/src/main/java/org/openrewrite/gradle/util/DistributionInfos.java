@@ -35,23 +35,16 @@ public class DistributionInfos {
     @Nullable
     Checksum wrapperJarChecksum;
 
-    public static DistributionInfos fetch(GradleWrapper.DistributionType distributionType,
-                                   GradleWrapper.GradleVersion gradleVersion, ExecutionContext ctx) throws IOException {
+    public static DistributionInfos fetch(GradleWrapper.GradleVersion gradleVersion, ExecutionContext ctx) throws IOException {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        String downloadUrl = toDistTypeUrl(distributionType, gradleVersion.getDownloadUrl());
-        Checksum checksum = fetchChecksum(httpSender, toDistTypeUrl(distributionType, gradleVersion.getChecksumUrl()));
+        Checksum checksum = gradleVersion.getChecksumUrl() == null ?
+                null :
+                fetchChecksum(httpSender, gradleVersion.getChecksumUrl());
         Checksum jarChecksum = gradleVersion.getWrapperChecksumUrl() == null ?
                 null :
                 fetchChecksum(httpSender, gradleVersion.getWrapperChecksumUrl());
 
-        return new DistributionInfos(downloadUrl, checksum, jarChecksum);
-    }
-
-    private static String toDistTypeUrl(GradleWrapper.DistributionType distributionType, String binUrl) {
-        if (distributionType == GradleWrapper.DistributionType.All) {
-            return binUrl.replace("-bin.zip", "-all.zip");
-        }
-        return binUrl;
+        return new DistributionInfos(gradleVersion.getDownloadUrl(), checksum, jarChecksum);
     }
 
     private static Checksum fetchChecksum(HttpSender httpSender, String checksumUrl) {

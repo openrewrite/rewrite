@@ -5,7 +5,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmitOnError": true,
-    "removeComments": true
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true
   },
   "include": [
     "src/**/*"
