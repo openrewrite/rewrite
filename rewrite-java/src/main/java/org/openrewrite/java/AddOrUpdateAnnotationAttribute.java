@@ -135,7 +135,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return ((J.Identifier) as.getVariable()).getSimpleName().equals(name);
                     }
                 }
-                return name.equals("value");
+                return "value".equals(name);
             }
 
             private boolean alreadyContainsAttributeOfName(J.Annotation annotation, String name) {
@@ -782,7 +782,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         return true;
                     }
                 }
-            } else if (attributeName().equals("value")) {
+            } else if ("value".equals(attributeName())) {
                 return true;
             }
         }
