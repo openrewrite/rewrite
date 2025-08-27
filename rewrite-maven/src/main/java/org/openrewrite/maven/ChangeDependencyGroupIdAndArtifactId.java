@@ -156,8 +156,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresents(newGroupId, newArtifactId, newVersion);
-                // Any managed dependency change is unlikely to use the same version, so only update selectively.
-                if ((changeManagedDependency == null || changeManagedDependency) && newVersion != null || versionPattern != null) {
+                if (changeManagedDependency == null || changeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             Optional.ofNullable(newGroupId).orElse(oldGroupId),
