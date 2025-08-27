@@ -147,7 +147,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     List<Expression> args = a.getArguments();
                     // Case for existing attribute: `@Foo("q")` -> @Foo(value = "q")
                     if (args.size() == 1 && !(args.get(0) instanceof J.Assignment)) {
-                        args = Collections.singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
+                        args = singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
                     }
                     a = a.withArguments(ListUtils.concat(as, args));
                 }
