@@ -17,4 +17,3 @@ jobs:
     uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@java25
     with:
       recipe: 'org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset'
-      additional_gradle_args: '-x :rewrite-java-25:compileJava -x :rewrite-java-25:processResources -x :rewrite-java-25:classes -x :rewrite-java-25:licenseFormat -x :rewrite-java-25:licenseMain -x :rewrite-java-25:rewriteRun'
