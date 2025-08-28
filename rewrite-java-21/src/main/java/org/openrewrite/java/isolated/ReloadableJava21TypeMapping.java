@@ -46,7 +46,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     private final JavaTypeCache typeCache;
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || isUnknownType(type) ||
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
@@ -488,7 +488,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR ||
-                isUnknownType(symbol.type)) {
+            symbol.type instanceof Type.UnknownType) {
             return null;
         }
 
@@ -553,7 +553,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     exceptionTypes.add(javaType);
                 }
             }
-        } else if (isUnknownType(selectType)) {
+        } else if (selectType instanceof Type.UnknownType) {
             returnType = JavaType.Unknown.getInstance();
         }
 
@@ -775,12 +775,5 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return annotationElementValue(((Attribute.Enum) value).value);
         }
         return JavaType.Unknown.getInstance();
-    }
-
-    /**
-     * Check for the `UnknownType` which existed up until JDK 22; starting with JDK 23 only the `ErrorType` is used
-     */
-    public static boolean isUnknownType(@Nullable Type type) {
-        return type != null && type.getClass().getName().equals("com.sun.tools.javac.code.Type$UnknownType");
     }
 }

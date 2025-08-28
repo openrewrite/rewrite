@@ -40,7 +40,7 @@ class ReloadableJava25TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null ||  type instanceof NullType) {
+        if (type == null || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
