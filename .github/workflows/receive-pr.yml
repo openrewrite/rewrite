@@ -14,7 +14,6 @@ concurrency:
 # Since this pull request receives untrusted code, we should **NOT** have any secrets in the environment.
 jobs:
   upload-patch:
-    uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@java25
+    uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main
     with:
       recipe: 'org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset'
-      additional_gradle_args: '-x :rewrite-java-25:licenseFormat -x :rewrite-java-25:rewriteRun'
