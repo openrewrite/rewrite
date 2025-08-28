@@ -27,16 +27,11 @@ dependencies {
 
 java {
     toolchain {
-        // Use Java 25 if available, otherwise use 21
-        val javaVersion = System.getProperty("java.version")
-        val toolchainVersion = if (javaVersion?.startsWith("25") == true) {
-            25
-        } else {
-            21
-        }
-        languageVersion.set(JavaLanguageVersion.of(toolchainVersion))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
+
+tasks.named("licenseFormat") { enabled = false }
 
 tasks.withType<JavaCompile>().configureEach {
     // allows --add-exports to in spite of the JDK's restrictions on this
