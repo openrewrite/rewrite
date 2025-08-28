@@ -158,7 +158,7 @@ class RecipeSchedulerTest implements RewriteTest {
         );
         recipe.addUninitialized(new RecipeWritingToFile(1));
         recipe.addUninitialized(new RecipeWritingToFile(2));
-        recipe.initialize(List.of(), Map.of());
+        recipe.initialize(List.of());
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(recipe),
           text("foo", "bar")

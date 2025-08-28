@@ -66,7 +66,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               dr.addUninitialized(
                 new ChangeText("3")
               );
-              dr.initialize(List.of(), Map.of());
+              dr.initialize(List.of());
               spec.recipe(dr);
           },
           text("1", "3"),
@@ -95,7 +95,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         dr.addUninitialized(
           new ChangeText("3")
         );
-        dr.initialize(List.of(), Map.of());
+        dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
           .hasSize(3) // precondition + 2 recipes with options
           .flatExtracting(RecipeDescriptor::getOptions)
@@ -336,7 +336,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, emptyList());
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
-        dr.initialize(List.of(), Map.of());
+        dr.initialize(List.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
 
