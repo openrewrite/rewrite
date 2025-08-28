@@ -1823,7 +1823,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
-            String.format("""
+                  """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1842,7 +1842,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependency>
                     </dependencies>
                 </project>
-                """, projectVersion),
+                """.formatted(projectVersion),
             """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
@@ -1872,8 +1872,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
-            //language=xml
-            String.format("""
+                  //language=xml
+                  """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1892,7 +1892,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependency>
                     </dependencies>
                 </project>
-                """, projectVersion)
+                """.formatted(projectVersion)
           )
         );
     }

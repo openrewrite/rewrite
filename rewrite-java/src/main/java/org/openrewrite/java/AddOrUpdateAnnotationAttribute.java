@@ -98,7 +98,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             @Override
             public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
                 J.Annotation a = super.visitAnnotation(original, ctx);
-                if (!TypeUtils.isOfClassType(a.getType(), annotationType) || !findMethod(a, attributeName()).isPresent()) {
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType) ||
+                        !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
                     return a;
                 }
 
@@ -143,7 +144,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
                 if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues())) {
                     J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
-                    a = a.withArguments(ListUtils.concat(as, a.getArguments()));
+                    List<Expression> args = a.getArguments();
+                    // Case for existing attribute: `@Foo("q")` -> @Foo(value = "q")
+                    if (args.size() == 1 && !(args.get(0) instanceof J.Assignment)) {
+                        args = singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
+                    }
+                    a = a.withArguments(ListUtils.concat(as, args));
                 }
 
                 if (original != a) {
@@ -340,7 +346,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
-            if (TypeUtils.isAssignableTo("java.lang.String", fa.getType())) {
+            if (!(fa.getTarget() instanceof J.Identifier)) {
                 return oldAttributeValue.equals(fa.toString());
             }
             String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();

@@ -34,8 +34,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -43,6 +45,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Adler32;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 
@@ -52,28 +55,43 @@ public class GradleWrapperScriptDownloader {
     public static void main(String[] args) throws IOException, InterruptedException {
         Lock lock = new ReentrantLock();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        List<GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllVersions(ctx);
+        Map<String, GradleWrapper.GradleVersion> allGradleReleases = GradleWrapper.listAllPublicVersions(ctx)
+                .stream()
+                .filter(v -> v.getDistributionType() == GradleWrapper.DistributionType.Bin)
+                .collect(toMap(GradleWrapper.GradleVersion::getVersion, v -> v));
         Map<String, GradleWrapperScriptLoader.Version> allDownloadedVersions =
                 new ConcurrentHashMap<>(new GradleWrapperScriptLoader().getAllVersions());
+        allDownloadedVersions.forEach((key, value) -> {
+            if (!allGradleReleases.containsKey(key)) {
+                allDownloadedVersions.remove(key);
+            }
+        });
 
+        Set<String> unixChecksums = new CopyOnWriteArraySet<>();
+        Set<String> batChecksums = new CopyOnWriteArraySet<>();
         AtomicInteger i = new AtomicInteger();
         ForkJoinPool pool = ForkJoinPool.commonPool();
-        pool.invokeAll(allGradleReleases.stream().map(version -> (Callable<Void>) () -> {
+        pool.invokeAll(allGradleReleases.values().stream().map(version -> (Callable<Void>) () -> {
             String v = version.getVersion();
             String threadName = " [" + Thread.currentThread().getName() + "]";
 
             if (allDownloadedVersions.containsKey(v)) {
+                unixChecksums.add(allDownloadedVersions.get(v).getGradlewChecksum());
+                batChecksums.add(allDownloadedVersions.get(v).getGradlewChecksum());
                 System.out.printf("%03d: %s already exists. Skipping.%s%n", i.incrementAndGet(),
                         v, threadName);
                 return null;
             }
 
             try {
-                DistributionInfos infos = DistributionInfos.fetch(GradleWrapper.DistributionType.Bin, version, ctx);
+                DistributionInfos infos = DistributionInfos.fetch(version, ctx);
                 GradleWrapper wrapper = new GradleWrapper(v, infos);
 
                 String gradlewChecksum = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
                 String gradlewBatChecksum = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
+
+                unixChecksums.add(gradlewChecksum);
+                batChecksums.add(gradlewBatChecksum);
 
                 lock.lock();
                 allDownloadedVersions.put(v, new GradleWrapperScriptLoader.Version(v, gradlewChecksum, gradlewBatChecksum));
@@ -102,6 +120,9 @@ public class GradleWrapperScriptDownloader {
             //noinspection BusyWait
             Thread.sleep(100);
         }
+
+        cleanupScripts("unix", unixChecksums);
+        cleanupScripts("windows", batChecksums);
     }
 
     private static String downloadScript(Path wrapperScriptLocation, GradleWrapper wrapper, String os,
@@ -125,5 +146,18 @@ public class GradleWrapperScriptDownloader {
         }
 
         return scriptChecksum;
+    }
+
+    private static void cleanupScripts(String os, Set<String> checksums) throws IOException {
+        Files.list(WRAPPER_SCRIPTS.resolve(os))
+                .forEach(path -> {
+                    if (!checksums.contains(path.getFileName().toString().replace(".txt", ""))) {
+                        try {
+                            Files.delete(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
     }
 }

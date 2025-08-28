@@ -65,11 +65,11 @@ public class DeleteProperty extends Recipe {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                 Properties.File f1 = (Properties.File) super.visitFile(file, ctx);
-                AtomicReference<String> prefixOnNextEntry = new AtomicReference<>("\n");
+                AtomicReference<@Nullable String> prefixOnNextEntry = new AtomicReference<>(null);
                 AtomicBoolean deleted = new AtomicBoolean(false);
                 Properties.File mapped = f1.withContent(ListUtils.map(f1.getContent(), (index, current) -> {
                     if (current instanceof Properties.Comment && nextEntryMatches(f1.getContent(), index)) {
-                        prefixOnNextEntry.compareAndSet("\n", current.getPrefix());
+                        prefixOnNextEntry.compareAndSet(null, current.getPrefix());
                         return null;
                     }
                     if (isMatch(current)) {
@@ -77,13 +77,15 @@ public class DeleteProperty extends Recipe {
                         return null;
                     }
                     if (deleted.getAndSet(false)) {
-                        String prefix = prefixOnNextEntry.getAndSet("\n");
-                        return (Properties.Content) current.withPrefix(prefix);
+                        String prefix = prefixOnNextEntry.getAndSet(null);
+                        if (prefix != null) {
+                            return (Properties.Content) current.withPrefix(prefix);
+                        }
                     }
                     return current;
                 }));
                 if (f1 != mapped) {
-                   return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
+                    return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
                 }
                 return mapped;
             }

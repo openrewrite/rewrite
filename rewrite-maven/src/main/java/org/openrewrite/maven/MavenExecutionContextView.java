@@ -218,6 +218,23 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_ACTIVE_PROFILES, emptyList());
     }
 
+    /**
+     * Replaces the current Maven execution settings with the provided {@link MavenSettings}.
+     * <p>
+     * This method does <strong>not</strong> merge with or preserve any existing configuration.
+     * All previously configured repositories, mirrors, credentials, active profiles,
+     * and local repository settings will be discarded and replaced entirely with those
+     * derived from the given {@code settings}.
+     * </p>
+     *
+     * <p>If {@code settings} is {@code null}, this call is a no-op and the current
+     * configuration remains unchanged.</p>
+     *
+     * @param settings        the Maven settings to apply; if {@code null}, no changes are made
+     * @param activeProfiles  additional active profiles to consider; these are resolved
+     *                        against the provided settings to determine the effective profiles
+     * @return this execution context view with the updated Maven settings applied
+     */
     public MavenExecutionContextView setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
         if (settings == null) {
             return this;

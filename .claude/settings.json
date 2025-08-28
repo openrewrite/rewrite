@@ -1,6 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npm view:*)",
+      "Bash(npx:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
       "Bash(../gradlew dependencies:*)",
       "Bash(./gradlew:*)",
       "Bash(cat:*)",
@@ -38,7 +42,11 @@
       "mcp__idea__replace_specific_text",
       "mcp__idea__replace_text_in_file",
       "mcp__idea__search_in_files_by_text",
-      "mcp__idea__search_in_files_content"
+      "mcp__idea__search_in_files_content",
+      "Bash(../../gradlew dependencies --configuration runtimeClasspath)",
+      "Bash(../../gradlew dependencies --configuration implementation)",
+      "Bash(../../gradlew dependencies)",
+      "Bash(../../gradlew dependencies --configuration compileClasspath)"
     ],
     "deny": []
   }

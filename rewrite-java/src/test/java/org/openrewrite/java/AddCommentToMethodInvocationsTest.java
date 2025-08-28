@@ -33,6 +33,7 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
           """
             package foo;
             public class Foo {
+                public Foo(String a) {}
                 public void bar(String arg) {}
                 public boolean gar() {
                     return true;
@@ -217,6 +218,34 @@ class AddCommentToMethodInvocationsTest implements RewriteTest {
                   void method(Foo foo) {
                       /* this is a * terrible idea */
                       foo.bar("a");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleNewClass() {
+        rewriteRun(
+          spec -> spec.recipe(new AddCommentToMethodInvocations("commenting on a new class", "foo.Foo <constructor>(..)")),
+          //language=java
+          java(
+            """
+              import foo.Foo;
+              
+              class Other {
+                  void method() {
+                      Foo foo = new Foo("hi");
+                  }
+              }
+              """,
+            """
+              import foo.Foo;
+              
+              class Other {
+                  void method() {
+                      Foo foo = /* commenting on a new class */ new Foo("hi");
                   }
               }
               """
