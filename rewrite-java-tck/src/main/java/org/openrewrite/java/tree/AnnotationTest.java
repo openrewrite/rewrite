@@ -20,9 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.MinimumJava21;
+import org.openrewrite.java.*;
 import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
 
@@ -476,26 +474,32 @@ class AnnotationTest implements RewriteTest {
     @Test // Because of `@Deprecated#forRemoval`
     void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
-        /*
-         *     Using these annotations in core library for testing this feature:
-         *
-         *     @Deprecated(since="1.2", forRemoval=true)
-         *     public final void stop()
-         *
-         *     @CallerSensitive
-         *     public ClassLoader getContextClassLoader() {
-         */
         List<SourceFile> sourceFiles = p.parse(
           """
-            class Test {
-              public void test() {
-                Thread.currentThread().stop();
-                Thread.currentThread().getContextClassLoader();
+          package a.b;
+          
+          public class Dummy {
+              @Deprecated(since = "1.2", forRemoval = true)
+              static void deprecatedWithParams() {
               }
+          
+              @Deprecated
+              static void deprecatedWithoutParams() {
+              }
+          }
+          """,
+          """
+          import a.b.Dummy;
+          
+          class Test {
+            public void test() {
+              Dummy.deprecatedWithParams();
+              Dummy.deprecatedWithoutParams();
             }
-            """
+          }
+          """
         ).toList();
-        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(0);
+        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(1);
 
         J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
         J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
@@ -511,7 +515,7 @@ class AnnotationTest implements RewriteTest {
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive", annotation.getType().getFullyQualifiedName());
+        assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
     }
 

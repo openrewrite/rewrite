@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,8 +30,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-
-class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
+class ReloadableJava25TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
 
@@ -41,7 +40,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
+        if (type == null || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
@@ -299,7 +298,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
+        } else if (selectType instanceof Type.JCNoType) {
             return "{undefined}";
         }
 

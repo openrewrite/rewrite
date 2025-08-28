@@ -52,8 +52,10 @@ export class InstallRecipes {
                     // Rather than using npm on PATH, use `node_cli.js`.
                     // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
                     const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                    // Use shell: true to handle platform differences (npm vs npm.cmd on Windows)
                     const installer = spawn("npm", ["install", packageSpec], {
-                        cwd: absoluteInstallDir
+                        cwd: absoluteInstallDir,
+                        shell: true
                     });
                     // installer.stdout.on("data", (data: any) => {
                     //     // TODO write this to rpc log instead

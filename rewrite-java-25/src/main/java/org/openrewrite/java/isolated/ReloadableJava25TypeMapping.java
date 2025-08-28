@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,15 +39,14 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
-class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
+class ReloadableJava25TypeMapping implements JavaTypeMapping<Tree> {
 
-    private final ReloadableJava21TypeSignatureBuilder signatureBuilder = new ReloadableJava21TypeSignatureBuilder();
+    private final ReloadableJava25TypeSignatureBuilder signatureBuilder = new ReloadableJava25TypeSignatureBuilder();
 
     private final JavaTypeCache typeCache;
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
-        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-                type instanceof NullType) {
+        if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -487,8 +486,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR ||
-            symbol.type instanceof Type.UnknownType) {
+        if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR) {
             return null;
         }
 
@@ -553,8 +551,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     exceptionTypes.add(javaType);
                 }
             }
-        } else if (selectType instanceof Type.UnknownType) {
-            returnType = JavaType.Unknown.getInstance();
         }
 
         JavaType.FullyQualified resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
