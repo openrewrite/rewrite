@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {ReplacedText} from "./example-recipe";
+import {ReplacedText} from "../fixtures/example-recipe";
 
 describe("data tables", () => {
 

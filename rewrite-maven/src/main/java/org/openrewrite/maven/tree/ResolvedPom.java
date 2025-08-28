@@ -15,17 +15,12 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -47,11 +42,14 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.*;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+// make sure `dependencyManagement` is serialized before `dependencyManagementSorted`
+@JsonPropertyOrder({"requested", "activeProfiles", "properties", "dependencyManagement",
+        "dependencyManagementSorted", "initialRepositories", "repositories",
+        "pluginRepositories", "requestedDependencies", "plugins", "pluginManagement", "subprojects"})
 @Getter
 @Builder
 public class ResolvedPom {
@@ -77,17 +75,16 @@ public class ResolvedPom {
     Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), true, null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, boolean dependencyManagementSorted, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
         this.dependencyManagement = dependencyManagement;
-        // TO-BE-REMOVED(2025-09-01): sorting added for backwards compatibility with older LSTs
-        this.dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
+        this.dependencyManagementSorted = dependencyManagementSorted;
         if (initialRepositories != null) {
             this.initialRepositories = initialRepositories;
         }
@@ -106,6 +103,12 @@ public class ResolvedPom {
     @NonFinal
     @Builder.Default
     List<ResolvedManagedDependency> dependencyManagement = emptyList();
+
+    // TO-BE-REMOVED(2025-11-30): See comment on `getDependencyManagement()`
+    @NonFinal
+    @Builder.Default
+    @Getter(AccessLevel.NONE)
+    boolean dependencyManagementSorted = false;
 
     @NonFinal
     @Builder.Default
@@ -135,6 +138,21 @@ public class ResolvedPom {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
+
+    // Annotation present to ensure that serialized data is always sorted
+    // TO-BE-REMOVED(2025-11-30): Remove this method and instead do simpler eager sorting in `resolveParentDependenciesRecursively()`.
+    //   This cannot be changed right now, because in older serialized models the data is unsorted.
+    @JsonGetter
+    public List<ResolvedManagedDependency> getDependencyManagement() {
+        if (!dependencyManagementSorted) {
+            // Some use cases require concurrent calls to this method
+            synchronized (this) {
+                dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
+                dependencyManagementSorted = true;
+            }
+        }
+        return dependencyManagement;
+    }
 
     /**
      * Deduplicate dependencies.
@@ -184,6 +202,7 @@ public class ResolvedPom {
                 activeProfiles,
                 emptyMap(),
                 emptyList(),
+                true,
                 initialRepositories,
                 emptyList(),
                 emptyList(),
@@ -210,12 +229,13 @@ public class ResolvedPom {
         }
 
         List<ResolvedManagedDependency> resolvedDependencyManagement = resolved.getDependencyManagement();
-        if (dependencyManagement == null || dependencyManagement.size() != resolvedDependencyManagement.size()) {
+        List<ResolvedManagedDependency> currentDependencyManagement = getDependencyManagement();
+        if (currentDependencyManagement.size() != resolvedDependencyManagement.size()) {
             return resolved;
         }
         for (int i = 0; i < resolvedDependencyManagement.size(); i++) {
             // TODO does ResolvedPom's equals work well enough to match on BOM imports?
-            if (!dependencyManagement.get(i).equals(resolvedDependencyManagement.get(i))) {
+            if (!currentDependencyManagement.get(i).equals(resolvedDependencyManagement.get(i))) {
                 return resolved;
             }
         }
@@ -362,13 +382,14 @@ public class ResolvedPom {
     }
 
     public @Nullable ResolvedManagedDependency getManagedDependency(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
-        if (dependencyManagement.isEmpty()) {
+        List<ResolvedManagedDependency> deps = getDependencyManagement();
+        if (deps.isEmpty()) {
             return null;
         }
 
         ResolvedManagedDependency searchKey = createSearchKey(groupId, artifactId, type, classifier);
-        int index = binarySearch(dependencyManagement, searchKey, MANAGED_DEPENDENCY_COMPARATOR);
-        return index >= 0 ? dependencyManagement.get(index) : null;
+        int index = binarySearch(deps, searchKey, MANAGED_DEPENDENCY_COMPARATOR);
+        return index >= 0 ? deps.get(index) : null;
     }
 
     private static ResolvedManagedDependency createSearchKey(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
@@ -474,9 +495,8 @@ public class ResolvedPom {
 
             resolveParentDependenciesRecursively(pomAncestry, managedDependencyMap);
             if (!managedDependencyMap.isEmpty()) {
-                dependencyManagement = managedDependencyMap.values().stream()
-                        .sorted(MANAGED_DEPENDENCY_COMPARATOR)
-                        .collect(toList());
+                dependencyManagement = new ArrayList<>(managedDependencyMap.values());
+                dependencyManagementSorted = false;
             }
         }
 
@@ -576,7 +596,7 @@ public class ResolvedPom {
                         boolean found = false;
                         for (Dependency reqDep : requestedDependencies) {
                             if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId()) &&
-                                reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                    reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
                                 found = true;
                                 break;
                             }
@@ -717,7 +737,7 @@ public class ResolvedPom {
                     // PHASE
                     String mergedPhase = currentExecution.getPhase();
                     if (incomingExecution.getPhase() != null &&
-                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                            !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
                         mergedPhase = incomingExecution.getPhase();
                     }
                     // CONFIGURATION
@@ -957,8 +977,8 @@ public class ResolvedPom {
                 Pom pom = pomAncestry.get(i);
                 ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
                 if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
-                    alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
-                    alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                        alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
+                        alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
                     return true;
                 }
             }
@@ -1000,9 +1020,9 @@ public class ResolvedPom {
                 try {
                     if (depth == 0 && d.getVersion() == null) {
                         String coordinates = d.getGav() +
-                                             (d.getClassifier() == null ? "" : ":" + d.getClassifier()) +
-                                             (d.getType() == null ? "" : ":" + d.getType()) +
-                                             (d.getScope() == null ? "" : ":" + d.getScope());
+                                (d.getClassifier() == null ? "" : ":" + d.getClassifier()) +
+                                (d.getType() == null ? "" : ":" + d.getType()) +
+                                (d.getScope() == null ? "" : ":" + d.getScope());
                         throw new MavenDownloadingException("No version provided for direct dependency " + coordinates, null, dd.getDependency().getGav());
                     }
                     if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType()) && !"tgz".equals(d.getType())))) {
@@ -1046,8 +1066,8 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
@@ -1057,7 +1077,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(),
+                                emptyList(), true, initialRepositories, emptyList(), emptyList(),
                                 emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
@@ -1102,7 +1122,7 @@ public class ResolvedPom {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -1141,7 +1161,7 @@ public class ResolvedPom {
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
+                    (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }
