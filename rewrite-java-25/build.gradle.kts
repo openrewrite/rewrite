@@ -27,14 +27,7 @@ dependencies {
 
 java {
     toolchain {
-        // Use Java 25 if available, otherwise use 21
-        val javaVersion = System.getProperty("java.version")
-        val toolchainVersion = if (javaVersion?.startsWith("25") == true) {
-            25
-        } else {
-            21
-        }
-        languageVersion.set(JavaLanguageVersion.of(toolchainVersion))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
 
