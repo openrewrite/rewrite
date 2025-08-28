@@ -172,7 +172,8 @@ public class GradleWrapper {
     }
 
     private static List<GradleVersion> listAllPrivateArtifactoryVersions(String artifactoryUrl, ExecutionContext ctx) {
-        String artifactoryApiUrl = artifactoryUrl.replace("/artifactory", "/artifactory/api/storage");
+        URI artifactoryUri = URI.create(artifactoryUrl);
+        String artifactoryApiUrl = String.format("%s://%s%s", artifactoryUri.getScheme(), artifactoryUri.getHost(), artifactoryUri.getPath().replace("/artifactory", "/artifactory/api/storage"));
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         try (HttpSender.Response resp = httpSender.send(httpSender.get(artifactoryApiUrl).build())) {
             if (resp.isSuccessful()) {
