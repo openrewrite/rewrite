@@ -16,7 +16,29 @@ jobs:
   upload-patch:
     uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main
     with:
-      java_version: |
-        25-ea
-        21
       recipe: 'org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset'
+      init_gradle: |
+        initscript {
+          repositories {
+            maven { url 'https://plugins.gradle.org/m2' }
+          }
+          dependencies {
+            classpath('org.openrewrite:plugin:latest.release')
+          }
+        }
+        rootProject {
+          // Apply plugin to all projects except rewrite-java-25
+          configure(allprojects.findAll { it.name != 'rewrite-java-25' }) {
+            plugins.apply(org.openrewrite.gradle.RewritePlugin)
+          }
+          dependencies {
+              rewrite('org.openrewrite.recipe:rewrite-rewrite:latest.release')
+          }
+          afterEvaluate {
+            if (repositories.isEmpty()) {
+              repositories {
+                mavenCentral()
+              }
+            }
+          }
+        }
