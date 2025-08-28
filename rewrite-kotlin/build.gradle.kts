@@ -30,7 +30,6 @@ dependencies {
 
 java {
     toolchain {
-        // Use JDK 21 for Kotlin compilation until Kotlin supports JDK 25
         languageVersion = JavaLanguageVersion.of(21)
     }
 }
