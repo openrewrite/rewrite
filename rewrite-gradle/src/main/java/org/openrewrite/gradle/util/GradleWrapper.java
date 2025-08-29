@@ -134,7 +134,7 @@ public class GradleWrapper {
             );
         }
 
-        throw new IllegalStateException("Unsupported distribution url from Gradle wrapper version detection: " + currentDistributionUrl);
+        throw new IllegalStateException("Unsupported distribution url for Gradle wrapper version detection: " + currentDistributionUrl);
     }
 
     public static List<GradleVersion> listAllPublicVersions(ExecutionContext ctx) {
@@ -165,7 +165,7 @@ public class GradleWrapper {
                 }
                 return allGradleVersions;
             }
-            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+            throw new IOException("Could not get Gradle versions from " + GRADLE_VERSIONS_ALL_URL + ": HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -192,7 +192,7 @@ public class GradleWrapper {
                 }
                 return gradleVersions;
             }
-            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+            throw new IOException("Could not get Gradle versions from " + artifactoryApiUrl + ": HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
