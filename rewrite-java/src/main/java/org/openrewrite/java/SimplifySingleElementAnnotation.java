@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -41,44 +42,42 @@ public class SimplifySingleElementAnnotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return getVisitor(null);
+        return new ExecutionContextJavaIsoVisitor(null);
     }
 
     public <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
-        return getVisitor(scope);
+        return new ExecutionContextJavaIsoVisitor(scope);
     }
 
-    public TreeVisitor<?, ExecutionContext> getVisitor(@Nullable J scope) {
+    @Value
+    private static class ExecutionContextJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
+        @Nullable
+        J scope;
 
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                J.Annotation an = super.visitAnnotation(annotation, executionContext);
-                if (an.getArguments() != null && an.getArguments().size() == 1 && inScope(an, scope)) {
-                    an = an.withArguments(ListUtils.mapFirst(an.getArguments(), v -> {
-                        if (v instanceof J.Assignment &&
-                                ((J.Assignment) v).getVariable() instanceof J.Identifier &&
-                                "value".equals(((J.Identifier) ((J.Assignment) v).getVariable()).getSimpleName())) {
-                            Expression assignment = ((J.Assignment) v).getAssignment();
-                            if (assignment instanceof J.NewArray) {
-                                J.NewArray na = (J.NewArray) assignment;
-                                List<Expression> initializer = na.getInitializer();
-                                if (initializer != null && initializer.size() == 1 && !(initializer.get(0) instanceof J.Empty)) {
-                                    return initializer.get(0).withPrefix(Space.EMPTY);
-                                }
+        @Override
+        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+            J.Annotation an = super.visitAnnotation(annotation, executionContext);
+            if (an.getArguments() != null &&
+                    an.getArguments().size() == 1 &&
+                    (scope == null || an.equals(scope))) {
+                return an.withArguments(ListUtils.mapFirst(an.getArguments(), v -> {
+                    if (v instanceof J.Assignment &&
+                            ((J.Assignment) v).getVariable() instanceof J.Identifier &&
+                            "value".equals(((J.Identifier) ((J.Assignment) v).getVariable()).getSimpleName())) {
+                        Expression assignment = ((J.Assignment) v).getAssignment();
+                        if (assignment instanceof J.NewArray) {
+                            J.NewArray na = (J.NewArray) assignment;
+                            List<Expression> initializer = na.getInitializer();
+                            if (initializer != null && initializer.size() == 1 && !(initializer.get(0) instanceof J.Empty)) {
+                                return initializer.get(0).withPrefix(Space.EMPTY);
                             }
-                            return assignment.withPrefix(Space.EMPTY);
                         }
-                        return v;
-                    }));
-                }
-
-                return an;
+                        return assignment.withPrefix(Space.EMPTY);
+                    }
+                    return v;
+                }));
             }
-        };
-    }
-
-    private boolean inScope(J.Annotation annotation, @Nullable J scope) {
-        return scope == null || annotation.equals(scope);
+            return an;
+        }
     }
 }

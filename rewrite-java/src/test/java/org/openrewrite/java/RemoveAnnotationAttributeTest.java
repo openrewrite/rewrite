@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,20 +29,20 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RemoveAnnotationAttribute("TestAnnotation", "deletedAttribute"))
-        .parser(JavaParser.fromJavaVersion().dependsOn(
-          """
-            @interface SomeAnnotation {
-                  String value();
-                  String attributeX() default "";
-            }
-            
-            @interface TestAnnotation {
-                  String attributeA();
-                  String deletedAttribute() default "";
-                  String value() default "";
-            }
+          .parser(JavaParser.fromJavaVersion().dependsOn(
             """
-        ));
+              @interface SomeAnnotation {
+                    String value();
+                    String attributeX() default "";
+              }
+              
+              @interface TestAnnotation {
+                    String attributeA();
+                    String deletedAttribute() default "";
+                    String value() default "";
+              }
+              """
+          ));
     }
 
     @Nested
@@ -117,6 +118,7 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
     }
 
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/5976")
     @Nested
     class TwoAnnotations {
         @Test
