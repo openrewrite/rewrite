@@ -42,15 +42,15 @@ public class SimplifySingleElementAnnotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ExecutionContextJavaIsoVisitor(null);
+        return new SimplifySingleElementAnnotationVisitor(null);
     }
 
-    public <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
-        return new ExecutionContextJavaIsoVisitor(scope);
+    public static <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
+        return new SimplifySingleElementAnnotationVisitor(scope);
     }
 
     @Value
-    private static class ExecutionContextJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class SimplifySingleElementAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Nullable
         J scope;
 

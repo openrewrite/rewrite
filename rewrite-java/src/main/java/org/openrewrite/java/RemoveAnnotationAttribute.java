@@ -99,7 +99,7 @@ public class RemoveAnnotationAttribute extends Recipe {
                 if (a != withoutAttribute &&
                         withoutAttribute.getArguments() != null &&
                         withoutAttribute.getArguments().size() == 1) {
-                    doAfterVisit(new SimplifySingleElementAnnotation().modifyOnly(withoutAttribute));
+                    doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
                 }
                 return withoutAttribute;
             }
