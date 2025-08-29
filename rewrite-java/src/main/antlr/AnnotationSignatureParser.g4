@@ -18,7 +18,7 @@ elementValuePairs
     ;
 
 elementValuePair
-    :   Identifier ASSIGN elementValue
+    :   SPACE* Identifier SPACE* ASSIGN SPACE* elementValue
     ;
 
 elementValue
