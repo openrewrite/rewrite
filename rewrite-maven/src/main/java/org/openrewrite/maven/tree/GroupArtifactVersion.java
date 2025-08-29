@@ -17,11 +17,8 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.errorprone.annotations.InlineMe;
-import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
@@ -46,10 +43,6 @@ public class GroupArtifactVersion implements Serializable {
 
     @Nullable
     String version;
-
-    // Lazily computed hash code for efficient map key usage
-    @NonFinal
-    transient int hash;
 
     @InlineMe(replacement = "GroupArtifactVersion.of(groupId, artifactId, version)", imports = "org.openrewrite.maven.tree.GroupArtifactVersion")
     public GroupArtifactVersion(@Nullable String groupId, String artifactId, @Nullable String version) {
@@ -110,29 +103,5 @@ public class GroupArtifactVersion implements Serializable {
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
         return GroupArtifactVersion.of(ga.getGroupId(), ga.getArtifactId(), version);
-    }
-
-    @Override
-    public int hashCode() {
-        int h = hash;
-        if (h == 0) {
-            h = Objects.hash(groupId, artifactId, version);
-            hash = h;
-        }
-        return h;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        GroupArtifactVersion that = (GroupArtifactVersion) o;
-        return Objects.equals(groupId, that.groupId) &&
-               Objects.equals(artifactId, that.artifactId) &&
-               Objects.equals(version, that.version);
     }
 }
