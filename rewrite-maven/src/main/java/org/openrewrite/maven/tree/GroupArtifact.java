@@ -16,14 +16,89 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
-import lombok.With;
+import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.lang.ref.WeakReference;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 
 @Value
-@With
 public class GroupArtifact implements Serializable {
+    private static final LinkedHashMap<String, WeakReference<GroupArtifact>> CACHE = new LinkedHashMap<String, WeakReference<GroupArtifact>>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry eldest) {
+            return size() > 10_000;
+        }
+    };
+
     String groupId;
     String artifactId;
+
+    @NonFinal
+    transient int hash;
+
+    /**
+     * Static factory method of() should be used instead. This is temporarily still public for minimally-disruptive deprecation.
+     */
+    @Deprecated
+    @InlineMe(replacement = "GroupArtifact.of(groupId, artifactId)", imports = "org.openrewrite.maven.tree.GroupArtifact")
+    public GroupArtifact(String groupId, String artifactId) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+    }
+
+    @JsonCreator
+    public static GroupArtifact of(
+            @Nullable String groupId,
+            String artifactId) {
+        String finalGroup = groupId == null ? "" : groupId;
+        String key = finalGroup + ":" + artifactId;
+
+        synchronized (CACHE) {
+            WeakReference<GroupArtifact> ref = CACHE.get(key);
+            GroupArtifact instance = ref != null ? ref.get() : null;
+
+            if (instance == null) {
+                instance = new GroupArtifact(finalGroup, artifactId);
+                CACHE.put(key, new WeakReference<>(instance));
+            }
+
+            return instance;
+        }
+    }
+
+    public GroupArtifact withGroupId(String groupId) {
+        return groupId.equals(this.groupId) ? this : of(groupId, artifactId);
+    }
+
+    public GroupArtifact withArtifactId(String artifactId) {
+        return artifactId.equals(this.artifactId) ? this : of(groupId, artifactId);
+    }
+
+    @Override
+    public int hashCode() {
+        int h = hash;
+        if (h == 0) {
+            h = Objects.hash(artifactId, groupId);
+        }
+        return h;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        GroupArtifact that = (GroupArtifact) o;
+        return Objects.equals(groupId, that.groupId) && Objects.equals(artifactId, that.artifactId);
+    }
 }

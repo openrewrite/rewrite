@@ -133,7 +133,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
-                accumulator.projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
+                accumulator.projectArtifacts.add(GroupArtifact.of(pom.getGroupId(), pom.getArtifactId()));
                 return super.visitDocument(document, ctx);
             }
 
@@ -306,7 +306,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String artifactId = managedDependency.getArtifactId();
                     String version = managedDependency.getVersion();
                     if (version != null &&
-                        !accumulator.projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
+                        !accumulator.projectArtifacts.contains(GroupArtifact.of(groupId, artifactId)) &&
                         matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
                         matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
                         return upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
@@ -316,7 +316,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         if (dm.getBomGav() != null) {
                             String group = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
                             String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
-                            if (!accumulator.projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
+                            if (!accumulator.projectArtifacts.contains(GroupArtifact.of(group, artifactId))) {
                                 ResolvedGroupArtifactVersion bom = dm.getBomGav();
                                 if (Objects.equals(group, bom.getGroupId()) &&
                                     Objects.equals(artifactId, bom.getArtifactId())) {

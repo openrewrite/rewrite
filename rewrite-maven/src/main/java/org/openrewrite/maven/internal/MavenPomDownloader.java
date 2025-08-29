@@ -175,7 +175,7 @@ public class MavenPomDownloader {
         for (Pom projectPom : projectPoms.values()) {
             List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
             Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
-            GroupArtifactVersion gav = new GroupArtifactVersion(
+            GroupArtifactVersion gav = GroupArtifactVersion.of(
                     projectPom.getGroupId(),
                     projectPom.getArtifactId(),
                     ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
@@ -223,7 +223,7 @@ public class MavenPomDownloader {
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
-        return downloadMetadata(new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
+        return downloadMetadata(GroupArtifactVersion.of(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
                 containingPom,
                 repositories);
     }
@@ -553,7 +553,7 @@ public class MavenPomDownloader {
                 continue;
             }
 
-            ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
+            ResolvedGroupArtifactVersion resolvedGav = ResolvedGroupArtifactVersion.of(
                     repo.getUri(), gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), versionMaybeDatedSnapshot);
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
 

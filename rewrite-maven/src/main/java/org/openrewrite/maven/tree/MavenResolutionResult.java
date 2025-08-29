@@ -189,7 +189,7 @@ public class MavenResolutionResult implements Marker {
                 dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
             } catch (MavenDownloadingExceptions e) {
                 for (MavenDownloadingException exception : e.getExceptions()) {
-                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(
+                    if (exceptionsInLowerScopes.computeIfAbsent(GroupArtifact.of(
                             exception.getRoot().getGroupId() == null ? "" : exception.getRoot().getGroupId(),
                             exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
                         exceptions = MavenDownloadingExceptions.append(exceptions, exception);

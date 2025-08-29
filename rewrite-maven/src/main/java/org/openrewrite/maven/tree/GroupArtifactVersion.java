@@ -16,16 +16,29 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.errorprone.annotations.InlineMe;
+import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.lang.ref.WeakReference;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @Value
-@With
 public class GroupArtifactVersion implements Serializable {
+    private static final LinkedHashMap<String, WeakReference<GroupArtifactVersion>> CACHE = new LinkedHashMap<String, WeakReference<GroupArtifactVersion>>() {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry eldest) {
+            return size() > 10_000;
+        }
+    };
+
     @Nullable
     String groupId;
 
@@ -34,10 +47,35 @@ public class GroupArtifactVersion implements Serializable {
     @Nullable
     String version;
 
+    // Lazily computed hash code for efficient map key usage
+    @NonFinal
+    transient int hash;
+
+    @InlineMe(replacement = "GroupArtifactVersion.of(groupId, artifactId, version)", imports = "org.openrewrite.maven.tree.GroupArtifactVersion")
     public GroupArtifactVersion(@Nullable String groupId, String artifactId, @Nullable String version) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
+    }
+
+    @JsonCreator
+    public static GroupArtifactVersion of(
+            @Nullable String groupId,
+            String artifactId,
+            @Nullable String version) {
+        String key = (groupId == null ? "" : groupId) + ":" + artifactId + ":" + (version == null ? "" : version);
+
+        synchronized (CACHE) {
+            WeakReference<GroupArtifactVersion> ref = CACHE.get(key);
+            GroupArtifactVersion instance = ref != null ? ref.get() : null;
+
+            if (instance == null) {
+                instance = new GroupArtifactVersion(groupId, artifactId, version);
+                CACHE.put(key, new WeakReference<>(instance));
+            }
+
+            return instance;
+        }
     }
 
     @Override
@@ -47,7 +85,7 @@ public class GroupArtifactVersion implements Serializable {
     }
 
     public GroupArtifact asGroupArtifact() {
-        return new GroupArtifact(groupId == null ? "" : groupId, artifactId);
+        return GroupArtifact.of(groupId, artifactId);
     }
 
     /**
@@ -55,13 +93,46 @@ public class GroupArtifactVersion implements Serializable {
      * Usable when repository of resolution or dated snapshot version are irrelevant.
      */
     public ResolvedGroupArtifactVersion asResolved() {
-        return new ResolvedGroupArtifactVersion(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
+        return ResolvedGroupArtifactVersion.of(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
+    }
+
+    public GroupArtifactVersion withGroupId(@Nullable String groupId) {
+        return Objects.equals(groupId, this.groupId) ? this : of(groupId, artifactId, version);
+    }
+
+    public GroupArtifactVersion withArtifactId(String artifactId) {
+        return Objects.equals(artifactId, this.artifactId) ? this : of(groupId, artifactId, version);
+    }
+
+    public GroupArtifactVersion withVersion(@Nullable String version) {
+        return Objects.equals(version, this.version) ? this : of(groupId, artifactId, version);
     }
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
-        if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
-            return this;
+        return GroupArtifactVersion.of(ga.getGroupId(), ga.getArtifactId(), version);
+    }
+
+    @Override
+    public int hashCode() {
+        int h = hash;
+        if (h == 0) {
+            h = Objects.hash(groupId, artifactId, version);
+            hash = h;
         }
-        return new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version);
+        return h;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        GroupArtifactVersion that = (GroupArtifactVersion) o;
+        return Objects.equals(groupId, that.groupId) &&
+               Objects.equals(artifactId, that.artifactId) &&
+               Objects.equals(version, that.version);
     }
 }

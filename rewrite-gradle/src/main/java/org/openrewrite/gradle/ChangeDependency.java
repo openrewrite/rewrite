@@ -247,7 +247,7 @@ public class ChangeDependency extends Recipe {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                            .select(GroupArtifact.of(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
                                 }
@@ -281,7 +281,7 @@ public class ChangeDependency extends Recipe {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                            .select(GroupArtifact.of(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
                                 }
@@ -354,7 +354,7 @@ public class ChangeDependency extends Recipe {
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(GroupArtifact.of(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
@@ -437,7 +437,7 @@ public class ChangeDependency extends Recipe {
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(GroupArtifact.of(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
@@ -525,7 +525,7 @@ public class ChangeDependency extends Recipe {
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(GroupArtifact.of(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
@@ -574,7 +574,7 @@ public class ChangeDependency extends Recipe {
                                 String resolvedVersion;
                                 try {
                                     resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                            .select(GroupArtifact.of(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
                                 }

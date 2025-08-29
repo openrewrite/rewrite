@@ -426,7 +426,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .map(MavenSettings.ActiveProfiles::getActiveProfiles)
                 .orElse(null);
         return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
-                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
+                .downloadMetadata(GroupArtifact.of(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
     public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
@@ -440,7 +440,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .map(MavenSettings.ActiveProfiles::getActiveProfiles)
                 .orElse(null);
         return new MavenPomDownloader(getResolutionResult().getProjectPoms(), ctx, maybeSettings.orElse(null), activeProfiles)
-                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
+                .downloadMetadata(GroupArtifact.of(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
     }
 
     /**

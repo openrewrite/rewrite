@@ -135,36 +135,24 @@ public final class GradleProjectBuilder {
         }
     }
 
-    private static final Map<GroupArtifact, GroupArtifact> groupArtifactCache = new ConcurrentHashMap<>();
-
     private static GroupArtifact groupArtifact(org.openrewrite.maven.tree.Dependency dep) {
-        //noinspection ConstantConditions
-        return groupArtifactCache.computeIfAbsent(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), it -> it);
+        return GroupArtifact.of(dep.getGroupId(), dep.getArtifactId());
     }
 
     private static GroupArtifact groupArtifact(ResolvedDependency dep) {
-        return groupArtifactCache.computeIfAbsent(new GroupArtifact(dep.getModuleGroup(), dep.getModuleName()), it -> it);
+        return GroupArtifact.of(dep.getModuleGroup(), dep.getModuleName());
     }
 
-    private static final Map<GroupArtifactVersion, GroupArtifactVersion> groupArtifactVersionCache = new ConcurrentHashMap<>();
-
     private static GroupArtifactVersion groupArtifactVersion(ResolvedDependency dep) {
-        return groupArtifactVersionCache.computeIfAbsent(
-                new GroupArtifactVersion(dep.getModuleGroup(), dep.getModuleName(), unspecifiedToNull(dep.getModuleVersion())),
-                it -> it);
+        return GroupArtifactVersion.of(dep.getModuleGroup(), dep.getModuleName(), unspecifiedToNull(dep.getModuleVersion()));
     }
 
     private static GroupArtifactVersion groupArtifactVersion(Dependency dep) {
-        return groupArtifactVersionCache.computeIfAbsent(
-                new GroupArtifactVersion(dep.getGroup(), dep.getName(), unspecifiedToNull(dep.getVersion())), it -> it);
+        return GroupArtifactVersion.of(dep.getGroup(), dep.getName(), unspecifiedToNull(dep.getVersion()));
     }
 
-    private static final Map<ResolvedGroupArtifactVersion, ResolvedGroupArtifactVersion> resolvedGroupArtifactVersionCache = new ConcurrentHashMap<>();
-
     private static ResolvedGroupArtifactVersion resolvedGroupArtifactVersion(ResolvedDependency dep) {
-        return resolvedGroupArtifactVersionCache.computeIfAbsent(new ResolvedGroupArtifactVersion(
-                        null, dep.getModuleGroup(), dep.getModuleName(), dep.getModuleVersion(), null),
-                it -> it);
+        return ResolvedGroupArtifactVersion.of(null, dep.getModuleGroup(), dep.getModuleName(), dep.getModuleVersion(), null);
     }
 
     /**
@@ -434,8 +422,5 @@ public final class GradleProjectBuilder {
     @SuppressWarnings("unused")
     public static void clearCaches() {
         requestedCache.clear();
-        groupArtifactCache.clear();
-        groupArtifactVersionCache.clear();
-        resolvedGroupArtifactVersionCache.clear();
     }
 }

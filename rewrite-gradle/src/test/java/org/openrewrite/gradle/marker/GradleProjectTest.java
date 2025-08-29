@@ -56,7 +56,7 @@ class GradleProjectTest implements RewriteTest {
     void noopUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            GroupArtifactVersion.of("org.openrewrite", "rewrite-java", "8.56.0"),
             "implementation",
             (original, updated) -> assertThat(updated).isSameAs(original)
           )),
@@ -80,7 +80,7 @@ class GradleProjectTest implements RewriteTest {
     void multiProject() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
+            GroupArtifactVersion.of("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
                 // mostly interested that a ProjectDependency does not cause an exception
@@ -134,7 +134,7 @@ class GradleProjectTest implements RewriteTest {
     void plusVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
+            GroupArtifactVersion.of("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
@@ -176,7 +176,7 @@ class GradleProjectTest implements RewriteTest {
     void simpleUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.57.0"),
+            GroupArtifactVersion.of("org.openrewrite", "rewrite-java", "8.57.0"),
             "implementation",
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
@@ -219,7 +219,7 @@ class GradleProjectTest implements RewriteTest {
     void bomUpgrade() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("org.openrewrite", "rewrite-bom", "8.57.0"),
+            GroupArtifactVersion.of("org.openrewrite", "rewrite-bom", "8.57.0"),
             "implementation",
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
@@ -263,7 +263,7 @@ class GradleProjectTest implements RewriteTest {
     void removesDefunctTransitives() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
-            new GroupArtifactVersion("io.vertx", "vertx-core", "5.0.1"),
+            GroupArtifactVersion.of("io.vertx", "vertx-core", "5.0.1"),
             "implementation",
             (original, updated) -> {
                 assertThat(updated).isNotSameAs(original);
@@ -314,7 +314,7 @@ class GradleProjectTest implements RewriteTest {
     void removeDependency() {
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency(
-            List.of(new GroupArtifact("org.openrewrite", "rewrite-core")),
+            List.of(GroupArtifact.of("org.openrewrite", "rewrite-core")),
             (original, updated) -> {
                 assertThat(updated).isNotSameAs(original);
 
@@ -349,7 +349,7 @@ class GradleProjectTest implements RewriteTest {
     void changeConstraint() {
         rewriteRun(
           spec -> spec.recipe(new ChangeConstraint(
-            Map.of("implementation", List.of(new GroupArtifactVersion("com.fasterxml.jackson.core", "jackson-databind", "2.19.2"))),
+            Map.of("implementation", List.of(GroupArtifactVersion.of("com.fasterxml.jackson.core", "jackson-databind", "2.19.2"))),
             (original, updated) -> {
                 GradleDependencyConfiguration implementation = updated.getConfiguration("implementation");
                 assertThat(implementation).isNotNull();

@@ -416,9 +416,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         if (others == null || others.isEmpty()) {
             return new ArrayList<>(preferred);
         }
-        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(toMap(it -> new GroupArtifact(it.getGroupId(), it.getArtifactId()), it -> it, GradleDependencyConfiguration::newer));
+        Map<GroupArtifact, GradleDependencyConstraint> results = preferred.stream().collect(toMap(it -> GroupArtifact.of(it.getGroupId(), it.getArtifactId()), it -> it, GradleDependencyConfiguration::newer));
         for (GradleDependencyConstraint lowerPrecedenceConstraint : others) {
-            results.putIfAbsent(new GroupArtifact(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
+            results.putIfAbsent(GroupArtifact.of(lowerPrecedenceConstraint.getGroupId(), lowerPrecedenceConstraint.getArtifactId()), lowerPrecedenceConstraint);
         }
         return new ArrayList<>(results.values());
     }
@@ -449,7 +449,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 if (Objects.equals(d.getGroupId(), gav.getGroupId()) &&
                     Objects.equals(d.getArtifactId(), gav.getArtifactId()) &&
                     !Objects.equals(d.getVersion(), Semver.max(d.getVersion(), gav.getVersion()))) {
-                    return d.withGav(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+                    return d.withGav(GroupArtifactVersion.of(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
                 }
             }
             return d;
@@ -614,7 +614,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 continue;
             }
             managed.add(new ManagedDependency.Defined(
-                    new GroupArtifactVersion(constraint.getGroupId(), constraint.getArtifactId(), version),
+                    GroupArtifactVersion.of(constraint.getGroupId(), constraint.getArtifactId(), version),
                     null,
                     null,
                     null,

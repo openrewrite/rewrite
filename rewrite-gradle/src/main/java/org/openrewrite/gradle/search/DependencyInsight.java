@@ -132,9 +132,6 @@ public class DependencyInsight extends Recipe {
                         continue;
                     }
                     for (ResolvedDependency resolvedDependency : c.getDirectResolved()) {
-                        if (!resolvedDependency.isDirect()) { // for some reason the direct resolved ones are also containing depth ones.
-                            continue;
-                        }
                         List<ResolvedDependency> nestedMatchingDependencies = resolvedDependency.findDependencies(groupIdPattern, artifactIdPattern);
                         for (ResolvedDependency dep : nestedMatchingDependencies) {
                             if (version != null) {
@@ -147,8 +144,9 @@ public class DependencyInsight extends Recipe {
                                     }
                                 }
                             }
-                            GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
-                            GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+
+                            GroupArtifactVersion requestedGav = resolvedDependency.getGav().asGroupArtifactVersion();
+                            GroupArtifactVersion targetGav = dep.getGav().asGroupArtifactVersion();
                             configurationToDirectDependency.computeIfAbsent(c.getName(), EMPTY).add(requestedGav);
                             directDependencyToTargetDependency.computeIfAbsent(requestedGav, EMPTY).add(targetGav);
                             dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(

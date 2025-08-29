@@ -119,7 +119,7 @@ public class RemoveExclusion extends Recipe {
             }
 
             private GroupArtifact groupArtifact(Xml.Tag tag) {
-                return new GroupArtifact(
+                return GroupArtifact.of(
                         tag.getChildValue("groupId").orElseThrow(IllegalArgumentException::new),
                         tag.getChildValue("artifactId").orElseThrow(IllegalArgumentException::new)
                 );

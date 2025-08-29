@@ -62,7 +62,7 @@ public class PrintMavenAsDot extends Recipe {
 
                 // for convenience, we construct a ResolvedDependency out of the POM's GAV.
                 ResolvedGroupArtifactVersion root =
-                        new ResolvedGroupArtifactVersion(
+                        ResolvedGroupArtifactVersion.of(
                                 null,
                                 mrr.getPom().getGroupId(),
                                 mrr.getPom().getArtifactId(),

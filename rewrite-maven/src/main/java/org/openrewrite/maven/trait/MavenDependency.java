@@ -80,7 +80,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
                                 .map(MavenSettings::getActiveProfiles)
                                 .map(MavenSettings.ActiveProfiles::getActiveProfiles)
                                 .orElse(null)
-                ).downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
+                ).downloadMetadata(GroupArtifact.of(groupId, artifactId), null, mrr.getPom().getRepositories()));
             } catch (NumberFormatException e) {
                 // this can happen when we encounter exotic, non-semver version numbers
                 return null;
@@ -103,7 +103,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         // fact that it's not in the metadata. Usually it won't be, only in situations like the
                         // MapR repository mentioned in the comment above will it be.
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
-                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
+                                mrr.getMavenSettings(), mrr.getActiveProfiles()).download(GroupArtifactVersion.of(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
                         if (pom.getGav().getVersion().equals(exactVersion)) {
                             return exactVersion;

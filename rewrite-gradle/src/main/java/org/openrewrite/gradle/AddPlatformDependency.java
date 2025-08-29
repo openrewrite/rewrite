@@ -171,7 +171,7 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
                         GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
                         gradleConfigurationFilter.removeTransitiveConfigurations();
-                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                        gradleConfigurationFilter.removeConfigurationsContainingDependency(GroupArtifact.of(groupId, artifactId));
                         resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
 
                         if (resolvedConfigurations.isEmpty()) {

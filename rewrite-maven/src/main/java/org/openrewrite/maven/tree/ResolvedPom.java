@@ -1029,7 +1029,7 @@ public class ResolvedPom {
                         continue;
                     }
 
-                    GroupArtifact ga = new GroupArtifact(d.getGroupId() == null ? "" : d.getGroupId(), d.getArtifactId());
+                    GroupArtifact ga = GroupArtifact.of(d.getGroupId(), d.getArtifactId());
                     VersionRequirement existingRequirement = requirements.get(ga);
                     if (existingRequirement == null) {
                         VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
