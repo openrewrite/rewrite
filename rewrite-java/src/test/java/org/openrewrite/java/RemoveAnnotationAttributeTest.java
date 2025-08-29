@@ -8,7 +8,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class RemoveAnnotationAttributeTest implements RewriteTest {
+class RemoveAnnotationAttributeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
