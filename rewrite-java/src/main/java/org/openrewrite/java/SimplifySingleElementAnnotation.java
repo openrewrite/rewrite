@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -40,12 +41,20 @@ public class SimplifySingleElementAnnotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return getVisitor(null);
+    }
+
+    public  <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
+        return getVisitor(scope);
+    }
+
+    public TreeVisitor<?, ExecutionContext> getVisitor(@Nullable J scope) {
+
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                 J.Annotation an = super.visitAnnotation(annotation, executionContext);
-
-                if (an.getArguments() != null && an.getArguments().size() == 1) {
+                if (an.getArguments() != null && an.getArguments().size() == 1 && inScope(an, scope)) {
                     an = an.withArguments(ListUtils.mapFirst(an.getArguments(), v -> {
                         if (v instanceof J.Assignment &&
                                 ((J.Assignment) v).getVariable() instanceof J.Identifier &&
@@ -69,4 +78,10 @@ public class SimplifySingleElementAnnotation extends Recipe {
         };
     }
 
+    private boolean inScope(J.Annotation annotation, @Nullable J scope) {
+        if (scope == null)
+            return true;
+
+        return annotation.equals(scope);
+    };
 }
