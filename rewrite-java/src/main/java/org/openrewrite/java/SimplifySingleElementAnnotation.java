@@ -44,7 +44,7 @@ public class SimplifySingleElementAnnotation extends Recipe {
         return getVisitor(null);
     }
 
-    public  <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
+    public <J2 extends J> TreeVisitor<?, ExecutionContext> modifyOnly(J2 scope) {
         return getVisitor(scope);
     }
 
@@ -79,10 +79,6 @@ public class SimplifySingleElementAnnotation extends Recipe {
     }
 
     private boolean inScope(J.Annotation annotation, @Nullable J scope) {
-        if (scope == null) {
-        }
-            return true;
-
-        return annotation.equals(scope);
+        return scope == null || annotation.equals(scope);
     }
 }
