@@ -248,9 +248,9 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                    -data: &first
-                      test: 0
-              """
+            -data: &first
+              test: 0
+            """
           )
         );
     }
@@ -452,7 +452,7 @@ class MappingTest implements RewriteTest {
     void mappingSequenceWithAnchor() {
         rewriteRun(
           yaml(
-            """
+              """
               defaults:
                 - &first
                   A: 1
