@@ -45,7 +45,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     private final JavaTypeCache typeCache;
 
-    public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
+    public JavaType type(@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || isUnknownType(type) ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
@@ -160,24 +160,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         return types.toArray(new JavaType.FullyQualified[0]);
     }
 
-    private JavaType.@Nullable FullyQualified[] mapAnnotations(Type type) {
-        if (!type.isAnnotated()) {
-            return null;
-        }
-        List<JavaType.FullyQualified> annotations = new ArrayList<>();
-        for (TypeMetadata metadata : type.getMetadata()) {
-            if (metadata instanceof TypeMetadata.Annotations) {
-                for (Attribute.Compound annotation : ((TypeMetadata.Annotations) metadata).annotationBuffer().toArray(Attribute.Compound[]::new)) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation.type));
-                    if (fq != null) {
-                        annotations.add(fq);
-                    }
-                }
-            }
-        }
-        return annotations.toArray(new JavaType.FullyQualified[0]);
-    }
-
     private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
         typeCache.put(signature, gtv);
@@ -276,7 +258,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             List<JavaType.FullyQualified> interfaces = null;
             if (symType.interfaces_field != null) {
                 interfaces = new ArrayList<>(symType.interfaces_field.length());
-                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                for (Type iParam : symType.interfaces_field) {
                     JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
                     if (javaType != null) {
                         interfaces.add(javaType);
@@ -290,8 +272,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
-                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if ("java.lang.String".equals(fqn) && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -304,7 +286,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                         }
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
-                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -375,6 +357,10 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         } else if (tree instanceof JCTree.JCRecordPattern) {
             symbol = ((JCTree.JCRecordPattern) tree).record;
         }
@@ -382,7 +368,10 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if (type == null && symbol != null) {
+            type = symbol.type;
+        }
         if (type instanceof Type.MethodType || type instanceof Type.ForAll || (type instanceof Type.ErrorType && type.getOriginalType() instanceof Type.MethodType)) {
             return methodInvocationType(type, symbol);
         }
@@ -471,7 +460,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType instanceof Type.ErrorType) {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
@@ -479,7 +468,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     if ("RecoveryErrorType".equals(targetClass.getSimpleName())) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
-                        return methodInvocationType(selectType.getOriginalType(), (Symbol) field.get(selectType));
+                        Symbol originalSymbol = (Symbol) field.get(selectType);
+                        return methodInvocationType(selectType.getOriginalType(), originalSymbol);
                     }
                 }
             } catch (Exception e) {
@@ -536,7 +526,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
             if (!methodType.argtypes.isEmpty()) {
                 parameterTypes = new ArrayList<>(methodType.argtypes.size());
-                for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
+                for (Type argtype : methodType.argtypes) {
                     if (argtype != null) {
                         JavaType javaType = type(argtype);
                         parameterTypes.add(javaType);
@@ -661,8 +651,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
             if (declaringType == null && (methodSymbol.owner instanceof Symbol.ClassSymbol ||
                     methodSymbol.owner instanceof Symbol.TypeVariableSymbol)) {
-                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
-                }
+                resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
+            }
 
 
             if (resolvedDeclaringType == null) {
@@ -678,17 +668,68 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (signatureType instanceof Type.MethodType) {
                 Type.MethodType mt = (Type.MethodType) signatureType;
 
+                com.sun.tools.javac.util.List<Attribute.TypeCompound> typeAttributes =
+                        symbol.getMetadata() != null ? symbol.getMetadata().getTypeAttributes() : null;
                 if (!mt.argtypes.isEmpty()) {
                     parameterTypes = new ArrayList<>(mt.argtypes.size());
-                    for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                    for (int i = 0; i < mt.argtypes.size(); i++) {
+                        Type argtype = mt.argtypes.get(i);
                         if (argtype != null) {
                             JavaType javaType = type(argtype);
+                            if (typeAttributes != null) {
+                                List<JavaType.FullyQualified> annotations = new ArrayList<>(1);
+                                for (Attribute.TypeCompound typeAttribute : typeAttributes) {
+                                    if (typeAttribute.getPosition().type == TargetType.METHOD_FORMAL_PARAMETER && typeAttribute.getPosition().parameter_index == i) {
+                                        JavaType.Annotation annotationType = annotationType(typeAttribute);
+                                        if (annotationType != null) {
+                                            annotations.add(annotationType);
+                                        }
+                                    }
+                                }
+                                if (annotations.size() > 0) {
+                                    if (javaType instanceof JavaType.Class) {
+                                        javaType = ((JavaType.Class) javaType).withAnnotations(annotations);
+                                    } else if (javaType instanceof JavaType.Parameterized) {
+                                        javaType = javaType;
+                                    } else if (javaType instanceof JavaType.GenericTypeVariable) {
+                                        javaType = javaType;
+                                    } else if (javaType instanceof JavaType.Array) {
+                                        javaType = ((JavaType.Array) javaType).withAnnotations(annotations);
+                                    } else {
+                                        javaType = javaType;
+                                    }
+                                }
+                            }
                             parameterTypes.add(javaType);
                         }
                     }
                 }
 
                 returnType = type(mt.restype);
+                if (typeAttributes != null) {
+                    List<JavaType.FullyQualified> annotations = new ArrayList<>(1);
+                    for (Attribute.TypeCompound typeAttribute : typeAttributes) {
+                        if (typeAttribute.getPosition().type == TargetType.METHOD_RETURN) {
+                            JavaType.Annotation annotationType = annotationType(typeAttribute);
+                            if (annotationType != null) {
+                                annotations.add(annotationType);
+                            }
+                        }
+                    }
+                    if (annotations.size() > 0) {
+                        if (returnType instanceof JavaType.Class) {
+                            returnType = ((JavaType.Class) returnType).withAnnotations(annotations);
+                        } else if (returnType instanceof JavaType.Parameterized) {
+                            returnType = returnType;
+                        } else if (returnType instanceof JavaType.GenericTypeVariable) {
+                            returnType = returnType;
+                        } else if (returnType instanceof JavaType.Array) {
+                            returnType = ((JavaType.Array) returnType).withAnnotations(annotations);
+                        } else {
+                            returnType = returnType;
+                        }
+                    }
+                }
             } else {
                 throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
             }
@@ -706,7 +747,6 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         try {
             classSymbol.complete();
         } catch (Symbol.CompletionFailure ignore) {
-            // Ignore
         }
     }
 
