@@ -79,7 +79,8 @@ public class SimplifySingleElementAnnotation extends Recipe {
     }
 
     private boolean inScope(J.Annotation annotation, @Nullable J scope) {
-        if (scope == null)
+        if (scope == null) {
+        }
             return true;
 
         return annotation.equals(scope);
