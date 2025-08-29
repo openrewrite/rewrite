@@ -83,5 +83,5 @@ public class SimplifySingleElementAnnotation extends Recipe {
             return true;
 
         return annotation.equals(scope);
-    };
+    }
 }
