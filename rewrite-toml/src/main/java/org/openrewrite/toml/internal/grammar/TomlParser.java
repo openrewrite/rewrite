@@ -15,6 +15,7 @@
  */
 // Generated from ~/git/rewrite/rewrite-toml/src/main/antlr/TomlParser.g4 by ANTLR 4.13.2
 package org.openrewrite.toml.internal.grammar;
+
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;

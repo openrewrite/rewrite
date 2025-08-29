@@ -2,3 +2,5 @@ rpc.*.log
 
 # Where recipes are installed during RPC tests
 /.rewrite
+
+src/main/resources/META-INF/version.txt

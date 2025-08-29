@@ -33,6 +33,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
     private final List<JsonPathMatcher> exclusionMatchers;
     private final List<JsonPathMatcher> applyToMatchers;
 
+    @Deprecated
     public CoalescePropertiesVisitor() {
         this(null, null);
     }

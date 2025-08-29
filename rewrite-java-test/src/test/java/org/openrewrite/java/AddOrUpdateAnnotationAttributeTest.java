@@ -2323,4 +2323,46 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5918")
+    @Test
+    void attributeWithShallowType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeType("org.example.Bar", "org.example.Foo", true),
+            new AddOrUpdateAnnotationAttribute(
+            "org.example.Foo",
+            "required",
+            "true",
+            null,
+            true,
+            false)
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Bar {
+                String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Bar;
+
+              @Bar("q")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo(required = true, value = "q")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
 }

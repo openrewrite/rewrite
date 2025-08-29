@@ -91,10 +91,10 @@ class DependencyInsightTest implements RewriteTest {
 
         private SourceSpecs expectationHelper(String configuration, String template, String matchComment, boolean matched) {
             @Language("groovy")
-            final String before = String.format(template, configuration);
+            final String before = template.formatted(configuration);
             if (matched) {
                 @Language("groovy")
-                final String after = String.format(template, matchComment + configuration);
+                final String after = template.formatted(matchComment + configuration);
                 return buildGradle(before, after);
             }
             return buildGradle(before);
