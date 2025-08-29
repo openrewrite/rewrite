@@ -184,14 +184,16 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         MappingStartEvent mappingStartEvent = (MappingStartEvent) event;
                         Yaml.Anchor anchor = null;
+                        int mappingEndIndex = event.getEndMark().getIndex();
                         if (mappingStartEvent.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), mappingEndIndex, false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
 
-                            lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                            // dashPrefixIndex could be 0 (if anchoring a sequence item) or greater than 0 (if anchoring a the entire list)
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
-                            if (dashPrefixIndex > -1) {
+                            lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
+
+                            if (dashPrefixIndex > 0) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
                         }
@@ -489,6 +491,7 @@ public class YamlParser implements org.openrewrite.Parser {
         int prefixStart = commentAwareIndexOf(':', eventPrefix);
         String prefix = "";
         if (!isForScalar) {
+            prefixStart = prefixStart == -1 ? commentAwareIndexOf('-', eventPrefix) : prefixStart;
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
