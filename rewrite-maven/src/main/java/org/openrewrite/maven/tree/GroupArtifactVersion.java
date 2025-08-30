@@ -52,7 +52,7 @@ public class GroupArtifactVersion implements Serializable {
             @Nullable String groupId,
             String artifactId,
             @Nullable String version) {
-        String key = (groupId == null ? "" : groupId) + ":" + artifactId + ":" + (version == null ? "" : version);
+        String key = (groupId == null ? "" : groupId) + ":" + artifactId + (version == null ? "" : ":" + version);
         //noinspection DataFlowIssue
         return CACHE.get(key, s -> new GroupArtifactVersion(groupId, artifactId, version));
     }
