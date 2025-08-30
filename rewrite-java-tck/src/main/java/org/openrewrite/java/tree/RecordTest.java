@@ -42,7 +42,66 @@ class RecordTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public record JavaRecord(String name, @Deprecated int age) {
+              public record JavaRecord(String name, @jdk.jfr.Name("A") @Deprecated int age) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void typeParameterAnnotation() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(PARAMETER)
+              public @interface A {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              record JavaRecord(@jdk.jfr.Name("A") @A("one value") String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void differentLiteralTypesAnnotation() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({PARAMETER})
+              public @interface A {
+                  String value() default "";
+                  Long a() default 0L;
+                  int b() default 0;
+              }
+              """
+          ),
+          java(
+            """
+              record JavaRecord(@jdk.jfr.Name("A") @A(value = ""\"
+                  one value "with a quote" and
+                  another value
+                  ""\", a=2_000L, b=123) String name) {
               }
               """
           )
