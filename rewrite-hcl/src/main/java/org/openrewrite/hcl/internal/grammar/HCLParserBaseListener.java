@@ -501,6 +501,24 @@ public class HCLParserBaseListener implements HCLParserListener {
      * <p>The default implementation does nothing.</p>
      */
     @Override
+    public void enterQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx) {
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The default implementation does nothing.</p>
+     */
+    @Override
+    public void exitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx) {
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The default implementation does nothing.</p>
+     */
+    @Override
     public void enterForExpr(HCLParser.ForExprContext ctx) {
     }
 

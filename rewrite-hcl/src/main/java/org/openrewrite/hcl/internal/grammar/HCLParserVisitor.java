@@ -249,6 +249,14 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
     T visitObjectelem(HCLParser.ObjectelemContext ctx);
 
     /**
+     * Visit a parse tree produced by {@link HCLParser#qualifiedIdentifier}.
+     *
+     * @param ctx the parse tree
+     * @return the visitor result
+     */
+    T visitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx);
+
+    /**
      * Visit a parse tree produced by {@link HCLParser#forExpr}.
      *
      * @param ctx the parse tree

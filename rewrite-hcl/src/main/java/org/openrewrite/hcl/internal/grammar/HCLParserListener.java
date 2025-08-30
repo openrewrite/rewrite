@@ -416,6 +416,20 @@ public interface HCLParserListener extends ParseTreeListener {
     void exitObjectelem(HCLParser.ObjectelemContext ctx);
 
     /**
+     * Enter a parse tree produced by {@link HCLParser#qualifiedIdentifier}.
+     *
+     * @param ctx the parse tree
+     */
+    void enterQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx);
+
+    /**
+     * Exit a parse tree produced by {@link HCLParser#qualifiedIdentifier}.
+     *
+     * @param ctx the parse tree
+     */
+    void exitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx);
+
+    /**
      * Enter a parse tree produced by {@link HCLParser#forExpr}.
      *
      * @param ctx the parse tree
