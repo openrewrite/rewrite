@@ -29,7 +29,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class CoalescePropertiesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new CoalesceProperties());
+        spec.recipe(new CoalesceProperties(null, null));
     }
 
     @DocumentExample

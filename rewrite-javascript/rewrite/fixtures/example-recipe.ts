@@ -1,3 +1,5 @@
+// noinspection JSUnusedGlobalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -16,20 +18,19 @@
 import {
     Column,
     DataTable,
-    ExecutionContext, markers, Markers,
+    ExecutionContext, Markers,
     Option, randomId,
     Recipe,
     RecipeRegistry,
     ScanningRecipe,
     SourceFile,
-    Transient, Tree,
-    TreeVisitor
-} from "../src";
-import {PlainText, PlainTextParser, PlainTextVisitor} from "../src/text";
-import {Json, JsonVisitor} from "../src/json";
+    Transient, TreeVisitor
+} from "@openrewrite/rewrite";
+import {PlainText, PlainTextParser, PlainTextVisitor} from "@openrewrite/rewrite/text";
+import {Json, JsonVisitor} from "@openrewrite/rewrite/json";
 import {createDraft, finishDraft} from "immer";
-import {JavaScriptVisitor} from "../src/javascript";
-import {J} from "../src/java";
+import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);

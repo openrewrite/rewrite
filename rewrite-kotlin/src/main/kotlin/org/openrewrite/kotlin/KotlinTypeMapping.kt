@@ -39,8 +39,11 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
-import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
+import org.jetbrains.kotlin.fir.resolve.providers.firProvider
+import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
+import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toSymbol
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -58,6 +61,7 @@ import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.*
+import org.openrewrite.java.tree.JavaType.Array
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
@@ -147,7 +151,7 @@ class KotlinTypeMapping(
             }
 
             is FirFile -> {
-                fileType(signature)
+                fileType(type, signature)
             }
 
             is FirFunction -> {
@@ -227,9 +231,15 @@ class KotlinTypeMapping(
             return null
         }
 
-        // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
-        val sym = type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession) ?: return ShallowClass.build(signature)
-        return type(sym.fir, signature)
+        // If the symbol is not resolvable, we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
+        return type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession)
+            ?.let { type(it.fir, signature) }
+            ?: ShallowClass.build(signature)
+                .withOwningClass(
+                    (type as? FirResolvedImport)?.resolvedParentClassId?.toSymbol(firSession)
+                        ?.let { it as? FirRegularClassSymbol }
+                        ?.let { TypeUtils.asFullyQualified(type(it.fir, signature)) }
+                )
     }
 
     private fun packageDirective(signature: String): JavaType? {
@@ -238,8 +248,18 @@ class KotlinTypeMapping(
         return jt
     }
 
-    private fun fileType(signature: String): JavaType {
+    private fun fileType(file: FirFile, signature: String): JavaType {
+        val functions = buildList {
+            file.declarations.forEach {
+                when (it) {
+                    is FirSimpleFunction -> add(it)
+                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    else -> {}
+                }
+            }
+        }
         val fileType = ShallowClass.build(signature)
+            .withMethods(functions.map { methodDeclarationType(it, null) })
         typeCache.put(signature, fileType)
         return fileType
     }
@@ -775,6 +795,8 @@ class KotlinTypeMapping(
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
                 }
+            } else {
+                declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.getContainingFile()))
             }
         } else {
             declaringType = TypeUtils.asFullyQualified(type(function.resolvedType))
@@ -1375,3 +1397,10 @@ class KotlinTypeMapping(
         }
     }
 }
+
+internal fun FirBasedSymbol<*>.getContainingFile() =
+    when (this) {
+        is FirCallableSymbol<*> -> moduleData.session.firProvider.getFirCallableContainerFile(this)
+        is FirClassLikeSymbol<*> -> moduleData.session.firProvider.getFirClassifierContainerFileIfAny(this)
+        else -> null
+    }

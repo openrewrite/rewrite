@@ -47,7 +47,6 @@ import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 import kotlin.collections.HashMap
-import kotlin.math.sign
 
 @Suppress("DuplicatedCode")
 class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) :
@@ -398,6 +397,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 ) {
                     declaringSig = "kotlin.Library"
                 }
+            } else {
+                declaringSig = signature(resolvedSymbol.getContainingFile())
             }
         } else if (sym is FirFunctionSymbol<*>) {
             declaringSig = signature(function.resolvedType)

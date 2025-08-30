@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven.trait;
 
+import org.openrewrite.java.InlineMe;
+
 /**
  * @deprecated Use specific matchers like {@link MavenDependency.Matcher} or {@link MavenPlugin.Matcher} instead.
  */
@@ -27,6 +29,7 @@ public class Traits {
      * @deprecated Use {@link MavenDependency.Matcher} instead.
      */
     @Deprecated
+    @InlineMe(replacement = "new MavenDependency.Matcher()", imports = "org.openrewrite.maven.MavenDependency")
     public static MavenDependency.Matcher mavenDependency() {
         return new MavenDependency.Matcher();
     }
@@ -35,6 +38,7 @@ public class Traits {
      * @deprecated Use {@link MavenPlugin.Matcher} instead.
      */
     @Deprecated
+    @InlineMe(replacement = "new MavenPlugin.Matcher()", imports = "org.openrewrite.maven.MavenPlugin")
     public static MavenPlugin.Matcher mavenPlugin() {
         return new MavenPlugin.Matcher();
     }

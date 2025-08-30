@@ -1,5 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="JS RPC server (socket)" type="NodeJSConfigurationType" application-parameters="--port 12345" node-parameters="-max-old-space-size=8192" path-to-js-file="server.ts" typescript-loader="bundled" working-dir="$PROJECT_DIR$/rewrite-javascript/rewrite/src/rpc">
-    <method v="2" />
-  </configuration>
-</component>
