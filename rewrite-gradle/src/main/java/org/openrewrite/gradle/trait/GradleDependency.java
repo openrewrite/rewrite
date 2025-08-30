@@ -171,13 +171,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     // Couldn't find the actual resolved dependency, return a virtualized one instead
                     ResolvedDependency resolvedDependency = ResolvedDependency.builder()
                             .depth(-1)
-                            .gav(new ResolvedGroupArtifactVersion(null, dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))
+                            .gav(ResolvedGroupArtifactVersion.of(null, dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))
                             .classifier(dependency.getClassifier())
                             .type(dependency.getExt())
                             .requested(Dependency.builder()
                                     .scope(methodInvocation.getSimpleName())
                                     .type(dependency.getExt())
-                                    .gav(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()))
+                                    .gav(GroupArtifactVersion.of(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()))
                                     .classifier(dependency.getClassifier())
                                     .build())
                             .build();

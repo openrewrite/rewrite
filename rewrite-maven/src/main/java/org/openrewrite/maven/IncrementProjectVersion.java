@@ -113,7 +113,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 if (newVersion.equals(oldVersion)) {
                     return t;
                 }
-                acc.put(new GroupArtifact(
+                acc.put(GroupArtifact.of(
                                 t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)),
                         newVersion);
                 return t;
@@ -169,7 +169,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                     t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
-                String newVersion = acc.get(new GroupArtifact(
+                String newVersion = acc.get(GroupArtifact.of(
                         t.getChildValue("groupId").orElse(null),
                         t.getChildValue("artifactId").orElse(null)));
                 String oldVersion = t.getChildValue("version").orElse(null);

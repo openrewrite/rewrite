@@ -423,7 +423,7 @@ public class RawPom {
 
 
     public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {
-        org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(new GroupArtifactVersion(
+        org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(GroupArtifactVersion.of(
                 getParent().getGroupId(), getParent().getArtifactId(),
                 getParent().getVersion()), getParent().getRelativePath());
 
@@ -431,7 +431,7 @@ public class RawPom {
                 .sourcePath(inputPath)
                 .repository(repo)
                 .parent(parent)
-                .gav(new ResolvedGroupArtifactVersion(
+                .gav(ResolvedGroupArtifactVersion.of(
                         repo == null ? null : repo.getUri(),
                         Objects.requireNonNull(getGroupId()),
                         artifactId,
@@ -543,7 +543,7 @@ public class RawPom {
             if (unmappedDependencies != null) {
                 dependencyManagementDependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
-                    GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                    GroupArtifactVersion dGav = GroupArtifactVersion.of(d.getGroupId(), d.getArtifactId(), d.getVersion());
                     if ("import".equals(d.getScope())) {
                         dependencyManagementDependencies.add(new ManagedDependency.Imported(dGav));
                     } else {
@@ -562,7 +562,7 @@ public class RawPom {
             if (unmappedDependencies != null) {
                 dependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
-                    GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                    GroupArtifactVersion dGav = GroupArtifactVersion.of(d.getGroupId(), d.getArtifactId(), d.getVersion());
                     dependencies.add(
                             org.openrewrite.maven.tree.Dependency.builder()
                                     .gav(dGav)
@@ -583,7 +583,7 @@ public class RawPom {
         if (rawDependencies != null) {
             dependencies = new ArrayList<>(rawDependencies.size());
             for (Dependency d : rawDependencies) {
-                GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
+                GroupArtifactVersion dGav = GroupArtifactVersion.of(d.getGroupId(), d.getArtifactId(), d.getVersion());
                 dependencies.add(org.openrewrite.maven.tree.Dependency.builder()
                         .gav(dGav)
                         .classifier(d.getClassifier())

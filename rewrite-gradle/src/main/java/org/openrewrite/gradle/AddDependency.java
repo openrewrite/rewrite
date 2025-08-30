@@ -216,8 +216,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
                         gradleConfigurationFilter.removeTransitiveConfigurations();
-                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
-                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
+                        gradleConfigurationFilter.removeConfigurationsContainingDependency(GroupArtifact.of(groupId, artifactId));
+                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(GroupArtifact.of(groupId, artifactId));
                         resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
 
                         if (resolvedConfigurations.isEmpty()) {

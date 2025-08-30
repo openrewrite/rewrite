@@ -193,7 +193,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            dependenciesToUpdate.put(new GroupArtifact(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
+                            dependenciesToUpdate.put(GroupArtifact.of(update.getKey().getGroupId(), update.getKey().getArtifactId()), config.getValue());
                         }
                     }
                 }
@@ -252,7 +252,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                     }
 
                                     acc.updatesPerProject.get(getGradleProjectKey(gradleProject)).merge(
-                                            new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
+                                            GroupArtifact.of(resolved.getGroupId(), resolved.getArtifactId()),
                                             singletonMap(constraintConfig, selected),
                                             (existing, update) -> {
                                                 Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
@@ -351,7 +351,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
                         return m;
                     }
-                    acc.versionPropNameToGA.put(declaredVersion, new GroupArtifact(declaredGroupId, declaredArtifactId));
+                    acc.versionPropNameToGA.put(declaredVersion, GroupArtifact.of(declaredGroupId, declaredArtifactId));
                 } else {
                     for (Expression depArg : m.getArguments()) {
                         if (depArg instanceof G.GString) {
@@ -360,7 +360,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     G.GString.Value versionValue = (G.GString.Value) strings.get(1);
-                                    acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                                    acc.versionPropNameToGA.put(versionValue.getTree().toString(), GroupArtifact.of(dep.getGroupId(), dep.getArtifactId()));
                                 }
                             }
                         } else if (depArg instanceof K.StringTemplate) {
@@ -369,7 +369,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                                 org.openrewrite.gradle.internal.Dependency dep = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                                 if (dep != null) {
                                     K.StringTemplate.Expression versionValue = (K.StringTemplate.Expression) strings.get(1);
-                                    acc.versionPropNameToGA.put(versionValue.getTree().toString(), new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                                    acc.versionPropNameToGA.put(versionValue.getTree().toString(), GroupArtifact.of(dep.getGroupId(), dep.getArtifactId()));
                                 }
                             }
                         }
@@ -479,7 +479,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         String configName = configToVersion.getKey().getName();
                         String newVersion = configToVersion.getValue();
                         configsToUpdate.computeIfAbsent(configName, it -> new HashSet<>())
-                                .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                                .add(GroupArtifactVersion.of(groupId, artifactId, newVersion));
                     }
                 }
                 return gp.addOrUpdateConstraints(configsToUpdate, ctx);
@@ -528,7 +528,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         }
                         Map<GradleDependencyConfiguration, String> configs = update.getValue();
                         for (Map.Entry<GradleDependencyConfiguration, String> config : configs.entrySet()) {
-                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), new GroupArtifactVersion(update.getKey().getGroupId(),
+                            cu = (JavaSourceFile) new AddConstraint(cu instanceof K.CompilationUnit, config.getKey().getName(), GroupArtifactVersion.of(update.getKey().getGroupId(),
                                     update.getKey().getArtifactId(), config.getValue()), gradleProject, because).visitNonNull(cu, ctx);
                         }
                     }

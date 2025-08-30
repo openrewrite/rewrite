@@ -42,7 +42,7 @@ class MavenArtifactDownloaderTest {
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
           artifactCache, null, t -> ctx.getOnError().accept(t));
-        ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
+        ResolvedGroupArtifactVersion recipeGav = ResolvedGroupArtifactVersion.of(
           "https://repo1.maven.org/maven2",
           "org.openrewrite.recipe",
           "rewrite-testing-frameworks",
