@@ -27,6 +27,7 @@ rewrite-java-21
 # Other language modules
 
 rewrite-gradle
+rewrite-graphql
 rewrite-groovy
 rewrite-hcl
 rewrite-json
