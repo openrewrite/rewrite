@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
-import com.google.errorprone.annotations.InlineMe;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -392,7 +391,6 @@ public class YamlResourceLoader implements ResourceLoader {
         return listRecipeDescriptors(emptyList(), listRecipeExamples());
     }
 
-
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
         Collection<Recipe> internalRecipes = listRecipes();
@@ -415,8 +413,8 @@ public class YamlResourceLoader implements ResourceLoader {
 
     }
 
+    @SuppressWarnings("unused")
     @Deprecated
-    @InlineMe(replacement = "this.listRecipeDescriptors(externalRecipes, recipeNamesToExamples)")
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
