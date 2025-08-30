@@ -17,23 +17,19 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.lang.ref.WeakReference;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @Value
 public class GroupArtifact implements Serializable {
-    private static final LinkedHashMap<String, WeakReference<GroupArtifact>> CACHE = new LinkedHashMap<String, WeakReference<GroupArtifact>>() {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry eldest) {
-            return size() > 10_000;
-        }
-    };
+    private static final Cache<String, GroupArtifact> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
 
     String groupId;
     String artifactId;
@@ -55,17 +51,8 @@ public class GroupArtifact implements Serializable {
         String finalGroup = groupId == null ? "" : groupId;
         String key = finalGroup + ":" + artifactId;
 
-        synchronized (CACHE) {
-            WeakReference<GroupArtifact> ref = CACHE.get(key);
-            GroupArtifact instance = ref != null ? ref.get() : null;
-
-            if (instance == null) {
-                instance = new GroupArtifact(finalGroup, artifactId);
-                CACHE.put(key, new WeakReference<>(instance));
-            }
-
-            return instance;
-        }
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new GroupArtifact(finalGroup, artifactId));
     }
 
     public GroupArtifact withGroupId(String groupId) {

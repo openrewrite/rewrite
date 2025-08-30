@@ -17,24 +17,20 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.lang.ref.WeakReference;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 
 @Value
 public class GroupArtifactVersion implements Serializable {
-    private static final LinkedHashMap<String, WeakReference<GroupArtifactVersion>> CACHE = new LinkedHashMap<String, WeakReference<GroupArtifactVersion>>() {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry eldest) {
-            return size() > 10_000;
-        }
-    };
+    private static final Cache<String, GroupArtifactVersion> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
 
     @Nullable
     String groupId;
@@ -57,18 +53,8 @@ public class GroupArtifactVersion implements Serializable {
             String artifactId,
             @Nullable String version) {
         String key = (groupId == null ? "" : groupId) + ":" + artifactId + ":" + (version == null ? "" : version);
-
-        synchronized (CACHE) {
-            WeakReference<GroupArtifactVersion> ref = CACHE.get(key);
-            GroupArtifactVersion instance = ref != null ? ref.get() : null;
-
-            if (instance == null) {
-                instance = new GroupArtifactVersion(groupId, artifactId, version);
-                CACHE.put(key, new WeakReference<>(instance));
-            }
-
-            return instance;
-        }
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new GroupArtifactVersion(groupId, artifactId, version));
     }
 
     @Override

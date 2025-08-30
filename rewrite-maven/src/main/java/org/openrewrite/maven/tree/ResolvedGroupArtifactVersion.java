@@ -17,24 +17,20 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.lang.ref.WeakReference;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 
 @Value
 public class ResolvedGroupArtifactVersion implements Serializable {
-    private static final LinkedHashMap<String, WeakReference<ResolvedGroupArtifactVersion>> CACHE = new LinkedHashMap<String, WeakReference<ResolvedGroupArtifactVersion>>() {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry eldest) {
-            return size() > 10_000;
-        }
-    };
+    private static final Cache<String, ResolvedGroupArtifactVersion> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
 
     @Nullable
     String repository;
@@ -69,18 +65,8 @@ public class ResolvedGroupArtifactVersion implements Serializable {
             String version,
             @Nullable String datedSnapshotVersion) {
         String key = (repository == null ? "" : repository) + "::" + groupId + ":" + artifactId + ":" + version + ":" + (datedSnapshotVersion == null ? "" : datedSnapshotVersion);
-
-        synchronized (CACHE) {
-            WeakReference<ResolvedGroupArtifactVersion> ref = CACHE.get(key);
-            ResolvedGroupArtifactVersion instance = ref != null ? ref.get() : null;
-
-            if (instance == null) {
-                instance = new ResolvedGroupArtifactVersion(repository, groupId, artifactId, version, datedSnapshotVersion);
-                CACHE.put(key, new WeakReference<>(instance));
-            }
-
-            return instance;
-        }
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new ResolvedGroupArtifactVersion(repository, groupId, artifactId, version, datedSnapshotVersion));
     }
 
     @Override
