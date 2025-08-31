@@ -156,7 +156,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         @Override
         public JavaScriptRewriteRpc get() {
             // npx --node-options="--enable-source-maps" --package=@openrewrite/rewrite@8.60.2 rewrite-js
-            StringJoiner nodeOptions = new StringJoiner(" ", "--node-options=\"", "\"");
+            StringJoiner nodeOptions = new StringJoiner(" ");
             nodeOptions.add("--enable-source-maps");
             if (inspectBrk != null) {
                 nodeOptions.add("--inspect-brk=" + inspectBrk);
@@ -164,7 +164,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
             String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
             String[] cmd = Stream.of(
-                    npxPath.toString(), nodeOptions.toString(),
+                    npxPath.toString(),
                     // For SNAPSHOT versions, assume npm link has been run and don't use --package
                     version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                     "rewrite-rpc",
@@ -174,6 +174,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             ).filter(Objects::nonNull).toArray(String[]::new);
 
             RewriteRpcProcess process = new RewriteRpcProcess(cmd);
+            if (!nodeOptions.toString().isEmpty()) {
+                process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            }
             process.start();
 
             return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)

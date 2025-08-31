@@ -36,6 +36,8 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.openrewrite.internal.StringUtils.readFully;
@@ -56,16 +58,24 @@ public class RewriteRpcProcess extends Thread {
     @Getter
     private JsonRpc rpcClient;
 
+    private final Map<String, String> environment = new LinkedHashMap<>();
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("JavaScriptRewriteRpcProcess");
         this.setDaemon(false);
     }
 
+    public Map<String, String> environment() {
+        return environment;
+    }
+
     @Override
     public void run() {
         try {
-            process = new ProcessBuilder(command).start();
+            ProcessBuilder pb = new ProcessBuilder(command);
+            pb.environment().putAll(environment);
+            process = pb.start();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
