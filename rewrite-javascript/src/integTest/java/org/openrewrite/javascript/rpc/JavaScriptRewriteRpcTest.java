@@ -56,7 +56,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
           .recipeInstallDir(tempDir)
           .log(tempDir.resolve("rpc.log"))
-          .verboseLogging());
+          .verboseLogging()
+        );
         client = JavaScriptRewriteRpc.getOrStart();
     }
 

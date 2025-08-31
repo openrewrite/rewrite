@@ -16,7 +16,6 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.errorprone.annotations.InlineMe;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
@@ -99,7 +98,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Deprecated
-    @InlineMe(replacement = "this.initialize(availableRecipes)")
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
@@ -109,8 +107,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         initialize(uninitializedPreconditions, preconditions, availableRecipes);
     }
 
+    @SuppressWarnings("unused")
     @Deprecated
-    @InlineMe(replacement = "this.initialize(availableRecipes)")
     public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
@@ -130,7 +128,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
-                                            "[" + i + "] (in " + source + ")",
+                                    "[" + i + "] (in " + source + ")",
                                     recipeFqn,
                                     "recipe '" + recipeFqn + "' does not exist.",
                                     null));
@@ -196,7 +194,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public String getDescription() {
             return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
+                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
         }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
