@@ -173,7 +173,8 @@ public interface RewriteTest extends SourceSpecs {
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
             assertThatCode(() -> {
-                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
+                Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
+                        .load(recipe.getClass(), null);
                 // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
                 r.getRecipeList();
                 // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
