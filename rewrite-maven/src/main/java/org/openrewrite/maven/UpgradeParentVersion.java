@@ -21,8 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.semver.Semver;
 
-import java.util.List;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends Recipe {
@@ -44,7 +42,7 @@ public class UpgradeParentVersion extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -55,13 +53,6 @@ public class UpgradeParentVersion extends Recipe {
             required = false)
     @Nullable
     Boolean onlyExternal;
-
-    @Option(displayName = "Except",
-            description = "Accepts a list of GAVs that should be retained when calling `RemoveRedundantDependencyVersions`.",
-            example = "com.jcraft:jsch",
-            required = false)
-    @Nullable
-    List<String> except;
 
     @Override
     public String getDisplayName() {
@@ -76,7 +67,7 @@ public class UpgradeParentVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
-                "or to a specific version number.";
+               "or to a specific version number.";
     }
 
     @Override
@@ -101,7 +92,7 @@ public class UpgradeParentVersion extends Recipe {
                 null,
                 versionPattern,
                 false,
-                except)
+                null)
                 .getVisitor();
     }
 }
