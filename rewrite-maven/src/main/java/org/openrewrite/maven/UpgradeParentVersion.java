@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -47,7 +46,7 @@ public class UpgradeParentVersion extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -79,24 +78,7 @@ public class UpgradeParentVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Set the parent pom version number according to a [version selector](https://docs.openrewrite.org/reference/dependency-version-selectors) " +
-               "or to a specific version number.";
-    }
-
-    @JsonCreator
-    public UpgradeParentVersion(String groupId, String artifactId, String newVersion,
-                                   @Nullable String versionPattern, @Nullable Boolean onlyExternal) {
-        this(groupId, artifactId, newVersion, versionPattern, onlyExternal, null);
-    }
-
-    public UpgradeParentVersion(String groupId, String artifactId, String newVersion,
-                                   @Nullable String versionPattern, @Nullable Boolean onlyExternal,
-                                   @Nullable List<String> except) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.onlyExternal = onlyExternal;
-        this.except = except;
+                "or to a specific version number.";
     }
 
     @Override
@@ -111,11 +93,17 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return changeParentPom().getVisitor();
-    }
-
-    private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, Boolean.TRUE.equals(onlyExternal) ? "" : null, null,
-                versionPattern, false, except);
+        return new ChangeParentPom(
+                groupId,
+                null,
+                artifactId,
+                null,
+                newVersion,
+                Boolean.TRUE.equals(onlyExternal) ? "" : null,
+                null,
+                versionPattern,
+                false,
+                except)
+                .getVisitor();
     }
 }
