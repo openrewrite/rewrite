@@ -1,8 +1,8 @@
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {text} from "@openrewrite/rewrite/text";
-import {ChangeText} from "../../fixtures/example-recipe";
 import {json} from "@openrewrite/rewrite/json";
+import {ChangeText} from "../../fixtures/change-text";
 
 describe("rewrite test", () => {
     const spec = new RecipeSpec();

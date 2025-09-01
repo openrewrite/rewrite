@@ -47,7 +47,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
 
         return j;
     }

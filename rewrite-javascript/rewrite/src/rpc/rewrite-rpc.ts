@@ -34,7 +34,7 @@ import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
 import {ParserInput} from "../parser";
-import {ReferenceMap} from "./reference";
+import {ReferenceMap} from "../reference";
 import {Writable} from "node:stream";
 
 export class RewriteRpc {

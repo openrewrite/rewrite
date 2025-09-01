@@ -62,14 +62,6 @@ public class RpcSendQueue {
         batch.clear();
     }
 
-    public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
-        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
-            Markers markers = Reference.getValue(markersRef);
-            getAndSend(requireNonNull(markers), Markers::getId);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
-        });
-    }
-
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }

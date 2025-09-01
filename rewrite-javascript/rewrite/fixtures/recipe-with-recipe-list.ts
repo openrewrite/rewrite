@@ -13,19 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {RecipeRegistry} from "@openrewrite/rewrite";
-import {FindIdentifier} from "./search-recipe";
-import {CreateText} from "./create-text";
 import {ChangeText} from "./change-text";
-import {ChangeVersion} from "./change-version";
-import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
-import {ReplaceId} from "./replace-id";
+import {Recipe} from "@openrewrite/rewrite";
 
-export function activate(registry: RecipeRegistry) {
-    registry.register(ChangeText);
-    registry.register(CreateText);
-    registry.register(ChangeVersion);
-    registry.register(RecipeWithRecipeList);
-    registry.register(ReplaceId);
-    registry.register(FindIdentifier);
+export class RecipeWithRecipeList extends Recipe {
+    name = "org.openrewrite.example.text.with-recipe-list"
+    displayName = "A recipe that has a recipe list";
+    description = "To verify that it is possible for a recipe list to be called over RPC.";
+
+    async recipeList() {
+        return [new ChangeText({text: "hello"})];
+    }
 }

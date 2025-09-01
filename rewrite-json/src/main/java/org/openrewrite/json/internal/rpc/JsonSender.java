@@ -34,7 +34,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, j2 -> asRef(j2.getPrefix()), space ->
                 visitSpace(Reference.getValueNonNull(space), q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
         return j;
     }
 
@@ -98,7 +98,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
             q.getAndSend(c, Comment::isMultiline);
             q.getAndSend(c, Comment::getText);
             q.getAndSend(c, Comment::getSuffix);
-            q.sendMarkers(c, Comment::getMarkers);
+            q.getAndSend(c, Comment::getMarkers);
         });
         q.getAndSend(space, Space::getWhitespace);
         return space;
@@ -110,7 +110,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
         q.getAndSend(right, j -> asRef(j.getAfter()),
                 space -> visitSpace(Reference.getValueNonNull(space), q));
-        q.sendMarkers(right, JsonRightPadded::getMarkers);
+        q.getAndSend(right, JsonRightPadded::getMarkers);
         return right;
     }
 }
