@@ -117,7 +117,7 @@ export abstract class Recipe {
     }
 
     /**
-     * At the end of a recipe run, a {@link RecipeScheduler} will call this method to allow the
+     * At the end of a recipe run, the recipe scheduler will call this method to allow the
      * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
      * only once per run.
      *

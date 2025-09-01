@@ -28,6 +28,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
@@ -82,12 +83,18 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
-        private boolean trace = false;
-        private boolean verboseLogging = true;
+        private @Nullable Path recipeInstallDir;
+        private Duration timeout = Duration.ofSeconds(30);
+        private boolean verboseLogging;
         private @Nullable Integer inspectBrk;
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
+            return this;
+        }
+
+        public Builder recipeInstallDir(@Nullable Path recipeInstallDir) {
+            this.recipeInstallDir = recipeInstallDir;
             return this;
         }
 
@@ -102,6 +109,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 throw new IllegalArgumentException("Invalid npx executable " + npxPath.toAbsolutePath().normalize());
             }
             this.npxPath = npxPath;
+            return this;
+        }
+
+        public Builder timeout(Duration timeout) {
+            this.timeout = timeout;
             return this;
         }
 
@@ -124,11 +136,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return verboseLogging(true);
         }
 
-        public Builder trace(boolean trace) {
-            this.trace = trace;
-            return this;
-        }
-
         /**
          * Set the port for the Node.js inspector to listen on. When this is set, you can use
          * an "Attach to Node.js/Chrome" run configuration in IDEA to debug the JavaScript Rewrite RPC process.
@@ -149,36 +156,32 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         @Override
         public JavaScriptRewriteRpc get() {
             // npx --node-options="--enable-source-maps" --package=@openrewrite/rewrite@8.60.2 rewrite-js
-            StringJoiner nodeOptions = new StringJoiner(" ", "--node-options=\"", "\"");
+            StringJoiner nodeOptions = new StringJoiner(" ");
             nodeOptions.add("--enable-source-maps");
             if (inspectBrk != null) {
                 nodeOptions.add("--inspect-brk=" + inspectBrk);
             }
 
             String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
-            String[] cmd;
-            if (version.endsWith("-SNAPSHOT")) {
-                // For SNAPSHOT versions, assume npm link has been run and don't use --package
-                cmd = Stream.of(
-                        npxPath.toString(), nodeOptions.toString(), "rewrite-rpc",
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null
-                ).filter(Objects::nonNull).toArray(String[]::new);
-            } else {
-                // For release versions, use --package to fetch from npm registry
-                String pkg = "--package=@openrewrite/rewrite@" + version;
-                cmd = Stream.of(
-                        npxPath.toString(), nodeOptions.toString(), pkg, "rewrite-rpc",
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null
-                ).filter(Objects::nonNull).toArray(String[]::new);
-            }
+            String[] cmd = Stream.of(
+                    npxPath.toString(),
+                    // For SNAPSHOT versions, assume npm link has been run and don't use --package
+                    version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                    "rewrite-rpc",
+                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    verboseLogging ? "--verbose" : null,
+                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+            ).filter(Objects::nonNull).toArray(String[]::new);
 
-            RewriteRpcProcess process = new RewriteRpcProcess(trace, cmd);
+            RewriteRpcProcess process = new RewriteRpcProcess(cmd);
+            if (!nodeOptions.toString().isEmpty()) {
+                process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            }
             process.start();
 
             return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
-                    .livenessCheck(process::getLivenessCheck);
+                    .livenessCheck(process::getLivenessCheck)
+                    .timeout(timeout);
         }
     }
 }

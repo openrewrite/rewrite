@@ -129,7 +129,7 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 
 val npmPack = tasks.register<Tar>("npmPack") {
     from(npmBuild) {
-        into("package/dist/src/")
+        into("package/dist/")
     }
     from(npmVersion) {
         into("package")
