@@ -88,7 +88,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     @JsonCreator
-    @SuppressWarnings("DeprecatedIsStillUsed")
     private RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
                                              @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
                                              @Nullable List<String> except) {
@@ -190,7 +189,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         if (tag.getChild("exclusions").isPresent()) {
                             return tag;
                         }
-                        //noinspection DataFlowIssue
                         return null;
                     }
                 } else if (isPluginTag()) {
