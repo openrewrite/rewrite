@@ -28,13 +28,6 @@ dependencies {
     testImplementation("com.google.testing.compile:compile-testing:0.+")
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
-    }
-}
-
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
 }
-

@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -71,12 +70,7 @@ class KotlinTemplateTest implements RewriteTest {
                       return multiVariable;
                   }
                   maybeAddImport(ObjectMapper.class.getName(), false);
-                  Path path;
-                  try {
-                      path = Path.of(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-                  } catch (URISyntaxException e) {
-                      throw new RuntimeException(e);
-                  }
+                  var path = Path.of(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().getPath());
                   return KotlinTemplate.builder("val mapper = ObjectMapper()")
                     .parser(KotlinParser.builder().classpath(List.of(path)))
                     .imports(ObjectMapper.class.getName())

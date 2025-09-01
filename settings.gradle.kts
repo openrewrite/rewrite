@@ -25,7 +25,6 @@ val allProjects = listOf(
     "rewrite-java-lombok",
     "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
     "rewrite-java-21",
-    "rewrite-java-25",
     "rewrite-javascript",
     "rewrite-json",
     "rewrite-kotlin",
@@ -77,8 +76,7 @@ if (System.getProperty("idea.active") == null &&
         "rewrite-java-8",
         "rewrite-java-11",
         "rewrite-java-17",
-        "rewrite-java-21",
-        "rewrite-java-25"
+        "rewrite-java-21"
     )
 }
 
