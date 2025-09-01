@@ -172,13 +172,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag()) {
                     ResolvedDependency d = findDependency(tag);
-                    if (d != null && matchesGroup(d) && matchesArtifact(d) && matchesVersion(d) && isNotExcepted(d)) {
+                    if (d != null && matchesGroup(d) && matchesArtifact(d) && matchesVersion(d) && isNotExcepted(d.getGroupId(), d.getArtifactId())) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                     }
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
-                    if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx) && isNotExcepted(managed)) {
+                    if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx) && isNotExcepted(managed.getGroupId(), managed.getArtifactId())) {
                         if (tag.getChild("exclusions").isPresent()) {
                             return tag;
                         }
@@ -340,32 +340,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 return maybeVersionComparator.isValid() && maybeVersionComparator.getValue() instanceof ExactVersion;
             }
 
-            private boolean isNotExcepted(ResolvedDependency d) {
+            private boolean isNotExcepted(String groupId, String artifactId) {
                 if (except == null) {
                     return true;
                 }
                 for (final String gav : except) {
-                    final String[] split = gav.split(":");
-                    final String exceptedGroupId = split[0];
-                    final String exceptedArtifactId = split[1];
-                    if (matchesGlob(d.getGroupId(), exceptedGroupId) &&
-                        matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            private boolean isNotExcepted(ResolvedManagedDependency d) {
-                if (except == null) {
-                    return true;
-                }
-                for (final String gav : except) {
-                    final String[] split = gav.split(":");
-                    final String exceptedGroupId = split[0];
-                    final String exceptedArtifactId = split[1];
-                    if (matchesGlob(d.getGroupId(), exceptedGroupId) &&
-                        matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                    String[] split = gav.split(":");
+                    String exceptedGroupId = split[0];
+                    String exceptedArtifactId = split[1];
+                    if (matchesGlob(groupId, exceptedGroupId) &&
+                        matchesGlob(artifactId, exceptedArtifactId)) {
                         return false;
                     }
                 }
