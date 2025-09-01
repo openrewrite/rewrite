@@ -30,9 +30,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
-
-import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 import static java.util.Objects.requireNonNull;
 
@@ -209,21 +206,20 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     if (versionValidation.isValid()) {
                         VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                         try {
-                            // Find the current highest version among existing dependencies
-                            String currentVersion = findCurrentHighestVersion(convertedGroup, convertedArtifact, 
-                                    Scope.fromName(scope), versionComparator);
-                            
-                            // Find what version we should use based on the version pattern
-                            String versionToUse = MavenDependency.findNewerVersion(convertedGroup, convertedArtifact, 
-                                    currentVersion, getResolutionResult(), metadataFailures, versionComparator, ctx);
-                            
-                            // Check if we should prevent a downgrade
-                            if (wouldCauseVersionDowngrade(convertedGroup, convertedArtifact, currentVersion,
-                                    versionToUse, versionComparator, Scope.fromName(scope))) {
+                            // The version of the dependency currently in use (if any) might influence the version comparator
+                            // For example, "latest.patch" gives very different results depending on the version in use
+                            String currentVersion = getResolutionResult().findDependencies(convertedGroup, convertedArtifact, Scope.fromName(scope)).stream()
+                                    .map(ResolvedDependency::getVersion)
+                                    .findFirst()
+                                    .orElse(existingManagedDependencyVersion());
+                            String versionToUse = MavenDependency.findNewerVersion(convertedGroup, convertedArtifact, currentVersion, getResolutionResult(), metadataFailures, versionComparator, ctx);
+
+                            // Prevent downgrades
+                            if (currentVersion != null && versionToUse != null &&
+                                    versionComparator.compare(null, currentVersion, versionToUse) >= 0) {
                                 return maven;
                             }
-                            
-                            // Add the managed dependency if it's different from what already exists
+
                             if (versionToUse != null && !versionToUse.equals(pom.getValue(existingManagedDependencyVersion()))) {
                                 if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
                                     // revert back to the original version if the version has a placeholder
@@ -242,96 +238,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 return maven;
             }
 
-            /**
-             * Find the current highest version of a dependency in the project.
-             * For transitive dependencies, finds the highest among all transitive versions.
-             * For direct dependencies, uses the first found version.
-             */
-            private String findCurrentHighestVersion(String groupId, String artifactId, 
-                                                     @Nullable Scope scope, VersionComparator versionComparator) {
-                List<ResolvedDependency> dependencies = getResolutionResult()
-                        .findDependencies(groupId, artifactId, scope);
-                
-                boolean hasTransitiveDeps = dependencies.stream()
-                        .anyMatch(ResolvedDependency::isTransitive);
-                
-                if (hasTransitiveDeps) {
-                    // Find the highest version among transitive dependencies
-                    return dependencies.stream()
-                            .filter(ResolvedDependency::isTransitive)
-                            .map(ResolvedDependency::getVersion)
-                            .reduce((v1, v2) -> compareVersions(v1, v2, versionComparator) >= 0 ? v1 : v2)
-                            .orElse(existingManagedDependencyVersion());
-                }
-
-                // For direct dependencies, use the first found version
-                return dependencies.stream()
-                        .map(ResolvedDependency::getVersion)
-                        .findFirst()
-                        .orElse(existingManagedDependencyVersion());
-            }
-            
-            /**
-             * Determine if adding a managed dependency would cause a downgrade.
-             * Takes into account both current versions and potential versions from related dependencies.
-             */
-            private boolean wouldCauseVersionDowngrade(String groupId, String artifactId,
-                                                       @Nullable String currentVersion, @Nullable String versionToUse,
-                                                       VersionComparator versionComparator, @Nullable Scope scope) {
-                if (versionToUse == null || currentVersion == null) {
-                    return false;
-                }
-                
-                // Check if this is a transitive dependency
-                boolean hasTransitiveDeps = getResolutionResult()
-                        .findDependencies(groupId, artifactId, scope).stream()
-                        .anyMatch(ResolvedDependency::isTransitive);
-                
-                if (hasTransitiveDeps) {
-                    // For transitive dependencies, also consider versions from related direct dependencies
-                    String highestPotentialVersion = findHighestPotentialVersion(groupId, currentVersion, versionComparator);
-                    return compareVersions(highestPotentialVersion, versionToUse, versionComparator) > 0;
-                }
-
-                // For direct dependencies, just compare current vs new
-                return compareVersions(currentVersion, versionToUse, versionComparator) > 0;
-            }
-            
-            /**
-             * Find the highest potential version by checking direct dependencies from the same organization.
-             * This helps prevent downgrades when related libraries typically use aligned versions.
-             */
-            private String findHighestPotentialVersion(String targetGroup, String currentVersion, 
-                                                       VersionComparator versionComparator) {
-                String highestVersion = currentVersion;
-                
-                // Get all direct dependencies
-                List<ResolvedDependency> directDeps = getResolutionResult().getDependencies().values().stream()
-                        .flatMap(List::stream)
-                        .filter(d -> !d.isTransitive())
-                        .collect(Collectors.toList());
-                
-                for (ResolvedDependency directDep : directDeps) {
-                    // Check if this dependency is from the same organization
-                    if (areFromSameOrganization(directDep.getGroupId(), targetGroup)) {
-                        // Libraries from the same organization typically use aligned versions
-                        if (compareVersions(highestVersion, directDep.getVersion(), versionComparator) < 0) {
-                            highestVersion = directDep.getVersion();
-                        }
-                    }
-                }
-                
-                return highestVersion;
-            }
-            
-            /**
-             * Compare two versions using the provided comparator, with fallback to string comparison.
-             * @return negative if v1 < v2, zero if equal, positive if v1 > v2
-             */
-            private int compareVersions(String v1, String v2, VersionComparator versionComparator) {
-                return versionComparator.compare(null, v1, v2);
-            }
-            
             private @Nullable String existingManagedDependencyVersion() {
                 return getResolutionResult().getPom().getDependencyManagement().stream()
                         .map(resolvedManagedDep -> {
@@ -346,44 +252,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                         })
                         .filter(Objects::nonNull)
                         .findFirst().orElse(null);
-            }
-            
-            /**
-             * Check if two group IDs are from the same organization by comparing their prefixes.
-             * Libraries from the same organization typically use aligned versions.
-             */
-            private boolean areFromSameOrganization(String group1, String group2) {
-                if (group1 == null || group2 == null) {
-                    return false;
-                }
-                if (group1.equals(group2)) {
-                    return true;
-                }
-                
-                // Check if they share a common organizational prefix using glob patterns
-                int lastDot1 = group1.lastIndexOf('.');
-                int lastDot2 = group2.lastIndexOf('.');
-                
-                if (lastDot1 > 0 && lastDot2 > 0) {
-                    String prefix1 = group1.substring(0, lastDot1);
-                    String prefix2 = group2.substring(0, lastDot2);
-                    
-                    // Check if one matches the other's prefix pattern
-                    if (matchesGlob(group1, prefix2 + ".*") || matchesGlob(group2, prefix1 + ".*")) {
-                        return true;
-                    }
-                    
-                    // Check for deeper organizational structure
-                    int nextDot1 = prefix1.lastIndexOf('.');
-                    int nextDot2 = prefix2.lastIndexOf('.');
-                    if (nextDot1 > 0 && nextDot2 > 0) {
-                        String orgPrefix1 = prefix1.substring(0, nextDot1);
-                        String orgPrefix2 = prefix2.substring(0, nextDot2);
-                        return orgPrefix1.equals(orgPrefix2);
-                    }
-                }
-                
-                return false;
             }
         });
     }

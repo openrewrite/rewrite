@@ -173,7 +173,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void doesNotDowngradeTransitiveDependencyWithExplicitVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
-            "com.fasterxml.jackson.core", "jackson-databind", "2.16.0", null, null, null, null, null, null, null)),
+            "com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null, null, null, null, null, null, null)),
           pomXml(
             """
             <project>

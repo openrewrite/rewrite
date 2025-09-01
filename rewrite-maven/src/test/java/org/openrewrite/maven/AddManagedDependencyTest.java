@@ -16,6 +16,8 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
@@ -300,9 +302,9 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
-    void doesNotDowngradeTransitiveDependency() {
+    void doesNotAddManagedDependencyIfTransitiveVersionIsTheSameAsRequested() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null,
+          spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.18.0", null,
             null, null, null, null, null, false)),
           pomXml(
             """
@@ -316,11 +318,6 @@ class AddManagedDependencyTest implements RewriteTest {
                     <artifactId>jackson-dataformat-xml</artifactId>
                     <version>2.18.0</version>
                   </dependency>
-                  <dependency>
-                    <groupId>com.fasterxml.jackson.datatype</groupId>
-                    <artifactId>jackson-datatype-jsr310</artifactId>
-                    <version>2.14.0</version>
-                  </dependency>
                 </dependencies>
               </project>
               """
@@ -329,7 +326,7 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
-    void addsWhenVersionIsHigherThanTransitive() {
+    void addsWhenVersionIsHigherThanTransitiveVersion() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.19.0", null,
             null, null, null, null, null, false)),
@@ -367,6 +364,60 @@ class AddManagedDependencyTest implements RewriteTest {
                     <groupId>com.fasterxml.jackson.dataformat</groupId>
                     <artifactId>jackson-dataformat-xml</artifactId>
                     <version>2.18.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeVersionIfTransitiveDependencyAppearsOnceInTree() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.15.3", null,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                    <artifactId>jackson-dataformat-xml</artifactId>
+                    <version>2.18.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2.14.0", "2.15.3"})
+    void doesNotDowngradeVersionIfTransitiveDependencyAppearsInTreeWithDifferentVersions(String requestedVersion) {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", requestedVersion, null,
+            null, null, null, null, null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                    <artifactId>jackson-dataformat-xml</artifactId>
+                    <version>2.18.0</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.datatype</groupId>
+                    <artifactId>jackson-datatype-jsr310</artifactId>
+                    <version>2.15.3</version>
                   </dependency>
                 </dependencies>
               </project>
