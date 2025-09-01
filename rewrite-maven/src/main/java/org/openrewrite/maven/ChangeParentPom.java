@@ -15,11 +15,13 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.InlineMe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -128,6 +130,43 @@ public class ChangeParentPom extends Recipe {
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
                 "Removes redundant dependency versions already managed by the new parent.";
+    }
+
+    @Deprecated
+    @InlineMe(replacement = "this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null)")
+    public ChangeParentPom(String oldGroupId,
+                           @Nullable String newGroupId,
+                           String oldArtifactId,
+                           @Nullable String newArtifactId,
+                           String newVersion,
+                           @Nullable String oldRelativePath,
+                           @Nullable String newRelativePath,
+                           @Nullable String versionPattern,
+                           @Nullable Boolean allowVersionDowngrades) {
+        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null);
+    }
+
+    @JsonCreator
+    public ChangeParentPom(String oldGroupId,
+                           @Nullable String newGroupId,
+                           String oldArtifactId,
+                           @Nullable String newArtifactId,
+                           String newVersion,
+                           @Nullable String oldRelativePath,
+                           @Nullable String newRelativePath,
+                           @Nullable String versionPattern,
+                           @Nullable Boolean allowVersionDowngrades,
+                           @Nullable List<String> except) {
+        this.oldGroupId = oldGroupId;
+        this.newGroupId = newGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.oldRelativePath = oldRelativePath;
+        this.newRelativePath = newRelativePath;
+        this.versionPattern = versionPattern;
+        this.allowVersionDowngrades = allowVersionDowngrades;
+        this.except = except;
     }
 
     @Override
