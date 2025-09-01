@@ -19,7 +19,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Function;
@@ -74,13 +73,8 @@ public class RpcReceiveQueue {
     @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
+        //noinspection ConstantValue
         return after != null && after != before ? mapping.apply((U) after) : after;
-    }
-
-    public Markers receiveMarkers(Markers markers) {
-        return requireNonNull(receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(requireNonNull(receiveList(m.getMarkers(), null)))));
     }
 
     /**
@@ -91,7 +85,6 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     public <T> T receive(@Nullable T before) {
-        //noinspection DataFlowIssue
         return receive(before, null);
     }
 
@@ -107,7 +100,7 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
         Trace.traceReceiver(message);
         Integer ref = null;
@@ -173,7 +166,6 @@ public class RpcReceiveQueue {
                 List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
-                    //noinspection DataFlowIssue
                     after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
                 }
                 return after;

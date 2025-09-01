@@ -70,6 +70,11 @@ public class RewriteRpcProcess extends Thread {
         return environment;
     }
 
+    public RewriteRpcProcess trace() {
+        this.trace = true;
+        return this;
+    }
+
     @Override
     public void run() {
         try {

@@ -16,11 +16,11 @@
 import {Checksum, FileAttributes, TreeKind} from "../tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./queue";
 import {createDraft, finishDraft} from "immer";
+import {Markers, MarkersKind, SearchResult} from "../markers";
 
 export * from "./queue"
-export * from "./reference"
+export * from "../reference"
 export * from "./rewrite-rpc"
-export * from "./recipe"
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
@@ -35,6 +35,7 @@ RpcCodecs.registerCodec(TreeKind.Checksum, {
         await q.getAndSend(after, c => c.value);
     }
 });
+
 RpcCodecs.registerCodec(TreeKind.FileAttributes, {
     async rpcReceive(before: FileAttributes, q: RpcReceiveQueue): Promise<FileAttributes> {
         const draft = createDraft(before);
@@ -56,5 +57,34 @@ RpcCodecs.registerCodec(TreeKind.FileAttributes, {
         await q.getAndSend(after, a => a.isWritable);
         await q.getAndSend(after, a => a.isExecutable);
         await q.getAndSend(after, a => a.size);
+    }
+});
+
+RpcCodecs.registerCodec(MarkersKind.Markers, {
+    async rpcReceive(before: Markers, q: RpcReceiveQueue): Promise<any> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.markers = (await q.receiveList(before.markers))!;
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: Markers, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, m => m.id);
+        await q.getAndSendList(after, m => m.markers, m => m.id);
+    }
+});
+
+// Register codecs for all Java markers with additional properties
+RpcCodecs.registerCodec(MarkersKind.SearchResult, {
+    async rpcReceive(before: SearchResult, q: RpcReceiveQueue): Promise<SearchResult> {
+        const draft = createDraft(before);
+        draft.id = await q.receive(before.id);
+        draft.description = await q.receive(before.description)
+        return finishDraft(draft);
+    },
+
+    async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.description);
     }
 });
