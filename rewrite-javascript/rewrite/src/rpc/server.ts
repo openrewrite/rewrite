@@ -48,7 +48,7 @@ async function main() {
         .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
         .option('--trace-get-object-output', 'enable `GetObject` output tracing')
         .option('--trace-get-object-input', 'enable `GetObject` input tracing')
-        .option('--recipe-install-dir', 'Recipe installation directory (default is a temporary directory)')
+        .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
         .parse();
 
     const options = program.opts() as ProgramOptions;
@@ -85,13 +85,13 @@ async function main() {
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
-        error: (msg: string) => log && log.write(`[Error] ${msg}\n`),
-        warn: (msg: string) => log && log.write(`[Warn] ${msg}\n`),
-        info: (msg: string) => log && options.verbose && log.write(`[Info] ${msg}\n`),
-        log: (msg: string) => log && options.verbose && log.write(`[Log] ${msg}\n`)
+        error: (msg: string) => log && log.write(`[js-rewrite-rpc] [error] ${msg}\n`),
+        warn: (msg: string) => log && log.write(`[js-rewrite-rpc] [warn] ${msg}\n`),
+        info: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [info] ${msg}\n`),
+        log: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [log] ${msg}\n`)
     };
 
-    logger.log(`[js-rewrite-rpc] starting\n`);
+    logger.log(`starting`);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
@@ -103,26 +103,27 @@ async function main() {
     if (options.verbose) {
         await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
             // Handle any unexpected errors during trace configuration
-            logger.error(`Failed to set trace: ${err}\n`);
+            logger.error(`Failed to set trace: ${err}`);
         });
     } else {
         await connection.trace(Trace.Off, {} as Tracer);
     }
 
     connection.onError(err => {
-        logger.error(`[js-rewrite-rpc] error: ${err}\n`);
+        logger.error(`error: ${err}`);
     });
 
     connection.onClose(() => {
-        logger.info(`[js-rewrite-rpc] connection closed\n`);
+        logger.info(`connection closed`);
     })
 
     connection.onDispose(() => {
-        logger.info(`[js-rewrite-rpc] connection disposed\n`);
+        logger.info(`connection disposed`);
     });
 
     new RewriteRpc(connection, {
         batchSize: options.batchSize,
+        logger: logger,
         traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
         traceGetObjectOutput: options.traceGetObjectOutput,
         recipeInstallDir: recipeInstallDir
