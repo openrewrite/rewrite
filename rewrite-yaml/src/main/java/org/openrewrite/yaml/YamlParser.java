@@ -53,7 +53,7 @@ import static org.openrewrite.Tree.randomId;
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
     // Only match single-line Helm templates that don't span multiple lines
-    private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*\\}\\}");
+    private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -184,12 +184,11 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         MappingStartEvent mappingStartEvent = (MappingStartEvent) event;
                         Yaml.Anchor anchor = null;
-                        int mappingEndIndex = event.getEndMark().getIndex();
                         if (mappingStartEvent.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), mappingEndIndex, false);
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
 
-                            // dashPrefixIndex could be 0 (if anchoring a sequence item) or greater than 0 (if anchoring a the entire list)
+                            // dashPrefixIndex could be 0 (if anchoring a sequence item) or greater than 0 (if anchoring entire list)
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
 
@@ -488,10 +487,12 @@ public class YamlParser implements org.openrewrite.Parser {
             postFix.append(c);
         }
 
-        int prefixStart = commentAwareIndexOf(':', eventPrefix);
         String prefix = "";
         if (!isForScalar) {
-            prefixStart = prefixStart == -1 ? commentAwareIndexOf('-', eventPrefix) : prefixStart;
+            int prefixStart = commentAwareIndexOf(':', eventPrefix);
+            if (prefixStart == -1) {
+                prefixStart = commentAwareIndexOf('-', eventPrefix);
+            }
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
