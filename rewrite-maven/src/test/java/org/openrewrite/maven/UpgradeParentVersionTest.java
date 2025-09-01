@@ -35,7 +35,7 @@ class UpgradeParentVersionTest implements RewriteTest {
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
+            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null, null))
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -79,8 +79,8 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            null
-          )),
+            null,
+            null)),
           pomXml(
             """
               <project>
@@ -107,8 +107,8 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            null
-          )),
+            null,
+            null)),
           pomXml(
             """
               <project>
@@ -149,8 +149,8 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            true
-          )),
+            true,
+            null)),
           pomXml(
             """
               <project>
@@ -191,8 +191,8 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            true
-          )),
+            true,
+            null)),
           pomXml(
             """
               <project>
@@ -219,8 +219,8 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.22.RELEASE",
             null,
-            null
-          )),
+            null,
+            null)),
           pomXml(
             """
               <project>
@@ -256,7 +256,13 @@ class UpgradeParentVersionTest implements RewriteTest {
     @Test
     void upgradeParentWithCIFriendlyVersionsAndNullProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion("org.openrewrite", "rewrite-bom", "8.56.0", null, null)),
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.openrewrite",
+            "rewrite-bom",
+            "8.56.0",
+            null,
+            null,
+            null)),
           pomXml(
             """
               <project>
@@ -308,7 +314,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "1.5.22.RELEASE",
             null,
             null,
-            List.of("org.projectlombok:lombok")
+            null//List.of("org.projectlombok:lombok")
           )),
           pomXml(
             """

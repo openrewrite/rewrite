@@ -16,7 +16,6 @@
 package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -24,7 +23,6 @@ import org.openrewrite.semver.Semver;
 
 import java.util.List;
 
-@Getter
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeParentVersion extends Recipe {
