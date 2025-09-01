@@ -45,8 +45,6 @@ import org.openrewrite.style.NamedStyles;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
