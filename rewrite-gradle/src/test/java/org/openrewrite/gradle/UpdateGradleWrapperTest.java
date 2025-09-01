@@ -921,7 +921,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void supportsSemverAgainstJFrogArtifactory() {
         HttpSender customDistributionHost = request -> {
             String url = request.getUrl().toString();
-            if ("https://company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
+            if ("https://artifactory.company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
                 return new HttpSender.Response(200, new ByteArrayInputStream("""
                   {
                     "repo" : "gradle-distributions",
@@ -944,7 +944,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
                   }
                   """.getBytes(StandardCharsets.UTF_8)), () -> {});
-            } else if ("https://company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
+            } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
                 });
             }
@@ -961,14 +961,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
-              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle-8.2-bin.zip
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.2-bin.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
             """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
-              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle-8.8-all.zip
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,

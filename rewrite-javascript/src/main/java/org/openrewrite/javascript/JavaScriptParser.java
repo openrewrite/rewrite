@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript;
 
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
@@ -22,34 +23,62 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.unmodifiableList;
 
+@RequiredArgsConstructor
 public class JavaScriptParser implements Parser {
+    private final long maxSizeBytes;
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-        return JavaScriptRewriteRpc.getOrStart().parse(sources, relativeTo, this, ctx).map(source -> {
-            try {
-                validator.visit(source, 0);
-                return source;
-            } catch (Exception e) {
-                Optional<Input> input = StreamSupport.stream(sources.spliterator(), false)
-                        .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
-                        .findFirst();
-                return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+        // Split inputs based on file size (2MB threshold)
+        List<Input> smallFiles = new ArrayList<>();
+        List<Input> largeFiles = new ArrayList<>();
+
+        for (Input input : sources) {
+            if (input.getFileAttributes() != null && input.getFileAttributes().getSize() > maxSizeBytes) {
+                // File is larger than 2MB, parse with PlainTextParser
+                largeFiles.add(input);
+            } else {
+                // File is 2MB or smaller, parse normally
+                smallFiles.add(input);
             }
-        });
+        }
+
+        // Parse large files with PlainTextParser
+        Stream<SourceFile> largeFileStream = Stream.empty();
+        if (!largeFiles.isEmpty()) {
+            PlainTextParser plainTextParser = PlainTextParser.builder().build();
+            largeFileStream = plainTextParser.parseInputs(largeFiles, relativeTo, ctx);
+        }
+
+        // Parse small files with the normal JavaScript parser
+        Stream<SourceFile> smallFileStream = Stream.empty();
+        if (!smallFiles.isEmpty()) {
+            JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
+            smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this, ctx).map(source -> {
+                try {
+                    validator.visit(source, 0);
+                    return source;
+                } catch (Exception e) {
+                    Optional<Input> input = StreamSupport.stream(smallFiles.spliterator(), false)
+                            .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
+                            .findFirst();
+                    return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                }
+            });
+        }
+
+        // Combine both streams
+        return Stream.concat(largeFileStream, smallFileStream);
     }
 
     private final static List<String> EXTENSIONS = unmodifiableList(Arrays.asList(
@@ -87,14 +116,30 @@ public class JavaScriptParser implements Parser {
         return new Builder();
     }
 
-    public static class Builder extends org.openrewrite.Parser.Builder {
+    public static class Builder extends Parser.Builder {
+        long maxSizeBytes = 1024 * 1024; // 1MB
+
         Builder() {
             super(JS.CompilationUnit.class);
         }
 
+        /**
+         * Set the maximum file size (in bytes) for files to be parsed as JavaScript/TypeScript.
+         * Files exceeding this size will be parsed as plain text to avoid performance issues.
+         * An example of such a huge file (>100k lines of code) is in
+         * <a href="https://github.com/denoland/deno/blob/main/cli/tsc/00_typescript.js">deno</a>.
+         *
+         * @param maxSizeBytes The maximum size of a file in bytes that will be parsed as JavaScript.
+         * @return This builder.
+         */
+        public Builder maxSizeBytes(long maxSizeBytes) {
+            this.maxSizeBytes = maxSizeBytes;
+            return this;
+        }
+
         @Override
         public JavaScriptParser build() {
-            return new JavaScriptParser();
+            return new JavaScriptParser(maxSizeBytes);
         }
 
         @Override
