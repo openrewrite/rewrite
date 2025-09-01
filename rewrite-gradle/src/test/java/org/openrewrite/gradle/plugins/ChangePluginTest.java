@@ -69,7 +69,7 @@ class ChangePluginTest implements RewriteTest {
     void changeApplyPluginSyntax() {
         rewriteRun(
           spec -> spec.recipes(
-            new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null),
+              new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null, true),
             new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)
           ),
           buildGradle(
