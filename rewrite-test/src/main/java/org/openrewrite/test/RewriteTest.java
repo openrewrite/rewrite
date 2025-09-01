@@ -175,7 +175,7 @@ public interface RewriteTest extends SourceSpecs {
             assertThatCode(() -> {
                 Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
                         .load(recipe.getClass(), null);
-                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
+                // getRecipeList should not fail with default parameters from RecipeLoader.
                 r.getRecipeList();
                 // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
                 //noinspection ResultOfMethodCallIgnored
@@ -183,7 +183,7 @@ public interface RewriteTest extends SourceSpecs {
                 //noinspection EqualsWithItself,ResultOfMethodCallIgnored
                 r.equals(r);
             })
-                    .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
+                    .as("Recipe must be able to instantiate via RecipeLoader")
                     .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
