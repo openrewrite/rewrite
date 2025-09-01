@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -107,37 +106,11 @@ public class ChangeParentPom extends Recipe {
     Boolean allowVersionDowngrades;
 
     @Option(displayName = "Except",
-            description = "Accepts a list of GAVs that should be excluded from dependencies list.",
+            description = "Accepts a list of GAVs that should be retained when calling `RemoveRedundantDependencyVersions`.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
     List<String> except;
-
-    @JsonCreator
-    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId,
-                           @Nullable String newArtifactId, String newVersion,
-                           @Nullable String oldRelativePath, @Nullable String newRelativePath,
-                           @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
-        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion,
-                oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null);
-    }
-
-    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId,
-                           @Nullable String newArtifactId, String newVersion,
-                           @Nullable String oldRelativePath, @Nullable String newRelativePath,
-                           @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades,
-                           @Nullable List<String> except) {
-        this.oldGroupId = oldGroupId;
-        this.newGroupId = newGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.oldRelativePath = oldRelativePath;
-        this.newRelativePath = newRelativePath;
-        this.versionPattern = versionPattern;
-        this.allowVersionDowngrades = allowVersionDowngrades;
-        this.except = except;
-    }
 
     @Override
     public String getDisplayName() {
