@@ -15,8 +15,6 @@
  */
 package org.openrewrite.test;
 
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -707,24 +705,5 @@ class RewriteTestUtils {
             }
         }
         return false;
-    }
-}
-
-@RequiredArgsConstructor
-class DelegateSourceFileForDiff implements SourceFile {
-    @Delegate(excludes = PrintAll.class)
-    private final SourceFile delegate;
-
-    private final String expected;
-
-    @Override
-    public <P> String printAll(PrintOutputCapture<P> out) {
-        out.append(expected);
-        return out.getOut();
-    }
-
-    @SuppressWarnings("unused") // Lombok delegate exclude
-    interface PrintAll {
-        <P> String printAll(PrintOutputCapture<P> out);
     }
 }
