@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ import static org.openrewrite.java.tree.Space.format;
  * This visitor is not thread safe, as it maintains a {@link #cursor} and {@link #endPosTable}
  * for each compilation unit visited.
  */
-public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
+public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
     private final static int SURR_FIRST = 0xD800;
     private final static int SURR_LAST = 0xDFFF;
     private static final Map<String, Modifier> MODIFIER_BY_KEYWORD =
@@ -90,7 +90,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private final Collection<NamedStyles> styles;
     private final ExecutionContext ctx;
     private final Context context;
-    private final ReloadableJava17TypeMapping typeMapping;
+    private final ReloadableJava25TypeMapping typeMapping;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
@@ -102,7 +102,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public ReloadableJava17ParserVisitor(Path sourcePath,
+    public ReloadableJava25ParserVisitor(Path sourcePath,
                                          @Nullable FileAttributes fileAttributes,
                                          EncodingDetectingInputStream source,
                                          Collection<NamedStyles> styles,
@@ -117,7 +117,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         this.styles = styles;
         this.ctx = ctx;
         this.context = context;
-        this.typeMapping = new ReloadableJava17TypeMapping(typeCache);
+        this.typeMapping = new ReloadableJava25TypeMapping(typeCache);
     }
 
     @Override
@@ -337,6 +337,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitDefaultCaseLabel(DefaultCaseLabelTree node, Space space) {
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), skip("default"), null, null);
+    }
+
+    @Override
     public J visitCase(CaseTree node, Space fmt) {
         J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
         return new J.Case(
@@ -345,15 +350,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY,
                 type,
                 null,
+                null,
                 JContainer.build(
-                        node.getExpressions().isEmpty() ? EMPTY : sourceBefore("case"),
-                        node.getExpressions().isEmpty() ?
-                                List.of(JRightPadded.build(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
+                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
+                                EMPTY : sourceBefore("case"),
+                        convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
                         Markers.EMPTY
                 ),
-                null,
-                null,
+                convert(node.getGuard()),
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),
@@ -392,7 +396,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
 
-        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava25ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
 
@@ -522,7 +526,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
         for (Tree m : node.getMembers()) {
-            // skip lombok-generated trees
+            // skip lombok generated code
             if (isLombokGenerated(m)) {
                 continue;
             }
@@ -531,12 +535,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
                     hasFlag(md.getModifiers(), Flags.GENERATEDCONSTR) ||
-                    hasFlag(md.getModifiers(), Flags.RECORD))) {
+                            hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -786,21 +790,45 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
-        J pattern = null;
         J.Modifier modifier = null;
         JavaType type = typeMapping.type(node);
-
         JRightPadded<Expression> expression = convert(node.getExpression(), t -> sourceBefore("instanceof"));
         //Handling final modifier in instance of pattern matching
         if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
-             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
+            modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
         }
         J clazz = convert(node.getType());
-        if (node.getPattern() instanceof JCBindingPattern b) {
-            pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
-        }
+        J pattern = getNodePattern(node.getPattern(), type);
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
+    }
+
+    @Override
+    public J visitDeconstructionPattern(DeconstructionPatternTree node, Space fmt) {
+        JavaType type = typeMapping.type(node);
+        return new J.DeconstructionPattern(randomId(),
+                fmt,
+                Markers.EMPTY,
+                convert(node.getDeconstructor()),
+                JContainer.build(sourceBefore("("), convertAll(node.getNestedPatterns(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY),
+                type);
+    }
+
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+        if (pattern instanceof JCBindingPattern b) {
+            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        } else if (pattern instanceof DeconstructionPatternTree r) {
+            return visitDeconstructionPattern(r, whitespace());
+        } else {
+            if (pattern == null) {
+                return null;
+            }
+            int saveCursor = cursor;
+            int endCursor = max(endPos(pattern), cursor);
+            cursor = endCursor;
+            return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
+
+        }
     }
 
     @Override
@@ -998,7 +1026,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
 
-        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava25ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         J.TypeParameters typeParams;
         if (node.getTypeParameters().isEmpty()) {
@@ -1169,7 +1197,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     members.add(m);
                 }
             }
-
             List<JRightPadded<Statement>> converted = convertStatements(members);
             addPossibleEmptyStatementsBeforeClosingBrace(converted);
 
@@ -1612,7 +1639,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
-        ReloadableJava17ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
+        ReloadableJava25ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
@@ -1761,8 +1788,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;
@@ -2024,7 +2057,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return isLombokAnnotationType(sym.getQualifiedName().toString()) ||
                 sym.getDeclarationAttributes().stream()
                         .map(a -> a.type.toString())
-                        .anyMatch(ReloadableJava17ParserVisitor::isLombokAnnotationType);
+                        .anyMatch(ReloadableJava25ParserVisitor::isLombokAnnotationType);
     }
 
     private static boolean isLombokAnnotationType(String name) {
@@ -2182,7 +2215,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                               field.getName().matches("[A-Z_]+");
+                                field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }
@@ -2208,7 +2241,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Leading annotations and modifiers in the order they appear in the source, which is not necessarily the same as the order in
      * which they appear in the OpenJDK AST
      */
-    private ReloadableJava17ModifierResults sortedModifiersAndAnnotations(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
+    private ReloadableJava25ModifierResults sortedModifiersAndAnnotations(ModifiersTree modifiers, Map<Integer, JCAnnotation> annotationPosTable) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Modifier> sortedModifiers = new ArrayList<>();
         List<J.Annotation> currentAnnotations = new ArrayList<>(2);
@@ -2275,7 +2308,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (sortedModifiers.isEmpty()) {
             cursor = lastAnnotationPosition;
         }
-        return new ReloadableJava17ModifierResults(
+        return new ReloadableJava25ModifierResults(
                 leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
                 sortedModifiers.isEmpty() ? emptyList() : sortedModifiers
         );
@@ -2394,7 +2427,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
             for (int j = 0; j < comments.size(); j++) {
                 if (i == j) {
-                    javadoc.set((Javadoc.DocComment) new ReloadableJava17JavadocVisitor(
+                    javadoc.set((Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
                             context,
                             getCurrentPath(),
                             typeMapping,
