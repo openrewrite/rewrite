@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import lombok.Getter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
