@@ -23,6 +23,7 @@ import java.util.regex.Pattern;
 
 import static java.lang.Integer.parseInt;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 /**
  * Allows changes that do not modify the left-most non-zero element in the [major, minor, patch] tuple.
@@ -100,17 +101,23 @@ public class CaretRange extends LatestRelease {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        if (v1.startsWith("^") && v2.startsWith("^")) {
-            CaretRange caretV1 = requireNonNull(build(v1, null).getValue());
-            CaretRange caretV2 = requireNonNull(build(v2, null).getValue());
+        Validated<CaretRange> maybeCaretV1 = build(v1, null);
+        Validated<CaretRange> maybeCaretV2 = build(v2, null);
+        if (maybeCaretV1.isValid() && maybeCaretV2.isValid()) {
+            CaretRange caretV1 = requireNonNull(maybeCaretV1.getValue());
+            CaretRange caretV2 = requireNonNull(maybeCaretV2.getValue());
             int compare = super.compare(currentVersion, caretV1.upperExclusive, caretV2.upperExclusive);
             if (compare != 0) {
                 return compare;
             }
 
             return super.compare(currentVersion, caretV1.lower, caretV2.lower);
-        } else if (v1.startsWith("^")) {
-            CaretRange caretV1 = requireNonNull(build(v1, null).getValue());
+        } else if (maybeCaretV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            CaretRange caretV1 = requireNonNull(maybeCaretV1.getValue());
             int compare = super.compare(currentVersion, caretV1.upperExclusive, v2);
             if (compare < 0) {
                 return compare;
@@ -120,8 +127,12 @@ public class CaretRange extends LatestRelease {
 
             compare = super.compare(currentVersion, caretV1.lower, v2);
             return Math.max(compare, 0);
-        } else if (v2.startsWith("^")) {
-            CaretRange caretV2 = requireNonNull(build(v2, null).getValue());
+        } else if (maybeCaretV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            CaretRange caretV2 = requireNonNull(maybeCaretV2.getValue());
             int compare = super.compare(currentVersion, v1, caretV2.upperExclusive);
             if (compare > 0) {
                 return compare;

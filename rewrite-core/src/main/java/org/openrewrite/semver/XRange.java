@@ -22,13 +22,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 /**
  * Any of X, x, or * may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
  */
 public class XRange extends LatestRelease {
-    private static final Pattern X_RANGE_PATTERN = Pattern.compile("[*xX]|\\d+\\.([*xX]|\\d+\\.([*xX]|\\d+\\.([*xX]|\\d+\\.[*xX])))");
+    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX]|\\d+)(?:\\.([*xX]|\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?)?");
 
     private final String major;
     private final String minor;
@@ -78,15 +79,22 @@ public class XRange extends LatestRelease {
 
     public static Validated<XRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
-        if (!matcher.matches()) {
+        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");
         }
 
-        String[] parts = pattern.split("\\.");
-        String major = normalizeWildcard(parts[0]);
-        String minor = normalizeWildcard(parts.length < 2 ? "*" : parts[1]);
-        String patch = normalizeWildcard(parts.length < 3 ? "*" : parts[2]);
-        String micro = normalizeWildcard(parts.length < 4 ? "*" : parts[3]);
+        String major = normalizeWildcard(matcher.group(1));
+        String minor = normalizeWildcard(matcher.group(2) == null ? "0" : matcher.group(2));
+        String patch = normalizeWildcard(matcher.group(3) == null ? "0" : matcher.group(3));
+        String micro = normalizeWildcard(matcher.group(4) == null ? "0" : matcher.group(4));
+
+        if ("*".equals(major) && (matcher.group(2) != null || matcher.group(3) != null || matcher.group(4) != null)) {
+            return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
+        } else if ("*".equals(minor) && (matcher.group(3) != null || matcher.group(4) != null)) {
+            return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
+        } else if ("*".equals(patch) && matcher.group(4) != null) {
+            return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
+        }
 
         return Validated.valid("xRange", new XRange(major, minor, patch, micro, metadataPattern));
     }
@@ -97,11 +105,11 @@ public class XRange extends LatestRelease {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        boolean v1Matches = X_RANGE_PATTERN.matcher(v1).matches();
-        boolean v2Matches = X_RANGE_PATTERN.matcher(v2).matches();
-        if (v1Matches && v2Matches) {
-            XRange xrangeV1 = requireNonNull(build(v1, null).getValue());
-            XRange xrangeV2 = requireNonNull(build(v2, null).getValue());
+        Validated<XRange> maybeXRangeV1 = build(v1, null);
+        Validated<XRange> maybeXRangeV2 = build(v2, null);
+        if (maybeXRangeV1.isValid() && maybeXRangeV2.isValid()) {
+            XRange xrangeV1 = requireNonNull(maybeXRangeV1.getValue());
+            XRange xrangeV2 = requireNonNull(maybeXRangeV2.getValue());
 
             if ("*".equals(xrangeV1.major) && "*".equals(xrangeV2.major)) {
                 return 0;
@@ -139,8 +147,12 @@ public class XRange extends LatestRelease {
 
             // Micro is guaranteed to be the same, so we can stop here
             return xrangeV1.patch.compareTo(xrangeV2.patch);
-        } else if (v1Matches) {
-            XRange xrangeV1 = requireNonNull(build(v1, null).getValue());
+        } else if (maybeXRangeV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            XRange xrangeV1 = requireNonNull(maybeXRangeV1.getValue());
             if ("*".equals(xrangeV1.major)) {
                 return 0;
             }
@@ -165,8 +177,12 @@ public class XRange extends LatestRelease {
             }
 
             return 0;
-        } else if (v2Matches) {
-            XRange xrangeV2 = requireNonNull(build(v2, null).getValue());
+        } else if (maybeXRangeV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            XRange xrangeV2 = requireNonNull(maybeXRangeV2.getValue());
             if ("*".equals(xrangeV2.major)) {
                 return 0;
             }

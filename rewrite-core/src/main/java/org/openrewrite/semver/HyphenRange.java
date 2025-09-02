@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 /**
  * <a href="https://github.com/npm/node-semver#hyphen-ranges-xyz---abc">Hyphen ranges</a>.
@@ -55,19 +56,23 @@ public class HyphenRange extends LatestRelease {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        boolean v1Matches = HYPHEN_RANGE_PATTERN.matcher(v1).find();
-        boolean v2Matches = HYPHEN_RANGE_PATTERN.matcher(v2).find();
-        if (v1Matches && v2Matches) {
-            HyphenRange hyphenRangeV1 = requireNonNull(build(v1, null).getValue());
-            HyphenRange hyphenRangeV2 = requireNonNull(build(v2, null).getValue());
+        Validated<HyphenRange> maybeHyphenRangeV1 = build(v1, null);
+        Validated<HyphenRange> maybeHyphenRangeV2 = build(v2, null);
+        if (maybeHyphenRangeV1.isValid() && maybeHyphenRangeV2.isValid()) {
+            HyphenRange hyphenRangeV1 = requireNonNull(maybeHyphenRangeV1.getValue());
+            HyphenRange hyphenRangeV2 = requireNonNull(maybeHyphenRangeV2.getValue());
             int compare = super.compare(currentVersion, hyphenRangeV1.upper, hyphenRangeV2.upper);
             if (compare != 0) {
                 return compare;
             }
 
             return super.compare(currentVersion, hyphenRangeV1.lower, hyphenRangeV2.lower);
-        } else if (v1Matches) {
-            HyphenRange hyphenRangeV1 = requireNonNull(build(v1, null).getValue());
+        } else if (maybeHyphenRangeV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            HyphenRange hyphenRangeV1 = requireNonNull(maybeHyphenRangeV1.getValue());
             int compare = super.compare(currentVersion, hyphenRangeV1.upper, v2);
             if (compare < 0) {
                 return compare;
@@ -76,8 +81,12 @@ public class HyphenRange extends LatestRelease {
             compare = super.compare(currentVersion, hyphenRangeV1.lower, v2);
             return Math.max(compare, 0);
 
-        } else if (v2Matches) {
-            HyphenRange hyphenRangeV2 = requireNonNull(build(v2, null).getValue());
+        } else if (maybeHyphenRangeV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            HyphenRange hyphenRangeV2 = requireNonNull(maybeHyphenRangeV2.getValue());
             int compare = super.compare(currentVersion, v1, hyphenRangeV2.upper);
             if (compare > 0) {
                 return compare;

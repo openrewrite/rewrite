@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 public class SetRange extends LatestRelease {
     private static final Pattern SET_RANGE_PATTERN = Pattern.compile("([\\[(])(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?\\s*,\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?([\\])])");
@@ -59,11 +60,11 @@ public class SetRange extends LatestRelease {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        boolean v1Matches = SET_RANGE_PATTERN.matcher(v1).matches();
-        boolean v2Matches = SET_RANGE_PATTERN.matcher(v2).matches();
-        if (v1Matches && v2Matches) {
-            SetRange setRangeV1 = requireNonNull(build(v1, null).getValue());
-            SetRange setRangeV2 = requireNonNull(build(v2, null).getValue());
+        Validated<SetRange> maybeSetRangeV1 = build(v1, null);
+        Validated<SetRange> maybeSetRangeV2 = build(v2, null);
+        if (maybeSetRangeV1.isValid() && maybeSetRangeV2.isValid()) {
+            SetRange setRangeV1 = requireNonNull(maybeSetRangeV1.getValue());
+            SetRange setRangeV2 = requireNonNull(maybeSetRangeV2.getValue());
             int compare = super.compare(currentVersion, setRangeV1.upper, setRangeV2.upper);
             if (compare != 0) {
                 return compare;
@@ -87,8 +88,12 @@ public class SetRange extends LatestRelease {
             }
 
             return 0;
-        } else if (v1Matches) {
-            SetRange setRangeV1 = requireNonNull(build(v1, null).getValue());
+        } else if (maybeSetRangeV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            SetRange setRangeV1 = requireNonNull(maybeSetRangeV1.getValue());
             int compare = super.compare(currentVersion, setRangeV1.upper, v2);
             if (setRangeV1.upperClosed && compare < 0) {
                 return compare;
@@ -104,8 +109,12 @@ public class SetRange extends LatestRelease {
             }
 
             return 0;
-        } else if (v2Matches) {
-            SetRange setRangeV2 = requireNonNull(build(v2, null).getValue());
+        } else if (maybeSetRangeV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            SetRange setRangeV2 = requireNonNull(maybeSetRangeV2.getValue());
             int compare = super.compare(currentVersion, v1, setRangeV2.upper);
             if (setRangeV2.upperClosed && compare > 0) {
                 return compare;
