@@ -22,6 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Integer.parseInt;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Allows changes that do not modify the left-most non-zero element in the [major, minor, patch] tuple.
@@ -95,5 +96,43 @@ public class CaretRange extends LatestRelease {
 
     private static @Nullable String normalizeWildcard(@Nullable String part) {
         return "*".equals(part) || "x".equals(part) || "X".equals(part) ? null : part;
+    }
+
+    @Override
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (v1.startsWith("^") && v2.startsWith("^")) {
+            CaretRange caretV1 = requireNonNull(build(v1, null).getValue());
+            CaretRange caretV2 = requireNonNull(build(v2, null).getValue());
+            int compare = super.compare(currentVersion, caretV1.upperExclusive, caretV2.upperExclusive);
+            if (compare != 0) {
+                return compare;
+            }
+
+            return super.compare(currentVersion, caretV1.lower, caretV2.lower);
+        } else if (v1.startsWith("^")) {
+            CaretRange caretV1 = requireNonNull(build(v1, null).getValue());
+            int compare = super.compare(currentVersion, caretV1.upperExclusive, v2);
+            if (compare < 0) {
+                return compare;
+            } else if (compare == 0) {
+                return -1;
+            }
+
+            compare = super.compare(currentVersion, caretV1.lower, v2);
+            return Math.max(compare, 0);
+        } else if (v2.startsWith("^")) {
+            CaretRange caretV2 = requireNonNull(build(v2, null).getValue());
+            int compare = super.compare(currentVersion, v1, caretV2.upperExclusive);
+            if (compare > 0) {
+                return compare;
+            } else if (compare == 0) {
+                return 1;
+            }
+
+            compare = super.compare(currentVersion, v1, caretV2.lower);
+            return Math.min(compare, 0);
+        }
+
+        return super.compare(currentVersion, v1, v2);
     }
 }
