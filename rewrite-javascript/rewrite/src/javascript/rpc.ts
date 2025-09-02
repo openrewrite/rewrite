@@ -41,7 +41,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
         await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        await q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
@@ -566,7 +566,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
         draft.id = await q.receive(j.id);
         draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+        draft.markers = await q.receive(j.markers);
 
         return finishDraft(draft);
     }

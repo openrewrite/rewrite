@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -115,6 +117,17 @@ describe("Rewrite RPC", () => {
                 ),
                 path: "hello.txt"
             }
+        );
+    });
+
+    test("runSearchRecipe", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier", {identifier: "hello"});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                "const hello = 'world'",
+                "const /*~~>*/hello = 'world'"
+            )
         );
     });
 

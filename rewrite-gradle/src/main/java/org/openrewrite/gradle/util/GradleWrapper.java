@@ -134,7 +134,7 @@ public class GradleWrapper {
             );
         }
 
-        throw new IllegalStateException("Unsupported distribution url from Gradle wrapper version detection: " + currentDistributionUrl);
+        throw new IllegalStateException("Unsupported distribution url for Gradle wrapper version detection: " + currentDistributionUrl);
     }
 
     public static List<GradleVersion> listAllPublicVersions(ExecutionContext ctx) {
@@ -165,14 +165,15 @@ public class GradleWrapper {
                 }
                 return allGradleVersions;
             }
-            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+            throw new IOException("Could not get Gradle versions from " + GRADLE_VERSIONS_ALL_URL + ": HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     private static List<GradleVersion> listAllPrivateArtifactoryVersions(String artifactoryUrl, ExecutionContext ctx) {
-        String artifactoryApiUrl = artifactoryUrl.replace("/artifactory", "/artifactory/api/storage");
+        URI artifactoryUri = URI.create(artifactoryUrl);
+        String artifactoryApiUrl = String.format("%s://%s%s", artifactoryUri.getScheme(), artifactoryUri.getHost(), artifactoryUri.getPath().replace("/artifactory", "/artifactory/api/storage"));
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         try (HttpSender.Response resp = httpSender.send(httpSender.get(artifactoryApiUrl).build())) {
             if (resp.isSuccessful()) {
@@ -191,7 +192,7 @@ public class GradleWrapper {
                 }
                 return gradleVersions;
             }
-            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+            throw new IOException("Could not get Gradle versions from " + artifactoryApiUrl + ": HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

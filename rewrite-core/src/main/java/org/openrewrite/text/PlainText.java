@@ -163,7 +163,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
     @Override
     public void rpcSend(PlainText after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
-        q.sendMarkers(after, Tree::getMarkers);
+        q.getAndSend(after, Tree::getMarkers);
         q.getAndSend(after, (PlainText d) -> d.getSourcePath().toString());
         q.getAndSend(after, (PlainText d) -> d.getCharset().name());
         q.getAndSend(after, PlainText::isCharsetBomMarked);
@@ -172,7 +172,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
         q.getAndSend(after, PlainText::getText);
         q.getAndSendList(after, PlainText::getSnippets, Tree::getId, snippet -> {
             q.getAndSend(snippet, Tree::getId);
-            q.sendMarkers(snippet, Tree::getMarkers);
+            q.getAndSend(snippet, Tree::getMarkers);
             q.getAndSend(snippet, Snippet::getText);
         });
     }
@@ -180,7 +180,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
     @Override
     public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
         return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
-                .withMarkers(q.receiveMarkers(t.getMarkers()))
+                .withMarkers(q.receive(t.getMarkers()))
                 .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
                 .withCharsetName(q.receiveAndGet(t.getCharsetName(), String::toString))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
@@ -189,7 +189,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
                 .withText(q.receive(t.getText()))
                 .withSnippets(q.receiveList(t.getSnippets(), s -> s
                         .withId(q.receiveAndGet(s.getId(), UUID::fromString))
-                        .withMarkers(q.receiveMarkers(s.getMarkers()))
+                        .withMarkers(q.receive(s.getMarkers()))
                         .withText(q.receive(s.getText()))));
     }
 
