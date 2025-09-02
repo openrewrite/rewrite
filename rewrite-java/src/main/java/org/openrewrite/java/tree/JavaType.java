@@ -1565,8 +1565,8 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
-            return Objects.equals(declaringType, method.declaringType) &&
-                   name.equals(method.name) &&
+            return Objects.equals(name, method.name) &&
+                   Objects.equals(declaringType, method.declaringType) &&
                    Objects.equals(returnType, method.returnType) &&
                    Arrays.equals(parameterTypes, method.parameterTypes);
         }

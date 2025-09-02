@@ -30,14 +30,21 @@ import org.opentest4j.AssertionFailedError;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 public class Assertions {
     private Assertions() {
     }
 
     static void customizeExecutionContext(ExecutionContext ctx) {
-        if (MavenSettings.readFromDiskEnabled()) {
-            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+        boolean nothingConfigured = mctx.getSettings() == null &&
+                                    mctx.getLocalRepository().equals(MAVEN_LOCAL_DEFAULT) &&
+                                    mctx.getRepositories().isEmpty() &&
+                                    mctx.getActiveProfiles().isEmpty() &&
+                                    mctx.getMirrors().isEmpty();
+        if (nothingConfigured) {
+            // Load Maven settings to pick up any mirrors, proxies etc. that might be required in corporate environments
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
         }
     }

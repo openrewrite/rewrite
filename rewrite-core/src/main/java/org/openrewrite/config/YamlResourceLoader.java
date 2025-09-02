@@ -61,9 +61,6 @@ public class YamlResourceLoader implements ResourceLoader {
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     @Nullable
-    private Map<String, List<Contributor>> contributors;
-
-    @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
 
     private final RecipeLoader recipeLoader;
@@ -73,8 +70,7 @@ public class YamlResourceLoader implements ResourceLoader {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
-        Example("specs.openrewrite.org/v1beta/example"),
-        Attribution("specs.openrewrite.org/v1beta/attribution");
+        Example("specs.openrewrite.org/v1beta/example");
 
         private final String spec;
 
@@ -198,12 +194,11 @@ public class YamlResourceLoader implements ResourceLoader {
     @Override
     public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
         Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
-        Map<String, List<Contributor>> contributors = RecipeDetail.CONTRIBUTORS.includedIn(details) ? listContributors() : emptyMap();
         for (Map<String, Object> recipeResource : resources) {
             if (!recipeResource.containsKey("name") || !recipeName.equals(recipeResource.get("name"))) {
                 continue;
             }
-            return mapToRecipe(recipeResource, contributors, EnumSet.copyOf(Arrays.asList(details)));
+            return mapToRecipe(recipeResource, EnumSet.copyOf(Arrays.asList(details)));
         }
         try {
             return recipeLoader.load(recipeName, null);
@@ -217,20 +212,19 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<Recipe> listRecipes() {
         Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
         List<Recipe> recipes = new ArrayList<>(resources.size());
-        Map<String, List<Contributor>> contributors = listContributors();
         for (Map<String, Object> r : resources) {
             if (!r.containsKey("name")) {
                 continue;
             }
 
-            DeclarativeRecipe recipe = mapToRecipe(r, contributors, EnumSet.allOf(RecipeDetail.class));
+            DeclarativeRecipe recipe = mapToRecipe(r, EnumSet.of(RecipeDetail.MAINTAINERS, RecipeDetail.EXAMPLES));
             recipes.add(recipe);
         }
         return recipes;
     }
 
     @SuppressWarnings("unchecked")
-    private DeclarativeRecipe mapToRecipe(Map<String, Object> yaml, Map<String, List<Contributor>> contributors, EnumSet<RecipeDetail> details) {
+    private DeclarativeRecipe mapToRecipe(Map<String, Object> yaml, EnumSet<RecipeDetail> details) {
         @Language("markdown") String name = (String) yaml.get("name");
 
         @Language("markdown")
@@ -310,9 +304,6 @@ public class YamlResourceLoader implements ResourceLoader {
                         recipe::addUninitializedPrecondition,
                         recipe::addValidation);
             }
-        }
-        if (details.contains(RecipeDetail.CONTRIBUTORS) && contributors.containsKey(recipe.getName())) {
-            recipe.setContributors(contributors.get(recipe.getName()));
         }
         return recipe;
     }
@@ -397,11 +388,10 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
+        return listRecipeDescriptors(emptyList(), listRecipeExamples());
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
-                                                              Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
@@ -415,12 +405,20 @@ public class YamlResourceLoader implements ResourceLoader {
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
-            declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
-            declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
+            declarativeRecipe.initialize(allRecipes);
             declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
+
+    }
+
+    @SuppressWarnings("unused")
+    @Deprecated
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
+                                                              Map<String, List<Contributor>> recipeNamesToContributors,
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
+        return listRecipeDescriptors(externalRecipes, recipeNamesToExamples);
     }
 
     @SuppressWarnings("unchecked")
@@ -591,32 +589,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
-        if (contributors == null) {
-            Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Attribution);
-            if (rawAttribution.isEmpty()) {
-                contributors = emptyMap();
-            } else {
-                Map<String, List<Contributor>> result = new HashMap<>(rawAttribution.size());
-                for (Map<String, Object> attribution : rawAttribution) {
-                    String recipeName = (String) attribution.get("recipeName");
-
-                    //noinspection unchecked
-                    List<Map<String, Object>> rawContributors = (List<Map<String, Object>>) attribution.get(
-                            "contributors");
-                    List<Contributor> contributors = new ArrayList<>(rawContributors.size());
-                    for (Map<String, Object> rawContributor : rawContributors) {
-                        contributors.add(new Contributor(
-                                (String) rawContributor.get("name"),
-                                (String) rawContributor.get("email"),
-                                (int) rawContributor.get("lineCount")
-                        ));
-                    }
-                    result.put(recipeName, contributors);
-                }
-                contributors = result;
-            }
-        }
-        return contributors;
-
+        return emptyMap();
     }
 }

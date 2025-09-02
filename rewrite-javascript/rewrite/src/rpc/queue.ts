@@ -16,7 +16,7 @@
 import {emptyMarkers, Marker, Markers, MarkersKind} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
-import {asRef, isRef, Reference, ReferenceMap} from "./reference";
+import {asRef, isRef, Reference, ReferenceMap} from "../reference";
 import {Writable} from "node:stream";
 
 /**
@@ -90,12 +90,7 @@ export class RpcSendQueue {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
-        if (after.kind === MarkersKind.Markers) {
-            // FIXME check if we can solve this via RpcCodec
-            await this.sendMarkers(undefined!, _ => after);
-        } else {
-            await this.send(after, before);
-        }
+        await this.send(after, before);
 
         const result = this.q;
         result.push({state: RpcObjectState.END_OF_OBJECT});

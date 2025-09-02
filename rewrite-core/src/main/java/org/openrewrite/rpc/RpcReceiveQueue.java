@@ -19,9 +19,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Markers;
 
-import java.io.PrintStream;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -44,14 +42,11 @@ public class RpcReceiveQueue {
 
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
-    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayDeque<>();
-        this.logFile = logFile;
         this.pull = pull;
     }
 
@@ -78,13 +73,8 @@ public class RpcReceiveQueue {
     @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
+        //noinspection ConstantValue
         return after != null && after != before ? mapping.apply((U) after) : after;
-    }
-
-    public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -110,15 +100,9 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-
-        if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
-            logFile.println("  " + message.getTrace());
-            logFile.println("  " + Trace.traceReceiver());
-            logFile.flush();
-        }
+        Trace.traceReceiver(message);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
