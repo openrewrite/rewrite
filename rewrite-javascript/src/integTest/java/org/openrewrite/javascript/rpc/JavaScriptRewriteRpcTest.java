@@ -40,6 +40,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.javascript.Assertions.javascript;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -96,6 +97,23 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
               }
               """,
             spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @DocumentExample
+    @Test
+    void runSearchRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.javascript.find-identifier",
+              Map.of("identifier", "hello")))
+            .expectedCyclesThatMakeChanges(1),
+          javascript(
+            "const hello = 'world'",
+            "const /*~~>*/hello = 'world'"
           )
         );
     }

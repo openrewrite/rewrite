@@ -324,10 +324,9 @@ public class RewriteRpc {
     public <T> T getObject(String id) {
         // Check if we have a cached version of this object
         Object localObject = localObjects.get(id);
-        String lastKnownId = localObject != null ? id : null;
 
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class));
+                new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");

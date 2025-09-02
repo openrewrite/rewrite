@@ -170,6 +170,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                     "rewrite-rpc",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     verboseLogging ? "--verbose" : null,
+                    "--trace-get-object-output",
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
             ).filter(Objects::nonNull).toArray(String[]::new);
 

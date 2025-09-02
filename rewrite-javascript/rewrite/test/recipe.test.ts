@@ -15,7 +15,8 @@
  */
 import {RecipeRegistry} from "@openrewrite/rewrite";
 import {describe} from "@jest/globals";
-import {ChangeText, activate} from "../fixtures/example-recipe";
+import {activate} from "../fixtures/example-recipe";
+import {ChangeText} from "../fixtures/change-text";
 
 describe("recipes", () => {
 
