@@ -80,14 +80,14 @@ public class CaretRange extends LatestRelease {
             lower = major + "." + minor + "." + patch + "." + micro;
         }
 
-        if (!"0".equals(major) || minor == null) {
+        if (minor == null) {
             upper = Integer.toString(parseInt(major) + 1);
-        } else if (!"0".equals(minor) || patch == null) {
-            upper = major + "." + (parseInt(minor) + 1);
-        } else if (!"0".equals(patch) && micro == null) {
-            upper = major + "." + minor + "." + patch;
+        } else if (patch == null) {
+            upper = (parseInt(major) + 1) + ".0";
+        } else if (micro == null) {
+            upper = (parseInt(major) + 1) + ".0.0";
         } else {
-            upper = major + "." + minor + "." + patch + "." + micro;
+            upper = (parseInt(major) + 1) + ".0.0.0";
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));

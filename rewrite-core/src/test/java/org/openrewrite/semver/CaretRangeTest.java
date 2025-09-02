@@ -68,7 +68,7 @@ class CaretRangeTest {
     }
 
     /**
-     * ^0.2.3 := >=0.2.3 <0.3.0
+     * ^0.2.3 := >=0.2.3 <1.0.0
      */
     @Test
     void updatePatch() {
@@ -77,18 +77,8 @@ class CaretRangeTest {
         assertThat(caretRange).isNotNull();
         assertThat(caretRange.isValid("1.0", "0.2.3")).isTrue();
         assertThat(caretRange.isValid("1.0", "0.2.4")).isTrue();
-        assertThat(caretRange.isValid("1.0", "0.3.0")).isFalse();
-    }
-
-    @Test
-    void updateNothing() {
-        CaretRange caretRange = CaretRange
-            .build("^0.0.3", null)
-            .getValue();
-
-        assertThat(caretRange).isNotNull();
-        assertThat(caretRange.isValid("1.0", "0.0.3")).isFalse();
-        assertThat(caretRange.isValid("1.0", "0.0.4")).isFalse();
+        assertThat(caretRange.isValid("1.0", "0.9.0")).isTrue();
+        assertThat(caretRange.isValid("1.0", "1.0.0")).isFalse();
     }
 
     /**
@@ -106,7 +96,7 @@ class CaretRangeTest {
     }
 
     /**
-     * ^0.0.x := >=0.0.0 <0.1.0
+     * ^0.0.x := >=0.0.0 <1.0.0
      */
     @Test
     void desugarPatchWildcard() {
@@ -115,6 +105,7 @@ class CaretRangeTest {
         assertThat(caretRange).isNotNull();
         assertThat(caretRange.isValid("1.0", "0.0.0")).isTrue();
         assertThat(caretRange.isValid("1.0", "0.0.1")).isTrue();
-        assertThat(caretRange.isValid("1.0", "0.1.0")).isFalse();
+        assertThat(caretRange.isValid("1.0", "0.1.0")).isTrue();
+        assertThat(caretRange.isValid("1.0", "1.0.0")).isFalse();
     }
 }
