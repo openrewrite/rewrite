@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
@@ -401,9 +402,9 @@ class TomlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5988")
     @Test
     void arrayWithTrailingComma() {
-        // Test for issue #5988 - TOML 1.0 spec allows trailing commas in arrays
         rewriteRun(
           toml(
             """
@@ -428,7 +429,6 @@ class TomlParserTest implements RewriteTest {
 
     @Test
     void inlineTableWithTrailingComma() {
-        // Test that inline tables also support trailing commas
         rewriteRun(
           toml(
             """
