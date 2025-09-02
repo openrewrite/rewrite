@@ -15,8 +15,6 @@
  */
 package org.openrewrite.test;
 
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -175,8 +173,9 @@ public interface RewriteTest extends SourceSpecs {
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
             assertThatCode(() -> {
-                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
-                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
+                Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
+                        .load(recipe.getClass(), null);
+                // getRecipeList should not fail with default parameters from RecipeLoader.
                 r.getRecipeList();
                 // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
                 //noinspection ResultOfMethodCallIgnored
@@ -184,7 +183,7 @@ public interface RewriteTest extends SourceSpecs {
                 //noinspection EqualsWithItself,ResultOfMethodCallIgnored
                 r.equals(r);
             })
-                    .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
+                    .as("Recipe must be able to instantiate via RecipeLoader")
                     .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
@@ -707,24 +706,5 @@ class RewriteTestUtils {
             }
         }
         return false;
-    }
-}
-
-@RequiredArgsConstructor
-class DelegateSourceFileForDiff implements SourceFile {
-    @Delegate(excludes = PrintAll.class)
-    private final SourceFile delegate;
-
-    private final String expected;
-
-    @Override
-    public <P> String printAll(PrintOutputCapture<P> out) {
-        out.append(expected);
-        return out.getOut();
-    }
-
-    @SuppressWarnings("unused") // Lombok delegate exclude
-    interface PrintAll {
-        <P> String printAll(PrintOutputCapture<P> out);
     }
 }

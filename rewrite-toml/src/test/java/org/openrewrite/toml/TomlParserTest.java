@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
@@ -23,12 +24,65 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class TomlParserTest implements RewriteTest {
+
     @Test
     void keyValueString() {
         rewriteRun(
           toml(
             """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineString() {
+        rewriteRun(
+          toml(
+            """
+              # Multi-line string with preserved newlines
+              description = ""\"
+              This is a
+              multi-line string
+              with preserved newlines""\"
+              
+              # Multi-line string with escaped newline (line-ending backslash)
+              one-line = ""\"
+              The quick brown \\
+              fox jumps over \\
+              the lazy dog.\\
+              ""\"
+              
+              # Multi-line string containing quotes
+              quotes = ""\"
+              This has a single " quote
+              This has double "" quotes
+              This has escaped \\" quote""\"
+              
+              # Multi-line string with leading newline trimmed
+              trimmed = ""\"
+              First line after opening quotes""\"
+              
+              # Multi-line literal string (no escapes processed)
+              regex = '''
+              \\d{2}-\\d{2}-\\d{4}
+              Line with \\ backslash
+              Line with ' single quote
+              Line with '' two quotes'''
+              
+              # Multi-line literal string with various quotes
+              literal-quotes = '''
+              Single ' quote
+              Double '' quotes
+              Almost ''\\' but not quite'''
+              
+              # Multi-line basic string with escape sequences
+              escaped = ""\"
+              Tab:\\there
+              Newline:\\nhere
+              Quote:\\" Unicode:\\u00E9
+              Backslash:\\\\""\"
               """
           )
         );
@@ -343,6 +397,46 @@ class TomlParserTest implements RewriteTest {
               """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
               #
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5988")
+    @Test
+    void arrayWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Single element with trailing comma
+              tsfresh = [
+                  "featuretools-tsfresh-primitives >= 1.0.0",
+              ]
+              
+              # Multiple elements with trailing comma
+              dependencies = [
+                  "package1",
+                  "package2",
+                  "package3",
+              ]
+              
+              # Inline array with trailing comma  
+              inline = ["value1", "value2",]
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineTableWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Inline table with trailing comma
+              point = { x = 1, y = 2, }
+              
+              # Another inline table with trailing comma
+              person = { name = "John", age = 30, }
               """
           )
         );

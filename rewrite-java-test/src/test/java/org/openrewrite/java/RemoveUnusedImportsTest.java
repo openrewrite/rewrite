@@ -2269,4 +2269,21 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5933")
+    @Test
+    void doNotAddStaticImportForClassLiteral() {
+        rewriteRun(
+          java(
+            """
+            import java.util.concurrent.TimeUnit;
+
+            public class Foo {
+                TimeUnit foo = TimeUnit.MINUTES;
+                Class<?> cls = TimeUnit.class;
+            }
+            """
+          )
+        );
+    }
 }

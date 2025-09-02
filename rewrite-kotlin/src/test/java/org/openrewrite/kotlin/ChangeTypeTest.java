@@ -505,4 +505,28 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeTypeOnUnusedImport() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A {
+              }
+              """,
+            """
+              class A {
+              }
+              """
+          )
+        );
+    }
 }

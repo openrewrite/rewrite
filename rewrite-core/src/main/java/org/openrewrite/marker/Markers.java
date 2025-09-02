@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BinaryOperator;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -110,6 +111,7 @@ public class Markers implements RpcCodec<Markers> {
     }
 
     public Markers removeByType(Class<? extends Marker> type) {
+        //noinspection DataFlowIssue
         return withMarkers(ListUtils.map(this.markers, m -> type.equals(m.getClass()) ? null : m));
     }
 
@@ -146,7 +148,7 @@ public class Markers implements RpcCodec<Markers> {
     /**
      * Add a new marker or update some existing marker.
      *
-     * @param m   A marker, which may or may not already exist already.
+     * @param m   A marker, which may or may not already exist.
      * @param <M> The marker type.
      * @return If a marker already exists that matches by object equality, an unchanged markers reference
      * is returned. Otherwise, the supplied marker is added.
@@ -178,6 +180,6 @@ public class Markers implements RpcCodec<Markers> {
     @Override
     public Markers rpcReceive(Markers before, RpcReceiveQueue q) {
         return withId(q.receiveAndGet(getId(), UUID::fromString))
-                .withMarkers(q.receiveList(getMarkers(), null));
+                .withMarkers(requireNonNull(q.receiveList(getMarkers(), null)));
     }
 }

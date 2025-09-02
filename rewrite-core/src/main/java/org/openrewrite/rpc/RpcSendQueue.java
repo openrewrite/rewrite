@@ -34,17 +34,14 @@ public class RpcSendQueue {
     private final List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
     private final IdentityHashMap<Object, Integer> refs;
-    private final boolean trace;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs,
-                        boolean trace) {
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
         this.refs = refs;
-        this.trace = trace;
     }
 
     public void put(RpcObjectData rpcObjectData) {
@@ -63,14 +60,6 @@ public class RpcSendQueue {
         }
         drain.accept(new ArrayList<>(batch));
         batch.clear();
-    }
-
-    public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
-        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
-            Markers markers = Reference.getValue(markersRef);
-            getAndSend(requireNonNull(markers), Markers::getId);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
-        });
     }
 
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
@@ -99,15 +88,15 @@ public class RpcSendQueue {
         Object beforeVal = Reference.getValue(before);
 
         if (beforeVal == afterVal) {
-            put(new RpcObjectData(NO_CHANGE, null, null, null, trace ? Trace.traceSender() : null));
+            put(new RpcObjectData(NO_CHANGE, null, null, null));
         } else if (beforeVal == null) {
             add(after, onChange);
         } else if (afterVal == null) {
-            put(new RpcObjectData(DELETE, null, null, null, trace ? Trace.traceSender() : null));
+            put(new RpcObjectData(DELETE, null, null, null));
         } else {
             //noinspection unchecked
             RpcCodec<Object> afterCodec = after instanceof RpcCodec ? (RpcCodec<Object>) after : null;
-            put(new RpcObjectData(CHANGE, null, onChange == null && afterCodec == null ? afterVal : null, null, trace ? Trace.traceSender() : null));
+            put(new RpcObjectData(CHANGE, null, onChange == null && afterCodec == null ? afterVal : null, null));
             doChange(after, before, onChange, afterCodec);
         }
     }
@@ -129,9 +118,9 @@ public class RpcSendQueue {
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
-                        put(new RpcObjectData(NO_CHANGE, null, null, null, trace ? Trace.traceSender() : null));
+                        put(new RpcObjectData(NO_CHANGE, null, null, null));
                     } else {
-                        put(new RpcObjectData(CHANGE, null, null, null, trace ? Trace.traceSender() : null));
+                        put(new RpcObjectData(CHANGE, null, null, null));
                         //noinspection unchecked
                         doChange(anAfter, aBefore, onChangeRun, anAfter instanceof RpcCodec ? ((RpcCodec<Object>) anAfter) : null);
                     }
@@ -152,7 +141,7 @@ public class RpcSendQueue {
             Integer beforePos = beforeIdx.get(id.apply(t));
             positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
         }
-        put(new RpcObjectData(CHANGE, null, positions, null, trace ? Trace.traceSender() : null));
+        put(new RpcObjectData(CHANGE, null, positions, null));
         return beforeIdx;
     }
 
@@ -161,7 +150,7 @@ public class RpcSendQueue {
         Integer ref = null;
         if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
-                put(new RpcObjectData(ADD, null, null, refs.get(afterVal), trace ? Trace.traceSender() : null));
+                put(new RpcObjectData(ADD, null, null, refs.get(afterVal)));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
@@ -171,7 +160,7 @@ public class RpcSendQueue {
         //noinspection unchecked
         RpcCodec<Object> afterCodec = afterVal instanceof RpcCodec ? (RpcCodec<Object>) afterVal : null;
         put(new RpcObjectData(ADD, getValueType(afterVal),
-                onChange == null && afterCodec == null ? afterVal : null, ref, trace ? Trace.traceSender() : null));
+                onChange == null && afterCodec == null ? afterVal : null, ref));
         doChange(afterVal, null, onChange, afterCodec);
     }
 

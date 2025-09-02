@@ -45,7 +45,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
-    private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
     private final ClassLoader classLoader;
@@ -145,11 +144,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 }
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
-                recipeAttributions.putAll(resourceLoader.listContributors());
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeAttributions, recipeExamples));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeExamples));
             }
         }
     }
@@ -255,7 +253,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
-        ensureScanned();
-        return recipeAttributions;
+        return emptyMap();
     }
 }

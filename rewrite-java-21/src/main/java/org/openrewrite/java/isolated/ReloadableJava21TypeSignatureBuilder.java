@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-import static org.openrewrite.java.isolated.ReloadableJava21TypeMapping.isUnknownType;
 
 class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -42,7 +41,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     private String signature(@Nullable Type type) {
-        if (type == null || isUnknownType(type) || type instanceof NullType) {
+        if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
             return intersectionSignature(type);
@@ -300,7 +299,7 @@ class ReloadableJava21TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return resolvedArgumentTypes.toString();
         } else if (selectType instanceof Type.ForAll) {
             return methodArgumentSignature(((Type.ForAll) selectType).qtype);
-        } else if (selectType instanceof Type.JCNoType || isUnknownType(selectType)) {
+        } else if (selectType instanceof Type.JCNoType || selectType instanceof Type.UnknownType) {
             return "{undefined}";
         }
 
