@@ -24,11 +24,12 @@ import org.openrewrite.*;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
@@ -115,7 +116,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
 
     private void addRowToDataTable(ExecutionContext ctx, Row row) {
         //noinspection DuplicatedCode
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, () -> Collections.synchronizedMap(new LinkedHashMap<>()), (extract, allDataTables) -> {
             //noinspection unchecked
             List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
             dataTablesOfType.add(row);

@@ -23,8 +23,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @param <Row> The model type for a single row of this data table.
@@ -53,7 +54,6 @@ public class DataTable<Row> {
         this.description = description;
 
         // Only null when transferring DataTables over RPC.
-        //noinspection ConstantValue
         if (recipe != null) {
             recipe.addDataTable(this);
         }
@@ -73,7 +73,7 @@ public class DataTable<Row> {
         if (!allowWritingInThisCycle(ctx)) {
             return;
         }
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, () -> Collections.synchronizedMap(new LinkedHashMap<>()), (extract, allDataTables) -> {
             //noinspection unchecked
             List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
             dataTablesOfType.add(row);
