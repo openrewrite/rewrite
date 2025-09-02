@@ -114,7 +114,7 @@ commentOrNl
 
 array
     : L_BRACKET commentOrNl* R_BRACKET
-    | L_BRACKET commentOrNl* value (COMMA commentOrNl* value COMMA?)* commentOrNl* R_BRACKET
+    | L_BRACKET commentOrNl* value (COMMA commentOrNl* value)* COMMA? commentOrNl* R_BRACKET
     ;
 
 table
@@ -128,7 +128,7 @@ standardTable
 
 inlineTable
     : L_BRACE commentOrNl* R_BRACE
-    | L_BRACE commentOrNl* keyValue (COMMA commentOrNl* keyValue COMMA?)* commentOrNl* R_BRACE
+    | L_BRACE commentOrNl* keyValue (COMMA commentOrNl* keyValue)* COMMA? commentOrNl* R_BRACE
     ;
 
 arrayTable

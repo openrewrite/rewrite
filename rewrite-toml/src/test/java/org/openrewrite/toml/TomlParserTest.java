@@ -402,6 +402,47 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void arrayWithTrailingComma() {
+        // Test for issue #5988 - TOML 1.0 spec allows trailing commas in arrays
+        rewriteRun(
+          toml(
+            """
+              # Single element with trailing comma
+              tsfresh = [
+                  "featuretools-tsfresh-primitives >= 1.0.0",
+              ]
+              
+              # Multiple elements with trailing comma
+              dependencies = [
+                  "package1",
+                  "package2",
+                  "package3",
+              ]
+              
+              # Inline array with trailing comma  
+              inline = ["value1", "value2",]
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineTableWithTrailingComma() {
+        // Test that inline tables also support trailing commas
+        rewriteRun(
+          toml(
+            """
+              # Inline table with trailing comma
+              point = { x = 1, y = 2, }
+              
+              # Another inline table with trailing comma
+              person = { name = "John", age = 30, }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiBytesUnicode() {
         rewriteRun(
           toml(
