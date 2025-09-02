@@ -125,7 +125,7 @@ public class ParseError implements SourceFile, RpcCodec<ParseError> {
     @Override
     public void rpcSend(ParseError after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
-        q.sendMarkers(after, Tree::getMarkers);
+        q.getAndSend(after, Tree::getMarkers);
         q.getAndSend(after, (ParseError d) -> d.getSourcePath().toString());
         q.getAndSend(after, (ParseError d) -> d.getCharset().name());
         q.getAndSend(after, ParseError::isCharsetBomMarked);
@@ -137,7 +137,7 @@ public class ParseError implements SourceFile, RpcCodec<ParseError> {
     @Override
     public ParseError rpcReceive(ParseError t, RpcReceiveQueue q) {
         return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
-                .withMarkers(q.receiveMarkers(t.getMarkers()))
+                .withMarkers(q.receive(t.getMarkers()))
                 .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
                 .withCharset(q.<Charset, String>receiveAndGet(t.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))

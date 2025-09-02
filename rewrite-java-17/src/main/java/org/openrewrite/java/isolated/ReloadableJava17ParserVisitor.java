@@ -1761,15 +1761,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-            // Though this is the Java 17 parser, we still need to support it if people use this parser with newer Java versions (e.g. https://github.com/PicnicSupermarket/error-prone-support/pull/1557)
-            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
-            reportJavaParsingException(ex);
-            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;

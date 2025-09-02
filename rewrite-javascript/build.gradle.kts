@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
@@ -43,7 +45,7 @@ tasks.withType<Javadoc>().configureEach {
     exclude("**/JS.java")
 }
 
-
+// Override the defaults because the JavaScript code is one directory down (rewrite/).
 extensions.configure<NodeExtension> {
     workDir.set(projectDir.resolve("rewrite"))
     npmWorkDir.set(projectDir.resolve("rewrite"))
@@ -59,6 +61,23 @@ val datedSnapshotVersion by extra {
     } else {
         project.version.toString()
     }
+}
+
+val npmVersion = tasks.register<NpmTask>("npmVersion") {
+    val versionDir = layout.buildDirectory.file("tmp/npmVersion")
+    inputs.file("rewrite/package.json")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(versionDir)
+
+    doFirst {
+        copy {
+            from("rewrite/package.json")
+            into(versionDir)
+        }
+    }
+
+    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
+    workingDir = versionDir
 }
 
 val npmInstall = tasks.named("npmInstall")
@@ -83,42 +102,34 @@ tasks.named("check") {
     dependsOn(npmTest)
 }
 
-
-val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
+val npmBuild = tasks.register<NpmTask>("npmBuild") {
     inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(file("rewrite/dist/src/"))
+    outputs.dir(file("rewrite/dist/"))
+
+    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    outputs.file(versionTxt)
+    doLast {
+        versionTxt.writeText(datedSnapshotVersion)
+    }
 
     args = listOf("run", "build")
 }
-tasks.named("assemble") {
-    dependsOn(npmRunBuild)
-}
 
-val npmVersion = tasks.register<NpmTask>("npmVersion") {
-    val versionDir = layout.buildDirectory.file("tmp/npmVersion")
-    inputs.file("rewrite/package.json")
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(versionDir)
-
-    doFirst {
-        copy {
-            from("rewrite/package.json")
-            into(versionDir)
-        }
+// Because each of these sees version.txt as an input
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(npmBuild)
     }
-
-    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
-    workingDir = versionDir
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
-    from(npmRunBuild) {
-        into("package/dist/src/")
+    from(npmBuild) {
+        into("package/dist/")
     }
     from(npmVersion) {
         into("package")
@@ -134,60 +145,18 @@ val npmPack = tasks.register<Tar>("npmPack") {
     destinationDirectory = layout.buildDirectory.dir("distributions")
 }
 
-val npmInitTemp = tasks.register<NpmTask>("npmInitTemp") {
-    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
-    args.set(listOf("init", "-y"))
-    workingDir.set(tempInstallDir)
-
-    doFirst {
-        if (tempInstallDir.exists()) {
-            tempInstallDir.deleteRecursively()
-        }
-        tempInstallDir.mkdirs()
-    }
-}
-
-val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
-    val tempInstallDir = layout.buildDirectory.file("tmp/npmInstall")
-    inputs.files(npmPack)
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(tempInstallDir)
-    dependsOn(npmInitTemp)
-
-    // Use a provider to defer evaluation until execution time
-    args = provider { listOf("install", npmPack.get().archiveFile.get().asFile.absolutePath, "--omit=dev") }
-    workingDir.set(tempInstallDir)
-}
-
-// Creates a production-ready package; writing it to `src/main/generated-resources` so that it will be included by IDEA
-val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
-    // Configure the tar output
-    archiveFileName.set("production-package.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("generated/resources/distributions/"))
-
-    from(npmInstallTemp) {
-        // Optionally exclude unnecessary files like package-lock.json, etc.
-        // exclude("package-lock.json", ".npmrc")
-    }
-}
-
-// Include production-ready package into jar
-tasks.named<Jar>("jar") {
-    from(createProductionPackage)
-}
-
-var npmTestBuild = tasks.register<NpmTask>("npmTestBuild") {
+val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
     inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(npmRunBuild)
+    inputs.files(npmBuild)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree("rewrite/test"))
+    inputs.files(fileTree("rewrite/fixtures"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(file("rewrite/dist/test/"))
+    outputs.dir(file("rewrite/dist-fixtures/"))
 
-    args = listOf("run", "build:test")
+    args = listOf("run", "build:fixtures")
 }
 
 testing {
@@ -198,7 +167,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        dependsOn(npmTestBuild)
+                        dependsOn(npmBuild, npmFixturesBuild)
                     }
                 }
             }
@@ -210,8 +179,8 @@ testing {
                 implementation(project(":rewrite-json"))
                 implementation(project(":rewrite-java-tck"))
                 implementation("org.assertj:assertj-core:latest.release")
-                implementation("org.junit.platform:junit-platform-suite-api:latest.release")
-                runtimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
+                implementation("org.junit.platform:junit-platform-suite-api")
+                runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
         }
     }
@@ -248,6 +217,7 @@ tasks.named("publish") {
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+    exclude("**/version.txt")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

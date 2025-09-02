@@ -104,6 +104,7 @@ public class ResolvedPom {
     @Builder.Default
     List<ResolvedManagedDependency> dependencyManagement = emptyList();
 
+    // TO-BE-REMOVED(2025-11-30): See comment on `getDependencyManagement()`
     @NonFinal
     @Builder.Default
     @Getter(AccessLevel.NONE)
@@ -139,11 +140,16 @@ public class ResolvedPom {
     List<String> subprojects = emptyList();
 
     // Annotation present to ensure that serialized data is always sorted
+    // TO-BE-REMOVED(2025-11-30): Remove this method and instead do simpler eager sorting in `resolveParentDependenciesRecursively()`.
+    //   This cannot be changed right now, because in older serialized models the data is unsorted.
     @JsonGetter
     public List<ResolvedManagedDependency> getDependencyManagement() {
         if (!dependencyManagementSorted) {
-            dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
-            dependencyManagementSorted = true;
+            // Some use cases require concurrent calls to this method
+            synchronized (this) {
+                dependencyManagement.sort(MANAGED_DEPENDENCY_COMPARATOR);
+                dependencyManagementSorted = true;
+            }
         }
         return dependencyManagement;
     }

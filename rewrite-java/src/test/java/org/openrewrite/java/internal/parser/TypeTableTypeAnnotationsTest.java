@@ -261,7 +261,7 @@ class TypeTableTypeAnnotationsTest {
         String tsvContent = processJarThroughTypeTable(jarFile);
 
         String[] lines = tsvContent.split("\n");
-        String header = lines[0];
+        String header = lines[0].trim();
 
         // Verify header has the right columns in order
         assertThat(header).isEqualTo(
@@ -279,7 +279,7 @@ class TypeTableTypeAnnotationsTest {
                 assertThat(cols[14]).as("elementAnnotations").contains("@Ljava/lang/Deprecated;");
                 assertThat(cols[15]).as("parameterAnnotations").isEmpty();
                 assertThat(cols[16]).as("typeAnnotations").isEmpty();
-                assertThat(cols[17]).as("constantValue").isEqualTo("s\"value\"");
+                assertThat(cols[17].trim()).as("constantValue").isEqualTo("s\"value\"");
             }
         }
     }

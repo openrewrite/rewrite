@@ -22,6 +22,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -34,7 +37,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
 @With
-public final class SearchResult implements Marker {
+public final class SearchResult implements Marker, RpcCodec<SearchResult> {
     UUID id;
 
     @EqualsAndHashCode.Include
@@ -111,5 +114,18 @@ public final class SearchResult implements Marker {
     @Override
     public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         return commentWrapper.apply(description == null ? "" : "(" + description + ")");
+    }
+
+    @Override
+    public void rpcSend(SearchResult after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, SearchResult::getDescription);
+    }
+
+    @Override
+    public SearchResult rpcReceive(SearchResult before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withDescription(q.receive(before.getDescription()));
     }
 }

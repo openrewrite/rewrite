@@ -1,6 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npm view:*)",
+      "Bash(npx:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
       "Bash(../gradlew dependencies:*)",
       "Bash(./gradlew:*)",
       "Bash(cat:*)",
