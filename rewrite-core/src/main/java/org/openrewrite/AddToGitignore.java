@@ -71,8 +71,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Tree visit(Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
-                    SourceFile sourceFile = (SourceFile) tree;
-                    String sourcePath = sourceFile.getSourcePath().toString();
+                    String sourcePath = ((SourceFile) tree).getSourcePath().toString();
                     // Check if this source file matches our target pattern
                     if (sourcePath.endsWith(".gitignore") && shouldNotCreate(sourcePath, pattern)) {
                         shouldCreate.set(false);
@@ -92,13 +91,31 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         if (shouldCreate.get()) {
             String pattern = getEffectiveFilePattern();
             // Extract the path from the pattern for simple cases
-            String path = extractPathFromPattern(pattern);
+            String path = patternToPathToCreate(pattern);
             return PlainTextParser.builder().build()
                     .parse(entries)
                     .map(text -> (SourceFile) text.withSourcePath(Paths.get(path)))
                     .collect(toList());
         }
         return emptyList();
+    }
+
+    private String patternToPathToCreate(String pattern) {
+        // Extract a concrete path from the pattern for file generation
+        if (!pattern.contains("*") && !pattern.contains("?")) {
+            // It's already a concrete path
+            return pattern;
+        }
+        if ("**/.gitignore".equals(pattern)) {
+            // Default to root for wildcard patterns
+            return ".gitignore";
+        }
+        if (pattern.endsWith("/.gitignore")) {
+            // Specific directory pattern like "src/.gitignore"
+            return pattern;
+        }
+        // Default to root for complex patterns
+        return ".gitignore";
     }
 
     @Override
@@ -257,22 +274,5 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
     private String getEffectiveFilePattern() {
         return isBlank(filePattern) ? ".gitignore" : filePattern;
-    }
-
-    private String extractPathFromPattern(String pattern) {
-        // Extract a concrete path from the pattern for file generation
-        if (!pattern.contains("*") && !pattern.contains("?")) {
-            // It's already a concrete path
-            return pattern;
-        } else if ("**/.gitignore".equals(pattern)) {
-            // Default to root for wildcard patterns
-            return ".gitignore";
-        } else if (pattern.endsWith("/.gitignore")) {
-            // Specific directory pattern like "src/.gitignore"
-            return pattern;
-        } else {
-            // Default to root for complex patterns
-            return ".gitignore";
-        }
     }
 }
