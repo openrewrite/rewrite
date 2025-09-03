@@ -28,7 +28,7 @@ class AddToGitignoreTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddToGitignore("*.tmp\n.DS_Store\ntarget/", null)),
           text(
-            null,
+            doesNotExist(),
             """
               *.tmp
               .DS_Store
@@ -154,7 +154,7 @@ class AddToGitignoreTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddToGitignore("local.properties", null)),
           text(
-            null,
+            doesNotExist(),
             """
               local.properties
               """,
@@ -376,7 +376,7 @@ class AddToGitignoreTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
-            null,
+            doesNotExist(),
             """
               *.log
               """,
@@ -391,7 +391,7 @@ class AddToGitignoreTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
-            null,
+            doesNotExist(),
             """
               *.log
               """,

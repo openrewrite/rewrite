@@ -74,7 +74,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                     SourceFile sourceFile = (SourceFile) tree;
                     String sourcePath = sourceFile.getSourcePath().toString();
                     // Check if this source file matches our target pattern
-                    if (sourcePath.endsWith(".gitignore") && matchesPattern(sourcePath, pattern)) {
+                    if (sourcePath.endsWith(".gitignore") && matchesFilePattern(sourcePath, pattern)) {
                         shouldCreate.set(false);
                     }
                 }
@@ -159,7 +159,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 }
             } else {
                 String normalized = normalizeRule(trimmed);
-                if (!existingRules.contains(normalized) && !isSuperfluousEntry(trimmed, existingWildcardPatterns)) {
+                if (!existingRules.contains(normalized) && !isRedundantEntry(trimmed, existingWildcardPatterns)) {
                     newLines.add(entry);
                     existingRules.add(normalized);
                 }
@@ -196,10 +196,10 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             normalized = normalized.substring(1);
         }
 
-        return normalized.toLowerCase();
+        return normalized;
     }
 
-    private boolean isSuperfluousEntry(String entry, Set<String> existingWildcardPatterns) {
+    private boolean isRedundantEntry(String entry, Set<String> existingWildcardPatterns) {
         // Check if this entry would be redundant given existing wildcard patterns
         for (String pattern : existingWildcardPatterns) {
             if (matchesGitignorePattern(entry, pattern)) {
@@ -255,7 +255,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         return isBlank(filePattern) ? ".gitignore" : filePattern;
     }
 
-    private boolean matchesPattern(String sourcePath, String pattern) {
+    private boolean matchesFilePattern(String sourcePath, String pattern) {
         // Simple pattern matching for common cases
         if (pattern.equals(".gitignore")) {
             // Root .gitignore only
