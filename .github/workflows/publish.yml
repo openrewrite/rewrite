@@ -14,6 +14,10 @@ concurrency:
 jobs:
   release:
     uses: openrewrite/gh-automation/.github/workflows/publish-gradle.yml@main
+    with:
+      java_version: |
+        25-ea
+        21
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       sonatype_username: ${{ secrets.SONATYPE_USERNAME }}
