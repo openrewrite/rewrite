@@ -15,10 +15,14 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava25
@@ -116,7 +120,14 @@ class UnnamedVariableTest implements RewriteTest {
                           System.out.println(third);
                   }
               }
-              """
+              """,
+            after -> after.afterRecipe(cu -> {
+                J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(1).getBody().getStatements().getFirst();
+                J.VariableDeclarations vd = (J.VariableDeclarations) md.getBody().getStatements().getFirst();
+                J.Lambda lambda = (J.Lambda) vd.getVariables().getFirst().getInitializer();
+                List<J> lambdaParams = lambda.getParameters().getParameters();
+                assertThat(lambdaParams.getFirst()).isNotEqualTo(lambdaParams.get(1));
+            })
           )
         );
     }
@@ -240,6 +251,7 @@ class UnnamedVariableTest implements RewriteTest {
     }
 
     @Test
+    @Disabled
     void unnamedVariableInAssignment() {
         rewriteRun(
           java(

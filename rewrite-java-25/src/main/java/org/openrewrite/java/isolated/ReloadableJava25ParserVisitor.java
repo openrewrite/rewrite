@@ -412,7 +412,6 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
-//        Space space = node.getSimpleName().isEmpty() ? sourceBefore("_") : sourceBefore(node.getSimpleName().toString());
         J.Identifier name = new J.Identifier(randomId(), sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, emptyList(), ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
 
