@@ -74,30 +74,15 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                     SourceFile sourceFile = (SourceFile) tree;
                     String sourcePath = sourceFile.getSourcePath().toString();
                     // Check if this source file matches our target pattern
-                    if (sourcePath.endsWith(".gitignore") && matchesFilePattern(sourcePath, pattern)) {
+                    if (sourcePath.endsWith(".gitignore") && shouldNotCreate(sourcePath, pattern)) {
                         shouldCreate.set(false);
                     }
                 }
                 return tree;
             }
 
-            private boolean matchesFilePattern(String sourcePath, String pattern) {
-                // Simple pattern matching for common cases
-                if (".gitignore".equals(pattern)) {
-                    // Root .gitignore only
-                    return ".gitignore".equals(sourcePath);
-                }
-                if ("**/.gitignore".equals(pattern)) {
-                    // All .gitignore files
-                    return true;
-                }
-                if (!pattern.contains("*") && !pattern.contains("?")) {
-                    // Exact path match
-                    return sourcePath.equals(pattern);
-                }
-                // For more complex patterns, we'll rely on FindSourceFiles
-                // This is a simplified check just for the scanner
-                return true;
+            private boolean shouldNotCreate(String sourcePath, String pattern) {
+                return pattern.contains("*") || pattern.contains("?") || sourcePath.equals(pattern);
             }
         };
     }
