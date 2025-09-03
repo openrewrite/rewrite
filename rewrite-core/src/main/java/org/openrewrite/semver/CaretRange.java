@@ -85,11 +85,23 @@ public class CaretRange extends LatestRelease {
         if (minor == null) {
             upper = Integer.toString(parseInt(major) + 1);
         } else if (patch == null) {
-            upper = (parseInt(major) + 1) + ".0";
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1);
+            } else {
+                upper = (parseInt(major) + 1) + ".0";
+            }
         } else if (micro == null) {
-            upper = (parseInt(major) + 1) + ".0.0";
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1) + ".0";
+            } else {
+                upper = (parseInt(major) + 1) + ".0.0";
+            }
         } else {
-            upper = (parseInt(major) + 1) + ".0.0.0";
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1) + ".0.0";
+            } else {
+                upper = (parseInt(major) + 1) + ".0.0.0";
+            }
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));
