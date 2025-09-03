@@ -726,7 +726,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitModuleImport(J.ModuleImport import_, PrintOutputCapture<P> p) {
         beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
         p.append("import");
-        visitSpace(import_.getModulePrefix(), Space.Location.MODULE_PREFIX, p);
+        visitSpace(import_.getModulePrefix(), Space.Location.MODULE_IMPORT_PREFIX, p);
         p.append("module");
         visit(import_.getModule(), p);
         afterSyntax(import_, p);

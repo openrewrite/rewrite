@@ -3138,11 +3138,6 @@ public interface J extends Tree, RpcCodec<J> {
             return getModule() instanceof FieldAccess ? (FieldAccess) getModule() : null;
         }
 
-        @Override
-        public ModuleImport withQualid(FieldAccess qualid) {
-            return getPadding().withModule(qualid);
-        }
-
         @Nullable
         JLeftPadded<J.Identifier> alias;
 

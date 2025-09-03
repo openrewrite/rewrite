@@ -791,8 +791,6 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getQualifiedIdentifier()), null);
     }
 
-
-
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
         J.Modifier modifier = null;

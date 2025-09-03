@@ -707,7 +707,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.ModuleImport i = import_;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.withModulePrefix(visitSpace(i.getModulePrefix(), Space.Location.MODULE_PREFIX, p));
+        i = i.withModulePrefix(visitSpace(i.getModulePrefix(), Space.Location.MODULE_IMPORT_PREFIX, p));
         i = i.withModule(visitAndCast(i.getModule(), p));
         return i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
     }
