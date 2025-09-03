@@ -128,6 +128,9 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
+    from("rewrite/src") {
+        into("package/src")
+    }
     from(npmBuild) {
         into("package/dist/")
     }
