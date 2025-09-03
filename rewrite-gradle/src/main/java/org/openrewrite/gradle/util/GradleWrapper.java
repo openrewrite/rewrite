@@ -114,7 +114,8 @@ public class GradleWrapper {
             );
         }
 
-        if (currentDistributionUrl.contains("/artifactory")) {
+        // Only list all versions via Artifactory if a wildcard notation was requested or null, e.g. 8.x
+        if (currentDistributionUrl.contains("/artifactory") && !(versionComparator instanceof ExactVersion)) {
             String artifactoryUrl = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/"));
             List<GradleVersion> allVersions = listAllPrivateArtifactoryVersions(artifactoryUrl, ctx);
             return allVersions.stream()
