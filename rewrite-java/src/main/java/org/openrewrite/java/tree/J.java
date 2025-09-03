@@ -2865,7 +2865,7 @@ public interface J extends Tree, RpcCodec<J> {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Import implements Statement, Comparable<Import> {
+    final class Import implements org.openrewrite.java.tree.Import, Statement, Comparable<Import> {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3080,6 +3080,154 @@ public interface J extends Tree, RpcCodec<J> {
 
             public Import withAlias(@Nullable JLeftPadded<J.Identifier> alias) {
                 return t.alias == alias ? t : new Import(t.id, t.prefix, t.markers, t.statik, t.qualid, alias);
+            }
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+    }
+
+    /**
+     * Represents a Java module import declaration.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * import module java.base;
+     * }</pre>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ModuleImport implements org.openrewrite.java.tree.Import, Statement, Comparable<ModuleImport> {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        Space modulePrefix;
+
+        @With
+        @Getter
+        Expression module;
+
+        @Override
+        public @Nullable FieldAccess getQualid() {
+            return getModule() instanceof FieldAccess ? (FieldAccess) getModule() : null;
+        }
+
+        @Override
+        public ModuleImport withQualid(FieldAccess qualid) {
+            return getPadding().withModule(qualid);
+        }
+
+        @Nullable
+        JLeftPadded<J.Identifier> alias;
+
+        public J.@Nullable Identifier getAlias() {
+            if (alias == null) {
+                return null;
+            }
+            return alias.getElement();
+        }
+
+        public J.ModuleImport withAlias(J.@Nullable Identifier alias) {
+            if (this.alias == null) {
+                if (alias == null) {
+                    return this;
+                }
+                return new J.ModuleImport(null, id, prefix, markers, modulePrefix, module, JLeftPadded
+                        .build(alias)
+                        .withBefore(Space.format(" ")));
+            }
+            if (alias == null) {
+                return new J.ModuleImport(null, id, prefix, markers, modulePrefix, module, null);
+            }
+            return getPadding().withAlias(this.alias.withElement(alias));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModuleImport(this, p);
+        }
+
+        @Override
+        public int compareTo(ModuleImport o) {
+            String p1 = ((J.FieldAccess)this.getModule()).getSimpleName();
+            String p2 = ((J.FieldAccess)o.getModule()).getSimpleName();
+
+            String[] p1s = p1.split("\\.");
+            String[] p2s = p2.split("\\.");
+
+            for (int i = 0; i < p1s.length; i++) {
+                String s = p1s[i];
+                if (p2s.length < i + 1) {
+                    return 1;
+                }
+                if (!s.equals(p2s[i])) {
+                    return s.compareTo(p2s[i]);
+                }
+            }
+
+            return p1s.length < p2s.length ? -1 :
+                    p1.compareTo(p2);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ModuleImport t;
+
+            public Expression getModule() {
+                return t.module;
+            }
+
+            public ModuleImport withModule(Expression module) {
+                return t.module == module ? t : new ModuleImport(t.id, t.prefix, t.markers, t.modulePrefix, module, t.alias);
+            }
+
+            public @Nullable JLeftPadded<J.Identifier> getAlias() {
+                return t.alias;
+            }
+
+            public ModuleImport withAlias(@Nullable JLeftPadded<J.Identifier> alias) {
+                return t.alias == alias ? t : new ModuleImport(t.id, t.prefix, t.markers, t.modulePrefix, t.module, alias);
             }
         }
 

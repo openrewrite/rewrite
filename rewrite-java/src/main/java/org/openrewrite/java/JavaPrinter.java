@@ -723,6 +723,17 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitModuleImport(J.ModuleImport import_, PrintOutputCapture<P> p) {
+        beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
+        p.append("import");
+        visitSpace(import_.getModulePrefix(), Space.Location.MODULE_PREFIX, p);
+        p.append("module");
+        visit(import_.getModule(), p);
+        afterSyntax(import_, p);
+        return import_;
+    }
+
+    @Override
     public J visitInstanceOf(InstanceOf instanceOf, PrintOutputCapture<P> p) {
         beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
         visitRightPadded(instanceOf.getPadding().getExpression(), JRightPadded.Location.INSTANCEOF, "instanceof", p);

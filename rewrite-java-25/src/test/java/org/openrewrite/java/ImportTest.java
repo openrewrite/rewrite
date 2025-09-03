@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.java.MinimumJava25;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
+//Temporarily added for testing -> move final content back to rewrite-java-tck
 class ImportTest implements RewriteTest {
 
     @Test
@@ -365,12 +366,13 @@ class ImportTest implements RewriteTest {
               import module java.logging;
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
-              .filter(i -> i.getQualid().getSimpleName().equals("java.base") || 
-                           i.getQualid().getSimpleName().equals("java.logging"))
-              .map(J.Import::getPackageName))
+                .filter(i -> i instanceof J.ModuleImport)
+              .map(J.ModuleImport::getModule))
+              .map(J.FieldAccess::cast)
+              .map(J.FieldAccess::getSimpleName)
               .containsExactly(
-                null,
-                null
+                "java.base",
+                "java.logging"
               ))
           )
         );
