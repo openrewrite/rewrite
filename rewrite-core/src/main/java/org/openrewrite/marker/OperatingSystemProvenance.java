@@ -47,6 +47,8 @@ public abstract class OperatingSystemProvenance implements Marker {
     private static final Map<String, OperatingSystemProvenance> OS_INSTANCES = new ConcurrentHashMap<>();
 
     private static OperatingSystemProvenance getOsInstance(String key) {
+        // This is to work around JLS/JVM bug which allows for deadlocks in class initializations
+        // see https://bugs.java.com/bugdatabase/view_bug.do?bug_id=4891511
         return OS_INSTANCES.computeIfAbsent(key, k -> {
             switch (k) {
                 case "WINDOWS":
