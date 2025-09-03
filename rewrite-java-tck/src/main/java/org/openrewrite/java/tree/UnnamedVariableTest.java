@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
@@ -243,24 +242,6 @@ class UnnamedVariableTest implements RewriteTest {
                       var _ = queue.poll();
                       var second = queue.poll();
                       System.out.println(second);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    @Disabled
-    void unnamedVariableInAssignment() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  void test() {
-                      int _;
-                      _ = 42;
-                      _ = 100;
                   }
               }
               """
