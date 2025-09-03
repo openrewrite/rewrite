@@ -412,6 +412,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
+//        Space space = node.getSimpleName().isEmpty() ? sourceBefore("_") : sourceBefore(node.getSimpleName().toString());
         J.Identifier name = new J.Identifier(randomId(), sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, emptyList(), ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
 
@@ -811,9 +812,19 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
+    @Override
+    public J visitAnyPattern(AnyPatternTree node, Space space) {
+        JavaType type = typeMapping.type(node);
+        skip("_");
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "",
+                type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+                type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+    }
+
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
-            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+            Space space = b.getVariable().getName().isEmpty() ? sourceBefore("_") : sourceBefore(b.getVariable().getName().toString());
+            return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
@@ -1700,7 +1711,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            Space namedVarPrefix = sourceBefore(n.getName().toString());
+            Space namedVarPrefix = n.getName().isEmpty() ? sourceBefore("_") : sourceBefore(n.getName().toString());
 
             JavaType type = typeMapping.type(n);
             J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),

@@ -694,6 +694,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(ident.getAnnotations(), p);
         beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
         p.append(ident.getSimpleName());
+        if (ident.getSimpleName().isEmpty()) {
+            p.append("_");
+        }
         afterSyntax(ident, p);
         return ident;
     }
