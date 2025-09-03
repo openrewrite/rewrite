@@ -101,7 +101,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
-    @DocumentExample
     @Test
     void runSearchRecipe() {
         installRecipes();
