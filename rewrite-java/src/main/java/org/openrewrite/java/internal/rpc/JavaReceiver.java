@@ -37,8 +37,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public J preVisit(J j, RpcReceiveQueue q) {
         J j2 = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j2 = j2.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        j2 = j2.withMarkers(q.receive(j.getMarkers()));
-        return j2;
+        return j2.withMarkers(q.receive(j.getMarkers()));
     }
 
     @Override

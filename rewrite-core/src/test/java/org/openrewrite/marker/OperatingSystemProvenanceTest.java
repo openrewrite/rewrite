@@ -21,7 +21,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,7 +41,7 @@ class OperatingSystemProvenanceTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    
+
                     if (threadNum % 2 == 0) {
                         Class.forName("org.openrewrite.marker.OperatingSystemProvenance$Linux");
                     } else {
@@ -58,7 +57,7 @@ class OperatingSystemProvenanceTest {
 
         // when
         startLatch.countDown();
-        
+
         // test
         boolean completed = completeLatch.await(1, TimeUnit.SECONDS);
         executor.shutdown();

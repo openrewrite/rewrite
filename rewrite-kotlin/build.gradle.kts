@@ -37,4 +37,3 @@ java {
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
 }
-
