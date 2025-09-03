@@ -41,8 +41,8 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     String entries;
 
     @Option(displayName = "File pattern",
-            description = "A glob pattern to match .gitignore files to update. Defaults to only the root .gitignore file. " +
-                    "Use `**/.gitignore` to update all .gitignore files in the repository, or specify a specific path like `src/.gitignore`.",
+            description = "A glob pattern to match `.gitignore` files to update. Defaults to only the root `.gitignore` file. " +
+                    "Use `**/.gitignore` to update all `.gitignore` files in the repository, or specify a specific path like `src/.gitignore`.",
             required = false,
             example = ".gitignore")
     @Nullable
@@ -50,12 +50,12 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDisplayName() {
-        return "Add entries to .gitignore";
+        return "Add entries to `.gitignore`";
     }
 
     @Override
     public String getDescription() {
-        return "Adds entries to the project's .gitignore file. If no .gitignore file exists, one will be created. " +
+        return "Adds entries to the project's `.gitignore` file. If no `.gitignore` file exists, one will be created. " +
                 "Existing entries that match will not be duplicated.";
     }
 
@@ -79,6 +79,25 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                     }
                 }
                 return tree;
+            }
+
+            private boolean matchesFilePattern(String sourcePath, String pattern) {
+                // Simple pattern matching for common cases
+                if (".gitignore".equals(pattern)) {
+                    // Root .gitignore only
+                    return ".gitignore".equals(sourcePath);
+                }
+                if ("**/.gitignore".equals(pattern)) {
+                    // All .gitignore files
+                    return true;
+                }
+                if (!pattern.contains("*") && !pattern.contains("?")) {
+                    // Exact path match
+                    return sourcePath.equals(pattern);
+                }
+                // For more complex patterns, we'll rely on FindSourceFiles
+                // This is a simplified check just for the scanner
+                return true;
             }
         };
     }
@@ -113,164 +132,146 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
                 return text;
             }
-        });
-    }
 
-    private String mergeGitignoreEntries(String existing, String newEntries) {
-        String separator = existing.contains("\r\n") ? "\r\n" : "\n";
+            private String mergeGitignoreEntries(String existing, String newEntries) {
+                String separator = existing.contains("\r\n") ? "\r\n" : "\n";
 
-        Set<String> existingRules = new LinkedHashSet<>();
-        Set<String> existingWildcardPatterns = new LinkedHashSet<>();
-        Set<String> existingComments = new LinkedHashSet<>();
-        List<String> existingLines = new ArrayList<>();
+                Set<String> existingRules = new LinkedHashSet<>();
+                Set<String> existingWildcardPatterns = new LinkedHashSet<>();
+                Set<String> existingComments = new LinkedHashSet<>();
+                List<String> existingLines = new ArrayList<>();
 
-        if (!StringUtils.isBlank(existing)) {
-            String[] lines = existing.split("\r?\n");
-            for (String line : lines) {
-                existingLines.add(line);
-                String trimmed = line.trim();
-                if (!StringUtils.isBlank(trimmed)) {
-                    if (trimmed.startsWith("#")) {
-                        existingComments.add(trimmed);
-                    } else {
-                        existingRules.add(normalizeRule(trimmed));
-                        // Track wildcard patterns and directory patterns for superfluous entry checking
-                        if (trimmed.contains("*") || trimmed.endsWith("/")) {
-                            existingWildcardPatterns.add(trimmed);
+                if (!StringUtils.isBlank(existing)) {
+                    String[] lines = existing.split("\r?\n");
+                    for (String line : lines) {
+                        existingLines.add(line);
+                        String trimmed = line.trim();
+                        if (!StringUtils.isBlank(trimmed)) {
+                            if (trimmed.startsWith("#")) {
+                                existingComments.add(trimmed);
+                            } else {
+                                existingRules.add(normalizeRule(trimmed));
+                                // Track wildcard patterns and directory patterns for superfluous entry checking
+                                if (trimmed.contains("*") || trimmed.endsWith("/")) {
+                                    existingWildcardPatterns.add(trimmed);
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        List<String> newLines = new ArrayList<>();
-        String[] entriesToAdd = newEntries.split("\r?\n");
+                List<String> newLines = new ArrayList<>();
+                String[] entriesToAdd = newEntries.split("\r?\n");
 
-        for (String entry : entriesToAdd) {
-            String trimmed = entry.trim();
-            if (StringUtils.isBlank(trimmed)) {
-                continue;
-            }
+                for (String entry : entriesToAdd) {
+                    String trimmed = entry.trim();
+                    if (StringUtils.isBlank(trimmed)) {
+                        continue;
+                    }
 
-            if (trimmed.startsWith("#")) {
-                if (!existingComments.contains(trimmed)) {
-                    newLines.add(entry);
-                    existingComments.add(trimmed);
+                    if (trimmed.startsWith("#")) {
+                        if (!existingComments.contains(trimmed)) {
+                            newLines.add(entry);
+                            existingComments.add(trimmed);
+                        }
+                    } else {
+                        String normalized = normalizeRule(trimmed);
+                        if (!existingRules.contains(normalized) && !isRedundantEntry(trimmed, existingWildcardPatterns)) {
+                            newLines.add(entry);
+                            existingRules.add(normalized);
+                        }
+                    }
                 }
-            } else {
-                String normalized = normalizeRule(trimmed);
-                if (!existingRules.contains(normalized) && !isRedundantEntry(trimmed, existingWildcardPatterns)) {
-                    newLines.add(entry);
-                    existingRules.add(normalized);
+
+                if (newLines.isEmpty()) {
+                    return existing;
                 }
+
+                List<String> result = new ArrayList<>(existingLines);
+
+                if (!existingLines.isEmpty() && !StringUtils.isBlank(existingLines.get(existingLines.size() - 1))) {
+                    result.add("");
+                }
+
+                result.addAll(newLines);
+
+                return String.join(separator, result);
             }
-        }
 
-        if (newLines.isEmpty()) {
-            return existing;
-        }
+            private String normalizeRule(String rule) {
+                String normalized = rule.trim();
 
-        List<String> result = new ArrayList<>(existingLines);
+                if (normalized.startsWith("!")) {
+                    normalized = normalized.substring(1).trim();
+                }
 
-        if (!existingLines.isEmpty() && !StringUtils.isBlank(existingLines.get(existingLines.size() - 1))) {
-            result.add("");
-        }
+                if (normalized.endsWith("/")) {
+                    normalized = normalized.substring(0, normalized.length() - 1);
+                }
 
-        result.addAll(newLines);
+                if (normalized.startsWith("/")) {
+                    normalized = normalized.substring(1);
+                }
 
-        return String.join(separator, result);
-    }
-
-    private String normalizeRule(String rule) {
-        String normalized = rule.trim();
-
-        if (normalized.startsWith("!")) {
-            normalized = normalized.substring(1).trim();
-        }
-
-        if (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-
-        if (normalized.startsWith("/")) {
-            normalized = normalized.substring(1);
-        }
-
-        return normalized;
-    }
-
-    private boolean isRedundantEntry(String entry, Set<String> existingWildcardPatterns) {
-        // Check if this entry would be redundant given existing wildcard patterns
-        for (String pattern : existingWildcardPatterns) {
-            if (matchesGitignorePattern(entry, pattern)) {
-                return true;
+                return normalized;
             }
-        }
-        return false;
-    }
 
-    private boolean matchesGitignorePattern(String path, String pattern) {
-        // Simple gitignore pattern matching
-        // This is a simplified implementation - gitignore patterns can be complex
-
-        // Remove leading slashes for comparison
-        String normalizedPath = path.trim();
-        String normalizedPattern = pattern.trim();
-
-        if (normalizedPath.startsWith("/")) {
-            normalizedPath = normalizedPath.substring(1);
-        }
-        if (normalizedPattern.startsWith("/")) {
-            normalizedPattern = normalizedPattern.substring(1);
-        }
-
-        // Handle directory patterns (ending with /)
-        boolean isDirectoryPattern = normalizedPattern.endsWith("/");
-        if (isDirectoryPattern) {
-            normalizedPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
-            // If the path is also a directory pattern, remove trailing slash
-            if (normalizedPath.endsWith("/")) {
-                normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
+            private boolean isRedundantEntry(String entry, Set<String> existingWildcardPatterns) {
+                // Check if this entry would be redundant given existing wildcard patterns
+                for (String pattern : existingWildcardPatterns) {
+                    if (matchesGitignorePattern(entry, pattern)) {
+                        return true;
+                    }
+                }
+                return false;
             }
-            // Check if the path is under this directory
-            if (normalizedPath.equals(normalizedPattern) ||
-                    normalizedPath.startsWith(normalizedPattern + "/")) {
-                return true;
+
+            private boolean matchesGitignorePattern(String path, String pattern) {
+                // Simple gitignore pattern matching
+                // This is a simplified implementation - gitignore patterns can be complex
+
+                // Remove leading slashes for comparison
+                String normalizedPath = path.trim();
+                String normalizedPattern = pattern.trim();
+
+                if (normalizedPath.startsWith("/")) {
+                    normalizedPath = normalizedPath.substring(1);
+                }
+                if (normalizedPattern.startsWith("/")) {
+                    normalizedPattern = normalizedPattern.substring(1);
+                }
+
+                // Handle directory patterns (ending with /)
+                boolean isDirectoryPattern = normalizedPattern.endsWith("/");
+                if (isDirectoryPattern) {
+                    normalizedPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
+                    // If the path is also a directory pattern, remove trailing slash
+                    if (normalizedPath.endsWith("/")) {
+                        normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
+                    }
+                    // Check if the path is under this directory
+                    if (normalizedPath.equals(normalizedPattern) ||
+                            normalizedPath.startsWith(normalizedPattern + "/")) {
+                        return true;
+                    }
+                }
+
+                // Convert gitignore pattern to regex for wildcard matching
+                String regex = normalizedPattern
+                        .replace(".", "\\.")
+                        .replace("**", "§§§")  // Temporary placeholder for **
+                        .replace("*", "[^/]*")  // * matches anything except /
+                        .replace("§§§", ".*")   // ** matches anything including /
+                        .replace("?", "[^/]");  // ? matches single character except /
+
+                // Check if the path matches the pattern
+                return normalizedPath.matches(regex);
             }
-        }
-
-        // Convert gitignore pattern to regex for wildcard matching
-        String regex = normalizedPattern
-                .replace(".", "\\.")
-                .replace("**", "§§§")  // Temporary placeholder for **
-                .replace("*", "[^/]*")  // * matches anything except /
-                .replace("§§§", ".*")   // ** matches anything including /
-                .replace("?", "[^/]");  // ? matches single character except /
-
-        // Check if the path matches the pattern
-        return normalizedPath.matches(regex);
+        });
     }
 
     private String getEffectiveFilePattern() {
         return isBlank(filePattern) ? ".gitignore" : filePattern;
-    }
-
-    private boolean matchesFilePattern(String sourcePath, String pattern) {
-        // Simple pattern matching for common cases
-        if (".gitignore".equals(pattern)) {
-            // Root .gitignore only
-            return ".gitignore".equals(sourcePath);
-        } else if ("**/.gitignore".equals(pattern)) {
-            // All .gitignore files
-            return true;
-        } else if (!pattern.contains("*") && !pattern.contains("?")) {
-            // Exact path match
-            return sourcePath.equals(pattern);
-        } else {
-            // For more complex patterns, we'll rely on FindSourceFiles
-            // This is a simplified check just for the scanner
-            return true;
-        }
     }
 
     private String extractPathFromPattern(String pattern) {
