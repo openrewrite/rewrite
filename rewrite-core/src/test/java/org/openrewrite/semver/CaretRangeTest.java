@@ -95,7 +95,7 @@ class CaretRangeTest {
     }
 
     /**
-     * ^0.0.x := >=0.0.0 <1.0.0
+     * ^0.0.x := >=0.0.0 <0.1.0
      */
     @Test
     void desugarPatchWildcard() {
@@ -104,8 +104,7 @@ class CaretRangeTest {
         assertThat(caretRange).isNotNull();
         assertThat(caretRange.isValid("1.0", "0.0.0")).isTrue();
         assertThat(caretRange.isValid("1.0", "0.0.1")).isTrue();
-        assertThat(caretRange.isValid("1.0", "0.1.0")).isTrue();
-        assertThat(caretRange.isValid("1.0", "1.0.0")).isFalse();
+        assertThat(caretRange.isValid("1.0", "0.1.0")).isFalse();
     }
 
     @Test
