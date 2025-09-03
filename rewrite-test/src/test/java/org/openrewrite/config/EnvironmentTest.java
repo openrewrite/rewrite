@@ -342,7 +342,7 @@ class EnvironmentTest implements RewriteTest {
     void listRecipeDescriptors() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
+        assertThat(recipeDescriptors).isNotEmpty();
         var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
@@ -355,7 +355,7 @@ class EnvironmentTest implements RewriteTest {
     void listStyles() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var styles = env.listStyles();
-        assertThat(styles).isNotNull().isNotEmpty();
+        assertThat(styles).isNotEmpty();
         var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
         assertThat(sampleStyle).isNotNull();
@@ -384,7 +384,7 @@ class EnvironmentTest implements RewriteTest {
     void recipeDescriptorsFromCrossResources() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
+        assertThat(recipeDescriptors).isNotEmpty();
         var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
