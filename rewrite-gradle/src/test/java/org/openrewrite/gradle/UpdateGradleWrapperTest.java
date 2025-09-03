@@ -38,6 +38,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -943,7 +945,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     } ],
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
                   }
-                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
             } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
                 });
@@ -1006,7 +1009,135 @@ class UpdateGradleWrapperTest implements RewriteTest {
                     } ],
                     "uri" : "https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions"
                   }
-                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {
+                });
+            } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactoryHtmlResponse() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://artifactory.company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  <!DOCTYPE html>
+                  <html>
+                  <head><meta name="robots" content="noindex" />
+                  <title>Index of gradle-distributions/</title>
+                  </head>
+                  <body>
+                  <h1>Index of gradle-distributions/</h1>
+                  <pre>Name                       Last modified      Size</pre><hr/>
+                  <pre><a href="distributions">distributions</a>->                 -    -
+                  <a href="gradle-8.6-bin.zip">gradle-8.6-bin.zip</a>          02-Feb-2024 16:58  126.64 MB
+                  <a href="gradle-8.7-bin.zip">gradle-8.7-bin.zip</a>          22-Mar-2024 16:05  127.97 MB
+                  <a href="gradle-8.8-bin.zip">gradle-8.8-bin.zip</a>          31-May-2024 21:58  131.64 MB
+                  <a href="gradle-8.8-all.zip">gradle-8.8-all.zip</a>          31-May-2024 21:58  141.64 MB
+                  <a href="gradle-8.9-bin.zip">gradle-8.9-bin.zip</a>          11-Jul-2024 14:51  129.81 MB
+                  <a href="gradle-8.10-bin.zip">gradle-8.10-bin.zip</a>          11-Jul-2024 14:51  159.81 MB
+                  </pre>
+                  </body>
+                  </html>
+                  """.getBytes(StandardCharsets.UTF_8)), Map.of("Content-Type", List.of("text/html")),
+                  () -> {
+                  });
+
+            } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", "all", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactoryHtmlResponseWithPath() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  <!DOCTYPE html>
+                  <html>
+                  <head><meta name="robots" content="noindex" />
+                  <title>Index of gradle-distributions/</title>
+                  </head>
+                  <body>
+                  <h1>Index of gradle-distributions/</h1>
+                  <pre>Name                       Last modified      Size</pre><hr/>
+                  <pre><a href="distributions">distributions</a>->                 -    -
+                  <a href="gradle-8.6-bin.zip">gradle-8.6-bin.zip</a>          02-Feb-2024 16:58  126.64 MB
+                  <a href="gradle-8.7-bin.zip">gradle-8.7-bin.zip</a>          22-Mar-2024 16:05  127.97 MB
+                  <a href="gradle-8.8-bin.zip">gradle-8.8-bin.zip</a>          31-May-2024 21:58  131.64 MB
+                  <a href="gradle-8.8-all.zip">gradle-8.8-all.zip</a>          31-May-2024 21:58  141.64 MB
+                  <a href="gradle-8.9-bin.zip">gradle-8.9-bin.zip</a>          11-Jul-2024 14:51  129.81 MB
+                  <a href="gradle-8.10-bin.zip">gradle-8.10-bin.zip</a>          11-Jul-2024 14:51  159.81 MB
+                  </pre>
+                  </body>
+                  </html>
+                  """.getBytes(StandardCharsets.UTF_8)), Map.of("Content-Type", List.of("text/html")),
+                  () -> {
+                  });
             } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
                 return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
                 });

@@ -42,10 +42,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
 import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
@@ -177,16 +179,23 @@ public class GradleWrapper {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         try (HttpSender.Response resp = httpSender.send(httpSender.get(artifactoryApiUrl).build())) {
             if (resp.isSuccessful()) {
-                JsonNode node = new ObjectMapper().readTree(resp.getBody());
                 List<GradleVersion> gradleVersions = new ArrayList<>();
-                for (JsonNode child : node.get("children")) {
-                    boolean folder = child.get("folder").asBoolean();
-                    if (!folder) {
-                        String uri = child.get("uri").asText();
-                        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(uri);
-                        if (matcher.find()) {
-                            String version = matcher.group(1);
-                            gradleVersions.add(new GradleVersion(version, artifactoryUrl + uri, uri.endsWith("-all.zip") ? DistributionType.All : DistributionType.Bin, null, null));
+                boolean htmlHeaderFound = ofNullable(resp.getHeaders())
+                        .map(hs -> hs.get("Content-Type")).map(h -> h.contains("text/html"))
+                        .orElse(false);
+                if(htmlHeaderFound) {
+                    // look for href's
+                    Matcher hrefMatcher = A_HREF_PATTERN.matcher(new String(resp.getBodyAsBytes()));
+                    while(hrefMatcher.find()) {
+                        tryGetGradleVersion(artifactoryUrl, "/" + hrefMatcher.group(1)).ifPresent(gradleVersions::add);
+                    }
+
+                } else {
+                    JsonNode node = new ObjectMapper().readTree(resp.getBody());
+                    for (JsonNode child : node.get("children")) {
+                        boolean folder = child.get("folder").asBoolean();
+                        if (!folder) {
+                            tryGetGradleVersion(artifactoryUrl, child.get("uri").asText()).ifPresent(gradleVersions::add);
                         }
                     }
                 }
@@ -198,7 +207,17 @@ public class GradleWrapper {
         }
     }
 
+    private static Optional<GradleVersion> tryGetGradleVersion(String artifactoryUrl, String uri) {
+        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(uri);
+        if(matcher.find()) {
+            String version = matcher.group(1);
+            return Optional.of(new GradleVersion(version, artifactoryUrl + uri, uri.endsWith("-all.zip") ? DistributionType.All : DistributionType.Bin, null, null));
+        }
+        return Optional.empty();
+    }
+
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
+    public static final Pattern A_HREF_PATTERN = Pattern.compile("<a href=\"(.*?)\">.*?</a>");
 
     /**
      * Construct a Gradle wrapper from a URI.
