@@ -29,7 +29,7 @@ class ElvisAssignmentTest implements RewriteTest {
             """
               def x = null
               x ?= 42
-              
+
               def y = 44
               y ?= 46
               """

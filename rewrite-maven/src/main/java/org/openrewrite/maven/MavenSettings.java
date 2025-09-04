@@ -150,10 +150,15 @@ public class MavenSettings {
         }
     }
 
-
+    /**
+     * @deprecated The concept of property `org.openrewrite.test.readMavenSettingsFromDisk` is no longer in use.
+     *
+     * @return True property `org.openrewrite.test.readMavenSettingsFromDisk` is true, false otherwise.
+     */
+    @Deprecated
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
-        return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
+        return propertyValue != null && !"false".equalsIgnoreCase(propertyValue);
     }
 
     private static Path userSettingsPath() {
@@ -444,7 +449,7 @@ public class MavenSettings {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     @With
-    @JsonIgnoreProperties(value = "httpHeaders")
+    @JsonIgnoreProperties("httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
         @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)

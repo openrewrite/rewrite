@@ -5,11 +5,12 @@ module.exports = {
   testTimeout: 30000,
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
-    '^@openrewrite/rewrite/(.*)$': '<rootDir>/dist/src/$1'
+    '^@openrewrite/rewrite$': '<rootDir>/src/index',
+    '^@openrewrite/rewrite/(.*)$': '<rootDir>/src/$1'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.test.json', // Adjust if your tsconfig file is named or located differently
+      tsconfig: 'tsconfig.json'
     }],
   },
   testMatch: ['**/?(*.)+(spec|test).+(ts|tsx|js)'],

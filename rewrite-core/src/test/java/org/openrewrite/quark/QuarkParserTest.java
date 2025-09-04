@@ -27,7 +27,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -44,16 +43,16 @@ class QuarkParserTest implements RewriteTest {
         rewriteRun(
           spec -> spec.beforeRecipe(sources -> {
               try {
-                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources).toList();
+                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Path.of("../"), sources).toList();
                   assertThat(quarks).isNotEmpty();
                   assertThat(quarks.stream().map(SourceFile::getSourcePath))
-                    .doesNotContain(Paths.get("build.gradle.kts"));
+                    .doesNotContain(Path.of("build.gradle.kts"));
               } catch (IOException e) {
                   throw new RuntimeException(e);
               }
 
           }),
-          text("hi", spec -> spec.path(Paths.get("build.gradle.kts")))
+          text("hi", spec -> spec.path(Path.of("build.gradle.kts")))
         );
     }
 
@@ -79,7 +78,7 @@ class QuarkParserTest implements RewriteTest {
                       if (sourceFile.getSourcePath().toString().endsWith(".bak")) {
                           return sourceFile;
                       }
-                      return sourceFile.withSourcePath(Paths.get(sourceFile.getSourcePath() + ".bak"));
+                      return sourceFile.withSourcePath(Path.of(sourceFile.getSourcePath() + ".bak"));
                   }
               }))
               .afterRecipe(run -> {
@@ -101,14 +100,14 @@ class QuarkParserTest implements RewriteTest {
             spec -> spec
               .path("hi.txt")
               .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "hi"))
-              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("hi.txt.bak")))
+              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Path.of("hi.txt.bak")))
           ),
           other(
             "jon",
             spec -> spec
               .path("jon")
               .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "jon"))
-              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("jon.bak")))
+              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Path.of("jon.bak")))
           )
         );
     }

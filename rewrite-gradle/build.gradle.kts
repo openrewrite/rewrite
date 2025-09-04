@@ -42,6 +42,7 @@ val latest = if (project.hasProperty("releasing")) {
 } else {
     "latest.integration"
 }
+val pluginLocalTestClasspath = configurations.create("pluginLocalTestClasspath")
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-groovy")) {
@@ -52,6 +53,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
+    implementation(project(":rewrite-toml"))
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
@@ -63,9 +65,9 @@ dependencies {
         exclude("ch.qos.logback", "logback-classic")
         exclude("org.slf4j", "slf4j-nop")
     }
-
-    testImplementation("org.openrewrite.gradle.tooling:model:$latest")
-
+    testImplementation(project(":rewrite-toml"))
+    testImplementation(project(":rewrite-gradle-tooling-model:model"))
+    "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
@@ -74,18 +76,24 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(pluginLocalTestClasspath)
+    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode
 // No option to explicitly target java-8 in the groovy compiler
-tasks.withType<GroovyCompile> {
+tasks.withType<GroovyCompile>().configureEach {
     this.javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/GradleProject**",
         "**/GradleDependencyConfiguration**",

@@ -25,7 +25,9 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    antlrGeneration("org.antlr:antlr4:4.13.2")
+    antlrGeneration("org.antlr:antlr4:4.13.2"){
+        exclude(group = "com.ibm.icu", module = "icu4j")
+    }
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("org.apache.commons:commons-text:1.11.+")
@@ -34,7 +36,7 @@ dependencies {
 }
 
 //Javadoc compiler will complain about the use of the internal types.
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     exclude(
         "**/Xml**"
     )

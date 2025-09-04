@@ -89,7 +89,7 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-              
+
               @Target({ FIELD, PARAMETER })
               public @interface Annotation {}
               """
@@ -104,7 +104,7 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-              
+
               @Target({ FIELD, PARAMETER , })
               public @interface Annotation {}
               """
@@ -174,7 +174,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.*;
               class TypeAnnotationTest {
                   List<@A ? extends @A String> list;
-              
+
                   @Target({ ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
                   private @interface A {
                   }
@@ -234,7 +234,7 @@ class AnnotationTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                  if (annotation.getSimpleName().equals("A")) {
+                  if ("A".equals(annotation.getSimpleName())) {
                       //noinspection ConstantConditions
                       return null;
                   }
@@ -245,10 +245,10 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
-              
+
                   public @Deprecated @A TypeAnnotationTest() {
                   }
-              
+
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
                   private @interface A {
                   }
@@ -257,10 +257,10 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.*;
               public class TypeAnnotationTest {
-              
+
                   public @Deprecated TypeAnnotationTest() {
                   }
-              
+
                   @Target({ ElementType.TYPE, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
                   private @interface A {
                   }
@@ -290,22 +290,22 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
               import java.util.List;
-              
+
               import static java.lang.annotation.ElementType.*;
-              
+
               public class A {
                 @Leading java. util. @Multi1 @Multi2 List<String> l;
                 @Leading java. util. @Multi1 @Multi2 List<String> m() { return null; }
               }
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value={FIELD, METHOD})
               public @interface Leading {}
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               public @interface Multi1 {}
-              
+
               @Retention(RetentionPolicy.RUNTIME)
               @Target(value=TYPE_USE)
               public @interface Multi2 {}
@@ -348,14 +348,14 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               class TypeAnnotationTest {
                   Integer @A1 [] @A2 [ ] integers;
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A1 {
                   }
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A2 {
                   }
@@ -398,10 +398,10 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               class TypeAnnotationTest {
                   Integer [] @A1 [ ] integers;
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A1 {
                   }
@@ -437,13 +437,13 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               @Target(ElementType.TYPE)
               @A
               private @interface A {
                   A[] value() default @A;
               }
-              
+
               @A({@A, @A(@A)})
               class TypeAnnotationTest {
               }
@@ -472,30 +472,36 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
-    @MinimumJava21 // Because of `@Deprecated#forRemoval`
+    @MinimumJava21
+    @Test // Because of `@Deprecated#forRemoval`
     void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
-        /*
-         *     Using these annotations in core library for testing this feature:
-         *
-         *     @Deprecated(since="1.2", forRemoval=true)
-         *     public final void stop()
-         *
-         *     @CallerSensitive
-         *     public ClassLoader getContextClassLoader() {
-         */
         List<SourceFile> sourceFiles = p.parse(
           """
-            class Test {
-              public void test() {
-                Thread.currentThread().stop();
-                Thread.currentThread().getContextClassLoader();
+          package a.b;
+          
+          public class Dummy {
+              @Deprecated(since = "1.2", forRemoval = true)
+              static void deprecatedWithParams() {
               }
+          
+              @Deprecated
+              static void deprecatedWithoutParams() {
+              }
+          }
+          """,
+          """
+          import a.b.Dummy;
+          
+          class Test {
+            public void test() {
+              Dummy.deprecatedWithParams();
+              Dummy.deprecatedWithoutParams();
             }
-            """
+          }
+          """
         ).toList();
-        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(0);
+        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(1);
 
         J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
         J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
@@ -511,7 +517,7 @@ class AnnotationTest implements RewriteTest {
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive", annotation.getType().getFullyQualifiedName());
+        assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
     }
 
@@ -522,11 +528,11 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               @Annotation(type = int[].class)
               class Test {
               }
-              
+
               @Target(ElementType.TYPE)
               @interface Annotation {
                   Class<?> type();
@@ -668,7 +674,7 @@ class AnnotationTest implements RewriteTest {
             """
             import java.lang.annotation.ElementType;
             import java.lang.annotation.Target;
-            
+
             class A {
                @Target({ ElementType.TYPE_USE, ElementType.TYPE_PARAMETER })
                private static @interface C {

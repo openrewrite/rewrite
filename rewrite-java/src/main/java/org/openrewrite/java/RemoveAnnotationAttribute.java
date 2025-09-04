@@ -68,7 +68,7 @@ public class RemoveAnnotationAttribute extends Recipe {
 
                 AtomicBoolean didPassFirstAttribute = new AtomicBoolean(false);
                 AtomicBoolean shouldTrimNextPrefix = new AtomicBoolean(false);
-                return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
+                J.Annotation withoutAttribute = a.withArguments(ListUtils.map(a.getArguments(), arg -> {
                     try {
                         if (arg instanceof J.Assignment) {
                             J.Assignment assignment = (J.Assignment) arg;
@@ -79,7 +79,7 @@ public class RemoveAnnotationAttribute extends Recipe {
                                 }
                                 return null;
                             }
-                        } else if (attributeName.equals("value")) {
+                        } else if ("value".equals(attributeName)) {
                             if (!didPassFirstAttribute.get()) {
                                 shouldTrimNextPrefix.set(true);
                             }
@@ -96,6 +96,12 @@ public class RemoveAnnotationAttribute extends Recipe {
 
                     return arg;
                 }));
+                if (a != withoutAttribute &&
+                        withoutAttribute.getArguments() != null &&
+                        withoutAttribute.getArguments().size() == 1) {
+                    doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
+                }
+                return withoutAttribute;
             }
         });
     }

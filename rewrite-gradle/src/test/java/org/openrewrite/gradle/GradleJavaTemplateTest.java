@@ -29,8 +29,8 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class GradleJavaTemplateTest implements RewriteTest {
 
-    @Test
     @Disabled("work in progress")
+    @Test
     void useJavaTemplateInBuildGradle() {
         Recipe addDependency = toRecipe(() -> new JavaIsoVisitor<>() {
             @Override

@@ -279,6 +279,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Javadoc visitSnippet(Javadoc.Snippet snippet, PrintOutputCapture<P> p) {
+        beforeSyntax(snippet, p);
+        p.append("{@snippet");
+        visit(snippet.getAttributes(), p);
+        visit(snippet.getContent(), p);
+        visit(snippet.getEndBrace(), p);
+        afterSyntax(snippet, p);
+        return snippet;
+    }
+
+    @Override
     public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
         beforeSyntax(summary, p);
         p.append("{@summary");
@@ -356,6 +367,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
+        beforeSyntax(reference, p);
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
         javaVisitorVisit(reference.getTree(), p);
@@ -442,6 +454,28 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             p.append(">");
             afterSyntax(typeParam, p);
             return typeParam;
+        }
+
+        @Override
+        public J visitWildcard(J.Wildcard wildcard, PrintOutputCapture<P> p) {
+            beforeSyntax(wildcard, Space.Location.WILDCARD_PREFIX, p);
+            p.append('?');
+            if (wildcard.getPadding().getBound() != null) {
+                //noinspection ConstantConditions
+                switch (wildcard.getBound()) {
+                    case Extends:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("extends");
+                        break;
+                    case Super:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("super");
+                        break;
+                }
+            }
+            visit(wildcard.getBoundedType(), p);
+            afterSyntax(wildcard, p);
+            return wildcard;
         }
 
         @Override

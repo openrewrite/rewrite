@@ -28,9 +28,9 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -83,7 +83,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
         if (shouldCreate.get()) {
             return XmlParser.builder().build().parse(fileContents == null ? "" : fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }

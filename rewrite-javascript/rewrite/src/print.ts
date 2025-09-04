@@ -46,6 +46,23 @@ export namespace MarkerPrinter {
             return "";
         },
     }
+
+    export const SEARCH_MARKERS_ONLY: MarkerPrinter = {
+        beforeSyntax(marker: Marker, _cursor: Cursor, commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult) {
+                let searchResult = marker as SearchResult;
+                return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
+            }
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
+
     export const FENCED: MarkerPrinter = {
         beforeSyntax(marker: Marker, _cursor: Cursor, _commentWrapper: CommentWrapper): string {
             if (marker.kind == MarkersKind.SearchResult || marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
@@ -63,6 +80,7 @@ export namespace MarkerPrinter {
             return "";
         },
     }
+
     export const SANITIZED: MarkerPrinter = {
         beforeSyntax(): string {
             return "";

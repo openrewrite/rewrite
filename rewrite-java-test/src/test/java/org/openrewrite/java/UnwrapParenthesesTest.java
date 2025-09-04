@@ -204,14 +204,14 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               import java.util.HashSet;
-              
+
               public class A {
                   static boolean notEmpty = !(new HashSet<>().isEmpty());
               }
               """,
             """
               import java.util.HashSet;
-              
+
               public class A {
                   static boolean notEmpty = !new HashSet<>().isEmpty();
               }

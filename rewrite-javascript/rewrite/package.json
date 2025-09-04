@@ -4,25 +4,29 @@
   "license": "Moderne Source Available License",
   "description": "OpenRewrite JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
-    "dist/src/**",
+    "dist/**",
     "src/**"
   ],
   "exports": {
-    ".": "./dist/src/index.js",
-    "./json": "./dist/src/json/index.js",
-    "./java": "./dist/src/java/index.js",
-    "./javascript": "./dist/src/javascript/index.js",
-    "./rpc": "./dist/src/rpc/index.js",
-    "./test": "./dist/src/test/index.js"
+    ".": "./dist/index.js",
+    "./text": "./dist/text/index.js",
+    "./json": "./dist/json/index.js",
+    "./java": "./dist/java/index.js",
+    "./javascript": "./dist/javascript/index.js",
+    "./rpc": "./dist/rpc/index.js",
+    "./test": "./dist/test/index.js"
   },
   "scripts": {
-    "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
+    "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
+    "postbuild": "chmod +x dist/rpc/server.js && npm link",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run build && jest",
-    "start": "npm run build && node ./dist/src/rpc/server.js"
+    "build:fixtures": "tsc --build fixtures/tsconfig.json",
+    "ci:test": "jest",
+    "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {
     "@akashrajpurohit/snowflake-id": "^2.0.0",
@@ -31,6 +35,7 @@
     "dedent": "^1.5.3",
     "diff": "^7.0.0",
     "immer": "^10.1.1",
+    "tmp-promise": "^3.0.3",
     "typescript": "^5.8.3",
     "vscode-jsonrpc": "^8.2.1"
   },
@@ -43,6 +48,6 @@
     "ts-node": "^10.9.2"
   },
   "bin": {
-    "rewrite-js": "./dist/src/rpc/server.js"
+    "rewrite-rpc": "./dist/rpc/server.js"
   }
 }

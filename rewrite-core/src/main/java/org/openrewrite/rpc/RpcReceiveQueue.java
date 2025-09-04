@@ -15,15 +15,12 @@
  */
 package org.openrewrite.rpc;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Markers;
 
-import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -31,17 +28,25 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
-    private final ObjenesisStd objenesis = new ObjenesisStd();
-    private final List<RpcObjectData> batch;
+    private static final ObjenesisStd objenesis = new ObjenesisStd();
+    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
+            .maximumSize(1_000)
+            .build((String key) -> {
+                try {
+                    Class<?> clazz = Class.forName(key);
+                    return objenesis.newInstance(clazz);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+    private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
-    private final @Nullable PrintStream logFile;
     private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, @Nullable PrintStream logFile,
-                           Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
-        this.batch = new ArrayList<>();
-        this.logFile = logFile;
+        this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
 
@@ -50,7 +55,7 @@ public class RpcReceiveQueue {
             List<RpcObjectData> data = pull.get();
             batch.addAll(data);
         }
-        return batch.remove(0);
+        return batch.remove();
     }
 
     /**
@@ -65,16 +70,11 @@ public class RpcReceiveQueue {
      * @return The received and converted value. When the received state is NO_CHANGE then the
      * before value will be returned.
      */
-    @SuppressWarnings({"DataFlowIssue", "ConstantValue", "unchecked"})
+    @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
+        //noinspection ConstantValue
         return after != null && after != before ? mapping.apply((U) after) : after;
-    }
-
-    public Markers receiveMarkers(Markers markers) {
-        return receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(receiveList(m.getMarkers(), null)));
     }
 
     /**
@@ -102,12 +102,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-        if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
-            logFile.println("  " + message.getTrace());
-            logFile.println("  " + Trace.traceReceiver());
-            logFile.flush();
-        }
+        Trace.traceReceiver(message);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -116,13 +111,20 @@ public class RpcReceiveQueue {
                 return null;
             case ADD:
                 ref = message.getRef();
-                if (refs.containsKey(ref)) {
-                    //noinspection unchecked
-                    return (T) refs.get(ref);
+                if (ref != null && message.getValueType() == null && message.getValue() == null) {
+                    // This is a pure reference to an existing object
+                    if (refs.containsKey(ref)) {
+                        //noinspection unchecked
+                        return (T) refs.get(ref);
+                    } else {
+                        throw new IllegalStateException("Received a reference to an object that was not previously sent: " + ref);
+                    }
+                } else {
+                    // This is either a new object or a forward declaration with ref
+                    before = message.getValueType() == null ?
+                            message.getValue() :
+                            newObj(message.getValueType());
                 }
-                before = message.getValueType() == null ?
-                        message.getValue() :
-                        newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
                 T after;
@@ -152,10 +154,8 @@ public class RpcReceiveQueue {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
-                //noinspection DataFlowIssue
                 return before;
             case DELETE:
-                //noinspection DataFlowIssue
                 return null;
             case ADD:
                 before = new ArrayList<>();
@@ -175,13 +175,8 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        try {
-            Class<?> clazz = Class.forName(type);
-            //noinspection unchecked
-            return (T) objenesis.newInstance(clazz);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
+        //noinspection unchecked
+        return (T) requireNonNull(instanceCache.get(type));
     }
 
     /**

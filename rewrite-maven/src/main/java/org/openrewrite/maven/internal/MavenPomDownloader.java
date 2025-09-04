@@ -50,8 +50,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
@@ -199,7 +198,7 @@ public class MavenPomDownloader {
     private List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
         if (parentPom == null) {
-            return Collections.singletonList(projectPom);
+            return singletonList(projectPom);
         } else {
             return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
         }
@@ -407,7 +406,7 @@ public class MavenPomDownloader {
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
         while (start > 0) {
-            start = start + 9;
+            start += 9;
             int end = responseBody.indexOf("\">", start);
             if (end < 0) {
                 break;
@@ -615,7 +614,7 @@ public class MavenPomDownloader {
                             // Record the absense of the pom file
                             ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         // unable to read the pom from a file-based repository.
                         repositoryResponses.put(repo, e.getMessage());
                     }
@@ -680,7 +679,7 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }
@@ -1020,7 +1019,7 @@ public class MavenPomDownloader {
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
+                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
                     try (HttpSender.Response response = httpSender.send(authenticated)) {
                         return response.isSuccessful();
                     }
@@ -1030,7 +1029,7 @@ public class MavenPomDownloader {
                 if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
-                        HttpSender.Request unauthenticated = httpSender.get(jarUrl).build();
+                        HttpSender.Request unauthenticated = httpSender.head(jarUrl).build();
                         try (HttpSender.Response response = httpSender.send(unauthenticated)) {
                             return response.isSuccessful();
                         }

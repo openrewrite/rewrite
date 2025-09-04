@@ -62,6 +62,7 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void replaceWithStaticImports() {
         rewriteRun(
@@ -152,8 +153,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodImportedNoStaticImport() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
@@ -174,8 +175,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodsNoStaticImport() {
         rewriteRun(
           spec -> spec.recipes(
@@ -276,8 +277,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void staticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
@@ -308,8 +309,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void nonStaticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
@@ -340,6 +341,85 @@ class UseStaticImportTest implements RewriteTest {
               class A {
                   String s(String[] strings) {
                       return Arrays.toString(strings);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4776")
+    @Test
+    void shouldNotImportDuplicateMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("test.B *(..)")),
+          java(
+            """
+              package test;
+
+              public class A {
+                  public static void method() {}
+              }
+              """
+          ),
+          java(
+            """
+              package test;
+
+              public class B {
+                  public static void method() {}
+              }
+              """
+          ),
+          java(
+            """
+              package test;
+
+              import static test.A.method;
+
+              public class Test {
+                  public static void test() {
+                      method();
+                      test.B.method();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5816")
+    @Test
+    void methodOverloads() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipes(
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail()"),
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail(String)")
+            ),
+          java(
+            """
+              import org.junit.jupiter.api.Test;
+              import org.junit.jupiter.api.Assertions;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      Assertions.fail();
+                      Assertions.fail("Test failed");
+                  }
+              }
+              """,
+            """
+              import org.junit.jupiter.api.Test;
+
+              import static org.junit.jupiter.api.Assertions.fail;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      fail();
+                      fail("Test failed");
                   }
               }
               """

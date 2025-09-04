@@ -69,7 +69,7 @@ RpcCodecs.registerCodec(ParseErrorKind, {
     async rpcReceive(before: ParseError, q: RpcReceiveQueue): Promise<ParseError> {
         const draft: Draft<ParseError> = createDraft(before);
         draft.id = await q.receive(before.id);
-        draft.markers = await q.receiveMarkers(before.markers);
+        draft.markers = await q.receive(before.markers);
         draft.sourcePath = await q.receive(before.sourcePath);
         draft.charsetName = await q.receive(before.charsetName);
         draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
@@ -81,7 +81,7 @@ RpcCodecs.registerCodec(ParseErrorKind, {
 
     async rpcSend(after: ParseError, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, p => p.id);
-        await q.sendMarkers(after, p => p.markers);
+        await q.getAndSend(after, p => p.markers);
         await q.getAndSend(after, p => p.sourcePath);
         await q.getAndSend(after, p => p.charsetName);
         await q.getAndSend(after, p => p.charsetBomMarked);

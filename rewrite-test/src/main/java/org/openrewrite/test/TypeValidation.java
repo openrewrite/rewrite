@@ -128,6 +128,15 @@ public class TypeValidation {
     private boolean immutableScanning = true;
 
     /**
+     * It is almost always a parser bug if a non-whitespace, non-comment, characters shows up in the whitespace of an LST element.
+     * In some edge cases with parsers this may be allowed.
+     * If you find yourself using this setting in a normal recipe test consider reporting a bug on the parser instead.
+     * If that parser bug were to be fixed it would change the behavior of recipes that expected non-whitespace in whitespace.
+     */
+    @Builder.Default
+    private boolean allowNonWhitespaceInWhitespace = false;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -138,7 +147,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

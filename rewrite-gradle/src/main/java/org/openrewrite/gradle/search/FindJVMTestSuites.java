@@ -24,11 +24,10 @@ import org.openrewrite.gradle.table.JVMTestSuitesDefined;
 import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-import static org.openrewrite.gradle.trait.Traits.jvmTestSuite;
+import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toSet;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -54,7 +53,7 @@ public class FindJVMTestSuites extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean tableAvailable = this.insertRows == null || this.insertRows;
-        return Preconditions.check(new IsBuildGradle<>(), jvmTestSuite().asVisitor((suite, ctx) -> {
+        return Preconditions.check(new IsBuildGradle<>(), new JvmTestSuite.Matcher().asVisitor((suite, ctx) -> {
             if (tableAvailable) {
                 jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(suite.getName()));
             }
@@ -64,10 +63,10 @@ public class FindJVMTestSuites extends Recipe {
 
     public static Set<JvmTestSuite> jvmTestSuites(SourceFile sourceFile) {
         if (!IsBuildGradle.matches(sourceFile.getSourcePath())) {
-            return Collections.emptySet();
+            return emptySet();
         }
 
-        return jvmTestSuite().lower(sourceFile)
-                .collect(Collectors.toSet());
+        return new JvmTestSuite.Matcher().lower(sourceFile)
+                .collect(toSet());
     }
 }

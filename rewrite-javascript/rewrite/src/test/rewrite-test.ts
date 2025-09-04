@@ -25,6 +25,8 @@ import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {mapAsync} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
+import {JavaScriptVisitor} from "../javascript";
+import {J} from "../java";
 
 export interface SourceSpec<T extends SourceFile> {
     kind: string,
@@ -73,6 +75,7 @@ export class RecipeSpec {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
+            await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
             this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
             const changeset = (await scheduleRun(this.recipe,
                 parsed.map(([_, sourceFile]) => sourceFile),
@@ -144,6 +147,7 @@ export class RecipeSpec {
 
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile) {
         expect(after).toBeDefined();
+        await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
         const actualAfter = await TreePrinters.print(after!);
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
@@ -181,6 +185,21 @@ export class RecipeSpec {
             }
             return [spec, sourceFile];
         });
+    }
+
+    private async expectWhitespaceNotToContainNonwhitespaceCharacters(parsed: [SourceSpec<any>, SourceFile][]) {
+        const validator = new ValidateWhitespaceVisitor();
+        for (const [_, sourceFile] of parsed) {
+            await validator.visit(sourceFile, this.executionContext);
+        }
+    }
+}
+
+class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
+    protected override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+        const ret = super.visitSpace(space, p);
+        expect(space.whitespace).toMatch(/^\s*$/);
+        return ret;
     }
 }
 
@@ -230,4 +249,3 @@ export class AdHocRecipe extends Recipe {
 export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
     return new AdHocRecipe(visitor);
 }
-

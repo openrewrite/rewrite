@@ -44,6 +44,12 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitWildcard(MethodSignatureParser.WildcardContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#dotDot}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

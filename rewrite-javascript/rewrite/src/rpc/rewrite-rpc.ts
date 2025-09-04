@@ -33,29 +33,32 @@ import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
 import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes";
-import {WriteStream} from "fs";
 import {ParserInput} from "../parser";
-import {randomId} from "../uuid";
+import {ReferenceMap} from "../reference";
+import {Writable} from "node:stream";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
 
-    readonly localObjects: Map<string, any> = new Map();
+    readonly localObjects: Map<string, ((input: string) => any) | any> = new Map();
     /* A reverse map of the objects back to their IDs */
-    private readonly localObjectIds = new IdentityMap()
+    private readonly localObjectIds = new IdentityMap();
 
-    private readonly remoteObjects: Map<string, any> = new Map();
-    private readonly remoteRefs: Map<number, any> = new Map();
+    readonly remoteObjects: Map<string, any> = new Map();
+    readonly remoteRefs: Map<number, any> = new Map();
+    readonly localRefs: ReferenceMap = new ReferenceMap();
 
-    constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
+    constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
                 ),
                 private readonly options: {
                     batchSize?: number,
                     registry?: RecipeRegistry,
+                    logger?: rpc.Logger,
                     traceGetObjectOutput?: boolean,
-                    traceGetObjectInput?: WriteStream
+                    traceGetObjectInput?: Writable,
+                    recipeInstallDir?: string
                 }) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
@@ -68,13 +71,13 @@ export class RewriteRpc {
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, options?.batchSize || 100,
-            !!options?.traceGetObjectOutput);
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
+            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
-        InstallRecipes.handle(this.connection, ".rewrite", registry);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
 
         this.connection.listen();
     }
@@ -85,10 +88,13 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string): Promise<P> {
+        const localObject = this.localObjects.get(id);
+        const lastKnownId = localObject ? id : undefined;
+
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id)
+                new GetObject(id, lastKnownId)
             );
         }, this.options.traceGetObjectInput);
 
@@ -96,7 +102,7 @@ export class RewriteRpc {
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            throw new Error("Expected END_OF_OBJECT");
+            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
         this.remoteObjects.set(id, remoteObject);
@@ -119,10 +125,9 @@ export class RewriteRpc {
 
     async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
-        // FIXME properly handle multiple results
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
-            new Parse(randomId(), inputs, relativeTo)
+            new Parse(inputs, relativeTo)
         )) {
             parsed.push(await this.getObject(g));
         }
@@ -222,7 +227,7 @@ export class RewriteRpc {
 }
 
 class IdentityMap {
-    constructor(private readonly objectMap = new WeakMap<any, string>(),
+    constructor(private objectMap = new WeakMap<any, string>(),
                 private readonly primitiveMap = new Map<any, string>()) {
     }
 

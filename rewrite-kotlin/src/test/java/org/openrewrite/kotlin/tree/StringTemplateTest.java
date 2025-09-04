@@ -59,8 +59,8 @@ class StringTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/293")
+    @Test
     void templateWithConstDollarBeforeSubstitution() {
         rewriteRun(
           kotlin(
@@ -72,8 +72,8 @@ class StringTemplateTest implements RewriteTest {
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/306")
+    @Test
     void dollarTemplateString() {
         rewriteRun(
           kotlin(

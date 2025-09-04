@@ -18,6 +18,7 @@ import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc"
 import {Json} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
+import {TreeKind} from "../tree";
 
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
@@ -25,7 +26,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         await q.getAndSend(j, j2 => j2.id);
         await q.getAndSend(j, j2 => asRef(j2.prefix),
             async space => await this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        await q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
@@ -80,7 +81,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
             await q.getAndSend(c, c2 => c2.multiline);
             await q.getAndSend(c, c2 => c2.text);
             await q.getAndSend(c, c2 => c2.suffix);
-            await q.sendMarkers(c, c2 => c2.markers);
+            await q.getAndSend(c, c2 => c2.markers);
         });
         await q.getAndSend(space, s => s.whitespace);
         return space;
@@ -89,7 +90,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
     protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, q: RpcSendQueue): Promise<Json.RightPadded<T> | undefined> {
         await q.getAndSend(right, r => r.element, j => this.visit(j, q));
         await q.getAndSend(right, r => asRef(r.after), async space => await this.visitSpace(space, q));
-        await q.sendMarkers(right, r => r.markers);
+        await q.getAndSend(right, r => r.markers);
         return right;
     }
 }
@@ -101,7 +102,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         const draft = createDraft(j)
         draft.id = await q.receive(j.id);
         draft.prefix = await q.receive(j.prefix, async space => await this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+        draft.markers = await q.receive(j.markers);
         return finishDraft(draft);
     }
 
@@ -164,7 +165,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                     draft.multiline = await q.receive(c.multiline);
                     draft.text = await q.receive(c.text);
                     draft.suffix = await q.receive(c.suffix);
-                    draft.markers = await q.receiveMarkers(c.markers);
+                    draft.markers = await q.receive(c.markers);
                 })
             });
             draft.whitespace = await q.receive(space.whitespace);
@@ -194,5 +195,7 @@ const jsonCodec: RpcCodec<Json> = {
 }
 
 Object.values(Json.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, jsonCodec);
+    if (!Object.values(TreeKind).includes(kind as any)) {
+        RpcCodecs.registerCodec(kind, jsonCodec);
+    }
 });

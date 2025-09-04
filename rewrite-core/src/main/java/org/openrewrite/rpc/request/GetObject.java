@@ -26,7 +26,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
@@ -43,15 +42,14 @@ public class GetObject implements RpcRequest {
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
-        private final AtomicBoolean trace;
-
-        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
          */
-        private final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        private final IdentityHashMap<Object, Integer> localRefs;
+
+        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
@@ -59,8 +57,8 @@ public class GetObject implements RpcRequest {
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null, null));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
+                deleted.add(new RpcObjectData(DELETE, null, null, null));
+                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null));
                 return deleted;
             }
 
@@ -68,7 +66,7 @@ public class GetObject implements RpcRequest {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs);
                 forkJoin.submit(() -> {
                     try {
                         sendQueue.send(after, before, null);
@@ -80,7 +78,7 @@ public class GetObject implements RpcRequest {
                     } catch (Throwable ignored) {
                         // TODO do something with this exception
                     } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
+                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null));
                         sendQueue.flush();
                     }
                     return 0;

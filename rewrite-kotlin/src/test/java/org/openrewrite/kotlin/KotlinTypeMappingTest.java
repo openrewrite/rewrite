@@ -32,7 +32,7 @@ import org.openrewrite.test.TypeValidation;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,7 +56,7 @@ class KotlinTypeMappingTest {
         cu = (K.CompilationUnit) KotlinParser.builder()
             .logCompilationWarningsAndErrors(true)
             .build()
-            .parseInputs(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+            .parseInputs(singletonList(new Parser.Input(Path.of("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), null, ctx)
             .findFirst()
             .orElseThrow();
 
@@ -195,7 +195,7 @@ class KotlinTypeMappingTest {
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
 
         J.MethodDeclaration md = goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
-          .filter(it -> (it instanceof J.MethodDeclaration) && "parameterized".equals(((J.MethodDeclaration) it).getSimpleName()))
+          .filter(it -> (it instanceof J.MethodDeclaration md1) && "parameterized".equals(md1.getSimpleName()))
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
@@ -355,12 +355,12 @@ class KotlinTypeMappingTest {
         assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
     }
 
-    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     @Nested
+    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     class ParsingTest implements RewriteTest {
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
+        @Test
         void coneTypeProjection() {
             rewriteRun(
               kotlin(
@@ -578,13 +578,13 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           "n++~kotlin.Int",
           "--n~kotlin.Int",
           "n += a~kotlin.Int",
           "n = a + b~kotlin.Int"
         }, delimiter = '~')
+        @ParameterizedTest
         void operatorOverload(String p1, String p2) {
             rewriteRun(
               kotlin(
@@ -629,21 +629,23 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @ParameterizedTest
         @CsvSource(value = {
           // Method type on overload with no named arguments.
-          "foo(\"\", 1, true)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
+          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
           // Method type on overload with named arguments.
-          "foo(b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.Int,kotlin.Boolean]}",
+          "foo(b = 1)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.Int,kotlin.Boolean]}",
           // Method type when named arguments are declared out of order.
-          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}",
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}",
           // Method type with trailing lambda
-          "foo(b = 1, noDefault = true) {}~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
+          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
         }, delimiter = '~')
+        @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
             rewriteRun(
               kotlin(
                 """
+                  package org.example
+                  
                   fun <T> foo(b: T, c: Boolean = true) {
                       foo("", b, true, c) {}
                   }
@@ -656,7 +658,7 @@ class KotlinTypeMappingTest {
                       %s
                   }
                   """.formatted(invocation), spec -> spec.afterRecipe(cu -> {
-                    MethodMatcher matcher = new MethodMatcher("* foo(..)");
+                    MethodMatcher matcher = new MethodMatcher("*..* foo(..)");
                     AtomicBoolean methodFound = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
@@ -670,7 +672,14 @@ class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (matcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo(methodType);
+                                assertThat(method.getMethodType()).satisfies(m -> {
+                                    assertThat(m.toString()).isEqualTo(methodType);
+                                    assertThat(m.getDeclaringType())
+                                      .satisfies(it -> {
+                                          assertThat(it.getFullyQualifiedName()).isEqualTo("org.example.openRewriteFile0Kt");
+                                          assertThat(it.getMethods()).extracting(JavaType.Method::getName).containsExactlyInAnyOrder("foo", "foo", "foo", "m");
+                                      });
+                                });
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
@@ -769,8 +778,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("UnusedReceiverParameter")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @SuppressWarnings("UnusedReceiverParameter")
         @Test
         void parameterizedReceiver() {
             rewriteRun(
@@ -865,8 +874,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/374")
+        @SuppressWarnings("CanBePrimaryConstructorProperty")
         @Test
         void privateToThisModifier() {
             rewriteRun(
@@ -1177,8 +1186,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("HasPlatformType")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/483")
+        @SuppressWarnings("HasPlatformType")
         @Test
         void isStaticFlag() {
             //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
@@ -1236,8 +1245,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
         @Test
         void memberReference() {
             //noinspection RemoveRedundantBackticks
@@ -1266,17 +1275,17 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
-        @ParameterizedTest
         @CsvSource(value = {
           "fun foo(l: MutableList<String>) { @Suppress l += \"x\" }~kotlin.Suppress",
           "val releaseDates: List< @Suppress String > = emptyList()~kotlin.Suppress"
         }, delimiter = '~')
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @ParameterizedTest
         void annotationOnKotlinConeType(String input, String type) {
             //noinspection RemoveRedundantBackticks
             rewriteRun(
               kotlin(
-                String.format("%s", input),
+                      "%s".formatted(input),
                 spec -> spec.afterRecipe(cu -> {
                     AtomicBoolean found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
@@ -1779,8 +1788,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")
+        @Test
         void callWithDefaultedGenericParameters() {
             rewriteRun(
               kotlin(

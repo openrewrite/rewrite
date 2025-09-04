@@ -28,15 +28,16 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("UnnecessarySemicolon")
 class RewriteTestTest implements RewriteTest {
 
     @Test
@@ -109,7 +110,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-              
+
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
@@ -140,11 +141,26 @@ class RewriteTestTest implements RewriteTest {
           text("foo")
         );
     }
+
+    @Test
+    void allowNonWhitespaceInWhitespace() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;;
+              interface A {
+                  List<String> getList();
+              }
+              """
+          )
+        );
+    }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -173,9 +189,9 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class MutateExecutionContext extends Recipe {
 
     @Override
@@ -200,9 +216,9 @@ class MutateExecutionContext extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ImproperCursorUsage extends Recipe {
 
     @Override
@@ -221,15 +237,16 @@ class ImproperCursorUsage extends Recipe {
         return new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
-                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+                return new TreeVisitor<>() {
+                }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
     @Override
@@ -240,7 +257,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "A source file's path must be unique. " +
-               "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
+          "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
     }
 
     @Override
@@ -254,7 +271,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }
@@ -268,8 +285,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
         if (alreadyExists.get()) {
             return emptyList();
         }
-        Path duplicatePath = Paths.get("duplicate.txt");
-        return Arrays.asList(PlainText.builder()
+        Path duplicatePath = Path.of("duplicate.txt");
+        return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)
             .build(),
@@ -281,8 +298,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
 @NullMarked
+@SuppressWarnings({"FieldCanBeLocal", "unused"})
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;

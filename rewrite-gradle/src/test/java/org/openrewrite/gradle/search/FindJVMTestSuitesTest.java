@@ -117,11 +117,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               integrationTest(JvmTestSuite) {
@@ -137,11 +137,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               /*~~>*/integrationTest(JvmTestSuite) {
@@ -157,11 +157,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               integrationTest(JvmTestSuite) {
@@ -176,11 +176,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               /*~~>*/integrationTest(JvmTestSuite) {
@@ -195,11 +195,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
           }

@@ -17,6 +17,7 @@ package org.openrewrite.gradle.util;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
@@ -28,6 +29,7 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.remote.RemoteArchive;
 import org.openrewrite.remote.RemoteResource;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -37,6 +39,7 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -47,6 +50,9 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
+    private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
+    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_SERVICES_URL + "/distributions";
+    private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
     public static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
@@ -60,7 +66,16 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, ExecutionContext ctx) {
+    /**
+     * Construct a Gradle wrapper from a distribution type and version.
+     * Used in contexts where services.gradle.org is available.
+     */
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
+        return create(null, distributionTypeName, version, ctx);
+    }
+
+    public static GradleWrapper create(@Nullable String currentDistributionUrl, @Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
+        String normalizedCurrentDistributionUrl = currentDistributionUrl == null ? null : currentDistributionUrl.replace("\\", "");
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
@@ -69,32 +84,116 @@ public class GradleWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
-        List<GradleVersion> allVersions = listAllVersions(repositoryUrl, ctx);
-        GradleVersion gradleVersion = allVersions.stream()
-                .filter(v -> versionComparator.isValid(null, v.version))
-                .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-
         try {
-            DistributionInfos infos = DistributionInfos.fetch(distributionType, gradleVersion, ctx);
+            GradleVersion gradleVersion = determineGradleVersion(normalizedCurrentDistributionUrl, version, versionComparator, distributionType, ctx);
+            DistributionInfos infos = DistributionInfos.fetch(gradleVersion, ctx);
             return new GradleWrapper(gradleVersion.version, infos);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public static List<GradleVersion> listAllVersions(@Nullable String repositoryUrl, ExecutionContext ctx) {
+    private static GradleVersion determineGradleVersion(@Nullable String currentDistributionUrl, @Nullable String version, VersionComparator versionComparator,
+                                                        DistributionType distributionType, ExecutionContext ctx) {
+        if (currentDistributionUrl == null || currentDistributionUrl.startsWith(GRADLE_SERVICES_URL)) {
+            // Only list all versions via services endpoint if a wildcard notation was requested or null, e.g. 8.x
+            if (!(versionComparator instanceof ExactVersion)) {
+                List<GradleVersion> allVersions = listAllPublicVersions(ctx);
+                return allVersions.stream()
+                        .filter(v -> versionComparator.isValid(null, v.version))
+                        .filter(v -> v.distributionType == distributionType)
+                        .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
+                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_SERVICES_URL)));
+            }
+
+            return new GradleVersion(version,
+                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip",
+                    distributionType,
+                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-" + distributionType.getFileSuffix() +".zip.sha256",
+                    GRADLE_DISTRIBUTIONS_URL + "/gradle-" + version + "-wrapper.jar.sha256"
+            );
+        }
+
+        URI currentDistributionUri = URI.create(currentDistributionUrl);
+        if (currentDistributionUri.getScheme().startsWith("http") && currentDistributionUri.getPath().startsWith("/artifactory")) {
+            String artifactoryUrl = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/"));
+            List<GradleVersion> allVersions = listAllPrivateArtifactoryVersions(artifactoryUrl, ctx);
+            return allVersions.stream()
+                    .filter(v -> versionComparator.isValid(null, v.version))
+                    .filter(v -> v.distributionType == distributionType)
+                    .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
+                    .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", artifactoryUrl)));
+        }
+
+        if (versionComparator instanceof ExactVersion) {
+            return new GradleVersion(
+                    version,
+                    currentDistributionUrl.replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-)(?:bin|all).zip", "$1" + version + "$3" + distributionType.getFileSuffix() + ".zip"),
+                    distributionType,
+                    null,
+                    null
+            );
+        }
+
+        throw new IllegalStateException("Unsupported distribution url for Gradle wrapper version detection: " + currentDistributionUrl);
+    }
+
+    public static List<GradleVersion> listAllPublicVersions(ExecutionContext ctx) {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        String gradleVersionsUrl = StringUtils.isBlank(repositoryUrl) ? "https://services.gradle.org/versions/all" : repositoryUrl;
-        try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
+        try (HttpSender.Response resp = httpSender.send(httpSender.get(GRADLE_VERSIONS_ALL_URL).build())) {
             if (resp.isSuccessful()) {
-                return new ObjectMapper()
+                List<GradleVersion> gradleVersions = new ObjectMapper()
                         .registerModule(new ParameterNamesModule())
                         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                         .readValue(resp.getBody(), new TypeReference<List<GradleVersion>>() {
                         });
+                List<GradleVersion> allGradleVersions = new ArrayList<>(gradleVersions.size() * 2);
+                for (GradleVersion gradleVersion : gradleVersions) {
+                    allGradleVersions.add(new GradleVersion(
+                            gradleVersion.version,
+                            gradleVersion.downloadUrl,
+                            DistributionType.Bin,
+                            gradleVersion.checksumUrl,
+                            gradleVersion.wrapperChecksumUrl
+                    ));
+                    allGradleVersions.add(new GradleVersion(
+                            gradleVersion.version,
+                            gradleVersion.downloadUrl.replace("-bin.zip", "-all.zip"),
+                            DistributionType.All,
+                            gradleVersion.checksumUrl == null ? null : gradleVersion.checksumUrl.replace("-bin.zip", "-all.zip"),
+                            gradleVersion.wrapperChecksumUrl
+                    ));
+                }
+                return allGradleVersions;
             }
-            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
+            throw new IOException("Could not get Gradle versions from " + GRADLE_VERSIONS_ALL_URL + ": HTTP " + resp.getCode());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static List<GradleVersion> listAllPrivateArtifactoryVersions(String artifactoryUrl, ExecutionContext ctx) {
+        URI artifactoryUri = URI.create(artifactoryUrl);
+        String artifactoryApiUrl = String.format("%s://%s%s", artifactoryUri.getScheme(), artifactoryUri.getHost(), artifactoryUri.getPath().replace("/artifactory", "/artifactory/api/storage"));
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+        try (HttpSender.Response resp = httpSender.send(httpSender.get(artifactoryApiUrl).build())) {
+            if (resp.isSuccessful()) {
+                JsonNode node = new ObjectMapper().readTree(resp.getBody());
+                List<GradleVersion> gradleVersions = new ArrayList<>();
+                for (JsonNode child : node.get("children")) {
+                    boolean folder = child.get("folder").asBoolean();
+                    if (!folder) {
+                        String uri = child.get("uri").asText();
+                        Matcher matcher = GRADLE_VERSION_PATTERN.matcher(uri);
+                        if (matcher.find()) {
+                            String version = matcher.group(1);
+                            gradleVersions.add(new GradleVersion(version, artifactoryUrl + uri, uri.endsWith("-all.zip") ? DistributionType.All : DistributionType.Bin, null, null));
+                        }
+                    }
+                }
+                return gradleVersions;
+            }
+            throw new IOException("Could not get Gradle versions from " + artifactoryApiUrl + ": HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -148,14 +247,27 @@ public class GradleWrapper {
     }
 
     public enum DistributionType {
-        Bin,
-        All
+        Bin("bin"),
+        All("all");
+
+        private final String fileSuffix;
+
+        DistributionType(String fileSuffix) {
+            this.fileSuffix = fileSuffix;
+        }
+
+        public String getFileSuffix() {
+            return fileSuffix;
+        }
     }
 
     @Value
     public static class GradleVersion {
         String version;
         String downloadUrl;
+        DistributionType distributionType;
+
+        @Nullable
         String checksumUrl;
 
         /**

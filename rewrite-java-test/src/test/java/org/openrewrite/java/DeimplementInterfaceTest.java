@@ -32,10 +32,10 @@ class DeimplementInterfaceTest implements RewriteTest {
           java(
             """
               import java.io.Closeable;
-                            
+
               class Test implements Closeable {
                   public void test() {}
-                            
+
                   @Override
                   public void close() {}
               }

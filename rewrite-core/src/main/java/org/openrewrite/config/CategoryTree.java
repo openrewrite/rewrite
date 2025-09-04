@@ -22,8 +22,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.config.CategoryTree.PrintNameStyle.ID;
 
@@ -376,7 +375,7 @@ public class CategoryTree<G> {
     @SuppressWarnings("unused")
     public Map<G, Collection<RecipeDescriptor>> getRecipesByGroup() {
         synchronized (lock) {
-            return Collections.unmodifiableMap(new HashMap<>(recipesByGroup));
+            return unmodifiableMap(new HashMap<>(recipesByGroup));
         }
     }
 

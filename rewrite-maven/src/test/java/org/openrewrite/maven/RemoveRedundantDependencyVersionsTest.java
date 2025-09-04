@@ -24,8 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Collections;
-
+import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -33,7 +32,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantDependencyVersions(null, null, (RemoveRedundantDependencyVersions.Comparator) null, null));
+        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
     }
 
     @DocumentExample
@@ -502,7 +501,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-
+                
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -551,7 +550,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-
+                
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -956,7 +955,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     void except() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
-                  Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
+            singletonList("org.junit.jupiter:junit-jupiter-api"))),
           pomXml(
             """
               <project>
@@ -1005,8 +1004,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    @Test
     void unmanagedDependency() {
         rewriteRun(
           pomXml(
@@ -1028,8 +1027,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    @Test
     void unmanagedDependencyAnyMatch() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.ANY, null)),
@@ -1172,8 +1171,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    @Test
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
@@ -1256,7 +1255,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-                SourceSpec::skip),
+            SourceSpec::skip),
           mavenProject("child", pomXml(
               """
                 <project>
@@ -1337,7 +1336,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-                SourceSpec::skip),
+            SourceSpec::skip),
           mavenProject("child", pomXml(
               """
                 <project>
@@ -1582,8 +1581,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
+    @Test
     void noChangesIfManagedPluginVersionDoesNotMatch() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.EQ, null)),
@@ -1654,52 +1653,52 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.3.12.RELEASE</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.boot</groupId>
-                                <artifactId>spring-boot-starter-web</artifactId>
-                                <version>2.2.13.RELEASE</version>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """,
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.12.RELEASE</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                              <version>2.2.13.RELEASE</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.3.12.RELEASE</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.12.RELEASE</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
@@ -1710,54 +1709,54 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
-            <project>
-                <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.3.0.RELEASE</version>
-                    <relativePath/>
-                </parent>
-
-                <groupId>com.example</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-
-                <modelVersion>4.0.0</modelVersion>
-                <build>
-                    <plugins>
-                        <plugin>
-                            <artifactId>kotlin-maven-plugin</artifactId>
-                            <groupId>org.jetbrains.kotlin</groupId>
-                            <version>${kotlin.version}</version>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
-            """,
-                """
-            <project>
-                <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.3.0.RELEASE</version>
-                    <relativePath/>
-                </parent>
-
-                <groupId>com.example</groupId>
-                <artifactId>test</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-
-                <modelVersion>4.0.0</modelVersion>
-                <build>
-                    <plugins>
-                        <plugin>
-                            <artifactId>kotlin-maven-plugin</artifactId>
-                            <groupId>org.jetbrains.kotlin</groupId>
-                        </plugin>
-                    </plugins>
-                </build>
-            </project>
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.0.RELEASE</version>
+                      <relativePath/>
+                  </parent>
+              
+                  <groupId>com.example</groupId>
+                  <artifactId>test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+              
+                  <modelVersion>4.0.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>kotlin-maven-plugin</artifactId>
+                              <groupId>org.jetbrains.kotlin</groupId>
+                              <version>${kotlin.version}</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
             """
+              <project>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.0.RELEASE</version>
+                      <relativePath/>
+                  </parent>
+              
+                  <groupId>com.example</groupId>
+                  <artifactId>test</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+              
+                  <modelVersion>4.0.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>kotlin-maven-plugin</artifactId>
+                              <groupId>org.jetbrains.kotlin</groupId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
           )
         );
     }
@@ -2027,82 +2026,82 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
+    @CsvSource({"GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2"})
     @ParameterizedTest
-    @CsvSource({ "GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2" })
     void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
-            String.format("""
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.5.1</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                            <version>%s</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """, projectVersion),
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.5.1</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.1</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                          <version>%s</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(projectVersion),
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.1</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
 
+    @CsvSource({"LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2"})
     @ParameterizedTest
-    @CsvSource({ "LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2" })
     void onlyIfManagedVersionIs_nonremovals(String comparator, String projectVersion) {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
           pomXml(
             //language=xml
-            String.format("""
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.5.1</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                            <version>%s</version>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """, projectVersion)
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.5.1</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                          <version>%s</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(projectVersion)
           )
         );
     }
@@ -2155,47 +2154,131 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
+    @Test
     void dontOverrideDependencyConfigurations() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.3.12.RELEASE</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.boot</groupId>
-                                <artifactId>spring-boot-starter-web</artifactId>
-                                <version>2.2.13.RELEASE</version>
-                                <!-- This exclusion should be kept -->
-                                <exclusions>
-                                    <exclusion>
-                                        <groupId>org.slf4j</groupId>
-                                        <artifactId>slf4j-api</artifactId>
-                                    </exclusion>
-                                </exclusions>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.12.RELEASE</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                              <version>2.2.13.RELEASE</version>
+                              <!-- This exclusion should be kept -->
+                              <exclusions>
+                                  <exclusion>
+                                      <groupId>org.slf4j</groupId>
+                                      <artifactId>slf4j-api</artifactId>
+                                  </exclusion>
+                              </exclusions>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void exceptManagedDependencyShouldNotBeRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(
+            null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
+            singletonList("org.springframework.boot:spring-boot-starter-web"))),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.12.RELEASE</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <!-- This dependency is in except list and should not be removed -->
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                              <version>2.2.13.RELEASE</version>
+                          </dependency>
+                          <!-- This dependency is not in except list and should be removed -->
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-test</artifactId>
+                              <version>2.2.13.RELEASE</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-test</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.3.12.RELEASE</version>
+                  </parent>
+                  <groupId>com.example</groupId>
+                  <artifactId>acme</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <!-- This dependency is in except list and should not be removed -->
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                              <version>2.2.13.RELEASE</version>
+                          </dependency>
+                          <!-- This dependency is not in except list and should be removed -->
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-web</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-test</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }

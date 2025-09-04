@@ -70,11 +70,11 @@ public class UseHttpsForRepositories extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (m.getSimpleName().equals("url") || m.getSimpleName().equals("uri")) {
+                if ("url".equals(m.getSimpleName()) || "uri".equals(m.getSimpleName())) {
                     try {
                         getCursor()
-                                .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("maven"))
-                                .dropParentUntil(e -> e instanceof J.MethodInvocation && ((J.MethodInvocation) e).getSimpleName().equals("repositories"));
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && "maven".equals(((J.MethodInvocation) e).getSimpleName()))
+                                .dropParentUntil(e -> e instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) e).getSimpleName()));
                         m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                             if (arg instanceof J.Literal) {
                                 return fixupLiteralIfNeeded((J.Literal) arg);

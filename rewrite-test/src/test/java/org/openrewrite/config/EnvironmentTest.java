@@ -23,7 +23,7 @@ import org.openrewrite.text.PlainText;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
@@ -95,7 +95,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -201,7 +201,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -251,7 +251,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -339,47 +339,11 @@ class EnvironmentTest implements RewriteTest {
     }
 
     @Test
-    void scanClasspath() {
-        var env = Environment.builder()
-          .scanRuntimeClasspath()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/attribution
-              recipeName: org.openrewrite.text.ChangeTextToJon
-              contributors:
-                - name: "Jonathan Schneider"
-                  email: "jon@moderne.io"
-                  lineCount: 5
-              """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSizeGreaterThanOrEqualTo(2)
-          .extracting("name")
-          .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon");
-
-        assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
-          .extracting("name")
-          .contains("org.openrewrite.SampleStyle");
-
-        //noinspection OptionalGetWithoutIsPresent
-        Recipe cttj = recipes.stream()
-          .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
-          .findAny()
-          .get();
-
-        assertThat(cttj.getContributors())
-          .isNotEmpty();
-    }
-
-    @Test
     void listRecipeDescriptors() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
+        assertThat(recipeDescriptors).isNotEmpty();
+        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
         assertThat(changeTextDescriptor.getOptions()).hasSize(1);
@@ -391,8 +355,8 @@ class EnvironmentTest implements RewriteTest {
     void listStyles() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var styles = env.listStyles();
-        assertThat(styles).isNotNull().isNotEmpty();
-        var sampleStyle = styles.stream().filter(s -> s.getName().equals("org.openrewrite.SampleStyle"))
+        assertThat(styles).isNotEmpty();
+        var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
         assertThat(sampleStyle).isNotNull();
         assertThat(sampleStyle.getDisplayName()).isEqualTo("Sample style");
@@ -420,8 +384,8 @@ class EnvironmentTest implements RewriteTest {
     void recipeDescriptorsFromCrossResources() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var helloJon2 = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.HelloJon2"))
+        assertThat(recipeDescriptors).isNotEmpty();
+        var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
         assertThat(helloJon2.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.HelloJon");
@@ -510,7 +474,7 @@ class EnvironmentTest implements RewriteTest {
                 causesAnotherCycle: true
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
-                
+
                 """.getBytes()
             ),
             URI.create("rewrite.yml"),

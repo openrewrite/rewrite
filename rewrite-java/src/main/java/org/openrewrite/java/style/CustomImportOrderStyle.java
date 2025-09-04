@@ -22,10 +22,11 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @With
@@ -136,7 +137,7 @@ public class CustomImportOrderStyle implements Style {
      * @return The list of parsed {@code GroupWithDepth} objects, or an empty list if input is null/blank.
      */
     public static List<GroupWithDepth> parseImportOrder(String input) {
-        if (StringUtils.isBlank(input)) return Collections.emptyList();
+        if (StringUtils.isBlank(input)) return emptyList();
         List<GroupWithDepth> groups = new ArrayList<>();
         for (String rule : input.split("\\s*,\\s*|###")) {
             String groupRule = rule.trim();

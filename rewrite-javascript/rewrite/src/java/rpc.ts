@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {JavaVisitor} from "./visitor";
-import {asRef, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Expression, isSpace, J, TextComment} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
@@ -26,7 +26,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async preVisit(j: J, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
         await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        await q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
@@ -212,7 +212,6 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(intersectionType, i => i.bounds, bounds => this.visitContainer(bounds, q));
-        await q.getAndSend(intersectionType, i => asRef(i.type), type => this.visitType(type, q));
         return intersectionType;
     }
 
@@ -421,7 +420,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     }
 
     protected async visitWildcard(wildcard: J.Wildcard, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(wildcard, w => w.bound);
+        await q.getAndSend(wildcard, w => w.bound, b => this.visitLeftPadded(b, q));
         await q.getAndSend(wildcard, w => w.boundedType, type => this.visit(type, q));
         return wildcard;
     }
@@ -537,7 +536,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
                     throw new Error(`Unexpected comment type ${c.kind}`);
                 }
                 await q.getAndSend(c, c2 => c2.suffix);
-                await q.sendMarkers(c, c2 => c2.markers);
+                await q.getAndSend(c, c2 => c2.markers);
             });
         await q.getAndSend(space, s => s.whitespace);
         return space;
@@ -552,7 +551,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         } else {
             await q.getAndSend(left, l => l.element);
         }
-        await q.sendMarkers(left, l => l.markers);
+        await q.getAndSend(left, l => l.markers);
         return left;
     }
 
@@ -563,19 +562,21 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
             await q.getAndSend(right, r => r.element);
         }
         await q.getAndSend(right, r => r.after, space => this.visitSpace(space, q));
-        await q.sendMarkers(right, r => r.markers);
+        await q.getAndSend(right, r => r.markers);
         return right;
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
         await q.getAndSend(container, c => c.before, space => this.visitSpace(space, q));
         await q.getAndSendList(container, c => c.elements, elem => elem.element.id, elem => this.visitRightPadded(elem, q));
-        await q.sendMarkers(container, c => c.markers);
+        await q.getAndSend(container, c => c.markers);
         return container;
     }
 
     public override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
-        return super.visitType(javaType, q);
+        const codec = RpcCodecs.forInstance(javaType);
+        await codec?.rpcSend(javaType, q);
+        return javaType;
     }
 }
 
@@ -587,7 +588,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
             draft.id = await q.receive(j.id);
             draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-            draft.markers = await q.receiveMarkers(j.markers);
+            draft.markers = await q.receive(j.markers);
 
             return finishDraft(draft);
         } catch (e: any) {
@@ -860,7 +861,6 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const draft = createDraft(intersectionType);
 
         draft.bounds = await q.receive(intersectionType.bounds, bounds => this.visitContainer(bounds, q));
-        draft.type = await q.receive(intersectionType.type, type => this.visitType(type, q));
 
         return finishDraft(draft);
     }
@@ -1306,7 +1306,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     draft.multiline = await q.receive(tc.multiline);
                     draft.text = await q.receive(tc.text);
                     draft.suffix = await q.receive(c.suffix);
-                    draft.markers = await q.receiveMarkers(c.markers);
+                    draft.markers = await q.receive(c.markers);
                 });
             } else {
                 throw new Error(`Unexpected comment type ${c.kind}`);
@@ -1334,7 +1334,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             }
             return elem;
         }) as Draft<T>;
-        draft.markers = await q.receiveMarkers(left.markers);
+        draft.markers = await q.receive(left.markers);
 
         return finishDraft(draft) as J.LeftPadded<T>;
     }
@@ -1356,7 +1356,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             return elem as any as T;
         }) as Draft<T>;
         draft.after = await q.receive(right.after, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(right.markers);
+        draft.markers = await q.receive(right.markers);
 
         return finishDraft(draft) as J.RightPadded<T>;
     }
@@ -1366,12 +1366,16 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         draft.before = await q.receive(container.before, space => this.visitSpace(space, q));
         draft.elements = await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)) as Draft<J.RightPadded<T>[]>;
-        draft.markers = await q.receiveMarkers(container.markers);
+        draft.markers = await q.receive(container.markers);
 
         return finishDraft(draft) as J.Container<T>;
     }
 
     public override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {
+        const codec = RpcCodecs.forInstance(javaType);
+        if (codec) {
+            return await codec.rpcReceive(javaType, q);
+        }
         return super.visitType(javaType, q);
     }
 }

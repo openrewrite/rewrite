@@ -1,4 +1,4 @@
-// #!/usr/bin/env node
+#!/usr/bin/env node
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -14,12 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as net from 'net';
 import * as rpc from "vscode-jsonrpc/node";
+import {Trace, Tracer} from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
-import {WriteStream} from "fs";
 import {Command} from 'commander';
+import {dir} from 'tmp-promise';
 
 // Include all languages you want this server to support.
 import "../text";
@@ -27,129 +27,113 @@ import "../json";
 import "../java";
 import "../javascript";
 
+// Not possible to set the stack size when executing from npx for security reasons
+require('v8').setFlagsFromString('--stack-size=4000');
+
 interface ProgramOptions {
-    port?: number;
     logFile?: string;
     verbose?: boolean;
     batchSize?: number;
     traceGetObjectOutput?: boolean;
     traceGetObjectInput?: boolean;
+    recipeInstallDir?: string;
 }
 
-const program = new Command();
-program
-    .option('--port <number>', 'port number')
-    .option('--log-file <path>', 'log file path')
-    .option('-v, --verbose', 'enable verbose output')
-    .option('--batch-size [size]', 'sets the batch size (default is 100)', s => parseInt(s, 10), 100)
-    .option('--trace-get-object-output', 'enable `GetObject` output tracing')
-    .option('--trace-get-object-input', 'enable `GetObject` input tracing')
-    .parse();
+async function main() {
+    const program = new Command();
+    program
+        .option('--port <number>', 'port number')
+        .option('--log-file <log_path>', 'log file path')
+        .option('-v, --verbose', 'enable verbose output')
+        .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
+        .option('--trace-get-object-output', 'enable `GetObject` output tracing')
+        .option('--trace-get-object-input', 'enable `GetObject` input tracing')
+        .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
+        .parse();
 
-const options = program.opts() as ProgramOptions;
+    const options = program.opts() as ProgramOptions;
 
-const log: WriteStream = fs.createWriteStream(options.logFile ?? `${process.cwd()}/rpc.js.log`, {flags: 'w'});
-log.write(`[js-rewrite-rpc] starting\n\n`);
+    let recipeInstallDir: string;
+    if (!options.recipeInstallDir) {
+        let recipeCleanup: () => Promise<void>;
 
-const logger: rpc.Logger = {
-    error: (msg: string) => log.write(`[Error] ${msg}\n`),
-    warn: (msg: string) => log.write(`[Warn] ${msg}\n`),
-    info: (msg: string) => options.verbose && log.write(`[Info] ${msg}\n`),
-    log: (msg: string) => options.verbose && log.write(`[Log] ${msg}\n`)
-};
+        async function setupRecipeDir() {
+            const {path, cleanup} = await dir({unsafeCleanup: true});
+            recipeCleanup = cleanup;
+            return path;
+        }
 
-if (!options.port) {
-// Create the connection with the custom logger
+        // Register cleanup on exit
+        process.on('SIGINT', async () => {
+            if (recipeCleanup) {
+                await recipeCleanup();
+            }
+            process.exit(0);
+        });
+
+        process.on('SIGTERM', async () => {
+            if (recipeCleanup) {
+                await recipeCleanup();
+            }
+            process.exit(0);
+        });
+
+        recipeInstallDir = await setupRecipeDir();
+    } else {
+        recipeInstallDir = options.recipeInstallDir;
+    }
+
+    const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
+    const logger: rpc.Logger = {
+        error: (msg: string) => log && log.write(`[js-rewrite-rpc] [error] ${msg}\n`),
+        warn: (msg: string) => log && log.write(`[js-rewrite-rpc] [warn] ${msg}\n`),
+        info: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [info] ${msg}\n`),
+        log: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [log] ${msg}\n`)
+    };
+
+    logger.log(`starting`);
+
+    // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(process.stdin),
         new rpc.StreamMessageWriter(process.stdout),
         logger
     );
 
-    connection.trace(rpc.Trace.Verbose, logger).catch(err => {
-        // Handle any unexpected errors during trace configuration
-        log.write(`Failed to set trace: ${err}`);
-    });
+    if (options.verbose) {
+        await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
+            // Handle any unexpected errors during trace configuration
+            logger.error(`Failed to set trace: ${err}`);
+        });
+    } else {
+        await connection.trace(Trace.Off, {} as Tracer);
+    }
 
     connection.onError(err => {
-        log.write(`[js-rewrite-rpc] error: ${err}\n\n`);
+        logger.error(`error: ${err}`);
     });
 
     connection.onClose(() => {
-        log.write(`[js-rewrite-rpc] connection closed\n\n`);
+        logger.info(`connection closed`);
     })
 
     connection.onDispose(() => {
-        log.write(`[js-rewrite-rpc] connection disposed\n\n`);
+        logger.info(`connection disposed`);
     });
 
     new RewriteRpc(connection, {
         batchSize: options.batchSize,
+        logger: logger,
         traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
         traceGetObjectOutput: options.traceGetObjectOutput,
-    });
-} else {
-// Create a TCP server
-    const server: net.Server = net.createServer((socket: net.Socket) => {
-        log.write(`[js-rewrite-rpc] new client connected: ${socket.remoteAddress}:${socket.remotePort}\n`);
-
-        // Create the connection with the custom logger using the socket streams
-        const connection: rpc.MessageConnection = rpc.createMessageConnection(
-            new rpc.StreamMessageReader(socket),
-            new rpc.StreamMessageWriter(socket),
-            logger
-        );
-
-        connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
-            // Handle any unexpected errors during trace configuration
-            log.write(`Failed to set trace: ${err}\n`);
-        });
-
-        connection.onError((err: [Error, rpc.Message | undefined, number | undefined]) => {
-            log.write(`[js-rewrite-rpc] error: ${err[0]}\n\n`);
-        });
-
-        connection.onClose(() => {
-            log.write(`[js-rewrite-rpc] connection closed\n\n`);
-        });
-
-        connection.onDispose(() => {
-            log.write(`[js-rewrite-rpc] connection disposed\n\n`);
-        });
-
-        socket.on('close', () => {
-            log.write(`[js-rewrite-rpc] socket closed: ${socket.remoteAddress}:${socket.remotePort}\n`);
-        });
-
-        socket.on('error', (err: Error) => {
-            log.write(`[js-rewrite-rpc] socket error: ${err.message}\n`);
-        });
-
-        // Initialize the RPC mechanism
-        new RewriteRpc(connection, {
-            batchSize: options.batchSize,
-            traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
-            traceGetObjectOutput: options.traceGetObjectOutput,
-        });
+        recipeInstallDir: recipeInstallDir
     });
 
-// Handle server errors
-    server.on('error', (err: Error) => {
-        log.write(`[js-rewrite-rpc] server error: ${err.message}\n`);
-        process.exit(1);
-    });
-
-// Start the server
-    server.listen(options.port, '127.0.0.1', () => {
-        log.write(`[js-rewrite-rpc] server listening on 127.0.0.1:${options.port}\n`);
-    });
-
-// Handle process termination
-    process.on('SIGINT', () => {
-        log.write(`[js-rewrite-rpc] received SIGINT, shutting down\n`);
-        server.close(() => {
-            log.write(`[js-rewrite-rpc] server closed\n`);
-            process.exit(0);
-        });
+    // log uncaught exceptions
+    process.on('uncaughtException', (error) => {
+        logger.error('Fatal error:' + error.message);
+        process.exit(8);
     });
 }
+
+main().catch(console.error);
