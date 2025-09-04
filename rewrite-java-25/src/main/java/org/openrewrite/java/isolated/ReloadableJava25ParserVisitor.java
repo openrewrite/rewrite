@@ -780,14 +780,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitImport(ImportTree node, Space fmt) {
         skip("import");
-        if (node instanceof JCModuleImport mi) {
-            Space module = sourceBefore("module");
-            return new J.ModuleImport(randomId(), fmt, Markers.EMPTY, module,
-                    convert(mi.getQualifiedIdentifier()), null);
-        }
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
+                new JLeftPadded<>(node.isModule() ? sourceBefore("module") : EMPTY,
+                        node.isModule(), Markers.EMPTY),
                 convert(node.getQualifiedIdentifier()), null);
     }
 

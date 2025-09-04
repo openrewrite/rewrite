@@ -703,15 +703,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
     }
 
-    public J visitModuleImport(J.ModuleImport import_, P p) {
-        J.ModuleImport i = import_;
-        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
-        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        i = i.withModulePrefix(visitSpace(i.getModulePrefix(), Space.Location.MODULE_IMPORT_PREFIX, p));
-        i = i.withModule(visitAndCast(i.getModule(), p));
-        return i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
-    }
-
     public J visitInstanceOf(J.InstanceOf instanceOf, P p) {
         J.InstanceOf i = instanceOf;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INSTANCEOF_PREFIX, p));
