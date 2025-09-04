@@ -47,6 +47,21 @@ class HelmTemplateParsingTest implements RewriteTest {
     }
 
     @Test
+    void helmInComment() {
+        rewriteRun(
+          yaml(
+            """
+              apiVersion: v1
+              kind: Service
+              metadata:
+                #name: {{ .Release.Name }}-service
+                name: Foo
+              """
+          )
+        );
+    }
+
+    @Test
     void parseSimpleHelmTemplate() {
         rewriteRun(
           yaml(

@@ -52,7 +52,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     public J preVisit(J j, RpcReceiveQueue q) {
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
-                .withMarkers(q.receiveMarkers(j.getMarkers()));
+                .withMarkers(q.receive(j.getMarkers()));
     }
 
     @Override

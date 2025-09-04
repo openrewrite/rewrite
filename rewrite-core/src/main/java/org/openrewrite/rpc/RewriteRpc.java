@@ -18,6 +18,7 @@ package org.openrewrite.rpc;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
+import io.moderne.jsonrpc.JsonRpcSuccess;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
@@ -30,22 +31,23 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
@@ -53,41 +55,11 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
  * Base class for RPC clients with thread-local context support.
  */
 @SuppressWarnings("UnusedReturnValue")
-public class RewriteRpc implements AutoCloseable {
-
-    public static Builder<?> from(JsonRpc jsonRpc, Environment marketplace) {
-        //noinspection rawtypes
-        return new Builder(marketplace) {
-            @Override
-            public RewriteRpc build() {
-                return new RewriteRpc(jsonRpc, marketplace, timeout);
-            }
-        };
-    }
-
-    @SuppressWarnings("unchecked")
-    public abstract static class Builder<T extends Builder<T>> {
-        protected final Environment marketplace;
-        protected Duration timeout = Duration.ofMinutes(1);
-
-        protected Builder(Environment marketplace) {
-            this.marketplace = marketplace;
-        }
-
-        public T timeout(Duration timeout) {
-            this.timeout = timeout;
-            return (T) this;
-        }
-
-        public abstract RewriteRpc build();
-    }
-
+public class RewriteRpc {
     private final JsonRpc jsonRpc;
-
     private final AtomicInteger batchSize = new AtomicInteger(200);
-    private final Duration timeout;
-    private final AtomicBoolean traceSendPackets = new AtomicBoolean(false);
-    private @Nullable PrintStream traceFile;
+    private Duration timeout = Duration.ofSeconds(30);
+    private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
 
     /**
      * Keeps track of the local and remote state of objects that are used in
@@ -117,9 +89,7 @@ public class RewriteRpc implements AutoCloseable {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    protected RewriteRpc(JsonRpc jsonRpc, Environment marketplace, Duration timeout) {
-        this.timeout = timeout;
-
+    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
 
         Map<String, Recipe> preparedRecipes = new HashMap<>();
@@ -129,7 +99,7 @@ public class RewriteRpc implements AutoCloseable {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject));
-        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs, traceSendPackets));
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
@@ -149,24 +119,22 @@ public class RewriteRpc implements AutoCloseable {
         jsonRpc.bind();
     }
 
+    public RewriteRpc livenessCheck(Supplier<? extends @Nullable RuntimeException> livenessCheck) {
+        this.livenessCheck = livenessCheck;
+        return this;
+    }
+
+    public RewriteRpc timeout(Duration timeout) {
+        this.timeout = timeout;
+        return this;
+    }
+
     public RewriteRpc batchSize(int batchSize) {
         this.batchSize.set(batchSize);
         return this;
     }
 
-    public RewriteRpc traceGetObjectOutput() {
-        this.traceSendPackets.set(true);
-        return this;
-    }
-
-    public RewriteRpc traceGetObjectInput(PrintStream log) {
-        this.traceFile = log;
-        return this;
-    }
-
-
-    @Override
-    public void close() {
+    public void shutdown() {
         jsonRpc.shutdown();
     }
 
@@ -264,7 +232,7 @@ public class RewriteRpc implements AutoCloseable {
         }
 
         if (inputList.isEmpty()) {
-            return Stream.of();
+            return Stream.empty();
         }
 
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
@@ -356,16 +324,15 @@ public class RewriteRpc implements AutoCloseable {
     public <T> T getObject(String id) {
         // Check if we have a cached version of this object
         Object localObject = localObjects.get(id);
-        String lastKnownId = localObject != null ? id : null;
 
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, traceFile, () -> send("GetObject",
-                new GetObject(id, lastKnownId), GetObjectResponse.class));
+        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
+                new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
         // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, remoteObject);
+        remoteObjects.put(id, requireNonNull(remoteObject));
         localObjects.put(id, remoteObject);
 
         //noinspection unchecked
@@ -374,13 +341,40 @@ public class RewriteRpc implements AutoCloseable {
 
     protected <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         try {
-            // TODO handle error
-            return jsonRpc
-                    .send(JsonRpcRequest.newRequest(method, body))
-                    .get(timeout.getSeconds(), TimeUnit.SECONDS)
-                    .getResult(responseType);
-        } catch (ExecutionException | TimeoutException | InterruptedException e) {
+            checkLiveness();
+
+            // Send the request and get the future
+            CompletableFuture<JsonRpcSuccess> future = jsonRpc.send(JsonRpcRequest.newRequest(method, body));
+
+            // Poll for completion while checking if process is alive
+            long totalTimeoutMs = timeout.toMillis();
+            long checkIntervalMs = 500; // Check every 500ms
+            long elapsedMs = 0;
+
+            while (elapsedMs < totalTimeoutMs) {
+                try {
+                    // Try to get the result with a short timeout
+                    return future.get(checkIntervalMs, TimeUnit.MILLISECONDS).getResult(responseType);
+                } catch (TimeoutException e) {
+                    checkLiveness();
+                    elapsedMs += checkIntervalMs;
+                    // Continue waiting if process is still alive and we haven't hit total timeout
+                }
+            }
+
+            // If we get here, we've hit the total timeout
+            throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
+        } catch (ExecutionException | InterruptedException e) {
+            // Check if process crashed during the request
+            checkLiveness();
             throw new RuntimeException(e);
+        }
+    }
+
+    private void checkLiveness() {
+        RuntimeException livenessProblem = livenessCheck.get();
+        if (livenessProblem != null) {
+            throw livenessProblem;
         }
     }
 

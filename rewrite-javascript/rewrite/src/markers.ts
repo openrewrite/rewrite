@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 import {randomId, UUID} from "./uuid";
-import {asRef} from "./rpc/reference";
+import {asRef} from "./reference";
 
 export const MarkersKind = {
     Markers: "org.openrewrite.marker.Markers",
     NamedStyles: "org.openrewrite.marker.NamedStyles",
     SearchResult: "org.openrewrite.marker.SearchResult",
     ParseExceptionResult: "org.openrewrite.ParseExceptionResult",
+
+    /**
+     * A generic marker that is sent/received as a bare map because the type hasn't been
+     * defined in both Java and JavaScript.
+     */
     RpcMarker: "org.openrewrite.rpc.RpcMarker",
 } as const
 
@@ -69,6 +74,24 @@ export const emptyMarkers: Markers = asRef({
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,
     readonly description?: string
+}
+
+export function foundSearchResult<T extends { markers: Markers }>(t: T, description?: string): T {
+    const existing = findMarker(t, MarkersKind.SearchResult);
+    if (!existing || (existing as SearchResult).description !== description) {
+        return {
+            ...t,
+            markers: {
+                ...t.markers,
+                markers: [...t.markers.markers, {
+                    kind: MarkersKind.SearchResult,
+                    id: randomId(),
+                    description: description
+                } as SearchResult]
+            }
+        } as T;
+    }
+    return t;
 }
 
 export interface ParseExceptionResult extends Marker {

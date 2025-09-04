@@ -37,7 +37,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
         j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        return j.withMarkers(q.receiveMarkers(j.getMarkers()));
+        return j.withMarkers(q.receive(j.getMarkers()));
     }
 
     @Override
@@ -94,7 +94,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                         .withMultiline(q.receive(c.isMultiline()))
                         .withText(q.receive(c.getText()))
                         .withSuffix(q.receive(c.getSuffix()))
-                        .withMarkers(q.receiveMarkers(c.getMarkers()))))
+                        .withMarkers(q.receive(c.getMarkers()))))
                 .withWhitespace(q.receive(space.getWhitespace()));
     }
 
@@ -105,6 +105,6 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         //noinspection unchecked
         return right.withElement(q.receive(right.getElement(), j -> (T) visitNonNull(j, q)))
                 .withAfter(q.receive(right.getAfter(), space -> visitSpace(space, q)))
-                .withMarkers(q.receiveMarkers(right.getMarkers()));
+                .withMarkers(q.receive(right.getMarkers()));
     }
 }
