@@ -150,7 +150,9 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                             } else {
                                 existingRules.add(normalizeRule(trimmed));
                                 // Track wildcard patterns and directory patterns for superfluous entry checking
-                                if (trimmed.contains("*") || trimmed.endsWith("/")) {
+                                if (trimmed.endsWith("/")) {
+                                    existingWildcardPatterns.add(trimmed + "**");
+                                } else if (trimmed.contains("*")) {
                                     existingWildcardPatterns.add(trimmed);
                                 }
                             }
@@ -196,11 +198,9 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 if (normalized.startsWith("!")) {
                     normalized = normalized.substring(1).trim();
                 }
-
                 if (normalized.endsWith("/")) {
                     normalized = normalized.substring(0, normalized.length() - 1);
                 }
-
                 if (normalized.startsWith("/")) {
                     normalized = normalized.substring(1);
                 }
@@ -211,53 +211,11 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
             private boolean isRedundantEntry(String entry, Set<String> existingWildcardPatterns) {
                 // Check if this entry would be redundant given existing wildcard patterns
                 for (String pattern : existingWildcardPatterns) {
-                    if (matchesGitignorePattern(entry, pattern)) {
+                    if (PathUtils.matchesGlob(Paths.get(entry), pattern)) {
                         return true;
                     }
                 }
                 return false;
-            }
-
-            private boolean matchesGitignorePattern(String path, String pattern) {
-                // Simple gitignore pattern matching
-                // This is a simplified implementation - gitignore patterns can be complex
-
-                // Remove leading slashes for comparison
-                String normalizedPath = path.trim();
-                String normalizedPattern = pattern.trim();
-
-                if (normalizedPath.startsWith("/")) {
-                    normalizedPath = normalizedPath.substring(1);
-                }
-                if (normalizedPattern.startsWith("/")) {
-                    normalizedPattern = normalizedPattern.substring(1);
-                }
-
-                // Handle directory patterns (ending with /)
-                boolean isDirectoryPattern = normalizedPattern.endsWith("/");
-                if (isDirectoryPattern) {
-                    normalizedPattern = normalizedPattern.substring(0, normalizedPattern.length() - 1);
-                    // If the path is also a directory pattern, remove trailing slash
-                    if (normalizedPath.endsWith("/")) {
-                        normalizedPath = normalizedPath.substring(0, normalizedPath.length() - 1);
-                    }
-                    // Check if the path is under this directory
-                    if (normalizedPath.equals(normalizedPattern) ||
-                            normalizedPath.startsWith(normalizedPattern + "/")) {
-                        return true;
-                    }
-                }
-
-                // Convert gitignore pattern to regex for wildcard matching
-                String regex = normalizedPattern
-                        .replace(".", "\\.")
-                        .replace("**", "§§§")  // Temporary placeholder for **
-                        .replace("*", "[^/]*")  // * matches anything except /
-                        .replace("§§§", ".*")   // ** matches anything including /
-                        .replace("?", "[^/]");  // ? matches single character except /
-
-                // Check if the path matches the pattern
-                return normalizedPath.matches(regex);
             }
         });
     }
