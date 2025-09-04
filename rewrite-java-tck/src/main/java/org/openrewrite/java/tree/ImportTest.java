@@ -270,10 +270,18 @@ class ImportTest implements RewriteTest {
               import module java.sql;
               
               public class A {
-                  String s;
+                  Set<String> s;
                   Connection conn;
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
+              .filter(J.Import::isModule)
+              .map(J.Import::getQualid)
+              .map(J.FieldAccess::toString))
+              .containsExactly(
+                "java.base",
+                "java.sql"
+              ))
           )
         );
     }
@@ -307,11 +315,12 @@ class ImportTest implements RewriteTest {
           java(
             """
               import module java.base;
+              // List is ambiguous here because java.awt.List is also in java.base
               import java.util.List;
               import java.awt.*;
               
               public class A {
-                  List<String> list;
+                  List<Date> list;
                   Color color;
               }
               """
@@ -335,51 +344,6 @@ class ImportTest implements RewriteTest {
                   Path path;
               }
               """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/511")
-    @MinimumJava25
-    @Test
-    void moduleImportTypeName() {
-        rewriteRun(
-          java(
-            """
-              import module java.base;
-              import module java.sql;
-              """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
-              .filter(J.Import::isModule)
-              .map(J.Import::getQualid)
-              .map(J.FieldAccess::toString))
-              .containsExactly(
-                "java.base",
-                "java.sql"
-              ))
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/511")
-    @MinimumJava25
-    @Test
-    void moduleImportPackageName() {
-        rewriteRun(
-          java(
-            """
-              import module java.base;
-              import module java.logging;
-              """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
-                .filter(J.Import::isModule)
-              .map(J.Import::getQualid)
-              .map(J.FieldAccess::toString))
-              .containsExactly(
-                "java.base",
-                "java.logging"
-              )
-            )
           )
         );
     }
