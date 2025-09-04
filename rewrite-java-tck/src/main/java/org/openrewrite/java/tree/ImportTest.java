@@ -241,8 +241,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportBasic() {
         rewriteRun(
@@ -259,8 +259,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportMultiple() {
         rewriteRun(
@@ -278,8 +278,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportWithRegularImports() {
         rewriteRun(
@@ -299,8 +299,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportShadowing() {
         rewriteRun(
@@ -319,8 +319,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportAggregator() {
         rewriteRun(
@@ -339,8 +339,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportTypeName() {
         rewriteRun(
@@ -361,8 +361,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportPackageName() {
         rewriteRun(
@@ -384,8 +384,8 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @MinimumJava25
     @Issue("https://openjdk.org/jeps/511")
+    @MinimumJava25
     @Test
     void moduleImportOrdering() {
         rewriteRun(
