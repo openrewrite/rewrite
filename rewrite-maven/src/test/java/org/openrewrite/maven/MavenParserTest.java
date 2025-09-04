@@ -4100,8 +4100,8 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @MethodSource("jacksonDependencies")
+    @ParameterizedTest
     void firstDeclarationWinsForEqualDistanceOfTransitiveDependencies(String dependencies, String resolvedTransitiveVersion) {
         rewriteRun(
           pomXml(
