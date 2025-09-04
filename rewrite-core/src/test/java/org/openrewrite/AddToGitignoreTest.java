@@ -26,7 +26,10 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void createGitignoreWhenNoneExists() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.tmp\n.DS_Store\ntarget/", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.tmp
+            .DS_Store
+            target/""", null)),
           text(
             doesNotExist(),
             """
@@ -42,7 +45,9 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void addEntriesToExistingGitignore() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.log\nbuild/", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.log
+            build/""", null)),
           text(
             """
               *.tmp
@@ -63,7 +68,9 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void doNotDuplicateExistingEntries() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.tmp\n*.log", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.tmp
+            *.log""", null)),
           text(
             """
               *.tmp
@@ -78,7 +85,9 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void handleEntriesWithDifferentFormats() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("/build\ntarget/", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            /build
+            target/""", null)),
           text(
             """
               build/
@@ -92,7 +101,10 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void preserveCommentsAndAddNewEntries() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("# IDE files\n.idea/\n*.iml", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            # IDE files
+            .idea/
+            *.iml""", null)),
           text(
             """
               # Build artifacts
@@ -116,7 +128,13 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void handleMultilineInput() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.log\n*.tmp\n\n# OS files\n.DS_Store\nThumbs.db", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.log
+            *.tmp
+            
+            # OS files
+            .DS_Store
+            Thumbs.db""", null)),
           text(
             """
               target/
@@ -191,7 +209,10 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void normalizeAndDeduplicateEntries() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("/build/\nbuild\n/build", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            /build/
+            build
+            /build""", null)),
           text(
             """
               target/
@@ -209,7 +230,9 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void handleNegationPatterns() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.log\n!important.log", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.log
+            !important.log""", null)),
           text(
             """
               *.tmp
@@ -242,7 +265,14 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void emptyLinesInInput() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("\n\n*.log\n\n*.tmp\n\n", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            
+            
+            *.log
+            
+            *.tmp
+            
+            """, null)),
           text(
             """
               target/
@@ -261,7 +291,11 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void doNotChangeWhenEntriesExistInDifferentOrder() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("*.log\ntarget/\n.DS_Store\nbuild/", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            *.log
+            target/
+            .DS_Store
+            build/""", null)),
           text(
             """
               # Build directories
@@ -416,7 +450,10 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void doNotAddSuperfluousEntriesWithMultiplePatterns() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("foo.tmp\nbuild/bin\ntest.log", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            foo.tmp
+            build/bin
+            test.log""", null)),
           text(
             """
               *.tmp
@@ -431,7 +468,9 @@ class AddToGitignoreTest implements RewriteTest {
     @Test
     void addNonSuperfluousEntries() {
         rewriteRun(
-          spec -> spec.recipe(new AddToGitignore("foo.txt\n*.tmp", null)),
+          spec -> spec.recipe(new AddToGitignore("""
+            foo.txt
+            *.tmp""", null)),
           text(
             """
               *.log
