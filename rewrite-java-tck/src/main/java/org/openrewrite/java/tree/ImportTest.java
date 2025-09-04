@@ -350,9 +350,9 @@ class ImportTest implements RewriteTest {
               import module java.sql;
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
-              .filter(i -> i.getQualid().getSimpleName().equals("java.base") || 
-                           i.getQualid().getSimpleName().equals("java.sql"))
-              .map(J.Import::getTypeName))
+              .filter(J.Import::isModule)
+              .map(J.Import::getQualid)
+              .map(J.FieldAccess::toString))
               .containsExactly(
                 "java.base",
                 "java.sql"
@@ -372,13 +372,14 @@ class ImportTest implements RewriteTest {
               import module java.logging;
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream()
-              .filter(i -> i.getQualid().getSimpleName().equals("java.base") || 
-                           i.getQualid().getSimpleName().equals("java.logging"))
-              .map(J.Import::getPackageName))
+                .filter(J.Import::isModule)
+              .map(J.Import::getQualid)
+              .map(J.FieldAccess::toString))
               .containsExactly(
-                null,
-                null
-              ))
+                "java.base",
+                "java.logging"
+              )
+            )
           )
         );
     }
