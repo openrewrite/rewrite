@@ -227,7 +227,7 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
-    void dontRemoveUsedParentMembers() {
+    void keepWhenParentMembersAreUsed() {
         rewriteRun(
           spec -> spec.recipe(removeTypeImportRecipe("org.example.Child.Companion.one")),
           kotlin(
@@ -263,7 +263,7 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
-    void keepImportWhenUsingTopLevelFunctions() {
+    void keepWhenUsingTopLevelFunctions() {
         rewriteRun(
           spec -> spec.recipe(removeTypeImportRecipe("org.example.one")),
           kotlin(
