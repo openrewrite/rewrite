@@ -20,7 +20,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
-import org.openrewrite.java.*;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MinimumJava21;
 import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.test.RewriteTest;
 

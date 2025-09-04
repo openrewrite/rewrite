@@ -213,6 +213,13 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
                             String versionToUse = MavenDependency.findNewerVersion(convertedGroup, convertedArtifact, currentVersion, getResolutionResult(), metadataFailures, versionComparator, ctx);
+
+                            // Prevent downgrades
+                            if (currentVersion != null && versionToUse != null &&
+                                    versionComparator.compare(null, currentVersion, versionToUse) >= 0) {
+                                return maven;
+                            }
+
                             if (versionToUse != null && !versionToUse.equals(pom.getValue(existingManagedDependencyVersion()))) {
                                 if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
                                     // revert back to the original version if the version has a placeholder

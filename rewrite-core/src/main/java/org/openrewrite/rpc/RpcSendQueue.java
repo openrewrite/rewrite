@@ -17,15 +17,11 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
-import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
 
