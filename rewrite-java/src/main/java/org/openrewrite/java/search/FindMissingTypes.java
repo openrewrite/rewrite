@@ -117,7 +117,10 @@ public class FindMissingTypes extends Recipe {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
             if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName())) {
-                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+                // Allow underscore when field type name is empty (unnamed variable pattern)
+                if (!("_".equals(identifier.getSimpleName()) && identifier.getFieldType().getName().isEmpty())) {
+                    identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+                }
             }
             return identifier;
         }
@@ -130,7 +133,10 @@ public class FindMissingTypes extends Recipe {
                 if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     v = SearchResult.found(v, "Variable type is missing or malformed");
                 } else if (variableType != null && !variableType.getName().equals(v.getSimpleName())) {
-                    v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
+                    // Allow underscore when variable type name is empty (unnamed variable pattern)
+                    if (!("_".equals(v.getSimpleName()) && variableType.getName().isEmpty())) {
+                        v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
+                    }
                 }
             }
             return v;
@@ -193,7 +199,10 @@ public class FindMissingTypes extends Recipe {
                 if (!isWellFormedType(variableType, seenTypes)) {
                     mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
-                    mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                    // Allow underscore when variable type name is empty (unnamed variable pattern)
+                    if (!("_".equals(mr.getReference().getSimpleName()) && variableType.getName().isEmpty())) {
+                        mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                    }
                 }
             }
             return mr;
