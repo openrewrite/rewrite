@@ -263,7 +263,7 @@ class RemoveImportTest implements RewriteTest {
     }
 
     @Test
-    void keepStarFoldWhenUsingTopLevelFunctions() {
+    void keepImportWhenUsingTopLevelFunctions() {
         rewriteRun(
           spec -> spec.recipe(removeTypeImportRecipe("org.example.one")),
           kotlin(
