@@ -493,8 +493,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 if (ctx.LPAREN() != null) {
                     parenthesesPrefix = sourceBefore("(");
                 }
-                if (ctx.Identifier() != null) {
-                    name = visitIdentifier(ctx.Identifier());
+                if (ctx.qualifiedIdentifier() != null) {
+                    name = visitQualifiedIdentifier(ctx.qualifiedIdentifier());
                 } else if (ctx.NULL() != null) {
                     name = visitIdentifier(ctx.NULL());
                 } else if (ctx.expression(0) != null) {
@@ -698,6 +698,32 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 Markers.EMPTY, identifier.getText());
         skip(identifier);
         return ident;
+    }
+
+    @Override
+    public @Nullable Expression visitQualifiedIdentifier(HCLParser.QualifiedIdentifierContext ctx) {
+        if (ctx == null) {
+            return null;
+        }
+        List<TerminalNode> identifiers = ctx.Identifier();
+        if (identifiers.size() == 1) {
+            return visitIdentifier(identifiers.get(0));
+        }
+        Expression expr = visitIdentifier(identifiers.get(0));
+        for (int i = 1; i < identifiers.size(); i++) {
+            expr = new Hcl.AttributeAccess(
+                    randomId(),
+                    expr.getPrefix(),
+                    Markers.EMPTY,
+                    expr.withPrefix(Space.EMPTY),
+                    new HclLeftPadded<>(
+                            sourceBefore("."),
+                            visitIdentifier(identifiers.get(i)),
+                            Markers.EMPTY
+                    )
+            );
+        }
+        return expr;
     }
 
     private String prefix(ParserRuleContext ctx) {

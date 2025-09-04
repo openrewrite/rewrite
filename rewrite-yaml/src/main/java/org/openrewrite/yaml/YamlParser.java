@@ -19,12 +19,10 @@ import lombok.Getter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -244,7 +242,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Tag tag = null;
                         if (scalar.getTag() != null) {
                             String potentialScalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
-                            assert(potentialScalarValue.contains("!"));
+                            assert (potentialScalarValue.contains("!"));
                             final int tagStartIndex = potentialScalarValue.indexOf('!');
                             String tagPrefix = potentialScalarValue.substring(0, tagStartIndex);
                             int indexOfTagName = tagStartIndex;
@@ -448,7 +446,75 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty()) {
+                return result;
+            }
+
+            // Restore UUID placeholders in all prefixes and suffixes
+            return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
+                private String restoreUuidPlaceholders(String text) {
+                    if (StringUtils.isBlank(text)) {
+                        return text;
+                    }
+                    String result = text;
+                    for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                        if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                        if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    return result;
+                }
+
+                @Override
+                public @Nullable Yaml visit(@Nullable Tree tree, Integer integer) {
+                    Yaml visit = super.visit(tree, integer);
+                    if (visit == null || StringUtils.isBlank(visit.getPrefix())) {
+                        return visit;
+                    }
+                    return visit.withPrefix(restoreUuidPlaceholders(visit.getPrefix()));
+                }
+
+                @Override
+                public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
+                    Yaml.Mapping m = super.visitMapping(mapping, p);
+                    String opening = m.getOpeningBracePrefix();
+                    if (!StringUtils.isBlank(opening)) {
+                        m = m.withOpeningBracePrefix((restoreUuidPlaceholders(opening)));
+                    }
+                    String closing = m.getClosingBracePrefix();
+                    if (!StringUtils.isBlank(closing)) {
+                        m = m.withClosingBracePrefix((restoreUuidPlaceholders(closing)));
+                    }
+                    return m;
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+                    Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
+                    return e.withBeforeMappingValueIndicator(restoreUuidPlaceholders(e.getBeforeMappingValueIndicator()));
+                }
+
+                @Override
+                public Yaml.Sequence visitSequence(Yaml.Sequence sequence, Integer p) {
+                    Yaml.Sequence s = super.visitSequence(sequence, p);
+                    String opening = s.getOpeningBracketPrefix();
+                    if (!StringUtils.isBlank(opening)) {
+                        s = s.withOpeningBracketPrefix((restoreUuidPlaceholders(opening)));
+                    }
+                    String closing = s.getClosingBracketPrefix();
+                    if (!StringUtils.isBlank(closing)) {
+                        s = s.withClosingBracketPrefix((restoreUuidPlaceholders(closing)));
+                    }
+                    return s;
+                }
+            }.visitNonNull(result, 0);
+
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -520,6 +586,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         return -1;
     }
+
 
     @Override
     public boolean accept(Path path) {
@@ -716,15 +783,15 @@ public class YamlParser implements org.openrewrite.Parser {
                     } else {
                         // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
                         return super.visitSequence(
-                            new Yaml.Sequence(
-                                    sequenceWithPrefix.getId(),
-                                    sequenceWithPrefix.getMarkers(),
-                                    sequenceWithPrefix.getOpeningBracketPrefix(),
-                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
-                                    sequenceWithPrefix.getClosingBracketPrefix(),
-                                    sequenceWithPrefix.getAnchor(),
-                                    sequenceWithPrefix.getTag()
-                            ), p);
+                                new Yaml.Sequence(
+                                        sequenceWithPrefix.getId(),
+                                        sequenceWithPrefix.getMarkers(),
+                                        sequenceWithPrefix.getOpeningBracketPrefix(),
+                                        ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
+                                        sequenceWithPrefix.getClosingBracketPrefix(),
+                                        sequenceWithPrefix.getAnchor(),
+                                        sequenceWithPrefix.getTag()
+                                ), p);
                     }
                 }
                 return super.visitSequence(sequence, p);
@@ -778,7 +845,7 @@ public class YamlParser implements org.openrewrite.Parser {
         } else {
             throw new IllegalArgumentException("Invalid tag format: " + text);
         }
-        return new Yaml.Tag(randomId(),prefix, markers, name, suffix, kind);
+        return new Yaml.Tag(randomId(), prefix, markers, name, suffix, kind);
     }
 
 

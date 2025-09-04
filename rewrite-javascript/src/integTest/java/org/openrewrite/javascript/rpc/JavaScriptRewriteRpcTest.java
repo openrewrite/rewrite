@@ -57,7 +57,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
           .recipeInstallDir(tempDir)
           .log(tempDir.resolve("rpc.log"))
-          .verboseLogging()
         );
         client = JavaScriptRewriteRpc.getOrStart();
     }
@@ -102,7 +101,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
-    @DocumentExample
     @Test
     void runSearchRecipe() {
         installRecipes();
