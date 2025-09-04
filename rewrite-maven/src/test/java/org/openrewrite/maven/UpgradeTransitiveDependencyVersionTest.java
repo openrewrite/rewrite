@@ -169,7 +169,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
      *  When trying to "upgrade" to 2.15.0 (which would be a downgrade), the recipe should
      *  make no changes to avoid downgrading the transitive dependency.
      */
-    @Test 
+    @Test
     void doesNotDowngradeTransitiveDependencyWithExplicitVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion(
