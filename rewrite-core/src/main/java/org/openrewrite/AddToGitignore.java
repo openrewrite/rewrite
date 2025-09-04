@@ -100,6 +100,10 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         return emptyList();
     }
 
+    private String getEffectiveFilePattern() {
+        return isBlank(filePattern) ? ".gitignore" : filePattern;
+    }
+
     private String patternToPathToCreate(String pattern) {
         // Extract a concrete path from the pattern for file generation
         if (!pattern.contains("*") && !pattern.contains("?")) {
@@ -125,14 +129,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
         return Preconditions.check(new FindSourceFiles(pattern), new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                String existingContent = text.getText();
-                String mergedContent = mergeGitignoreEntries(existingContent, entries);
-
-                if (!existingContent.equals(mergedContent)) {
-                    return text.withText(mergedContent);
-                }
-
-                return text;
+                return text.withText(mergeGitignoreEntries(text.getText(), entries));
             }
 
             private String mergeGitignoreEntries(String existing, String newEntries) {
@@ -144,8 +141,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 List<String> existingLines = new ArrayList<>();
 
                 if (!StringUtils.isBlank(existing)) {
-                    String[] lines = existing.split("\r?\n");
-                    for (String line : lines) {
+                    for (String line : existing.split("\r?\n")) {
                         existingLines.add(line);
                         String trimmed = line.trim();
                         if (!StringUtils.isBlank(trimmed)) {
@@ -162,30 +158,24 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                     }
                 }
 
-                List<String> newLines = new ArrayList<>();
-                String[] entriesToAdd = newEntries.split("\r?\n");
+                List<String> linesToAdd = new ArrayList<>();
 
-                for (String entry : entriesToAdd) {
+                for (String entry : newEntries.split("\r?\n")) {
                     String trimmed = entry.trim();
                     if (StringUtils.isBlank(trimmed)) {
                         continue;
                     }
 
                     if (trimmed.startsWith("#")) {
-                        if (!existingComments.contains(trimmed)) {
-                            newLines.add(entry);
-                            existingComments.add(trimmed);
+                        if (existingComments.add(trimmed)) {
+                            linesToAdd.add(entry);
                         }
-                    } else {
-                        String normalized = normalizeRule(trimmed);
-                        if (!existingRules.contains(normalized) && !isRedundantEntry(trimmed, existingWildcardPatterns)) {
-                            newLines.add(entry);
-                            existingRules.add(normalized);
-                        }
+                    } else if (!isRedundantEntry(trimmed, existingWildcardPatterns) && existingRules.add(normalizeRule(trimmed))) {
+                        linesToAdd.add(entry);
                     }
                 }
 
-                if (newLines.isEmpty()) {
+                if (linesToAdd.isEmpty()) {
                     return existing;
                 }
 
@@ -195,7 +185,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                     result.add("");
                 }
 
-                result.addAll(newLines);
+                result.addAll(linesToAdd);
 
                 return String.join(separator, result);
             }
@@ -270,9 +260,5 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
                 return normalizedPath.matches(regex);
             }
         });
-    }
-
-    private String getEffectiveFilePattern() {
-        return isBlank(filePattern) ? ".gitignore" : filePattern;
     }
 }
