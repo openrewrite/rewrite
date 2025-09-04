@@ -559,7 +559,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
               sourceCompatibility = %s
               targetCompatibility = %s
 
-              """.formatted(sourceCompatibility, targetCompatibility)
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(%s)
+                  }
+              }
+              
+              """.formatted(sourceCompatibility, targetCompatibility, version)
           )
         );
     }
@@ -580,7 +586,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
               sourceCompatibility = 11
-
+              
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(11)
+                  }
+              }
+              
               """
           )
         );
@@ -602,7 +614,13 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
               targetCompatibility = 11
-
+              
+              java {
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(11)
+                  }
+              }
+              
               """
           )
         );

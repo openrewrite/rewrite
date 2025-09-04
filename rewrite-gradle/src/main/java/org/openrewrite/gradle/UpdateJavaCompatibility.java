@@ -211,7 +211,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 c = addCompatibilityTypeToSourceFile(c, "target", ctx);
             }
             if (getCursor().pollMessage(JAVA_TOOLCHAIN_FOUND) == null) {
-                // todo : c = addJavaToolchainToSourceFile(c, ctx);
+                c = addJavaToolchainToSourceFile(c, ctx);
             }
             return super.visitCompilationUnit(c, ctx);
         }
@@ -245,6 +245,64 @@ public class UpdateJavaCompatibility extends Recipe {
                 c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
             }
             return c;
+        }
+
+        private K.CompilationUnit addJavaToolchainToSourceFile(K.CompilationUnit c, ExecutionContext ctx) {
+            if (!(TRUE.equals(addIfMissing))) {
+                return c;
+            }
+
+            Optional<J.MethodInvocation> javaStatement = c.getStatements().stream().filter(s -> s instanceof J.MethodInvocation)
+                    .map(s -> (J.MethodInvocation) s)
+                    .filter(m -> "java".equals(m.getSimpleName()))
+                    .findFirst();
+
+            if (javaStatement.isPresent()) {
+                List<Expression> args = javaStatement.get().getArguments();
+                J.Lambda jLambda = (J.Lambda) args.get(0);
+                J.Block body = (J.Block) jLambda.getBody();
+                Statement toolchainStatement = KotlinParser.builder()
+                        .isKotlinScript(true)
+                        .build()
+                        .parse(ctx, "\ntoolchain {" +
+                            "\n  languageVersion.set(JavaLanguageVersion.of(" + version + "))" +
+                            "\n}")
+                        .map(K.CompilationUnit.class::cast)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as Kotlin"))
+                        .getStatements()
+                        .get(0);
+                J.Lambda newLambda = jLambda.withBody(body.withStatements(ListUtils.concat(toolchainStatement, body.getStatements())));
+                List<Expression> newArgs = new ArrayList<>();
+                newArgs.add(newLambda);
+                J.MethodInvocation newJavaStatement = javaStatement.get().withArguments(newArgs);
+                List<Statement> newStatements = new ArrayList<>();
+                for (Statement s : c.getStatements()) {
+                    if (s instanceof J.MethodInvocation) {
+                        J.MethodInvocation invocation = (J.MethodInvocation) s;
+                        if ("java".equals(invocation.getName().getSimpleName())) {
+                            newStatements.add(newJavaStatement);
+                            continue;
+                        }
+                    }
+                    newStatements.add(s);
+                }
+                c = c.withStatements(newStatements);
+            } else {
+                K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
+                        .isKotlinScript(true)
+                        .build()
+                        .parse(ctx, "\n\njava {" +
+                                "\n    toolchain {" +
+                                "\n        languageVersion.set(JavaLanguageVersion.of(" + version + "))" +
+                                "\n    }" +
+                                "\n}")
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse Java toolchain as a Kotlin file"));
+                c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+            }
+
+            return autoFormat(c, ctx);
         }
 
         private J maybeAddToExistingJavaMethod(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
