@@ -96,7 +96,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
+    @MinimumJava21
     @Test
     void validationBeforeThisConstructor() {
         rewriteRun(
@@ -117,7 +117,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
+    @MinimumJava21
     @Test
     void validationBeforeSuperConstructor() {
         rewriteRun(
@@ -137,7 +137,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
+    @MinimumJava21
     @Test
     void assignmentBeforeThisConstructor() {
         rewriteRun(
@@ -157,7 +157,7 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
+    @MinimumJava21
     @Test
     void assignmentBeforeSuperConstructor() {
         rewriteRun(
