@@ -2867,17 +2867,6 @@ public interface J extends Tree, RpcCodec<J> {
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Import implements Statement, Comparable<Import> {
 
-        @JsonCreator
-        public Import(UUID id, Space prefix, Markers markers, JLeftPadded<Boolean> statik, FieldAccess qualid, @Nullable JLeftPadded<Identifier> alias) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.statik = statik;
-            this.module = JLeftPadded.build(false);
-            this.qualid = qualid;
-            this.alias = alias;
-        }
-
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2896,6 +2885,8 @@ public interface J extends Tree, RpcCodec<J> {
         Markers markers;
 
         JLeftPadded<Boolean> statik;
+
+        @Nullable
         JLeftPadded<Boolean> module;
 
         @With
@@ -2909,23 +2900,22 @@ public interface J extends Tree, RpcCodec<J> {
             return statik.getElement();
         }
 
-        public Import withStatic(boolean statik) {
+        public J.Import withStatic(boolean statik) {
             return getPadding().withStatic(this.statik.withElement(statik));
         }
 
         public boolean isModule() {
-            return module.getElement();
+            return module != null ? module.getElement() : false;
         }
 
-        public Import withModule(boolean module) {
-            return getPadding().withModule(this.module.withElement(module));
+        public J.Import withModule(boolean module) {
+            return this.module != null ?
+                    getPadding().withModule(this.module.withElement(module)) :
+                    getPadding().withModule(JLeftPadded.build(module));
         }
 
         public J.@Nullable Identifier getAlias() {
-            if (alias == null) {
-                return null;
-            }
-            return alias.getElement();
+            return alias != null ? alias.getElement() : null;
         }
 
         public J.Import withAlias(J.@Nullable Identifier alias) {

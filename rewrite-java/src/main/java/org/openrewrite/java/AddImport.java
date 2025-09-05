@@ -145,6 +145,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     Markers.EMPTY,
                     new JLeftPadded<>(member == null ? Space.EMPTY : Space.SINGLE_SPACE,
                             member != null, Markers.EMPTY),
+                    JLeftPadded.build(false),
                     TypeTree.build(fullyQualifiedName +
                             (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
                     null);

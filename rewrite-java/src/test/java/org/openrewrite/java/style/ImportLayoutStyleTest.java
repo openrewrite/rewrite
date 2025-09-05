@@ -94,6 +94,7 @@ class ImportLayoutStyleTest {
                         Space.EMPTY,
                         Markers.EMPTY,
                         new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                        JLeftPadded.build(false),
                         TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
                         null),
                 Space.EMPTY,
@@ -104,6 +105,7 @@ class ImportLayoutStyleTest {
                         Space.EMPTY,
                         Markers.EMPTY,
                         new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                        JLeftPadded.build(false),
                         TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
                         null),
                 Space.EMPTY,
@@ -113,6 +115,7 @@ class ImportLayoutStyleTest {
                 Space.EMPTY,
                 Markers.EMPTY,
                 new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+                JLeftPadded.build(false),
                 TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
             null);
         assertThat(style.addImport(List.of(import1, import2), importToAdd, null, emptyList()))
@@ -131,6 +134,7 @@ class ImportLayoutStyleTest {
             Space.EMPTY,
             Markers.EMPTY,
             new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            JLeftPadded.build(false),
             TypeTree.build("pkg.AAA.MEMBER_0").withPrefix(Space.SINGLE_SPACE),
             null),
           Space.EMPTY,
@@ -141,6 +145,7 @@ class ImportLayoutStyleTest {
             Space.EMPTY,
             Markers.EMPTY,
             new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            JLeftPadded.build(false),
             TypeTree.build("pkg.Clazz.MEMBER_3").withPrefix(Space.SINGLE_SPACE),
             null),
           Space.EMPTY,
@@ -151,6 +156,7 @@ class ImportLayoutStyleTest {
             Space.EMPTY,
             Markers.EMPTY,
             new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
+            JLeftPadded.build(false),
             TypeTree.build("pkg.Clazz.MEMBER_1").withPrefix(Space.SINGLE_SPACE),
             null),
           Space.EMPTY,
@@ -160,6 +166,7 @@ class ImportLayoutStyleTest {
           Space.EMPTY,
           Markers.EMPTY,
           new JLeftPadded<>(Space.EMPTY, true, Markers.EMPTY),
+          JLeftPadded.build(false),
           TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
           null);
 
