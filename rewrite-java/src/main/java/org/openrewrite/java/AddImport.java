@@ -72,6 +72,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private final String member;
 
     @EqualsAndHashCode.Include
+    private final boolean module;
+
+    @EqualsAndHashCode.Include
     private final boolean onlyIfReferenced;
 
     @EqualsAndHashCode.Include
@@ -84,6 +87,18 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         this.typeName = lastDotIdx != -1 ? type.substring(lastDotIdx + 1) : type;
         this.fullyQualifiedName = type;
         this.member = member;
+        this.module = false;
+        this.onlyIfReferenced = onlyIfReferenced;
+        alias = null;
+    }
+
+    public AddImport(String type, @Nullable String member, boolean module, boolean onlyIfReferenced) {
+        int lastDotIdx = type.lastIndexOf('.');
+        this.packageName = lastDotIdx != -1 ? type.substring(0, lastDotIdx) : null;
+        this.typeName = lastDotIdx != -1 ? type.substring(lastDotIdx + 1) : type;
+        this.fullyQualifiedName = type;
+        this.member = member;
+        this.module = module;
         this.onlyIfReferenced = onlyIfReferenced;
         alias = null;
     }
@@ -93,6 +108,16 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         this.typeName = typeName.replace('.', '$');
         this.fullyQualifiedName = packageName == null ? typeName : packageName + "." + typeName;
         this.member = member;
+        this.module = false;
+        this.onlyIfReferenced = onlyIfReferenced;
+        this.alias = alias;
+    }
+    public AddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean module, @Nullable String alias, boolean onlyIfReferenced) {
+        this.packageName = packageName;
+        this.typeName = typeName.replace('.', '$');
+        this.fullyQualifiedName = packageName == null ? typeName : packageName + "." + typeName;
+        this.member = member;
+        this.module = module;
         this.onlyIfReferenced = onlyIfReferenced;
         this.alias = alias;
     }
@@ -145,7 +170,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     Markers.EMPTY,
                     new JLeftPadded<>(member == null ? Space.EMPTY : Space.SINGLE_SPACE,
                             member != null, Markers.EMPTY),
-                    JLeftPadded.build(false),
+                    new JLeftPadded<>(module ? Space.SINGLE_SPACE : Space.EMPTY,
+                            module, Markers.EMPTY),
                     TypeTree.build(fullyQualifiedName +
                             (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
                     null);
