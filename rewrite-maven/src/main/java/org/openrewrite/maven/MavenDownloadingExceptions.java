@@ -61,7 +61,7 @@ public class MavenDownloadingExceptions extends Exception {
     public Xml.Document warn(Xml.Document document) {
         Map<GroupArtifact, List<MavenDownloadingException>> byGav = new HashMap<>();
         for (MavenDownloadingException exception : exceptions) {
-            byGav.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+            byGav.computeIfAbsent(GroupArtifact.of(exception.getRoot().getGroupId(),
                     exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
         }
 

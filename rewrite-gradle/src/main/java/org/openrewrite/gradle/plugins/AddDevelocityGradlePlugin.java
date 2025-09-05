@@ -200,10 +200,10 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
             private @Nullable String findNewerVersion(DependencyVersionSelector versionSelector, ExecutionContext ctx) throws MavenDownloadingException {
                 String newVersion = versionSelector
-                        .select(new GroupArtifact("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
+                        .select(GroupArtifact.of("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
                 if (newVersion == null) {
                     newVersion = versionSelector
-                            .select(new GroupArtifact("com.gradle.enterprise", "com.gradle.enterprise.gradle.plugin"), "classpath", version, null, ctx);
+                            .select(GroupArtifact.of("com.gradle.enterprise", "com.gradle.enterprise.gradle.plugin"), "classpath", version, null, ctx);
                 }
                 return newVersion;
             }

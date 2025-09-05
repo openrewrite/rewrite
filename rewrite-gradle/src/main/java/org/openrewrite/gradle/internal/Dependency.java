@@ -40,7 +40,7 @@ public class Dependency {
     String ext;
 
     public GroupArtifactVersion getGav() {
-        return new GroupArtifactVersion(groupId, artifactId, version);
+        return GroupArtifactVersion.of(groupId, artifactId, version);
     }
 
     public String toStringNotation() {

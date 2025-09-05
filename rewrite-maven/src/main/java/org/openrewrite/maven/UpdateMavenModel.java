@@ -60,7 +60,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
         if (parent.isPresent()) {
-            Parent updatedParent = new Parent(new GroupArtifactVersion(
+            Parent updatedParent = new Parent(GroupArtifactVersion.of(
                     parent.get().getChildValue("groupId").orElse(null),
                     parent.get().getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("GAV must have artifactId")),
                     parent.get().getChildValue("version").orElse(null)
@@ -76,7 +76,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             List<Dependency> requestedDependencies = new ArrayList<>(eachDependency.size());
             for (Xml.Tag dependency : eachDependency) {
                 requestedDependencies.add(Dependency.builder()
-                        .gav(new GroupArtifactVersion(
+                        .gav(GroupArtifactVersion.of(
                                 dependency.getChildValue("groupId").orElse(null),
                                 dependency.getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("Dependency must have artifactId")),
                                 dependency.getChildValue("version").orElse(null)
@@ -102,7 +102,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 List<ManagedDependency> requestedManagedDependencies = new ArrayList<>(eachDependency.size());
                 for (Xml.Tag dependency : eachDependency) {
                     String scope = dependency.getChildValue("scope").orElse(null);
-                    GroupArtifactVersion gav = new GroupArtifactVersion(
+                    GroupArtifactVersion gav = GroupArtifactVersion.of(
                             dependency.getChildValue("groupId").orElse(null),
                             dependency.getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("Dependency must have artifactId")),
                             dependency.getChildValue("version").orElse(null)
@@ -154,7 +154,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     List<Xml.Tag> eachExclusion = exclusions.getChildren("exclusion");
                     List<GroupArtifact> requestedExclusions = new ArrayList<>(eachExclusion.size());
                     for (Xml.Tag exclusion : eachExclusion) {
-                        requestedExclusions.add(new GroupArtifact(
+                        requestedExclusions.add(GroupArtifact.of(
                                 exclusion.getChildValue("groupId").orElse(null),
                                 exclusion.getChildValue("artifactId").orElse(null)
                         ));

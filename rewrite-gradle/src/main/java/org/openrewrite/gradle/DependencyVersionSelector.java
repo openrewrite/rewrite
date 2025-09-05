@@ -79,7 +79,7 @@ public class DependencyVersionSelector {
             }
         }
         return select(
-                new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion),
+                GroupArtifactVersion.of(ga.getGroupId(), ga.getArtifactId(), currentVersion),
                 configuration,
                 // we don't want to select the latest patch in the 0.x line...
                 "latest.patch".equalsIgnoreCase(version) && "0".equals(currentVersion) ? "latest.release" : version,
@@ -106,7 +106,7 @@ public class DependencyVersionSelector {
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
-        return select(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()),
+        return select(GroupArtifactVersion.of(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()),
                 configuration, version, versionPattern, ctx);
     }
 
@@ -202,7 +202,7 @@ public class DependencyVersionSelector {
 
     private MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(ctx).downloadMetadata(
-                new GroupArtifact(groupId, artifactId), null, repositories);
+                GroupArtifact.of(groupId, artifactId), null, repositories);
     }
 
     private List<MavenRepository> determineRepos(@Nullable String configuration) {
