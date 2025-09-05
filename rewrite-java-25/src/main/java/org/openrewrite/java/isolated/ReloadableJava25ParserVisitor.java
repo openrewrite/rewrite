@@ -850,17 +850,25 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
     public J visitAnyPattern(AnyPatternTree node, Space space) {
         JavaType type = typeMapping.type(node);
         skip("_");
-        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
+        J.Identifier name = new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
                 type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
                 type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+        if (name.getFieldType() != null && name.getFieldType().getName().isEmpty()) {
+            name = name.withFieldType(name.getFieldType().withName("_"));
+        }
+        return name;
     }
 
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
-            String name = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
-            Space space = sourceBefore(name);
-            return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), name,
+            String varName = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
+            Space space = sourceBefore(varName);
+            J.Identifier name = new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), varName,
                     type, typeMapping.variableType(b.var.sym));
+            if (name.getFieldType().getName().isEmpty()) {
+                name = name.withFieldType(name.getFieldType().withName("_"));
+            }
+            return name;
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
@@ -1760,23 +1768,30 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            String namedVar = n.getName().isEmpty() ? "_" : n.getName().toString();
-            Space namedVarPrefix = sourceBefore(namedVar);
+            String varName = n.getName().isEmpty() ? "_" : n.getName().toString();
+            Space namedVarPrefix = sourceBefore(varName);
 
             JavaType type = typeMapping.type(n);
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), namedVar,
+            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), varName,
                     type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
                     type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+            if ("_".equals(varName) && name.getFieldType() != null && name.getFieldType().getName().isEmpty()) {
+                name = name.withFieldType(name.getFieldType().withName("_"));
+            }
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
+            J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
+                    name,
+                    dimensionsAfterName,
+                    n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
+                    (JavaType.Variable) typeMapping.type(n)
+            );
+            if ("_".equals(varName) && namedVar.getVariableType() != null && namedVar.getVariableType().getName().isEmpty()) {
+                namedVar = namedVar.withVariableType(namedVar.getVariableType().withName("_"));
+            }
             vars.add(
                     padRight(
-                            new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
-                                    name,
-                                    dimensionsAfterName,
-                                    n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    (JavaType.Variable) typeMapping.type(n)
-                            ),
+                            namedVar,
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
             );
