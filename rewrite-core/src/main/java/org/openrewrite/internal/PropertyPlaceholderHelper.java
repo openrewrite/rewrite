@@ -71,7 +71,7 @@ public class PropertyPlaceholderHelper {
 
     public List<String> getPlaceholders(@Nullable String value) {
         if (value == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<String> placeholders = new ArrayList<>();
