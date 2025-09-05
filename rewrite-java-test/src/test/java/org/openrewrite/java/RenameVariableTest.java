@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
@@ -1450,5 +1448,88 @@ class RenameVariableTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Nested
+    class RenameVariableCombinedWithChangeTypeHasUnexpectedBehavior implements RewriteTest {
+
+        @Test
+        void replacingTheNameOfTheVariableSucceeds() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "arrayDeque"));
+                      return super.visitVariableDeclarations(multiVariable, executionContext);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> arrayDeque = new Stack<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeFails() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visit(Tree tree, ExecutionContext ctx) {
+                      J t = super.visit(tree, ctx);
+                      Tree visited = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(t, ctx, getCursor());
+                      return (J) visited;
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }
