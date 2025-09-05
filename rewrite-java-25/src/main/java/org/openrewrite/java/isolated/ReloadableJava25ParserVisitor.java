@@ -865,7 +865,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             Space space = sourceBefore(varName);
             J.Identifier name = new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), varName,
                     type, typeMapping.variableType(b.var.sym));
-            if (name.getFieldType().getName().isEmpty()) {
+            if ("_".equals(varName) && name.getFieldType() != null && name.getFieldType().getName().isEmpty()) {
                 name = name.withFieldType(name.getFieldType().withName("_"));
             }
             return name;
