@@ -30,7 +30,6 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -66,7 +65,7 @@ class DeclarativeRecipeTest implements RewriteTest {
               dr.addUninitialized(
                 new ChangeText("3")
               );
-              dr.initialize(List.of(), Map.of());
+              dr.initialize(List.of());
               spec.recipe(dr);
           },
           text("1", "3"),
@@ -95,7 +94,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         dr.addUninitialized(
           new ChangeText("3")
         );
-        dr.initialize(List.of(), Map.of());
+        dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
           .hasSize(3) // precondition + 2 recipes with options
           .flatExtracting(RecipeDescriptor::getOptions)
@@ -182,21 +181,21 @@ class DeclarativeRecipeTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipeFromYaml(
             """
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.PreconditionTest
-            description: Test.
-            preconditions:
-              - org.openrewrite.DeclarativePrecondition
-            recipeList:
-              - org.openrewrite.text.ChangeText:
-                 toText: 3
-            ---
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.DeclarativePrecondition
-            recipeList:
-              - org.openrewrite.text.Find:
-                  find: 1
-            """,
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.PreconditionTest
+              description: Test.
+              preconditions:
+                - org.openrewrite.DeclarativePrecondition
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: 3
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.DeclarativePrecondition
+              recipeList:
+                - org.openrewrite.text.Find:
+                    find: 1
+              """,
             "org.openrewrite.PreconditionTest"
           ),
           text("1", "3"),
@@ -268,18 +267,18 @@ class DeclarativeRecipeTest implements RewriteTest {
     void scanningPreconditionMet() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.ScanningPreconditionTest
-              description: Test.
-              preconditions:
-                - org.openrewrite.search.RepositoryContainsFile:
-                    filePattern: sam.txt
-              recipeList:
-                - org.openrewrite.text.FindAndReplace:
-                    find: foo
-                    replace: bar
-              """, "org.openrewrite.ScanningPreconditionTest"),
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.ScanningPreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.search.RepositoryContainsFile:
+                  filePattern: sam.txt
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: foo
+                  replace: bar
+            """, "org.openrewrite.ScanningPreconditionTest"),
           text("sam", spec -> spec.path("sam.txt")),
           text("foo", "bar")
         );
@@ -289,18 +288,18 @@ class DeclarativeRecipeTest implements RewriteTest {
     void scanningPreconditionNotMet() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.ScanningPreconditionTest
-              description: Test.
-              preconditions:
-                - org.openrewrite.search.RepositoryContainsFile:
-                    filePattern: sam.txt
-              recipeList:
-                - org.openrewrite.text.FindAndReplace:
-                    find: foo
-                    replace: bar
-              """, "org.openrewrite.ScanningPreconditionTest"),
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.ScanningPreconditionTest
+            description: Test.
+            preconditions:
+              - org.openrewrite.search.RepositoryContainsFile:
+                  filePattern: sam.txt
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: foo
+                  replace: bar
+            """, "org.openrewrite.ScanningPreconditionTest"),
           text("foo")
         );
     }
@@ -309,24 +308,24 @@ class DeclarativeRecipeTest implements RewriteTest {
     void preconditionOnNestedDeclarative() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.PreconditionOnDeclarative
-              description: Test.
-              preconditions:
-                - org.openrewrite.text.Find:
-                    find: foo
-              recipeList:
-                - org.openrewrite.DeclarativeExample
-              ---
-              type: specs.openrewrite.org/v1beta/recipe
-              name: org.openrewrite.DeclarativeExample
-              description: Test.
-              recipeList:
-                - org.openrewrite.text.FindAndReplace:
-                    find: foo
-                    replace: bar
-              """, "org.openrewrite.PreconditionOnDeclarative"),
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionOnDeclarative
+            description: Test.
+            preconditions:
+              - org.openrewrite.text.Find:
+                  find: foo
+            recipeList:
+              - org.openrewrite.DeclarativeExample
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.DeclarativeExample
+            description: Test.
+            recipeList:
+              - org.openrewrite.text.FindAndReplace:
+                  find: foo
+                  replace: bar
+            """, "org.openrewrite.PreconditionOnDeclarative"),
           text("foo", "bar")
         );
     }
@@ -336,7 +335,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.DeclarativeDataTable", "declarative with data table",
           "test", emptySet(), null, URI.create("dummy"), true, emptyList());
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
-        dr.initialize(List.of(), Map.of());
+        dr.initialize(List.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
     }
 

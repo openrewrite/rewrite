@@ -229,6 +229,46 @@ class MappingTest implements RewriteTest {
         );
     }
 
+    @Test
+    void keysWithDashes() {
+        rewriteRun(
+          yaml(
+            """
+            foo-bar: 1
+            foo-bar-baz: 2
+            foo-: 3
+            -foo: 4
+            """
+          )
+        );
+    }
+
+    @Test
+    void keysWithDashesAnchored() {
+        rewriteRun(
+          yaml(
+            """
+            -data: &first
+              test: 0
+            """
+          )
+        );
+    }
+
+    @Test
+    void keysWithDashesInsideSequence() {
+        rewriteRun(
+          yaml(
+            """
+            - foo-bar: 1
+            - bar-baz-qux: 2
+            - nested:
+                deep-key-name: 3
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3632")
     @Test
     void multilineScalar() {
@@ -403,6 +443,27 @@ class MappingTest implements RewriteTest {
                 << : *defaults
                 A: 23
                 C: 99
+              """
+          )
+        );
+    }
+
+    @Test
+    void mappingSequenceWithAnchor() {
+        rewriteRun(
+          yaml(
+              """
+              defaults:
+                - &first
+                  A: 1
+                  B: 2
+              mapping:
+                - &first
+                  A: 1
+                  B: 2
+                - <<: *first
+                  A: 23
+                  C: 99
               """
           )
         );

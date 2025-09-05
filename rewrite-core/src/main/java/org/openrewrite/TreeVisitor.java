@@ -287,8 +287,9 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
     public void visit(@Nullable List<? extends T> nodes, P p) {
         if (nodes != null) {
-            for (T node : nodes) {
-                visit(node, p);
+            //noinspection ForLoopReplaceableByForEach
+            for (int i = 0; i < nodes.size(); i++) {
+                visit(nodes.get(i), p);
             }
         }
     }

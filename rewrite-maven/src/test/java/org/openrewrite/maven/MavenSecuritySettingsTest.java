@@ -19,6 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.InMemoryExecutionContext;
 
 import java.io.IOException;
@@ -27,6 +29,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Execution(ExecutionMode.SAME_THREAD)
 class MavenSecuritySettingsTest {
 
     private static final String MASTER_PASS_ENCRYPTED = "FyoLIiN2Fx8HpT8O0aBsTn2/s3pYmtLRRCpoWPzhN4A="; // "master"

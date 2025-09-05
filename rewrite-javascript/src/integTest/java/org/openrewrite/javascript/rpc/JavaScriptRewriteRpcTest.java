@@ -20,9 +20,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -33,47 +32,39 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.javascript.Assertions.javascript;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
+    @TempDir
+    Path tempDir;
 
     JavaScriptRewriteRpc client;
-    PrintStream log;
-    ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope;
 
     @BeforeEach
-    void before() throws FileNotFoundException {
-        this.log = new PrintStream(new FileOutputStream("rpc.java.log"));
-        this.client = JavaScriptRewriteRpc.builder(Environment.builder().build())
-          .nodePath(Path.of("node"))
-          .installationDirectory(Path.of("./rewrite/dist"))
-//          .inspectAndBreak()
-//          .timeout(Duration.ofMinutes(10))
-          .build();
-        this.scope = JavaScriptRewriteRpc.current().using(client);
-
-//        client
-//          .traceGetObjectOutput()
-//          .traceGetObjectInput(log);
+    void before() {
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .log(tempDir.resolve("rpc.log"))
+        );
+        client = JavaScriptRewriteRpc.getOrStart();
     }
 
     @AfterEach
-    void after() {
-        scope.close();
-        log.close();
-        client.close();
+    void after() throws IOException {
+        JavaScriptRewriteRpc.shutdownCurrent();
+        System.out.println(Files.readString(tempDir.resolve("rpc.log")));
     }
 
     @Override
@@ -109,10 +100,25 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @Test
+    void runSearchRecipe() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.javascript.find-identifier",
+              Map.of("identifier", "hello")))
+            .expectedCyclesThatMakeChanges(1),
+          javascript(
+            "const hello = 'world'",
+            "const /*~~>*/hello = 'world'"
+          )
+        );
+    }
 
     @Test
     void printJava() {
-        assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
+        assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
           .isEqualTo(1);
         Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -164,14 +170,14 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
     }
 
+    @SuppressWarnings("JSUnusedLocalSymbols")
     @Test
     void parseAndPrintJavaScript() {
         // language=javascript
         String source = "const two = 1 + 1";
 
-        SourceFile cu = JavaScriptParser.builder().rewriteRpc(client).build()
-          .parseInputs(List.of(Parser.Input.fromString(
-          Path.of("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().get();
+        SourceFile cu = JavaScriptParser.builder().build().parseInputs(List.of(Parser.Input.fromString(
+          Path.of("test.js"), source)), null, new InMemoryExecutionContext()).findFirst().orElseThrow();
 
         new JavaIsoVisitor<Integer>() {
             @Override
@@ -251,7 +257,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist/test/example-recipe.js");
+        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
         assertThat(client.installRecipes(exampleRecipes)).isGreaterThan(0);
     }

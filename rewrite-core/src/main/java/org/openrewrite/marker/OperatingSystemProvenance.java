@@ -32,7 +32,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -42,12 +44,30 @@ import static java.util.Collections.emptyList;
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
 public abstract class OperatingSystemProvenance implements Marker {
-    public static final Windows WINDOWS = new Windows();
-    public static final MacOs MAC_OS = new MacOs();
-    public static final Solaris SOLARIS = new Solaris();
-    public static final Linux LINUX = new Linux();
-    public static final FreeBSD FREE_BSD = new FreeBSD();
-    public static final Unix UNIX = new Unix();
+    private static final Map<String, OperatingSystemProvenance> OS_INSTANCES = new ConcurrentHashMap<>();
+
+    private static OperatingSystemProvenance getOsInstance(String key) {
+        // This is to work around JLS/JVM bug which allows for deadlocks in class initializations
+        // see https://bugs.java.com/bugdatabase/view_bug.do?bug_id=4891511
+        return OS_INSTANCES.computeIfAbsent(key, k -> {
+            switch (k) {
+                case "WINDOWS":
+                    return new Windows();
+                case "MAC_OS":
+                    return new MacOs();
+                case "SOLARIS":
+                    return new Solaris();
+                case "LINUX":
+                    return new Linux();
+                case "FREE_BSD":
+                    return new FreeBSD();
+                case "UNIX":
+                    return new Unix();
+                default:
+                    throw new IllegalArgumentException("Unknown OS type: " + k);
+            }
+        });
+    }
 
     private static OperatingSystemProvenance currentOs;
     private final String toStringValue;
@@ -155,18 +175,18 @@ public abstract class OperatingSystemProvenance implements Marker {
     public static OperatingSystemProvenance forName(String os) {
         String osName = os.toLowerCase();
         if (osName.contains("windows")) {
-            return WINDOWS;
+            return getOsInstance("WINDOWS");
         } else if (osName.contains("mac os x") || osName.contains("darwin") || osName.contains("osx")) {
-            return MAC_OS;
+            return getOsInstance("MAC_OS");
         } else if (osName.contains("sunos") || osName.contains("solaris")) {
-            return SOLARIS;
+            return getOsInstance("SOLARIS");
         } else if (osName.contains("linux")) {
-            return LINUX;
+            return getOsInstance("LINUX");
         } else if (osName.contains("freebsd")) {
-            return FREE_BSD;
+            return getOsInstance("FREE_BSD");
         } else {
             // Not strictly true
-            return UNIX;
+            return getOsInstance("UNIX");
         }
     }
 

@@ -1773,7 +1773,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async afterSyntaxMarkers(markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
+            p.append(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 
@@ -1783,18 +1783,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async beforeSyntaxExt(prefix: J.Space, markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
 
         await this.visitSpace(prefix, p);
         await this.visitMarkers(markers, p);
 
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 

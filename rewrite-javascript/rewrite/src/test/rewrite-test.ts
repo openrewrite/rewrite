@@ -249,4 +249,3 @@ export class AdHocRecipe extends Recipe {
 export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
     return new AdHocRecipe(visitor);
 }
-

@@ -17,10 +17,45 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RecipeRegistry} from "../../recipe";
 import * as path from "path";
 import * as fs from "fs";
-import {spawn} from "child_process";
+import {spawn, ChildProcess} from "child_process";
 
 export interface InstallRecipesResponse {
     recipesInstalled: number
+}
+
+/**
+ * Helper function to spawn npm/npx commands with logging and promise handling
+ */
+async function spawnNpmCommand(
+    command: string,
+    args: string[],
+    cwd: string,
+    logger?: rpc.Logger,
+    logPrefix?: string
+): Promise<void> {
+    const child = spawn(command, args, {cwd});
+
+    if (logger) {
+        const prefix = logPrefix ? `${logPrefix}: ` : '';
+        child.stdout.on("data", (data: any) => {
+            logger.info(`${prefix}${data.toString().trim()}`);
+        });
+        child.stderr.on("data", (data: any) => {
+            logger.error(`${prefix}${data.toString().trim()}`);
+        });
+    }
+
+    return new Promise<void>((resolve, reject) => {
+        child.on("error", reject);
+        child.on("close", (exitCode: number) => {
+            if (exitCode === 0) {
+                resolve();
+            } else {
+                const commandStr = `${command} ${args.join(' ')}`;
+                reject(new Error(`${commandStr} exited with code ${exitCode}`));
+            }
+        });
+    });
 }
 
 export class InstallRecipes {
@@ -32,7 +67,8 @@ export class InstallRecipes {
     constructor(private readonly recipes: string | { packageName: string, version?: string }) {
     }
 
-    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry): void {
+    static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
+                  logger?: rpc.Logger): void {
         connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), async (request) => {
             const beforeInstall = registry.all.size;
             let resolvedPath;
@@ -41,37 +77,32 @@ export class InstallRecipes {
             if (typeof request.recipes === "object") {
                 const recipePackage = request.recipes;
                 const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
-                await new Promise<void>((resolve, reject) => {
 
-                    if (!fs.existsSync(absoluteInstallDir)) {
-                        fs.mkdirSync(absoluteInstallDir, {recursive: true});
-                        fs.writeFileSync(path.join(absoluteInstallDir, "package.json"),
-                            `{"name": "please-work"}`)
+                // Ensure directory exists
+                if (!fs.existsSync(absoluteInstallDir)) {
+                    fs.mkdirSync(absoluteInstallDir, {recursive: true});
+                }
+
+                // Check if package.json exists, if not create one
+                const packageJsonPath = path.join(absoluteInstallDir, "package.json");
+                if (!fs.existsSync(packageJsonPath)) {
+                    // Create a minimal package.json with a custom name
+                    const packageJson = {
+                        name: "openrewrite-recipes",
+                        version: "1.0.0",
+                        description: "OpenRewrite recipe marketplace",
+                        private: true
+                    };
+                    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+                    if (logger) {
+                        logger.info("Created package.json for recipe dependencies");
                     }
+                }
 
-                    // Rather than using npm on PATH, use `node_cli.js`.
-                    // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
-                    const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
-                    const installer = spawn("npm", ["install", packageSpec], {
-                        cwd: absoluteInstallDir
-                    });
-                    // installer.stdout.on("data", (data: any) => {
-                    //     // TODO write this to rpc log instead
-                    //     console.log(data.toString());
-                    // });
-                    // installer.stderr.on("data", (data: any) => {
-                    //     // TODO write this to rpc log instead
-                    //     console.log(data.toString());
-                    // });
-                    installer.on("error", reject);
-                    installer.on("close", (exitCode: number) => {
-                        if (exitCode === 0) {
-                            resolve();
-                        } else {
-                            reject(new Error(`npm install exited with code ${exitCode}`));
-                        }
-                    });
-                });
+                // Rather than using npm on PATH, use `node_cli.js`.
+                // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
+                const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
                 resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                 recipesName = request.recipes.packageName;
             } else {
@@ -117,7 +148,7 @@ function setupSharedDependencies(targetModulePath: string) {
             if (yourModule) {
                 // Find where the target would look for this dependency
                 const targetDir = path.dirname(targetModulePath);
-                const targetDepPath = require.resolve(dep, { paths: [targetDir] });
+                const targetDepPath = require.resolve(dep, {paths: [targetDir]});
 
                 // Make the target use your cached version
                 require.cache[targetDepPath] = yourModule;
