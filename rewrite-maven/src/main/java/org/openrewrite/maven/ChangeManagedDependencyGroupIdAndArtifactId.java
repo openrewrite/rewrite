@@ -26,6 +26,7 @@ import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -151,15 +152,18 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     if (newVersion != null) {
                         try {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
+                            String resolvedArtifactId = newArtifactId;
+                            if (resolvedArtifactId.contains("${")) {
+                                ResolvedPom pom = getResolutionResult().getPom();
+                                Map<String, String> properties = pom.getProperties();
+                                resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
+                            }
                             if (versionTag.isPresent()) {
-                                String resolvedArtifactId = newArtifactId;
-                                if (resolvedArtifactId.contains("${")) {
-                                    ResolvedPom pom = getResolutionResult().getPom();
-                                    Map<String, String> properties = pom.getProperties();
-                                    resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(newArtifactId, properties::get);
-                                }
                                 String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, getResolutionResult().getPom().getValue(versionTag.get().getValue().orElse(null)));
                                 t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                            } else if (!getResolutionResult().parentPomIsProjectPom()) {
+                                String resolvedNewVersion = resolveSemverVersion(ctx, newGroupId, resolvedArtifactId, null);
+                                t = AddToTagVisitor.addToTag(t, Xml.Tag.build("<version>" + resolvedNewVersion + "</version>"), getCursor().getParentOrThrow());
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);

@@ -267,7 +267,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-              """
+            """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -342,6 +342,53 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void canAddVersionToManagedDependencyIfParentOutsideOfProject() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "com.fasterxml.jackson.core",
+            "jackson-core",
+            "io.swagger.core.v3",
+            "swagger-jaxrs2",
+            "2.2.x"
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-bom</artifactId>
+                  <version>2.20.0</version>
+                </parent>
+                <modules>
+                  <module>child-project</module>
+                </modules>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>io.swagger.core.v3</groupId>")
+              .containsPattern("<artifactId>swagger-jaxrs2</artifactId>")
+              .containsPattern("<version>2.2.\\d+</version>")
+              .doesNotContainPattern("<groupId>com.fasterxml.jackson.core</groupId>")
+              .doesNotContainPattern("<artifactId>jackson-core</artifactId>")
+              .actual()
+            )
           )
         );
     }
