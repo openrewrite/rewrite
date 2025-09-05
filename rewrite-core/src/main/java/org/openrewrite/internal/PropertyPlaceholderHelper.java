@@ -20,6 +20,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Simplified from Spring's PropertyPlaceholderHelper.
@@ -29,6 +33,7 @@ import java.util.function.Function;
  */
 public class PropertyPlaceholderHelper {
     private static final Map<String, String> wellKnownSimplePrefixes = new HashMap<>(4);
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     static {
         wellKnownSimplePrefixes.put("}", "{");
@@ -64,6 +69,19 @@ public class PropertyPlaceholderHelper {
         }
         int startIndex = value.indexOf(placeholderPrefix);
         return startIndex > -1 && value.indexOf(placeholderSuffix, startIndex) > startIndex;
+    }
+
+    public List<String> getPlaceholders(@Nullable String value) {
+        if (value == null) {
+            return emptyList();
+        }
+
+        List<String> placeholders = new ArrayList<>();
+        Matcher matcher = PROPERTY_PATTERN.matcher(value);
+        while (matcher.find()) {
+            placeholders.add(matcher.group(1));
+        }
+        return placeholders;
     }
 
     public String replacePlaceholders(String value, final Properties properties) {
