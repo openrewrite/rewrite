@@ -2446,7 +2446,7 @@ public class GroovyParserVisitor {
             if (sourceStartsWith("as")) {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
-            return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
+            return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, null, qualid, alias));
         }
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node, new RewriteGroovyClassVisitor(unit));
