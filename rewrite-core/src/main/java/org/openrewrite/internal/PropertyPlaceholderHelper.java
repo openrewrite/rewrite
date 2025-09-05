@@ -23,6 +23,8 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Simplified from Spring's PropertyPlaceholderHelper.
  *
