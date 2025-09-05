@@ -132,6 +132,54 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainImportIfUsedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link Date} only in doc
+               */
+              class Test {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportIfFullyQualifiedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """,
+            """
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1052")
     @Test
     void usedInJavadocWithThrows() {
