@@ -44,8 +44,8 @@ public class HCLParser extends Parser {
             EQ = 20, LT = 21, COLON = 22, LBRACK = 23, LPAREN = 24, MINUS = 25, OR = 26, NEQ = 27,
             GT = 28, QUESTION = 29, RBRACK = 30, RPAREN = 31, MUL = 32, NOT = 33, LEQ = 34, DOT = 35,
             DIV = 36, GEQ = 37, ARROW = 38, COMMA = 39, MOD = 40, ELLIPSIS = 41, TILDE = 42, TEMPLATE_INTERPOLATION_START = 43,
-            TemplateStringLiteral = 44, TemplateStringLiteralChar = 45, HTemplateLiteral = 46,
-            HTemplateLiteralChar = 47;
+            TemplateStringLiteral = 44, TemplateStringLiteralChar = 45, HP_WS = 46, HP_COMMENT = 47,
+            HP_LINE_COMMENT = 48, HTemplateLiteral = 49, HTemplateLiteralChar = 50;
     public static final int
             RULE_configFile = 0, RULE_body = 1, RULE_bodyContent = 2, RULE_attribute = 3,
             RULE_block = 4, RULE_blockLabel = 5, RULE_expression = 6, RULE_exprTerm = 7,
@@ -95,8 +95,8 @@ public class HCLParser extends Parser {
                 "EQ", "LT", "COLON", "LBRACK", "LPAREN", "MINUS", "OR", "NEQ", "GT",
                 "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", "DIV", "GEQ",
                 "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START",
-                "TemplateStringLiteral", "TemplateStringLiteralChar", "HTemplateLiteral",
-                "HTemplateLiteralChar"
+                "TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT",
+                "HP_LINE_COMMENT", "HTemplateLiteral", "HTemplateLiteralChar"
         };
     }
 
@@ -4132,7 +4132,7 @@ public class HCLParser extends Parser {
     }
 
     public static final String _serializedATN =
-            "\u0004\u0001/\u017d\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002" +
+            "\u0004\u00012\u017d\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002" +
                     "\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002" +
                     "\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002" +
                     "\b\u0007\b\u0002\t\u0007\t\u0002\n\u0007\n\u0002\u000b\u0007\u000b\u0002" +
@@ -4365,7 +4365,7 @@ public class HCLParser extends Parser {
                     "\u016a\u0162\u0001\u0000\u0000\u0000\u016bI\u0001\u0000\u0000\u0000\u016c" +
                     "\u016f\u0003R)\u0000\u016d\u016f\u0003L&\u0000\u016e\u016c\u0001\u0000" +
                     "\u0000\u0000\u016e\u016d\u0001\u0000\u0000\u0000\u016fK\u0001\u0000\u0000" +
-                    "\u0000\u0170\u0171\u0005.\u0000\u0000\u0171M\u0001\u0000\u0000\u0000\u0172" +
+                    "\u0000\u0170\u0171\u00051\u0000\u0000\u0171M\u0001\u0000\u0000\u0000\u0172" +
                     "\u0175\u0003R)\u0000\u0173\u0175\u0003P(\u0000\u0174\u0172\u0001\u0000" +
                     "\u0000\u0000\u0174\u0173\u0001\u0000\u0000\u0000\u0175O\u0001\u0000\u0000" +
                     "\u0000\u0176\u0177\u0005,\u0000\u0000\u0177Q\u0001\u0000\u0000\u0000\u0178" +
