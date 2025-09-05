@@ -368,9 +368,6 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <artifactId>jackson-bom</artifactId>
                   <version>2.20.0</version>
                 </parent>
-                <modules>
-                  <module>child-project</module>
-                </modules>
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
