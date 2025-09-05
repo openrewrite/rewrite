@@ -239,7 +239,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
                         .isKotlinScript(true)
-                        .build().parse(ctx, "\n\njava {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
+                        .build().parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum))
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
                 c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
@@ -302,7 +302,7 @@ public class UpdateJavaCompatibility extends Recipe {
                 c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
             }
 
-            return autoFormat(c, ctx);
+            return c;
         }
 
         private J maybeAddToExistingJavaMethod(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
