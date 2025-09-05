@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.parser.JavaParserClasspathLoader;
 import org.openrewrite.java.internal.parser.RewriteClasspathJarClasspathLoader;
@@ -39,6 +40,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -110,6 +112,15 @@ public interface JavaParser extends Parser {
         return artifacts;
     }
 
+    /**
+     * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
+     * execution classpath, or where you need to load multiple different versions of the same artifact.
+     * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+     *
+     * @param ctx                       The execution context to use for loading resources.
+     * @param artifactNamesWithVersions artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+     * @return A list of paths to the located artifacts.
+     */
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         if (artifactNamesWithVersions.length == 0) {
             return emptyList();
@@ -151,7 +162,18 @@ public interface JavaParser extends Parser {
             version = 8;
         }
 
-        if (version >= 21) {
+        if (version > 21) {
+            try {
+                return (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java25Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+            } catch (Exception e) {
+                //Fall through, look for a parser on an older version.
+            }
+        }
+
+        if (version > 17) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java21Parser")
@@ -162,7 +184,7 @@ public interface JavaParser extends Parser {
             }
         }
 
-        if (version >= 17) {
+        if (version > 11) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java17Parser")
@@ -173,7 +195,7 @@ public interface JavaParser extends Parser {
             }
         }
 
-        if (version >= 11) {
+        if (version > 8) {
             try {
                 return (JavaParser.Builder<? extends JavaParser, ?>) Class
                         .forName("org.openrewrite.java.Java11Parser")
@@ -194,7 +216,7 @@ public interface JavaParser extends Parser {
         }
 
         throw new IllegalStateException("Unable to create a Java parser instance. " +
-                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
+                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, or `rewrite-java-25` must be on the classpath.");
     }
 
     @Override
@@ -295,7 +317,7 @@ public interface JavaParser extends Parser {
         @Incubating(since = "8.18.3")
         public B addClasspathEntry(Path entry) {
             if (classpath.isEmpty()) {
-                classpath = Collections.singletonList(entry);
+                classpath = singletonList(entry);
             } else if (!classpath.contains(entry)) {
                 classpath = new ArrayList<>(classpath);
                 classpath.add(entry);
@@ -303,12 +325,31 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * Sets the classpath from runtime classpath dependencies of the process constructing the parser. Predates
+         * {@link #classpathFromResources(ExecutionContext, String...)}, with the latter preferred to limit dependencies
+         * needed on the recipe runtime classpath, as the runtime classpath may differ in say the CLI or Platform.
+         * <p>
+         * This is suitable, for example, when writing tests that may require older versions of dependencies,
+         * without needing to add them to the recipe runtime classpath through resources.
+         *
+         * @return A list of paths to jars on the runtime classpath of the process constructing the parser.
+         */
         public B classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = emptyList();
             return (B) this;
         }
 
+        /**
+         * Load artifacts from packaged resources. This is useful for loading dependencies which are not on the recipe
+         * execution classpath, or where you need to load multiple different versions of the same artifact.
+         * Supports both {@link TypeTable} `classpath.tsv.gz` and packaged resource jars in `META-INF/rewrite/classpath/`.
+         *
+         * @param ctx       The execution context to use for loading resources.
+         * @param classpath artifact prefix to match, e.g. "guava" or "guava-31" for a specific version.
+         * @return A list of paths to the located artifacts.
+         */
         @SuppressWarnings({"UnusedReturnValue", "unused"})
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.artifactNames = emptyList();
@@ -316,6 +357,11 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        /**
+         * @deprecated prefer {@link #classpath} and {@link #classpathFromResources(ExecutionContext, String...)}.
+         */
+        @Deprecated
+        @ToBeRemoved(after = "2025-12-31", reason = "Use classpath or classpathFromResources instead.")
         public B classpath(byte[]... classpath) {
             this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;

@@ -157,7 +157,7 @@ class ForLoopTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                  
+
                       int[] a;
                       int i=0;
                       for(i=0; i<a.length; i++) {}

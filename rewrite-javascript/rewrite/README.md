@@ -11,3 +11,14 @@ This project contains the LST models as well as the runtime required to execute 
 ```
 npm i -D @openrewrite/rewrite
 ```
+
+### When making changes to JavaScript code
+
+You can run this command from rewrite/ directory to build the JavaScript code. A
+subsequent run of JavaScriptRewriteRpc will use that.
+
+```
+npm run build
+```
+
+Alternatively, `./gradlew npmBuild`.

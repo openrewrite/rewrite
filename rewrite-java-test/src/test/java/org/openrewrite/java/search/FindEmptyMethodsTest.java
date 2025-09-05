@@ -37,7 +37,7 @@ class FindEmptyMethodsTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-              
+
               class Test implements Collection<String> {
                   @Override
                   public boolean isEmpty() {
@@ -46,7 +46,7 @@ class FindEmptyMethodsTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-              
+
               class Test implements Collection<String> {
                   /*~~>*/@Override
                   public boolean isEmpty() {
@@ -107,7 +107,7 @@ class FindEmptyMethodsTest implements RewriteTest {
           java(
             """
               import java.util.Collection;
-              
+
               class Test implements Collection<String> {
                   @Override
                   public boolean isEmpty() {

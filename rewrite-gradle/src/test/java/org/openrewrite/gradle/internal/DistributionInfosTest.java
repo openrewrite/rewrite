@@ -24,7 +24,6 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
-import java.io.IOException;
 import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,16 +31,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DistributionInfosTest {
 
     @Test
-    void fetch() throws IOException {
+    void fetch() throws Exception {
         HttpSender httpSender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
 
         GradleWrapper.GradleVersion gradleVersion = new GradleWrapper.GradleVersion(
           "7.6",
           "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
+          GradleWrapper.DistributionType.Bin,
           "https://services.gradle.org/distributions/gradle-7.6-bin.zip.sha256",
           "https://services.gradle.org/distributions/gradle-7.6-wrapper.jar.sha256"
         );
-        DistributionInfos infos = DistributionInfos.fetch(GradleWrapper.DistributionType.Bin, gradleVersion,
+        DistributionInfos infos = DistributionInfos.fetch(gradleVersion,
           HttpSenderExecutionContextView.view(new InMemoryExecutionContext()).setHttpSender(httpSender));
 
         assertThat(infos).isEqualTo(new DistributionInfos(

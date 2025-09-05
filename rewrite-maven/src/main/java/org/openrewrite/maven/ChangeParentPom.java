@@ -15,11 +15,13 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.InlineMe;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -34,11 +36,9 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toCollection;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 import static org.openrewrite.maven.RemoveRedundantDependencyVersions.Comparator.GTE;
 import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
@@ -107,6 +107,13 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     Boolean allowVersionDowngrades;
 
+    @Option(displayName = "Except",
+            description = "Accepts a list of GAVs that should be retained when calling `RemoveRedundantDependencyVersions`.",
+            example = "com.jcraft:jsch",
+            required = false)
+    @Nullable
+    List<String> except;
+
     @Override
     public String getDisplayName() {
         return "Change Maven parent";
@@ -123,6 +130,43 @@ public class ChangeParentPom extends Recipe {
                 "and updating it to a new groupId, artifactId, version, and optional relativePath. " +
                 "Also updates the project to retain dependency management and properties previously inherited from the old parent that are no longer provided by the new parent. " +
                 "Removes redundant dependency versions already managed by the new parent.";
+    }
+
+    @Deprecated
+    @InlineMe(replacement = "this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null)")
+    public ChangeParentPom(String oldGroupId,
+                           @Nullable String newGroupId,
+                           String oldArtifactId,
+                           @Nullable String newArtifactId,
+                           String newVersion,
+                           @Nullable String oldRelativePath,
+                           @Nullable String newRelativePath,
+                           @Nullable String versionPattern,
+                           @Nullable Boolean allowVersionDowngrades) {
+        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, oldRelativePath, newRelativePath, versionPattern, allowVersionDowngrades, null);
+    }
+
+    @JsonCreator
+    public ChangeParentPom(String oldGroupId,
+                           @Nullable String newGroupId,
+                           String oldArtifactId,
+                           @Nullable String newArtifactId,
+                           String newVersion,
+                           @Nullable String oldRelativePath,
+                           @Nullable String newRelativePath,
+                           @Nullable String versionPattern,
+                           @Nullable Boolean allowVersionDowngrades,
+                           @Nullable List<String> except) {
+        this.oldGroupId = oldGroupId;
+        this.newGroupId = newGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.oldRelativePath = oldRelativePath;
+        this.newRelativePath = newRelativePath;
+        this.versionPattern = versionPattern;
+        this.allowVersionDowngrades = allowVersionDowngrades;
+        this.except = except;
     }
 
     @Override
@@ -243,7 +287,7 @@ public class ChangeParentPom extends Recipe {
                                     doAfterVisit(visitor);
                                 }
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, null).getVisitor());
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, GTE, except).getVisitor());
                             }
                         } catch (MavenDownloadingException e) {
                             for (Map.Entry<MavenRepository, String> repositoryResponse : e.getRepositoryResponses().entrySet()) {
@@ -329,7 +373,7 @@ public class ChangeParentPom extends Recipe {
 
             private boolean isGlobalProperty(String propertyName) {
                 return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
-                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                        propertyName.startsWith("settings.") || "basedir".equals(propertyName);
             }
         }.reduce(pomXml, new HashMap<>());
     }
@@ -374,7 +418,7 @@ public class ChangeParentPom extends Recipe {
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
                 .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
-                .collect(Collectors.toSet());
+                .collect(toSet());
 
         return depsWithoutExplicitVersion.stream()
                 .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))

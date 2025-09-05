@@ -47,7 +47,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
 
         return j;
     }
@@ -433,6 +433,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     @Override
     public J visitJsxTag(JSX.Tag tag, RpcSendQueue q) {
         q.getAndSend(tag, el -> el.getPadding().getOpenName(), el -> visitLeftPadded(el, q));
+        q.getAndSend(tag, JSX.Tag::getTypeArguments, el -> visitContainer(el, q));
         q.getAndSend(tag, JSX.Tag::getAfterName, space -> visitSpace(space, q));
         q.getAndSendList(tag, el -> el.getPadding().getAttributes(), attr -> attr.getElement().getId(), attr -> visitRightPadded(attr, q));
 

@@ -1,15 +1,16 @@
+@file:Suppress("UnstableApiUsage")
+
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import org.eclipse.jgit.api.Git
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.moderne-source-available-license")
-    id("com.netflix.nebula.integtest-standalone")
     id("com.github.node-gradle.node") version "latest.release"
+    id("jvm-test-suite")
     id("publishing")
 }
 
@@ -28,11 +29,6 @@ dependencies {
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
-
-    integTestImplementation(project(":rewrite-json"))
-    integTestImplementation(project(":rewrite-java-tck"))
-    integTestImplementation("org.junit.platform:junit-platform-suite-api:latest.release")
-    integTestRuntimeOnly("org.junit.platform:junit-platform-suite-engine:latest.release")
 }
 
 tasks.withType<Javadoc>().configureEach {
@@ -49,7 +45,7 @@ tasks.withType<Javadoc>().configureEach {
     exclude("**/JS.java")
 }
 
-
+// Override the defaults because the JavaScript code is one directory down (rewrite/).
 extensions.configure<NodeExtension> {
     workDir.set(projectDir.resolve("rewrite"))
     npmWorkDir.set(projectDir.resolve("rewrite"))
@@ -65,6 +61,23 @@ val datedSnapshotVersion by extra {
     } else {
         project.version.toString()
     }
+}
+
+val npmVersion = tasks.register<NpmTask>("npmVersion") {
+    val versionDir = layout.buildDirectory.file("tmp/npmVersion")
+    inputs.file("rewrite/package.json")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(versionDir)
+
+    doFirst {
+        copy {
+            from("rewrite/package.json")
+            into(versionDir)
+        }
+    }
+
+    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
+    workingDir = versionDir
 }
 
 val npmInstall = tasks.named("npmInstall")
@@ -89,42 +102,37 @@ tasks.named("check") {
     dependsOn(npmTest)
 }
 
-
-val npmRunBuild = tasks.register<NpmTask>("npmBuild") {
+val npmBuild = tasks.register<NpmTask>("npmBuild") {
     inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(file("rewrite/package.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(file("rewrite/dist/src/"))
+    outputs.dir(file("rewrite/dist/"))
+
+    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    outputs.file(versionTxt)
+    doLast {
+        versionTxt.writeText(datedSnapshotVersion)
+    }
 
     args = listOf("run", "build")
 }
-tasks.named("assemble") {
-    dependsOn(npmRunBuild)
-}
 
-val npmVersion = tasks.register<NpmTask>("npmVersion") {
-    val versionDir = layout.buildDirectory.file("tmp/npmVersion")
-    inputs.file("rewrite/package.json")
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.dir(versionDir)
-
-    doFirst {
-        copy {
-            from("rewrite/package.json")
-            into(versionDir)
-        }
+// Because each of these sees version.txt as an input
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(npmBuild)
     }
-
-    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
-    workingDir = versionDir
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
-    from(npmRunBuild) {
-        into("package/dist/src/")
+    from("rewrite/src") {
+        into("package/src")
+    }
+    from(npmBuild) {
+        into("package/dist/")
     }
     from(npmVersion) {
         into("package")
@@ -140,75 +148,45 @@ val npmPack = tasks.register<Tar>("npmPack") {
     destinationDirectory = layout.buildDirectory.dir("distributions")
 }
 
-val npmInitTemp = tasks.register<NpmTask>("npmInitTemp") {
-    val tempInstallDir = layout.buildDirectory.dir("tmp/npmInstall").get().asFile
-    args.set(listOf("init", "-y"))
-    workingDir.set(tempInstallDir)
-
-    doFirst {
-        if (tempInstallDir.exists()) {
-            tempInstallDir.deleteRecursively()
-        }
-        tempInstallDir.mkdirs()
-    }
-}
-
-val npmInstallTemp = tasks.register<NpmTask>("npmInstallTemp") {
-    val tempInstallDir = layout.buildDirectory.file("tmp/npmInstall")
-    inputs.files(npmPack)
+val npmFixturesBuild = tasks.register<NpmTask>("npmFixturesBuild") {
+    inputs.files(npmInstall)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(npmInitTemp)
+    inputs.files(file("rewrite/package.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(npmBuild)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree("rewrite/fixtures"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(file("rewrite/dist-fixtures/"))
 
-    // Use a provider to defer evaluation until execution time
-    args = provider { listOf("install", npmPack.get().archiveFile.get().asFile.absolutePath, "--omit=dev") }
-    workingDir.set(tempInstallDir)
+    args = listOf("run", "build:fixtures")
 }
 
-sourceSets {
-    main {
-        resources {
-            srcDir("src/main/generated-resources")
+testing {
+    suites {
+        register<JvmTestSuite>("integTest") {
+            useJUnitJupiter()
+
+            targets {
+                all {
+                    testTask.configure {
+                        dependsOn(npmBuild, npmFixturesBuild)
+                    }
+                }
+            }
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-java-21"))
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-json"))
+                implementation(project(":rewrite-java-tck"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("org.junit.platform:junit-platform-suite-api")
+                runtimeOnly("org.junit.platform:junit-platform-suite-engine")
+            }
         }
     }
-}
-
-afterEvaluate {
-    tasks.named("licenseMain") {
-        dependsOn(createProductionPackage)
-    }
-}
-
-tasks.named<Jar>("sourcesJar") {
-    dependsOn("createProductionPackage")
-    exclude("production-package.zip")
-}
-
-tasks.named("processResources") {
-    dependsOn(createProductionPackage)
-}
-
-// Creates a production-ready package; writing it to `src/main/generated-resources` so that it will be included by IDEA
-val createProductionPackage by tasks.register<Zip>("createProductionPackage") {
-    // Configure the tar output
-    archiveFileName.set("production-package.zip")
-    destinationDirectory.set(layout.projectDirectory.dir("src/main/generated-resources"))
-
-    dependsOn(npmInstallTemp)
-
-    // Reference the actual directory where npm packages are installed
-    from(layout.buildDirectory.dir("tmp/npmInstall")) {
-        // Optionally exclude unnecessary files like package-lock.json, etc.
-        // exclude("package-lock.json", ".npmrc")
-    }
-}
-
-// Include production-ready package into jar
-tasks.named<Jar>("jar") {
-    from(createProductionPackage)
-}
-
-tasks.named("integrationTest") {
-    dependsOn(npmRunBuild)
 }
 
 // This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
@@ -242,6 +220,7 @@ tasks.named("publish") {
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+    exclude("**/version.txt")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

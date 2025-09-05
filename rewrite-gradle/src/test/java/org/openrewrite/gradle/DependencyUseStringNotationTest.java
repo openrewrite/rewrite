@@ -42,11 +42,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
-              }  
-                
+              }
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
@@ -56,11 +56,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
                   implementation "org.openrewrite:rewrite-core:latest.release"
@@ -78,13 +78,13 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               val version = "latest.release"
-              
+
               dependencies {
                   api(group = "org.openrewrite", name = "rewrite-core", version = "latest.release")
                   implementation(group = "org.openrewrite", name = "rewrite-core", version = version, classifier = "sources")
@@ -94,13 +94,13 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               val version = "latest.release"
-              
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
                   implementation("org.openrewrite:rewrite-core:$version:sources")
@@ -118,11 +118,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources'
@@ -132,11 +132,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release:sources")
                   implementation "org.openrewrite:rewrite-core:latest.release:sources"
@@ -154,11 +154,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources', ext: 'jar'
@@ -168,11 +168,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release:sources@jar")
                   implementation "org.openrewrite:rewrite-core:latest.release:sources@jar"
@@ -190,11 +190,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api([group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'])
               }
@@ -203,11 +203,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
               }
@@ -224,11 +224,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-               
+
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
@@ -239,7 +239,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -262,11 +262,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: "$version")
@@ -277,7 +277,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -318,8 +318,8 @@ class DependencyUseStringNotationTest implements RewriteTest {
 
               repositories {
                   mavenCentral()
-              } 
-              
+              }
+
               dependencies {
                   implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
                   api("org.openrewrite:rewrite-core")
@@ -338,7 +338,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -353,11 +353,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-                
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release") {
                       exclude group: "org.openrewrite", module: "rewrite-gradle"
@@ -376,7 +376,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -392,7 +392,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
@@ -486,11 +486,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
-              }  
-                
+              }
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier'
@@ -500,11 +500,11 @@ class DependencyUseStringNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api("org.openrewrite:rewrite-core::classifier")
                   implementation "org.openrewrite:rewrite-core::classifier"

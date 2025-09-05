@@ -19,6 +19,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.InMemoryExecutionContext;
 
 import java.io.IOException;
@@ -27,6 +29,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Execution(ExecutionMode.SAME_THREAD)
 class MavenSecuritySettingsTest {
 
     private static final String MASTER_PASS_ENCRYPTED = "FyoLIiN2Fx8HpT8O0aBsTn2/s3pYmtLRRCpoWPzhN4A="; // "master"
@@ -51,7 +54,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void decryptCredentials() throws IOException {
+    void decryptCredentials() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -95,7 +98,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void relocatedCredentials() throws IOException {
+    void relocatedCredentials() throws Exception {
         // Create settings-security.xml with relocation
         Path relocated = tempDir.resolve(".m2/relocation-settings-security.xml");
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
@@ -149,7 +152,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void handleInvalidEncryptedPassword() throws IOException {
+    void handleInvalidEncryptedPassword() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -187,7 +190,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void noSecuritySettingsNoDecryption() throws IOException {
+    void noSecuritySettingsNoDecryption() throws Exception {
         // Only create settings.xml without settings-security.xml
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
           //language=xml
@@ -216,7 +219,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void decryptPasswordWithComments() throws IOException {
+    void decryptPasswordWithComments() throws Exception {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml
@@ -255,7 +258,7 @@ class MavenSecuritySettingsTest {
     }
 
     @Test
-    void invalidMasterPasswordButValidPasswordFormat() throws IOException {
+    void invalidMasterPasswordButValidPasswordFormat() throws Exception {
         // Create settings-security.xml with invalid master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
           //language=xml

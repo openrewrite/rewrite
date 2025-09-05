@@ -30,10 +30,12 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.Objects;
@@ -861,7 +863,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
             .afterRecipe(run -> {
-                Path subdir = Paths.get("subdir");
+                Path subdir = Path.of("subdir");
                 var gradleSh = result(run, PlainText.class, "gradlew");
                 assertThat(gradleSh.getSourcePath()).isEqualTo(subdir.resolve(WRAPPER_SCRIPT_LOCATION));
                 assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
@@ -913,6 +915,132 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void failRecipeIfBothVersionAndDistributionUriAreProvided() {
         assertThat(new UpdateGradleWrapper("7.4.2", "bin", false, "https://company.com/repo/gradle-7.4.2-bin.zip", null).validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactory() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://artifactory.company.com/artifactory/api/storage/gradle-distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  {
+                    "repo" : "gradle-distributions",
+                    "path" : "/",
+                    "created" : "2025-08-25T07:12:28.801Z",
+                    "createdBy" : "admin",
+                    "lastModified" : "2025-08-25T07:12:28.801Z",
+                    "modifiedBy" : "admin",
+                    "lastUpdated" : "2025-08-25T07:12:28.801Z",
+                    "children" : [ {
+                      "uri" : "/gradle-8.10-bin.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-all.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-bin.zip",
+                      "folder" : false
+                    } ],
+                    "uri" : "https://company.com/artifactory/api/storage/gradle-distributions"
+                  }
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+            } else if ("https://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.8-all.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", "all", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://artifactory.company.com/artifactory/gradle-distributions/gradle-8.8-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void supportsSemverAgainstJFrogArtifactoryWithPath() {
+        HttpSender customDistributionHost = request -> {
+            String url = request.getUrl().toString();
+            if ("https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions".equals(url)) {
+                return new HttpSender.Response(200, new ByteArrayInputStream("""
+                  {
+                    "repo" : "gradle-distributions",
+                    "path" : "/gradle/distributions",
+                    "created" : "2025-08-25T07:12:28.801Z",
+                    "createdBy" : "admin",
+                    "lastModified" : "2025-08-25T07:12:28.801Z",
+                    "modifiedBy" : "admin",
+                    "lastUpdated" : "2025-08-25T07:12:28.801Z",
+                    "children" : [ {
+                      "uri" : "/gradle-8.10-bin.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-all.zip",
+                      "folder" : false
+                    }, {
+                      "uri" : "/gradle-8.8-bin.zip",
+                      "folder" : false
+                    } ],
+                    "uri" : "https://company.com/artifactory/api/storage/gradle-distributions/gradle/distributions"
+                  }
+                  """.getBytes(StandardCharsets.UTF_8)), () -> {});
+            } else if ("https://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip".equals(url)) {
+                return new HttpSender.Response(200, UpdateGradleWrapperTest.class.getClassLoader().getResourceAsStream("gradle-8.10-bin.zip"), () -> {
+                });
+            }
+            return new HttpUrlConnectionSender().send(request);
+        };
+        HttpSenderExecutionContextView ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(customDistributionHost)
+          .setLargeFileHttpSender(customDistributionHost);
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("8.x", null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "8.2")))
+            .executionContext(ctx),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://company.com/artifactory/gradle-distributions/gradle/distributions/gradle-8.10-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
     }
 
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {

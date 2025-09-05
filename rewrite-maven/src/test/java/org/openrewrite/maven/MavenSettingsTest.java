@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -41,12 +43,13 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"HttpUrlsUsage", "ConstantConditions", "OptionalGetWithoutIsPresent"})
+@Execution(ExecutionMode.SAME_THREAD)
 class MavenSettingsTest {
 
     private final MavenExecutionContextView ctx = MavenExecutionContextView.view(
@@ -74,7 +77,7 @@ class MavenSettingsTest {
 
     @Test
     void parse() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -106,10 +109,10 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parseWithEncryption()  throws IOException{
+    void parseWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -127,17 +130,17 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void parsePlainTextWithEncryption()  throws IOException{
+    void parsePlainTextWithEncryption() throws Exception {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -155,15 +158,15 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
           .matches(repo -> repo.getPassword().equals(plainTextPassword));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultActiveWhenNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -203,7 +206,7 @@ class MavenSettingsTest {
 
     @Test
     void idCollisionLastRepositoryWins() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -245,7 +248,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultOnlyActiveIfNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -295,7 +298,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/130")
     @Test
     void mirrorReplacesRepository() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -337,7 +340,7 @@ class MavenSettingsTest {
 
     @Test
     void starredMirrorWithExclusion() {
-        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -379,11 +382,11 @@ class MavenSettingsTest {
           .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
           .hasSize(2)
           .haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://internalartifactrepository.yourorg.com"),
+            new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
               "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"
             )
           ).haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://externalrepository.com") &&
+            new Condition<>(repo -> "https://externalrepository.com".equals(repo.getUri()) &&
                                     "should-not-be-mirrored".equals(repo.getId()),
               "Repository should-not-be-mirrored should have had its URL left unchanged"
             )
@@ -392,7 +395,7 @@ class MavenSettingsTest {
 
     @Test
     void serverCredentials() {
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -412,17 +415,17 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("my_password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "my_password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsWithEncryption() throws IOException {
+    void serverCredentialsWithEncryption() throws Exception {
         createSettingsSecurityFile();
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -440,18 +443,18 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("password"));
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
+          .matches(repo -> "password".equals(repo.getPassword()));
     }
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1155")
     @Test
-    void serverCredentialsPlainTextWithEncryption() throws IOException {
+    void serverCredentialsPlainTextWithEncryption() throws Exception {
         createSettingsSecurityFile();
         String plainTextPassword = "password";
 
-        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -469,8 +472,8 @@ class MavenSettingsTest {
         ), ctx);
 
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
+          .matches(repo -> "server001".equals(repo.getId()))
+          .matches(repo -> "my_login".equals(repo.getUsername()))
           .matches(repo -> repo.getPassword().equals(plainTextPassword));
     }
 
@@ -478,7 +481,7 @@ class MavenSettingsTest {
     void serverTimeouts() {
         // Deliberately supporting the simpler old configuration of a single timeout
         // https://maven.apache.org/guides/mini/guide-http-settings.html#connection-timeouts
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -499,7 +502,7 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().getFirst())
-          .matches(repo -> repo.getId().equals("server001"))
+          .matches(repo -> "server001".equals(repo.getId()))
           .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
 
@@ -508,7 +511,7 @@ class MavenSettingsTest {
     class LocalRepositoryTest {
         @Test
         void parsesLocalRepositoryPathFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -525,7 +528,7 @@ class MavenSettingsTest {
 
         @Test
         void parsesLocalRepositoryUriFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -543,7 +546,7 @@ class MavenSettingsTest {
 
         @Test
         void defaultsToTheMavenDefault() {
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                         <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -563,7 +566,7 @@ class MavenSettingsTest {
         @Test
         void properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp");
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -603,7 +606,7 @@ class MavenSettingsTest {
 
         @Test
         void unresolvedPlaceholdersRemainUnchanged() {
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -649,7 +652,7 @@ class MavenSettingsTest {
         void env() {
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_USERNAME", "user");
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_PASSWORD", "pass");
-            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -751,7 +754,7 @@ class MavenSettingsTest {
 
         @Test
         void concatenatesElementsWithUniqueIds() {
-            Path path = Paths.get("settings.xml");
+            Path path = Path.of("settings.xml");
             var baseSettings = MavenSettings.parse(Parser.Input.fromString(path, installationSettings), ctx);
             var userSettings = MavenSettings.parse(Parser.Input.fromString(path,
               //language=xml
@@ -810,7 +813,7 @@ class MavenSettingsTest {
 
         @Test
         void mergedOrderingPutsFirstSettingsFirst() {
-            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -829,7 +832,7 @@ class MavenSettingsTest {
                 </settings>
                 """
             ), ctx);
-            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                 <settings>
@@ -858,8 +861,8 @@ class MavenSettingsTest {
 
         @Test
         void replacesElementsWithMatchingIds() {
-            var baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"), installationSettings), ctx);
-            var userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+            var baseSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"), installationSettings), ctx);
+            var userSettings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -918,7 +921,7 @@ class MavenSettingsTest {
      */
     @Test
     void serverHttpHeaders() {
-        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+        var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
           //language=xml
           """
             <settings>
@@ -956,30 +959,30 @@ class MavenSettingsTest {
     }
 
     @Test
-    void canDeserializeSettingsCorrectly() throws IOException {
+    void canDeserializeSettingsCorrectly() throws Exception {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
-            <settings>
-              <servers>
-                <server>
-                  <id>maven-snapshots</id>
-                  <configuration>
-                    <timeout>10000</timeout>
-                    <httpHeaders>
-                      <property>
-                        <name>X-JFrog-Art-Api</name>
-                        <value>myApiToken</value>
-                      </property>
-                    </httpHeaders>
-                  </configuration>
-                </server>
-              </servers>
-            </settings>
-            """).findFirst().get();
+          <settings>
+            <servers>
+              <server>
+                <id>maven-snapshots</id>
+                <configuration>
+                  <timeout>10000</timeout>
+                  <httpHeaders>
+                    <property>
+                      <name>X-JFrog-Art-Api</name>
+                      <value>myApiToken</value>
+                    </property>
+                  </httpHeaders>
+                </configuration>
+              </server>
+            </servers>
+          </settings>
+          """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(singletonList(httpHeader), 10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
-        MavenSettings.Servers servers = new MavenSettings.Servers(java.util.Collections.singletonList(server));
+        MavenSettings.Servers servers = new MavenSettings.Servers(singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -992,8 +995,8 @@ class MavenSettingsTest {
           .isPresent()
           .get(InstanceOfAssertFactories.type(Xml.Document.class))
           .isNotNull()
-            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
-            .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+          .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
+          .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
     }
 
     private void createSettingsSecurityFile() throws IOException {

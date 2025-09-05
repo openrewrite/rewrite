@@ -97,7 +97,7 @@ public class SuperBuilderHandler extends JavacAnnotationHandler<SuperBuilder> {
     private List<JCTree.JCAnnotation> removeBuilderDefault(List<JCTree.JCAnnotation> annotations) {
         ListBuffer<JCTree.JCAnnotation> filteredAnnotations = new ListBuffer<>();
         for (JCTree.JCAnnotation annotation : annotations) {
-            if (annotation.getAnnotationType().toString().equals("lombok.Builder.Default")) {
+            if ("lombok.Builder.Default".equals(annotation.getAnnotationType().toString())) {
                 continue;
             }
             filteredAnnotations = filteredAnnotations.append(annotation);

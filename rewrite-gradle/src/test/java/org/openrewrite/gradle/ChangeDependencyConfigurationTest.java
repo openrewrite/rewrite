@@ -107,11 +107,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
@@ -121,11 +121,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-core:latest.release'
                   implementation "org.openrewrite:rewrite-core:latest.release"
@@ -145,11 +145,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -159,11 +159,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   implementation group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -183,11 +183,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api "org.openrewrite:rewrite-core:${version}"
@@ -197,11 +197,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   implementation "org.openrewrite:rewrite-core:${version}"
@@ -270,11 +270,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   testImplementation group: "org.openrewrite", name: "rewrite-test", version: "latest.release"
@@ -284,11 +284,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   testImplementation group: "org.openrewrite", name: "rewrite-test", version: "latest.release"
@@ -308,11 +308,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {
@@ -328,11 +328,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {
@@ -397,7 +397,7 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
             settingsGradle(
               """
                 rootProject.name = "root"
-                
+
                 include "project1"
                 include "project2"
                 """

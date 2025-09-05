@@ -29,10 +29,10 @@ import java.text.ParseException;
 import java.text.RuleBasedCollator;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
 
 public class ExtractInterface {
@@ -50,7 +50,7 @@ public class ExtractInterface {
                 String pkg = c.getPackageDeclaration() == null ? "" :
                         Arrays.stream(c.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
                                 .map(subpackage -> "..")
-                                .collect(Collectors.joining("/", "../", "/"));
+                                .collect(joining("/", "../", "/"));
 
                 String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
                 if (!interfacePkg.isEmpty()) {

@@ -76,7 +76,7 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
 
     @Option(displayName = "Configuration",
             description = "A configuration to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                    "is used when adding a new as of yet unused dependency.",
+                    "is used when adding a new, as yet unused, dependency.",
             example = "implementation",
             required = false)
     @Nullable

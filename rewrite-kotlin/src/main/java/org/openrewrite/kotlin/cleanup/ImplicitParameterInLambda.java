@@ -24,10 +24,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinVisitor;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 
 
 @Value
@@ -54,7 +54,7 @@ public class ImplicitParameterInLambda extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S6558");
+        return singleton("RSPEC-S6558");
     }
 
     @Override
