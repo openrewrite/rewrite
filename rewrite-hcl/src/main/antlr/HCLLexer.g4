@@ -157,6 +157,9 @@ END_QUOTE           : '"' -> type(QUOTE), popMode;
 mode HEREDOC_PREAMBLE;
 // ----------------------------------------------------------------------------------------------
 HP_NEWLINE : '\n' -> type(NEWLINE), mode(HEREDOC);
+HP_WS              : [ \t\r\u000C]+                           -> channel(HIDDEN);
+HP_COMMENT         : '/*' .*? '*/'                            -> channel(HIDDEN);
+HP_LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'? -> channel(HIDDEN);
 
 HPIdentifier : Letter (LetterOrDigit | '-')* {
     heredocIdentifier.push(getText());
