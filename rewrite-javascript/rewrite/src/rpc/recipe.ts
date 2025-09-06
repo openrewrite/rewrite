@@ -46,11 +46,11 @@ export class RpcRecipe extends ScanningRecipe<number> {
         return 0
     }
 
-    editorWithData(_acc: number): TreeVisitor<any, ExecutionContext> {
+    async editorWithData(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
         return this.editVisitor ? new RpcVisitor(this.rpc, this.editVisitor) : noopVisitor();
     }
 
-    scanner(_acc: number): TreeVisitor<any, ExecutionContext> {
+    async scanner(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
         return this.scanVisitor ? new RpcVisitor(this.rpc, this.scanVisitor) : noopVisitor();
     }
 

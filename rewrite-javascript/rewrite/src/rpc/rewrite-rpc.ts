@@ -39,6 +39,8 @@ import {Writable} from "node:stream";
 import {GetLanguages} from "./request/get-languages";
 
 export class RewriteRpc {
+    private static _global?: RewriteRpc;
+
     private readonly snowflake = SnowflakeId();
 
     readonly localObjects: Map<string, ((input: string) => any) | any> = new Map();
@@ -84,6 +86,17 @@ export class RewriteRpc {
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
 
         this.connection.listen();
+    }
+
+    static set(value: RewriteRpc) {
+        this._global = value;
+    }
+
+    static get(): RewriteRpc {
+        if (!this._global) {
+            throw new Error("RewriteRpc not initialized");
+        }
+        return this._global;
     }
 
     end(): RewriteRpc {

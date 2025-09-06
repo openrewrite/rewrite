@@ -42,7 +42,7 @@ export class Visit {
             const before: Tree = await getObject(request.treeId);
             localObjects.set(before.id.toString(), before);
 
-            const visitor = Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
+            const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
             const after = await visitor.visit(before, p, await getCursor(request.cursor));
             if (!after) {
                 localObjects.delete(before.id.toString());
@@ -54,10 +54,10 @@ export class Visit {
         });
     }
 
-    private static instantiateVisitor(request: Visit,
+    private static async instantiateVisitor(request: Visit,
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
-                                      p: any): TreeVisitor<any, any> {
+                                      p: any): Promise<TreeVisitor<any, any>> {
         const visitorName = request.visitor;
         if (visitorName.startsWith("scan:")) {
             const recipeKey = visitorName.substring("scan:".length);
@@ -73,7 +73,7 @@ export class Visit {
             const acc = recipe.accumulator(cursor, p);
             return new class extends TreeVisitor<any, ExecutionContext> {
                 protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                    await recipe.scanner(acc).visit(tree, ctx);
+                    await (await recipe.scanner(acc)).visit(tree, ctx);
                     this.stopAfterPreVisit();
                     return tree;
                 }
@@ -84,7 +84,7 @@ export class Visit {
             if (!recipe) {
                 throw new Error(`No editing recipe found for key: ${recipeKey}`);
             }
-            return recipe.editor;
+            return await recipe.editor();
         } else {
             return Reflect.construct(
                 // "as any" bypasses strict type checking

@@ -117,6 +117,22 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void runSearchRecipeWithJavaRecipeActingAsPrecondition() {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.javascript.remote-find-identifier-with-path",
+              Map.of("identifier", "hello", "requiredPath", "hello.js")))
+            .expectedCyclesThatMakeChanges(1),
+          javascript(
+            "const hello = 'world'",
+            "const /*~~>*/hello = 'world'",
+            spec -> spec.path("hello.js")
+          )
+        );
+    }
+
+    @Test
     void printJava() {
         assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
           .isEqualTo(1);

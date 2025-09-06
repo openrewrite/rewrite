@@ -66,12 +66,12 @@ export class FindIdentifierWithPathPrecondition extends Recipe {
         super(options);
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const precondition = new PathPreconditionVisitor(this.requiredPath);
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
         // Use the check function to apply the precondition
-        return check(precondition, findIdentifier.editor);
+        return await check(precondition, findIdentifier.editor());
     }
 }
 
@@ -99,10 +99,10 @@ export class ConditionalFindIdentifier extends Recipe {
         super(options);
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const findIdentifier = new FindIdentifier({identifier: this.identifier});
 
         // Use the check function with a boolean condition
-        return check(this.shouldSearch, findIdentifier.editor);
+        return check(this.shouldSearch, findIdentifier.editor());
     }
 }

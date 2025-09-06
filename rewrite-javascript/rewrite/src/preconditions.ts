@@ -15,48 +15,56 @@
  */
 import {noopVisitor, TreeVisitor} from './visitor';
 import {Cursor, isSourceFile, SourceFile, Tree} from './tree';
+import {Recipe} from "./recipe";
+import {ExecutionContext} from "./execution";
 
-export function check<T extends Tree, P>(
-    checkCondition: TreeVisitor<T, P> | boolean,
-    v: TreeVisitor<T, P>
-): TreeVisitor<T, P> {
-    if (typeof checkCondition === 'boolean') {
-        return checkCondition ? v : noopVisitor<T, P>();
+export async function check<T extends Tree>(
+    checkCondition: Recipe | Promise<Recipe> | TreeVisitor<T, ExecutionContext> | Promise<TreeVisitor<T, ExecutionContext>> | boolean,
+    v: TreeVisitor<T, ExecutionContext> | Promise<TreeVisitor<T, ExecutionContext>>
+): Promise<TreeVisitor<T, ExecutionContext>> {
+    const resolvedCheck = await checkCondition;
+    const resolvedV = await v;
+
+    if (typeof resolvedCheck === 'boolean') {
+        return resolvedCheck ? resolvedV : noopVisitor<T, ExecutionContext>();
+    } else if (resolvedCheck instanceof Recipe) {
+        const editor = await resolvedCheck.editor();
+        return new Check(editor as TreeVisitor<T, ExecutionContext>, resolvedV);
     }
-    return new Check(checkCondition, v);
+    return new Check(resolvedCheck, resolvedV);
 }
 
-class Check<T extends Tree, P> extends TreeVisitor<T, P> {
+class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
     constructor(
-        private readonly check: TreeVisitor<T, P>,
-        private readonly v: TreeVisitor<T, P>
+        private readonly check: TreeVisitor<T, ExecutionContext>,
+        private readonly v: TreeVisitor<T, ExecutionContext>
     ) {
         super();
     }
 
-    async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
-        return await this.check.isAcceptable(sourceFile, p) &&
-            await this.v.isAcceptable(sourceFile, p);
+    async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
+        return await this.check.isAcceptable(sourceFile, ctx) &&
+            await this.v.isAcceptable(sourceFile, ctx);
     }
 
-    async visit<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {
+    async visit<R extends T>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
         // if tree isn't an instanceof of SourceFile, then a precondition visitor may
         // not be able to do its work because it may assume we are starting from the root level
         if (!isSourceFile(tree)) {
             return parent !== undefined
-                ? this.v.visit<R>(tree, p, parent)
-                : this.v.visit<R>(tree, p);
+                ? this.v.visit<R>(tree, ctx, parent)
+                : this.v.visit<R>(tree, ctx);
         }
 
         const checkResult = parent !== undefined
-            ? await this.check.visit(tree, p, parent)
-            : await this.check.visit(tree, p);
+            ? await this.check.visit(tree, ctx, parent)
+            : await this.check.visit(tree, ctx);
 
         // If check visitor modified the tree (returned something different), run the main visitor
         if (checkResult !== (tree as unknown as T)) {
             return parent !== undefined
-                ? this.v.visit<R>(tree, p, parent)
-                : this.v.visit<R>(tree, p);
+                ? this.v.visit<R>(tree, ctx, parent)
+                : this.v.visit<R>(tree, ctx);
         }
 
         return tree as unknown as R;
