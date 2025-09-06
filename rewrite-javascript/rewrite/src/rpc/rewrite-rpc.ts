@@ -178,7 +178,7 @@ export class RewriteRpc {
         );
     }
 
-    async prepareRecipe(id: string, options?: any): Promise<Recipe> {
+    async prepareRecipe(id: string, options?: any): Promise<RpcRecipe> {
         const response = await this.connection.sendRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             new PrepareRecipe(id, options)

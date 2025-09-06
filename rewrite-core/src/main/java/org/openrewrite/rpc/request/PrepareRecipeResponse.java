@@ -31,5 +31,11 @@ public class PrepareRecipeResponse {
     String editVisitor;
 
     @Nullable
+    String editPreconditionVisitor;
+
+    @Nullable
     String scanVisitor;
+
+    @Nullable
+    String scanPreconditionVisitor;
 }

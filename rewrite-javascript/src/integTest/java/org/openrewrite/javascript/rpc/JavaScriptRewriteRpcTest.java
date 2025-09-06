@@ -18,9 +18,10 @@ package org.openrewrite.javascript.rpc;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -45,7 +46,7 @@ import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-@Disabled
+//@Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
@@ -57,6 +58,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
           .recipeInstallDir(tempDir)
           .log(tempDir.resolve("rpc.log"))
+          .verboseLogging()
         );
         client = JavaScriptRewriteRpc.getOrStart();
     }
@@ -116,19 +118,26 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    @Test
-    void runSearchRecipeWithJavaRecipeActingAsPrecondition() {
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void runSearchRecipeWithJavaRecipeActingAsPrecondition(boolean matchesPrecondition) {
         installRecipes();
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.example.javascript.remote-find-identifier-with-path",
               Map.of("identifier", "hello", "requiredPath", "hello.js")))
-            .expectedCyclesThatMakeChanges(1),
-          javascript(
-            "const hello = 'world'",
-            "const /*~~>*/hello = 'world'",
-            spec -> spec.path("hello.js")
-          )
+            .expectedCyclesThatMakeChanges(matchesPrecondition ? 1 : 0),
+          matchesPrecondition ?
+            javascript(
+              "const hello = 'world'",
+              "const /*~~>*/hello = 'world'",
+              spec -> spec.path("hello.js")
+            ) :
+            javascript(
+              "const hello = 'world'",
+              spec -> spec.path("not-hello.js")
+            )
         );
     }
 

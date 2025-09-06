@@ -16,7 +16,6 @@
 package org.openrewrite.rpc;
 
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
@@ -45,8 +44,9 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     private final RecipeDescriptor descriptor;
     private final String editVisitor;
-
+    private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
     private final @Nullable String scanVisitor;
+    private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 
     @Override
     public String getName() {
@@ -96,7 +96,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
-        return scanVisitor == null ? TreeVisitor.noop() : new RpcVisitor(rpc, scanVisitor);
+        return scanVisitor == null ? TreeVisitor.noop() : Preconditions.check(scanPreconditionVisitor, new RpcVisitor(rpc, scanVisitor));
     }
 
     @Override
@@ -106,7 +106,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
-        return new RpcVisitor(rpc, editVisitor);
+        return Preconditions.check(editPreconditionVisitor, new RpcVisitor(rpc, editVisitor));
     }
 
     @Override
@@ -128,6 +128,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         // When multiple recipes ran on the same RPC peer, they will all have been
         // adding to the same ExecutionContext instance on that peer, and so really
         // a CHANGE will only be returned for the first of any recipes on that peer.
+        //
         // It doesn't matter which one added data table entries, because they all share
         // the same view of the data tables.
         String id = ctx.getMessage("org.openrewrite.rpc.id");

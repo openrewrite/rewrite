@@ -27,23 +27,20 @@ export async function check<T extends Tree>(
 
     if (typeof resolvedCheck === 'boolean') {
         return resolvedCheck ? resolvedV : noopVisitor<T, ExecutionContext>();
-    } else if (resolvedCheck instanceof Recipe) {
-        const editor = await resolvedCheck.editor();
-        return new Check(editor as TreeVisitor<T, ExecutionContext>, resolvedV);
     }
     return new Check(resolvedCheck, resolvedV);
 }
 
-class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
+export class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
     constructor(
-        private readonly check: TreeVisitor<T, ExecutionContext>,
-        private readonly v: TreeVisitor<T, ExecutionContext>
+        readonly check: TreeVisitor<T, ExecutionContext> | Recipe,
+        readonly v: TreeVisitor<T, ExecutionContext>
     ) {
         super();
     }
 
     async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
-        return await this.check.isAcceptable(sourceFile, ctx) &&
+        return await (await this.checkVisitor()).isAcceptable(sourceFile, ctx) &&
             await this.v.isAcceptable(sourceFile, ctx);
     }
 
@@ -57,8 +54,8 @@ class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
         }
 
         const checkResult = parent !== undefined
-            ? await this.check.visit(tree, ctx, parent)
-            : await this.check.visit(tree, ctx);
+            ? await (await this.checkVisitor()).visit(tree, ctx, parent)
+            : await (await this.checkVisitor()).visit(tree, ctx);
 
         // If check visitor modified the tree (returned something different), run the main visitor
         if (checkResult !== (tree as unknown as T)) {
@@ -68,5 +65,9 @@ class Check<T extends Tree> extends TreeVisitor<T, ExecutionContext> {
         }
 
         return tree as unknown as R;
+    }
+
+    private async checkVisitor(): Promise<TreeVisitor<any, ExecutionContext>> {
+        return this.check instanceof Recipe ? this.check.editor() : this.check;
     }
 }

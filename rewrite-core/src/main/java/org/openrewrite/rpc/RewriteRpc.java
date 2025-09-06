@@ -26,6 +26,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -61,6 +62,8 @@ public class RewriteRpc {
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
 
+    final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
+
     /**
      * Keeps track of the local and remote state of objects that are used in
      * visits and other operations for which incremental state sharing is useful
@@ -94,12 +97,9 @@ public class RewriteRpc {
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
 
-        Map<String, Recipe> preparedRecipes = new HashMap<>();
-        Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
-
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
+        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
-        jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
+        jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects, localRefs));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
@@ -222,11 +222,11 @@ public class RewriteRpc {
         return remoteLanguages;
     }
 
-    public Recipe prepareRecipe(String id) {
+    public RpcRecipe prepareRecipe(String id) {
         return prepareRecipe(id, emptyMap());
     }
 
-    public Recipe prepareRecipe(String id, Map<String, Object> options) {
+    public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
@@ -234,7 +234,14 @@ public class RewriteRpc {
                 throw new IllegalArgumentException("Missing required option `" + option.getName() + "` for recipe `" + id + "`.");
             }
         }
-        return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), r.getScanVisitor());
+
+        TreeVisitor<?, ExecutionContext> editPreconditionVisitor = r.getEditPreconditionVisitor() == null ?
+                null : preparedRecipes.instantiateVisitor(r.getEditPreconditionVisitor(), null);
+        TreeVisitor<?, ExecutionContext> scanPreconditionVisitor = r.getScanPreconditionVisitor() == null ?
+                null : preparedRecipes.instantiateVisitor(r.getScanPreconditionVisitor(), null);
+
+        return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), editPreconditionVisitor,
+                r.getScanVisitor(), scanPreconditionVisitor);
     }
 
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
@@ -349,9 +356,12 @@ public class RewriteRpc {
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
         }
-        // We are now in sync with the remote state of the object.
-        remoteObjects.put(id, requireNonNull(remoteObject));
-        localObjects.put(id, remoteObject);
+
+        if (remoteObject != null) {
+            // We are now in sync with the remote state of the object.
+            remoteObjects.put(id, requireNonNull(remoteObject));
+            localObjects.put(id, remoteObject);
+        }
 
         //noinspection unchecked
         return (T) remoteObject;

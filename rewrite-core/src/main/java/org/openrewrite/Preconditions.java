@@ -30,8 +30,8 @@ public class Preconditions {
         return new RecipeCheck(check, v);
     }
 
-    public static TreeVisitor<?, ExecutionContext> check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
-        return new Check(check, v);
+    public static TreeVisitor<?, ExecutionContext> check(@Nullable TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
+        return check == null ? v : new Check(check, v);
     }
 
     public static TreeVisitor<?, ExecutionContext> check(boolean check, TreeVisitor<?, ExecutionContext> v) {

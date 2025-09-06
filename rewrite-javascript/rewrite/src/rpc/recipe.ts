@@ -29,8 +29,8 @@ export class RpcRecipe extends ScanningRecipe<number> {
     constructor(private readonly rpc: RewriteRpc,
                 private readonly remoteId: string,
                 private readonly _descriptor: RecipeDescriptor,
-                private readonly editVisitor: string,
-                private readonly scanVisitor?: string) {
+                readonly editVisitor: string,
+                readonly scanVisitor?: string) {
         super();
     }
 
