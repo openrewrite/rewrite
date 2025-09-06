@@ -162,21 +162,14 @@ export class RewriteRpc {
     }
 
     async visit(tree: Tree, visitorName: string, p: any, cursor?: Cursor): Promise<Tree> {
-        let response = await this.scan(tree, visitorName, p, cursor);
-        if (response.modified) {
-            return this.getObject(tree.id.toString());
-        }
-        return tree;
-    }
-
-    scan(tree: Tree, visitorName: string, p: any, cursor?: Cursor): Promise<VisitResponse> {
         this.localObjects.set(tree.id.toString(), tree);
         const pId = this.localObject(p);
         const cursorIds = this.getCursorIds(cursor);
-        return this.connection.sendRequest(
+        const response = await this.connection.sendRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
             new Visit(visitorName, undefined, tree.id.toString(), pId, cursorIds)
         );
+        return response.modified ? this.getObject(tree.id.toString()) : tree;
     }
 
     async generate(remoteRecipeId: string, ctx: ExecutionContext): Promise<SourceFile[]> {

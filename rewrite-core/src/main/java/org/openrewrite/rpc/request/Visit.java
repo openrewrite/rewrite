@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
@@ -96,7 +97,14 @@ public class Visit implements RpcRequest {
                 ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
                 Object acc = recipe.getAccumulator(recipeCursors.computeIfAbsent(recipe, r -> new Cursor(null, Cursor.ROOT_VALUE)),
                         (ExecutionContext) p);
-                return recipe.getScanner(acc);
+                return new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+                        stopAfterPreVisit();
+                        recipe.getScanner(acc).visit(tree, ctx);
+                        return tree;
+                    }
+                };
             } else if (visitorName.startsWith("edit:")) {
                 Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
                 return recipe.getVisitor();

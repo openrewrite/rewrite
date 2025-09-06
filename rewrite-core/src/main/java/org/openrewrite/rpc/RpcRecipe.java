@@ -16,6 +16,7 @@
 package org.openrewrite.rpc;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;

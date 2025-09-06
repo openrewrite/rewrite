@@ -1,6 +1,7 @@
 package org.openrewrite.rpc;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -19,9 +20,8 @@ class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
     }
 
     @Override
-    public Tree preVisit(Tree tree, ExecutionContext ctx) {
+    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
         stopAfterPreVisit();
-        rpc.scan((SourceFile) tree, visitorName, ctx);
-        return tree;
+        return rpc.visit((SourceFile) tree, visitorName, ctx);
     }
 }

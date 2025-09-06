@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
+import {ExecutionContext} from "../../execution";
 
 export interface VisitResponse {
     modified: boolean
@@ -70,7 +71,13 @@ export class Visit {
                 recipeCursors.set(recipe, cursor);
             }
             const acc = recipe.accumulator(cursor, p);
-            return recipe.scanner(acc);
+            return new class extends TreeVisitor<any, ExecutionContext> {
+                protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                    await recipe.scanner(acc).visit(tree, ctx);
+                    this.stopAfterPreVisit();
+                    return tree;
+                }
+            }
         } else if (visitorName.startsWith("edit:")) {
             const recipeKey = visitorName.substring("edit:".length);
             const recipe = preparedRecipes.get(recipeKey) as Recipe;

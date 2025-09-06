@@ -17,7 +17,7 @@ import {Minutes, Recipe, RecipeDescriptor, ScanningRecipe} from "../recipe";
 import {RewriteRpc} from "./rewrite-rpc";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
-import {SourceFile} from "../tree";
+import {SourceFile, Tree} from "../tree";
 
 export class RpcRecipe extends ScanningRecipe<number> {
     name: string = this._descriptor.name;
@@ -47,30 +47,11 @@ export class RpcRecipe extends ScanningRecipe<number> {
     }
 
     editorWithData(_acc: number): TreeVisitor<any, ExecutionContext> {
-        const rpc = this.rpc;
-        const editVisitor = this.editVisitor;
-        return new class extends TreeVisitor<any, ExecutionContext> {
-            protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                const t = await rpc.visit(tree, editVisitor, ctx);
-                this.stopAfterPreVisit();
-                return t;
-            }
-        };
+        return this.editVisitor ? new RpcVisitor(this.rpc, this.editVisitor) : noopVisitor();
     }
 
     scanner(_acc: number): TreeVisitor<any, ExecutionContext> {
-        const rpc = this.rpc;
-        const scanVisitor = this.scanVisitor;
-        if (scanVisitor) {
-            return new class extends TreeVisitor<any, ExecutionContext> {
-                protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                    await rpc.scan(tree, scanVisitor, ctx);
-                    this.stopAfterPreVisit();
-                    return tree;
-                }
-            };
-        }
-        return noopVisitor();
+        return this.scanVisitor ? new RpcVisitor(this.rpc, this.scanVisitor) : noopVisitor();
     }
 
     async generate(_acc: number, ctx: ExecutionContext): Promise<SourceFile[]> {
@@ -98,5 +79,25 @@ export class RpcRecipe extends ScanningRecipe<number> {
             const updated = await this.rpc.getObject(ctx.messages["org.openrewrite.rpc.id"]);
             Object.assign(ctx, updated);
         }
+    }
+}
+
+export class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    constructor(
+        private readonly rpc: RewriteRpc,
+        private readonly visitorName: string
+    ) {
+        super();
+    }
+
+    isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean {
+        // TODO: at the point where we add a second RPC language like Python, we should
+        //  narrow this check to the set of source files that the remote peer supports
+        return true;
+    }
+
+    protected async preVisit(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+        this.stopAfterPreVisit();
+        return this.rpc.visit(tree as SourceFile, this.visitorName, ctx);
     }
 }

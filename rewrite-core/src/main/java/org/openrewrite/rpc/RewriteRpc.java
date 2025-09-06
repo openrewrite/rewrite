@@ -142,29 +142,18 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
-    public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
-        VisitResponse response = scan(tree, visitorName, p, cursor);
-        return response.isModified() ?
-                getObject(tree.getId().toString()) :
-                tree;
-    }
-
-    public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p) {
-        return scan(sourceFile, visitorName, p, null);
-    }
-
-    public <P> VisitResponse scan(Tree sourceFile, String visitorName, P p,
-                                  @Nullable Cursor cursor) {
-        // Set the local state of this tree, so that when the remote
-        // asks for it, we know what to send.
+    public <P> @Nullable Tree visit(Tree sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
+        // Set the local state of this tree, so that when the remote asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
 
         String pId = maybeUnwrapExecutionContext(p);
-
         List<String> cursorIds = getCursorIds(cursor);
 
-        return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),
-                VisitResponse.class);
+        VisitResponse response = send("Visit", new Visit(visitorName, null,
+                sourceFile.getId().toString(), pId, cursorIds), VisitResponse.class);
+        return response.isModified() ?
+                getObject(sourceFile.getId().toString()) :
+                sourceFile;
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
