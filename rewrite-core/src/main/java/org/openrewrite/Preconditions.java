@@ -160,7 +160,7 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
             return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
                     v.visit(tree, ctx) :
@@ -169,7 +169,7 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
             return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
                     v.visit(tree, ctx, parent) :

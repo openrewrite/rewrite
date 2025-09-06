@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, findMarker, Marker, Markers} from "./markers";
+import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, Objectish} from "immer";
 import {mapAsync} from "./util";
