@@ -14,9 +14,7 @@ class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-        // TODO at the point where we add a second RPC language like Python, we should
-        //  narrow this check to the set of source files that the remote peer supports
-        return sourceFile instanceof RpcCodec;
+        return rpc.getLanguages().contains(sourceFile.getClass().getName());
     }
 
     @Override

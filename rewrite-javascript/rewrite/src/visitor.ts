@@ -61,7 +61,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
 
         let t: T | undefined
         const isAcceptable = (!(isSourceFile(tree)) ||
-            this.isAcceptable(tree, p));
+            await this.isAcceptable(tree, p));
 
         try {
             if (isAcceptable) {
@@ -108,7 +108,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
         this.cursor.messages.set(stopAfterPreVisit, true);
     }
 
-    isAcceptable(sourceFile: SourceFile, p: P): boolean {
+    async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
         return true;
     }
 

@@ -90,10 +90,8 @@ export class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
         super();
     }
 
-    isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean {
-        // TODO: at the point where we add a second RPC language like Python, we should
-        //  narrow this check to the set of source files that the remote peer supports
-        return true;
+    async isAcceptable(sourceFile: SourceFile, _: ExecutionContext): Promise<boolean> {
+        return (await this.rpc.languages()).includes(sourceFile.kind);
     }
 
     protected async preVisit(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {

@@ -34,7 +34,7 @@ import {JavaType} from "./type";
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
 
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJava(sourceFile);
     }
 

@@ -34,8 +34,9 @@ class Check<T extends Tree, P> extends TreeVisitor<T, P> {
         super();
     }
 
-    isAcceptable(sourceFile: SourceFile, p: P): boolean {
-        return this.check.isAcceptable(sourceFile, p) && this.v.isAcceptable(sourceFile, p);
+    async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
+        return await this.check.isAcceptable(sourceFile, p) &&
+            await this.v.isAcceptable(sourceFile, p);
     }
 
     async visit<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R | undefined> {

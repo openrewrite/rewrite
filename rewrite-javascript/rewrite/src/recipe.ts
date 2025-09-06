@@ -166,7 +166,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return new class extends TreeVisitor<any, ExecutionContext> {
             private delegate?: TreeVisitor<any, ExecutionContext>
 
-            isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean {
+            async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
                 return this.delegateForCtx(ctx).isAcceptable(sourceFile, ctx);
             }
 

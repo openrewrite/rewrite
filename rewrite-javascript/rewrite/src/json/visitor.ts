@@ -18,7 +18,7 @@ import {isJson, Json} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export class JsonVisitor<P> extends TreeVisitor<Json, P> {
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJson(sourceFile);
     }
 

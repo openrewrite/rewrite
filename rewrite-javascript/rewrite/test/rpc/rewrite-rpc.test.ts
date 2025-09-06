@@ -120,6 +120,10 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("languages", async () => {
+        expect(await client.languages()).toContainEqual(JS.Kind.CompilationUnit);
+    });
+
     test("runSearchRecipe", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier", {identifier: "hello"});
         await spec.rewriteRun(

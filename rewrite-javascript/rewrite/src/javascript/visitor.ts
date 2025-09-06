@@ -23,7 +23,7 @@ import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
-    override isAcceptable(sourceFile: SourceFile): boolean {
+    override async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJavaScript(sourceFile);
     }
 

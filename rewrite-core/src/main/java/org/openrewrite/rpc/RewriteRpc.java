@@ -81,6 +81,8 @@ public class RewriteRpc {
     @VisibleForTesting
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
+    private @Nullable List<String> remoteLanguages;
+
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
@@ -104,6 +106,26 @@ public class RewriteRpc {
             @Override
             protected Object handle(Void noParams) {
                 return marketplace.listRecipeDescriptors();
+            }
+        });
+        jsonRpc.rpc("GetLanguages", new JsonRpcMethod<Void>() {
+            @Override
+            protected Object handle(Void noParams) {
+                return Stream.of(
+                        ifOnClasspath("org.openrewrite.text.PlainText"),
+                        ifOnClasspath("org.openrewrite.json.tree.Json$Document"),
+                        ifOnClasspath("org.openrewrite.java.tree.J$CompilationUnit"),
+                        ifOnClasspath("org.openrewrite.javascript.tree.JS$CompilationUnit")
+                ).filter(Objects::nonNull).toArray(String[]::new);
+            }
+
+            private @Nullable String ifOnClasspath(String className) {
+                try {
+                    Class.forName(className);
+                    return className;
+                } catch (ClassNotFoundException e) {
+                    return null;
+                }
             }
         });
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
@@ -191,6 +213,13 @@ public class RewriteRpc {
 
     public List<RecipeDescriptor> getRecipes() {
         return send("GetRecipes", null, GetRecipesResponse.class);
+    }
+
+    public List<String> getLanguages() {
+        if (remoteLanguages == null) {
+            remoteLanguages = Arrays.asList(send("GetLanguages", null, String[].class));
+        }
+        return remoteLanguages;
     }
 
     public Recipe prepareRecipe(String id) {

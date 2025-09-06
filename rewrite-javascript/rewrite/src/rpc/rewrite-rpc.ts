@@ -36,6 +36,7 @@ import {InstallRecipes, InstallRecipesResponse} from "./request/install-recipes"
 import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {Writable} from "node:stream";
+import {GetLanguages} from "./request/get-languages";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -47,6 +48,8 @@ export class RewriteRpc {
     readonly remoteObjects: Map<string, any> = new Map();
     readonly remoteRefs: Map<number, any> = new Map();
     readonly localRefs: ReferenceMap = new ReferenceMap();
+
+    private remoteLanguages?: string[];
 
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
                     new rpc.StreamMessageReader(process.stdin),
@@ -74,6 +77,7 @@ export class RewriteRpc {
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
         GetRecipes.handle(this.connection, registry);
+        GetLanguages.handle(this.connection);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
         Print.handle(this.connection, getObject, getCursor);
@@ -144,6 +148,15 @@ export class RewriteRpc {
             new rpc.RequestType<Print, string, Error>("Print"),
             new Print(tree.id, this.getCursorIds(cursor))
         );
+    }
+
+    async languages(): Promise<string[]> {
+        if (!this.remoteLanguages) {
+            this.remoteLanguages = await this.connection.sendRequest(
+                new rpc.RequestType0<string[], Error>("GetLanguages")
+            );
+        }
+        return this.remoteLanguages;
     }
 
     async recipes(): Promise<({ name: string } & RecipeDescriptor)[]> {
