@@ -450,7 +450,7 @@ export namespace J {
 
     export interface Literal extends J, TypedTree, Expression, VariableDeclarator {
         readonly kind: typeof Kind.Literal;
-        readonly value?: Object;
+        readonly value?: string | number | bigint | boolean | null | undefined;
         readonly valueSource?: string;
         readonly unicodeEscapes?: LiteralUnicodeEscape[];
         readonly type?: JavaType.Primitive;

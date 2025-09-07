@@ -20,16 +20,22 @@ import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 
 export class JavaScriptTypeMapping {
-    private readonly typeCache: Map<number, JavaType> = new Map();
+    private readonly typeCache: Map<string | number, JavaType> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
+    private readonly projectRoot: string;
 
-    constructor(private readonly checker: ts.TypeChecker) {
+    constructor(
+        private readonly checker: ts.TypeChecker,
+        projectRoot?: string
+    ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
             undefined,
             ts.SymbolFlags.Type,
             false
         );
+        // Default to current working directory if not provided
+        this.projectRoot = projectRoot || process.cwd();
     }
 
     type(node: ts.Node): JavaType | undefined {
@@ -53,13 +59,31 @@ export class JavaScriptTypeMapping {
         return result;
     }
 
-    private getSignature(type: ts.Type): number {
-        // FIXME for classes we need to include the containing module / package in the signature and probably include in the qualified name
-        if ("id" in type) { // a private field returned by the type checker
+    private getSignature(type: ts.Type): string | number {
+        // Try to use TypeScript's internal id if available
+        if ("id" in type && type.id !== undefined) {
             return type.id as number;
-        } else {
-            throw new Error("no id property in type: " + JSON.stringify(type));
         }
+        
+        // Fallback: Generate a string signature based on type characteristics
+        const typeString = this.checker.typeToString(type);
+        const symbol = type.getSymbol?.();
+        
+        if (symbol) {
+            const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+            if (declaration) {
+                const sourceFile = declaration.getSourceFile();
+                const fileName = sourceFile.fileName;
+                const pos = declaration.pos;
+                // Create unique signature from file + position + type string
+                // This ensures types from different modules are distinguished
+                return `${fileName}:${pos}:${typeString}`;
+            }
+        }
+        
+        // Last resort: use type string with a prefix to distinguish from numeric IDs
+        // This might happen for synthetic types or types without declarations
+        return `synthetic:${typeString}`;
     }
 
     primitiveType(node: ts.Node): JavaType.Primitive {
@@ -81,7 +105,87 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
-    private createType(type: ts.Type, cacheKey: number): JavaType {
+    /**
+     * Get the fully qualified name for a TypeScript type.
+     * Format: "module-specifier.TypeName" (e.g., "@mui/material.Button", "src/components/Button.Button")
+     */
+    private getFullyQualifiedName(type: ts.Type): string {
+        const symbol = type.getSymbol?.();
+        if (!symbol) {
+            return "unknown";
+        }
+
+        const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+        if (!declaration) {
+            // No declaration - might be a built-in or synthetic type
+            const typeName = symbol.getName();
+            if (this.isBuiltInType(typeName)) {
+                return `lib.${typeName}`;
+            }
+            return typeName;
+        }
+
+        const sourceFile = declaration.getSourceFile();
+        const fileName = sourceFile.fileName;
+
+        // Check if this is from an external module (node_modules or .d.ts)
+        if (sourceFile.isDeclarationFile || fileName.includes("node_modules")) {
+            const packageName = this.extractPackageName(fileName);
+            if (packageName) {
+                return `${packageName}.${symbol.getName()}`;
+            }
+        }
+
+        // For local files, use relative path from project root
+        const relativePath = this.getRelativeModulePath(fileName);
+        return `${relativePath}.${symbol.getName()}`;
+    }
+
+    /**
+     * Extract package name from a node_modules path.
+     * Examples:
+     * - /path/to/project/node_modules/react/index.d.ts -> "react"
+     * - /path/to/project/node_modules/@mui/material/Button/index.d.ts -> "@mui/material"
+     */
+    private extractPackageName(fileName: string): string | null {
+        const match = fileName.match(/node_modules\/(@[^\/]+\/[^\/]+|[^\/]+)/);
+        return match ? match[1] : null;
+    }
+
+    /**
+     * Get relative module path from project root.
+     * Removes file extension and uses forward slashes.
+     */
+    private getRelativeModulePath(fileName: string): string {
+        // Remove project root and normalize path
+        let relativePath = fileName;
+        if (fileName.startsWith(this.projectRoot)) {
+            relativePath = fileName.slice(this.projectRoot.length);
+        }
+
+        // Remove leading slash and file extension
+        relativePath = relativePath.replace(/^\//, '').replace(/\.[^/.]+$/, '');
+
+        // Convert backslashes to forward slashes (for Windows)
+        relativePath = relativePath.replace(/\\/g, '/');
+
+        return relativePath;
+    }
+
+    /**
+     * Check if a type name is a built-in TypeScript/JavaScript type.
+     */
+    private isBuiltInType(typeName: string): boolean {
+        const builtInTypes = new Set([
+            'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
+            'Date', 'RegExp', 'Error', 'Promise', 'Map', 'Set', 'WeakMap',
+            'WeakSet', 'Symbol', 'BigInt', 'HTMLElement', 'Document',
+            'Window', 'Console', 'JSON', 'Math', 'Reflect', 'Proxy'
+        ]);
+        return builtInTypes.has(typeName);
+    }
+
+    private createType(type: ts.Type, cacheKey: string | number): JavaType {
         const signature = this.checker.typeToString(type);
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {

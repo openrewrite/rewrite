@@ -77,6 +77,7 @@ export class JavaScriptParser extends Parser {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
             allowJs: true,
+            checkJs: true,
             esModuleInterop: true,
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
@@ -181,7 +182,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker, this.relativeTo || process.cwd())
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
@@ -211,8 +212,9 @@ export class JavaScriptParserVisitor {
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeChecker: ts.TypeChecker) {
-        this.typeMapping = new JavaScriptTypeMapping(typeChecker);
+        typeChecker: ts.TypeChecker,
+        projectRoot?: string) {
+        this.typeMapping = new JavaScriptTypeMapping(typeChecker, projectRoot);
     }
 
     visit = (node: ts.Node): any => {
@@ -569,7 +571,22 @@ export class JavaScriptParserVisitor {
     }
 
     visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        // Parse the numeric value from the text
+        const text = node.text;
+        let value: number | bigint;
+        
+        // Check if it's a BigInt literal (ends with 'n')
+        if (text.endsWith('n')) {
+            value = BigInt(text.slice(0, -1));
+        } else if (text.includes('.') || text.toLowerCase().includes('e')) {
+            // Floating point number
+            value = parseFloat(text);
+        } else {
+            // Integer - but JavaScript doesn't distinguish, so use number
+            value = parseInt(text, text.startsWith('0x') ? 16 : text.startsWith('0o') ? 8 : text.startsWith('0b') ? 2 : 10);
+        }
+        
+        return this.mapLiteral(node, value);
     }
 
     visitTrueKeyword(node: ts.TrueLiteral): J.Literal {
@@ -653,11 +670,14 @@ export class JavaScriptParserVisitor {
     }
 
     visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        // Parse BigInt value, removing the 'n' suffix
+        const text = node.text;
+        const value = BigInt(text.slice(0, -1));
+        return this.mapLiteral(node, value);
     }
 
     visitStringLiteral(node: ts.StringLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        return this.mapLiteral(node, node.text);
     }
 
     visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
