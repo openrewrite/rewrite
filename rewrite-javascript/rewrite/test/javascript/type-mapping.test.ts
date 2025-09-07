@@ -259,10 +259,51 @@ describe('JavaScript type mapping', () => {
     });
 
     describe('class types', () => {
-        test('should map class types', async () => {
+        test('should map built-in DOM types with correct fully qualified names', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark class identifiers and class member types
+                // Mark HTMLElement type references
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'HTMLElement') {
+                    if (JavaType.isClass(type)) {
+                        // Verify we're getting members - HTMLElement has many properties
+                        const memberNames = type.members.map(m => m.name);
+                        // Check for some known HTMLElement properties
+                        const hasExpectedProperties =
+                            memberNames.includes('innerHTML') &&
+                            memberNames.includes('style') &&
+                            memberNames.includes('classList');
+
+                        if (hasExpectedProperties) {
+                            return `${type.fullyQualifiedName} (${type.members.length} members)`;
+                        }
+                        return type.fullyQualifiedName;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        let element: HTMLElement;
+                        const div = document.createElement('div');
+                        element = div;
+                    `,
+                    `
+                        let element: /*~~(lib.HTMLElement (235 members))~~>*/HTMLElement;
+                        const div = document.createElement('div');
+                        element = div;
+                    `
+                )
+            );
+        });
+
+        test('should map user-defined class types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark class identifiers
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'Person') {
                     return JavaType.isClass(type) ? type.fullyQualifiedName : null;
                 }

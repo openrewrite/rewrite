@@ -13,18 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as ts from "typescript";
+import ts from "typescript";
 import {JavaType} from "../java";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+
+const builtInTypes = new Set([
+    'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
+    'Date', 'RegExp', 'Error', 'Promise', 'Map', 'Set', 'WeakMap',
+    'WeakSet', 'Symbol', 'BigInt', 'HTMLElement', 'Document',
+    'Window', 'Console', 'JSON', 'Math', 'Reflect', 'Proxy'
+]);
 
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<string | number, JavaType> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
-    private readonly projectRoot: string;
 
     constructor(
         private readonly checker: ts.TypeChecker,
-        projectRoot?: string
+        private readonly projectRoot: string = process.cwd()
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -32,8 +38,6 @@ export class JavaScriptTypeMapping {
             ts.SymbolFlags.Type,
             false
         );
-        // Default to current working directory if not provided
-        this.projectRoot = projectRoot || process.cwd();
     }
 
     type(node: ts.Node): JavaType | undefined {
@@ -46,13 +50,18 @@ export class JavaScriptTypeMapping {
         return type && this.getType(type);
     }
 
-    private getType(type: ts.Type) {
+    private getType(type: ts.Type): JavaType {
         const signature = this.getSignature(type);
         const existing = this.typeCache.get(signature);
         if (existing) {
             return existing;
         }
-        const result = this.createType(type, signature);
+
+        // Set a placeholder to prevent infinite recursion during type creation
+        // This is crucial for types with cyclic references (e.g., DOM types)
+        this.typeCache.set(signature, JavaType.unknownType);
+
+        const result = this.createType(type);
         this.typeCache.set(signature, result);
         return result;
     }
@@ -62,11 +71,11 @@ export class JavaScriptTypeMapping {
         if ("id" in type && type.id !== undefined) {
             return type.id as number;
         }
-        
+
         // Fallback: Generate a string signature based on type characteristics
         const typeString = this.checker.typeToString(type);
         const symbol = type.getSymbol?.();
-        
+
         if (symbol) {
             const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
             if (declaration) {
@@ -78,7 +87,7 @@ export class JavaScriptTypeMapping {
                 return `${fileName}:${pos}:${typeString}`;
             }
         }
-        
+
         // Last resort: use type string with a prefix to distinguish from numeric IDs
         // This might happen for synthetic types or types without declarations
         return `synthetic:${typeString}`;
@@ -93,7 +102,9 @@ export class JavaScriptTypeMapping {
         if (ts.isVariableDeclaration(node)) {
             const symbol = this.checker.getSymbolAtLocation(node.name);
             if (symbol) {
-                const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
+                // TODO: Implement in Phase 6
+                // const type = this.checker.getTypeOfSymbolAtLocation(symbol, node);
+                // return JavaType.Variable with proper mapping
             }
         }
         return undefined;
@@ -117,7 +128,7 @@ export class JavaScriptTypeMapping {
         const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
         if (!declaration) {
             // No declaration - might be a built-in or synthetic type
-            if (this.isBuiltInType(typeName)) {
+            if (builtInTypes.has(typeName)) {
                 return `lib.${typeName}`;
             }
             return typeName;
@@ -131,6 +142,11 @@ export class JavaScriptTypeMapping {
         if (/^\d+\.(ts|tsx|js|jsx)$/.test(fileName)) {
             // For test files, just return the type name without module prefix
             return typeName;
+        }
+
+        // Check if this is from TypeScript's lib files (lib.d.ts, lib.dom.d.ts, etc.)
+        if (fileName.includes("/typescript/lib/lib.") || fileName.includes("\\typescript\\lib\\lib.")) {
+            return `lib.${typeName}`;
         }
 
         // Check if this is from an external module (node_modules or .d.ts)
@@ -178,24 +194,11 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * Check if a type name is a built-in TypeScript/JavaScript type.
-     */
-    private isBuiltInType(typeName: string): boolean {
-        const builtInTypes = new Set([
-            'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
-            'Date', 'RegExp', 'Error', 'Promise', 'Map', 'Set', 'WeakMap',
-            'WeakSet', 'Symbol', 'BigInt', 'HTMLElement', 'Document',
-            'Window', 'Console', 'JSON', 'Math', 'Reflect', 'Proxy'
-        ]);
-        return builtInTypes.has(typeName);
-    }
-
-    /**
      * Create a JavaType.Class from a TypeScript type and symbol.
      */
     private createClassType(type: ts.Type, symbol: ts.Symbol, kind: JavaType.Class.Kind): JavaType.Class {
         const fullyQualifiedName = this.getFullyQualifiedName(type);
-        
+
         // Collect all the data first
         const typeParameters: JavaType[] = [];
         const interfaces: JavaType.Class[] = [];
@@ -213,7 +216,7 @@ export class JavaScriptTypeMapping {
                             typeParameters.push(this.getType(tpType));
                         }
                     }
-                    
+
                     // Extract heritage information
                     if (declaration.heritageClauses) {
                         const heritage = this.extractHeritage(declaration.heritageClauses, kind);
@@ -222,7 +225,7 @@ export class JavaScriptTypeMapping {
                         }
                         interfaces.push(...heritage.interfaces);
                     }
-                    
+
                     break; // Only process the first declaration
                 }
             }
@@ -263,12 +266,12 @@ export class JavaScriptTypeMapping {
     /**
      * Extract supertype and interfaces from heritage clauses.
      */
-    private extractHeritage(heritageClauses: ts.NodeArray<ts.HeritageClause>, kind: JavaType.Class.Kind): 
+    private extractHeritage(heritageClauses: ts.NodeArray<ts.HeritageClause>, kind: JavaType.Class.Kind):
         { supertype?: JavaType.Class, interfaces: JavaType.Class[] } {
-        
+
         let supertype: JavaType.Class | undefined = undefined;
         const interfaces: JavaType.Class[] = [];
-        
+
         for (const clause of heritageClauses) {
             if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
                 if (kind === JavaType.Class.Kind.Class && clause.types.length > 0) {
@@ -299,8 +302,8 @@ export class JavaScriptTypeMapping {
                 }
             }
         }
-        
-        return { supertype, interfaces };
+
+        return {supertype, interfaces};
     }
 
     /**
@@ -310,7 +313,7 @@ export class JavaScriptTypeMapping {
         // Generate a name for the anonymous type
         const typeString = this.checker.typeToString(type);
         const fullyQualifiedName = `<anonymous>${typeString}`;
-        
+
         // Create initial class type with asRef for cyclic references
         const classType: JavaType.Class = asRef({
             kind: JavaType.Kind.Class,
@@ -342,9 +345,7 @@ export class JavaScriptTypeMapping {
         return classType;
     }
 
-    private createType(type: ts.Type, cacheKey: string | number): JavaType {
-        const signature = this.checker.typeToString(type);
-        
+    private createType(type: ts.Type): JavaType {
         // Check for literals first
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {
@@ -460,7 +461,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Class, {
         const interfaces = await q.receive(before.interfaces);
         const members = await q.receive(before.members);
         const methods = await q.receive(before.methods);
-        
+
         return asRef({
             kind: JavaType.Kind.Class,
             classKind,
@@ -489,7 +490,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Variable, {
         const type = await q.receive(before.type);
         // FIXME we need to use receiveList here but need to think about what to use for the ID
         const annotations = await q.receive(before.annotations);
-        
+
         return asRef({
             kind: JavaType.Kind.Variable,
             name,
@@ -508,7 +509,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Annotation, {
     async rpcReceive(before: JavaType.Annotation, q: RpcReceiveQueue): Promise<JavaType.Annotation> {
         const type = await q.receive(before.type);
         const values = await q.receive(before.values);
-        
+
         return asRef({
             kind: JavaType.Kind.Annotation,
             type,
