@@ -16,54 +16,12 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, typescript, tsx} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, tsx, typescript} from "../../src/javascript";
 import {J, JavaType} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 
-/**
- * Helper to create a recipe that marks types
- */
-function markTypes(predicate: (node: any, type: JavaType | undefined) => string | null): Recipe {
-    class TypeMarkerRecipe extends Recipe {
-        name = 'Type marker';
-        displayName = 'Mark types';
-        description = 'Marks nodes with their types';
-
-        async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
-            return new class extends JavaScriptVisitor<ExecutionContext> {
-                async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J.Literal> {
-                    const visited = await super.visitLiteral(literal, p) as J.Literal;
-                    const description = predicate(literal, literal.type);
-                    if (description) {
-                        return foundSearchResult(visited, description);
-                    }
-                    return visited;
-                }
-
-                async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J.Identifier> {
-                    const visited = await super.visitIdentifier(ident, p) as J.Identifier;
-                    const description = predicate(ident, ident.type);
-                    if (description) {
-                        return foundSearchResult(visited, description);
-                    }
-                    return visited;
-                }
-            }
-        }
-    }
-
-    return new TypeMarkerRecipe();
-}
-
-/**
- * Helper to format primitive types for display
- */
-function formatPrimitiveType(type: JavaType | undefined): string | null {
-    return JavaType.isPrimitive(type) ? type.keyword || 'None' : null;
-}
-
-describe('JavaScriptTypeMapping', () => {
-    describe('Primitive Types', () => {
+describe('JavaScript type mapping', () => {
+    describe('primitive types', () => {
         test('should map number literals', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -232,7 +190,7 @@ describe('JavaScriptTypeMapping', () => {
         });
     });
 
-    describe('Type Annotations', () => {
+    describe('type annotations', () => {
         // TODO: These will be implemented in Phase 2/3
         test.skip('should map type annotations', async () => {
             const spec = new RecipeSpec();
@@ -251,7 +209,7 @@ describe('JavaScriptTypeMapping', () => {
         });
     });
 
-    describe('Cache Behavior', () => {
+    describe('cache behavior', () => {
         test('should use same type instance for same primitive types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -280,7 +238,7 @@ describe('JavaScriptTypeMapping', () => {
         });
     });
 
-    describe('Union Types', () => {
+    describe('union types', () => {
         test('should handle union type with concrete initializer', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -300,9 +258,8 @@ describe('JavaScriptTypeMapping', () => {
         });
     });
 
-    describe('Complex Types (Future Phases)', () => {
-        test.skip('should map class types', async () => {
-            // TODO: Implement in Phase 2
+    describe('class types', () => {
+        test('should map class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
                 // Mark class identifiers and class member types
@@ -331,8 +288,7 @@ describe('JavaScriptTypeMapping', () => {
             );
         });
 
-        test.skip('should map interface types', async () => {
-            // TODO: Implement in Phase 2
+        test('should map interface types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
                 // Mark interface identifiers
@@ -368,7 +324,7 @@ describe('JavaScriptTypeMapping', () => {
                 // Mark array literals
                 if (node?.kind === J.Kind.NewArray) {
                     if (JavaType.isArray(type)) {
-                        const elemTypeName = JavaType.isPrimitive(type.elemType) 
+                        const elemTypeName = JavaType.isPrimitive(type.elemType)
                             ? type.elemType.keyword || 'unknown'
                             : 'unknown';
                         return `Array<${elemTypeName}>`;
@@ -467,10 +423,12 @@ describe('JavaScriptTypeMapping', () => {
                 tsx(
                     `
                         import React from 'react';
+
                         const element = <div className="test">Hello</div>;
                     `,
                     `
                         import React from 'react';
+
                         const element = /*~~(JSX.IntrinsicElements.div)~~>*/<div className="test">Hello</div>;
                     `
                 )
@@ -478,3 +436,45 @@ describe('JavaScriptTypeMapping', () => {
         });
     });
 });
+
+/**
+ * Helper to create a recipe that marks types
+ */
+function markTypes(predicate: (node: any, type: JavaType | undefined) => string | null): Recipe {
+    class TypeMarkerRecipe extends Recipe {
+        name = 'Type marker';
+        displayName = 'Mark types';
+        description = 'Marks nodes with their types';
+
+        async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
+            return new class extends JavaScriptVisitor<ExecutionContext> {
+                async visitLiteral(literal: J.Literal, p: ExecutionContext): Promise<J.Literal> {
+                    const visited = await super.visitLiteral(literal, p) as J.Literal;
+                    const description = predicate(literal, literal.type);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J.Identifier> {
+                    const visited = await super.visitIdentifier(ident, p) as J.Identifier;
+                    const description = predicate(ident, ident.type);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+            }
+        }
+    }
+
+    return new TypeMarkerRecipe();
+}
+
+/**
+ * Helper to format primitive types for display
+ */
+function formatPrimitiveType(type: JavaType | undefined): string | null {
+    return JavaType.isPrimitive(type) ? type.keyword || 'None' : null;
+}

@@ -52,28 +52,25 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
   - ✅ Integrated project root passing from parser to type mapping
 
 ### Phase 2: Object and Class Types
-- [ ] **2.1 Implement Class Type Mapping**
-  - Map TypeScript classes to `JavaType.Class`
-  - Handle class kinds (Class, Interface, Enum)
-  - Extract class members and methods
-  - Handle inheritance chain (`supertype`)
-  - Support nested/inner classes (`owningClass`)
-  ```typescript
-  // In createType method
-  if (type.symbol && type.symbol.flags & ts.SymbolFlags.Class) {
-    // Create JavaType.Class
-  }
-  ```
+- [x] **2.1 Implement Class Type Mapping** ✅
+  - ✅ Map TypeScript classes to `JavaType.Class`
+  - ✅ Handle class kinds (Class, Interface, Enum)
+  - ✅ Extract class members (properties as JavaType.Variable)
+  - ✅ Handle inheritance chain (`supertype`)
+  - ✅ Handle implemented interfaces
+  - ⚠️ Nested/inner classes (`owningClass`) - deferred to later phase
+  - Methods extraction deferred to Phase 3
 
-- [ ] **2.2 Implement Interface Type Mapping**
-  - Map interfaces to `JavaType.Class` with `Kind.Interface`
-  - Handle extended interfaces
-  - Extract interface members
+- [x] **2.2 Implement Interface Type Mapping** ✅
+  - ✅ Map interfaces to `JavaType.Class` with `Kind.Interface`
+  - ✅ Handle extended interfaces (stored in `interfaces` array)
+  - ✅ Extract interface members as JavaType.Variable
 
-- [ ] **2.3 Handle Object Literal Types**
-  - Map object literals to appropriate JavaType
-  - Handle index signatures
-  - Support mapped types
+- [x] **2.3 Handle Object Literal Types** ✅
+  - ✅ Map anonymous object literals to JavaType.Class with Interface kind
+  - ✅ Extract object literal properties as members
+  - ⚠️ Index signatures - needs additional work
+  - ⚠️ Mapped types - needs additional work
 
 ### Phase 3: Function and Method Types
 - [ ] **3.1 Complete `methodType()` Implementation**
@@ -215,6 +212,21 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
 - **Project Root**: Parser's `relativeTo` property can be used as project root for fully qualified names
 - **Module Resolution**: TypeScript's `sourceFile.isDeclarationFile` helps identify external modules
 - **Package Name Extraction**: Regex pattern `/node_modules\/(@[^\/]+\/[^\/]+|[^\/]+)/` handles both scoped and unscoped packages
+
+### Phase 2 Learnings  
+- **Readonly Properties**: JavaType interfaces have readonly properties, but can be mutated after creation with asRef
+- **Test File Handling**: Test files use snowflake IDs as filenames (e.g., "672087069480189952.ts"), need special handling in `getFullyQualifiedName`
+- **Symbol Flags**: TypeScript uses `ts.SymbolFlags.Class`, `ts.SymbolFlags.Interface`, and `ts.SymbolFlags.Enum` to identify type kinds
+- **Heritage Clauses**: `ts.SyntaxKind.ExtendsKeyword` and `ts.SyntaxKind.ImplementsKeyword` identify inheritance relationships
+  - For classes: `extends` = single superclass, `implements` = interfaces
+  - For interfaces: `extends` = extended interfaces (can be multiple)
+- **Anonymous Objects**: Anonymous object types can be mapped to JavaType.Class with Interface kind
+- **Type Properties**: `checker.getPropertiesOfType()` provides all properties including methods (need to filter by SymbolFlags.Method)
+- **Circular References**: Must use `asRef()` to handle cyclic type references (e.g., class members referencing their owner)
+- **Type Aliases**: Need to resolve through `checker.getDeclaredTypeOfSymbol()` to get underlying type
+- **RPC Codecs**: Each JavaType kind needs an RPC codec for serialization/deserialization
+- **asRef Usage**: Critical for avoiding duplicate sending of the same type instance and handling cycles in RPC
+- **Code Deduplication**: Heritage clause processing extracted into `extractHeritage()` helper method
 
 ### TypeChecker Capabilities Discovered
 - TypeChecker can infer types even from plain JavaScript through control flow analysis
