@@ -26,6 +26,8 @@ import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+
 @Value
 public class PrepareRecipe implements RpcRequest {
     String id;
@@ -44,12 +46,12 @@ public class PrepareRecipe implements RpcRequest {
                     instanceId,
                     recipe.getDescriptor(),
                     "edit:" + instanceId,
-                    // Making this non-null would only be valuable if a non-Java process was controlling
+                    // Making this non-empty would only be valuable if a non-Java process was controlling
                     // recipe execution and there would then be some benefit to it preempting the execution
                     // of the edit visitor in this Java RPC process. Same for the scan precondition visitor below.
-                    null,
+                    emptyList(),
                     recipe instanceof ScanningRecipe ? "scan:" + instanceId : null,
-                    null
+                    emptyList()
             );
         }
     }

@@ -21,6 +21,7 @@ import {ChangeVersion} from "./change-version";
 import {RecipeWithRecipeList} from "./recipe-with-recipe-list";
 import {ReplaceId} from "./replace-id";
 import {FindIdentifierWithRemotePathPrecondition} from "./remote-path-precondition";
+import {FindIdentifierWithPathPrecondition} from "./path-precondition";
 
 export function activate(registry: RecipeRegistry) {
     registry.register(ChangeText);
@@ -30,4 +31,5 @@ export function activate(registry: RecipeRegistry) {
     registry.register(ReplaceId);
     registry.register(FindIdentifier);
     registry.register(FindIdentifierWithRemotePathPrecondition);
+    registry.register(FindIdentifierWithPathPrecondition);
 }

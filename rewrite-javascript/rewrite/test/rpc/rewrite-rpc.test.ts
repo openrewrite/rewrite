@@ -175,6 +175,23 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("runRecipeWithPreconditions", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
+            identifier: "hello",
+            requiredPath: "hello.js"
+        });
+        await spec.rewriteRun(
+            {
+                //language=javascript
+                ...javascript(
+                    "const hello = 'world'",
+                    "const /*~~>*/hello = 'world'"
+                ),
+                path: "hello.js"
+            }
+        );
+    });
+
     test("runRecipeWithRecipeList", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.with-recipe-list");
         await spec.rewriteRun(

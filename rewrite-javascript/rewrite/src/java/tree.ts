@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-import {emptyMarkers, Markers, SourceFile, Tree, TreeKind} from "../";
+import {emptyMarkers, Markers} from "../markers";
+import {SourceFile, Tree, TreeKind} from "../tree";
 import {JavaType} from "./type";
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {JavaReceiver, JavaSender} from "./rpc";

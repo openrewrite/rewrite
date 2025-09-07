@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isTree,
-    mapAsync,
-    produceAsync,
-    SourceFile,
-    TreeVisitor,
-    ValidImmerRecipeReturnType
-} from "../";
+import {isTree, SourceFile} from "../tree";
+import {mapAsync} from "../util";
+import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
 import {
     Expression,
     isJava,

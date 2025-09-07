@@ -21,6 +21,7 @@ import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.JsonRpcSuccess;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import org.jetbrains.annotations.VisibleForTesting;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -228,6 +229,7 @@ public class RewriteRpc {
 
     public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
             if (option.isRequired() && !options.containsKey(option.getName())) {
@@ -235,13 +237,37 @@ public class RewriteRpc {
             }
         }
 
-        TreeVisitor<?, ExecutionContext> editPreconditionVisitor = r.getEditPreconditionVisitor() == null ?
-                null : preparedRecipes.instantiateVisitor(r.getEditPreconditionVisitor(), null);
-        TreeVisitor<?, ExecutionContext> scanPreconditionVisitor = r.getScanPreconditionVisitor() == null ?
-                null : preparedRecipes.instantiateVisitor(r.getScanPreconditionVisitor(), null);
+        return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
+                matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()));
+    }
 
-        return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(), editPreconditionVisitor,
-                r.getScanVisitor(), scanPreconditionVisitor);
+    private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {
+        if (preconditions.isEmpty()) {
+            return null;
+        }
+
+        List<TreeVisitor<?, ExecutionContext>> visitors = new ArrayList<>(preconditions.size());
+        for (PrepareRecipeResponse.Precondition p : preconditions) {
+            visitors.add(preparedRecipes.instantiateVisitor(
+                    p.getVisitorName(), p.getVisitorOptions()));
+        }
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                Tree t = tree;
+                for (TreeVisitor<?, ExecutionContext> v : visitors) {
+                    //noinspection unchecked
+                    t = ((TreeVisitor<Tree, ExecutionContext>) v).visit(tree, ctx);
+                    if (t == tree) {
+                        // One of the preconditions didn't match, so we fail the whole precondition
+                        return tree;
+                    }
+                }
+                return t;
+            }
+        };
     }
 
     public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
@@ -363,7 +389,7 @@ public class RewriteRpc {
             localObjects.put(id, remoteObject);
         }
 
-        //noinspection unchecked
+        //noinspection unchecked,DataFlowIssue
         return (T) remoteObject;
     }
 

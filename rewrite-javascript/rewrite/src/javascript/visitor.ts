@@ -15,7 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
+import {mapAsync} from "../util";
+import {SourceFile} from "../tree";
+import {ValidImmerRecipeReturnType} from "../visitor";
 import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS, JSX} from "./tree";

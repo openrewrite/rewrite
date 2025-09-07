@@ -38,23 +38,11 @@ export class PrepareRecipe {
             }
             let recipe = new recipeCtor(request.options);
 
-            // For preconditions that can be evaluated on the remote peer, let the remote peer
-            // evaluate them and know that we will only have to do the visit work if the
-            // precondition passes.
-            const editor = await recipe.editor()
-            let editPreconditionVisitor: string | undefined = undefined;
-            if (editor instanceof Check && editor.check instanceof RpcRecipe) {
-                editPreconditionVisitor = editor.check.editVisitor;
-                recipe = Object.assign(
-                    Object.create(Object.getPrototypeOf(recipe)),
-                    recipe,
-                    {
-                        async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
-                            return editor.v;
-                        }
-                    }
-                )
-            }
+            const editPreconditions: Precondition[] = [];
+            recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
+
+            const scanPreconditions: Precondition[] = [];
+            recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
 
             preparedRecipes.set(id, recipe);
 
@@ -62,12 +50,81 @@ export class PrepareRecipe {
                 id: id,
                 descriptor: await recipe.descriptor(),
                 editVisitor: `edit:${id}`,
-                editPreconditionVisitor: editPreconditionVisitor,
+                editPreconditions: editPreconditions,
                 scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                // TODO don't yet support short-circuiting preconditions on the scanning phase
-                scanPreconditionVisitor: undefined
+                scanPreconditions: scanPreconditions
             }
         });
+    }
+
+    /**
+     * For preconditions that can be evaluated on the remote peer, let the remote peer
+     * evaluate them and know that we will only have to do the visit work if the
+     * precondition passes.
+     */
+    private static async optimizePreconditions(recipe: Recipe, phase: "edit" | "scan", preconditions: Precondition[]): Promise<Recipe> {
+        let visitor: TreeVisitor<any, ExecutionContext>;
+        if (phase === "edit") {
+            visitor = await recipe.editor();
+        } else if (phase === "scan") {
+            if (recipe instanceof ScanningRecipe) {
+                visitor = await recipe.scanner(undefined);
+            } else {
+                return recipe;
+            }
+        }
+
+        if (visitor! instanceof Check) {
+            if (visitor.check instanceof RpcRecipe) {
+                preconditions.push({visitorName: phase === "edit" ? visitor.check.editVisitor : visitor.check.scanVisitor!});
+                recipe = Object.assign(
+                    Object.create(Object.getPrototypeOf(recipe)),
+                    recipe,
+                    phase === "edit" ?
+                        {
+                            async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
+                                return visitor.v;
+                            }
+                        } :
+                        {
+                            async scanner(acc: any): Promise<TreeVisitor<any, ExecutionContext>> {
+                                const checkVisitor = await (recipe as ScanningRecipe<any>).scanner(acc);
+                                return (checkVisitor as Check<any>).v;
+                            }
+                        }
+                )
+            }
+            this.visitorTypePrecondition(preconditions, visitor.v);
+        } else {
+            this.visitorTypePrecondition(preconditions, visitor!);
+        }
+        return recipe;
+    }
+
+    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+        let treeType: string | undefined;
+        
+        // Use CommonJS require to defer loading and avoid circular dependencies
+        const {JsonVisitor} = require("../../json");
+        const {JavaScriptVisitor} = require("../../javascript");
+        const {JavaVisitor} = require("../../java");
+        
+        if (v instanceof JsonVisitor) {
+            treeType = "org.openrewrite.json.tree.Json";
+        } else if (v instanceof JavaScriptVisitor) {
+            // Order is important here! JavaScriptVisitor is a subclass of JavaVisitor
+            // and so must appear first in these conditional statements
+            treeType = "org.openrewrite.javascript.tree.JS";
+        } else if (v instanceof JavaVisitor) {
+            treeType = "org.openrewrite.java.tree.J";
+        }
+        if (treeType) {
+            preconditions.push({
+                visitorName: "org.openrewrite.rpc.internal.FindTreesOfType",
+                visitorOptions: {type: treeType}
+            });
+        }
+        return preconditions;
     }
 }
 
@@ -75,7 +132,12 @@ export interface PrepareRecipeResponse {
     id: string
     descriptor: RecipeDescriptor
     editVisitor: string
-    editPreconditionVisitor?: string,
+    editPreconditions: Precondition[]
     scanVisitor?: string
-    scanPreconditionVisitor?: string
+    scanPreconditions: Precondition[]
+}
+
+export interface Precondition {
+    visitorName: string
+    visitorOptions?: {}
 }
