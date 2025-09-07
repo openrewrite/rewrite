@@ -76,12 +76,14 @@ export class JavaScriptParser extends Parser {
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
+            moduleResolution: ts.ModuleResolutionKind.Node10,
             allowJs: true,
             checkJs: true,
             esModuleInterop: true,
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
-            jsx: ts.JsxEmit.Preserve
+            jsx: ts.JsxEmit.Preserve,
+            baseUrl: relativeTo || process.cwd()
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
@@ -107,6 +109,12 @@ export class JavaScriptParser extends Parser {
 
         // Create a new CompilerHost within parseInputs
         const host = ts.createCompilerHost(this.compilerOptions);
+        
+        // Set the current directory for module resolution
+        if (this.relativeTo) {
+            const originalGetCurrentDirectory = host.getCurrentDirectory;
+            host.getCurrentDirectory = () => this.relativeTo || originalGetCurrentDirectory();
+        }
 
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {

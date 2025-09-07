@@ -248,7 +248,14 @@ export class JavaScriptTypeMapping {
         for (const prop of properties) {
             // Skip methods for now (will be handled in Phase 3)
             if (!(prop.flags & ts.SymbolFlags.Method)) {
-                const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
+                // Get a declaration to use for type checking
+                const declaration = prop.valueDeclaration || prop.declarations?.[0];
+                if (!declaration) {
+                    // Skip properties without declarations (synthetic properties)
+                    continue;
+                }
+                
+                const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
                 const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),

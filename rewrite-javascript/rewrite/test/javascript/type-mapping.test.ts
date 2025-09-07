@@ -324,11 +324,11 @@ describe('JavaScript type mapping', () => {
                                 const sum = _.reduce(doubled, (a, b) => a + b, 0);
                             `,
                             `
-                                import /*~~(lodash)~~>*/_ from 'lodash';
+                                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
 
                                 const numbers = [1, 2, 3, 4, 5];
-                                const doubled = /*~~(lodash)~~>*/_.map(numbers, n => n * 2);
-                                const sum = /*~~(lodash)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
+                                const doubled = /*~~(@types/lodash.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
+                                const sum = /*~~(@types/lodash.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
                             `
                         ),
                         //language=json
