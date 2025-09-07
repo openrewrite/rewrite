@@ -121,13 +121,13 @@ async function main() {
         logger.info(`connection disposed`);
     });
 
-    new RewriteRpc(connection, {
+    RewriteRpc.set(new RewriteRpc(connection, {
         batchSize: options.batchSize,
         logger: logger,
         traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
         traceGetObjectOutput: options.traceGetObjectOutput,
         recipeInstallDir: recipeInstallDir
-    });
+    }));
 
     // log uncaught exceptions
     process.on('uncaughtException', (error) => {

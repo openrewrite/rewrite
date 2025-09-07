@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Markers, SourceFile, Tree, TreeKind} from "../";
+import {Markers} from "../markers";
+import {SourceFile, Tree, TreeKind} from "../tree";
 
 
 export interface Json extends Tree {

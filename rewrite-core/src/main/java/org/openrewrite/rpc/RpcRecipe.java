@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -34,19 +35,18 @@ import static java.util.stream.Collectors.toMap;
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
     private final transient RewriteRpc rpc;
-
-    @Nullable
-    private transient List<Recipe> recipeList;
+    private transient @Nullable List<Recipe> recipeList;
 
     /**
      * The ID that the remote is using to refer to this recipe.
      */
     private final String remoteId;
+
     private final RecipeDescriptor descriptor;
     private final String editVisitor;
-
-    @Nullable
-    private final String scanVisitor;
+    private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+    private final @Nullable String scanVisitor;
+    private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 
     @Override
     public String getName() {
@@ -80,7 +80,8 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public List<Contributor> getContributors() {
-        return descriptor.getContributors();
+        // This is deprecated in RecipeDescriptor
+        return emptyList();
     }
 
     @Override
@@ -95,22 +96,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
-        if (scanVisitor == null) {
-            return TreeVisitor.noop();
-        }
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof RpcCodec;
-            }
-
-            @Override
-            public Tree preVisit(Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                rpc.scan((SourceFile) tree, scanVisitor, ctx);
-                return tree;
-            }
-        };
+        return scanVisitor == null ? TreeVisitor.noop() : Preconditions.check(scanPreconditionVisitor, new RpcVisitor(rpc, scanVisitor));
     }
 
     @Override
@@ -120,18 +106,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Integer acc) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof RpcCodec;
-            }
-
-            @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                stopAfterPreVisit();
-                return rpc.visit((SourceFile) tree, editVisitor, ctx);
-            }
-        };
+        return Preconditions.check(editPreconditionVisitor, new RpcVisitor(rpc, editVisitor));
     }
 
     @Override
@@ -153,6 +128,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         // When multiple recipes ran on the same RPC peer, they will all have been
         // adding to the same ExecutionContext instance on that peer, and so really
         // a CHANGE will only be returned for the first of any recipes on that peer.
+        //
         // It doesn't matter which one added data table entries, because they all share
         // the same view of the data tables.
         String id = ctx.getMessage("org.openrewrite.rpc.id");
