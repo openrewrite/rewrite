@@ -20,7 +20,7 @@ import {
     emptySpace,
     Expression,
     J,
-    JavaType,
+    Type,
     NameTree,
     Statement,
     TextComment,
@@ -713,8 +713,8 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             annotations: [], // FIXME decorators
             simpleName: name,
-            type: type?.kind === JavaType.Kind.Variable ? (type as JavaType.Variable).type : type,
-            fieldType: type?.kind === JavaType.Kind.Variable ? type as JavaType.Variable : undefined
+            type: type?.kind === Type.Kind.Variable ? (type as Type.Variable).type : type,
+            fieldType: type?.kind === Type.Kind.Variable ? type as Type.Variable : undefined
         };
     }
 
@@ -3175,7 +3175,7 @@ export class JavaScriptParserVisitor {
                     emptySpace)],
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node) as JavaType.Class
+            type: this.mapType(node) as Type.Class
         };
     }
 
@@ -4080,19 +4080,19 @@ export class JavaScriptParserVisitor {
         return this.prefix(getNextSibling(node)!, consume);
     }
 
-    private mapType(node: ts.Node): JavaType | undefined {
+    private mapType(node: ts.Node): Type | undefined {
         return Object.freeze(this.typeMapping.type(node));
     }
 
-    private mapPrimitiveType(node: ts.Node): JavaType.Primitive {
+    private mapPrimitiveType(node: ts.Node): Type.Primitive {
         return this.typeMapping.primitiveType(node);
     }
 
-    private mapVariableType(node: ts.NamedDeclaration): JavaType.Variable | undefined {
+    private mapVariableType(node: ts.NamedDeclaration): Type.Variable | undefined {
         return this.typeMapping.variableType(node);
     }
 
-    private mapMethodType(node: ts.Node): JavaType.Method | undefined {
+    private mapMethodType(node: ts.Node): Type.Method | undefined {
         return this.typeMapping.methodType(node);
     }
 

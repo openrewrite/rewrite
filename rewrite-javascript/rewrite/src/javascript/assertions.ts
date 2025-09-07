@@ -17,8 +17,46 @@ import {AfterRecipeText, dedentAfter, SourceSpec} from "../test";
 import {JavaScriptParser} from "./parser";
 import {JS} from "./tree";
 import ts from 'typescript';
+import {json, Json} from "../json";
+import * as fs from "fs";
+import * as path from "path";
+import {execSync} from "child_process";
 
 const sourceFileCache: Map<string, ts.SourceFile> = new Map();
+
+export function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): Generator<SourceSpec<any>, void, unknown> {
+    for (const spec of sourceSpecs) {
+        if (spec.path === 'package.json') {
+            // Write package.json to disk so npm install can be run
+            fs.mkdirSync(relativeTo, {recursive: true});
+            fs.writeFileSync(path.join(relativeTo, 'package.json'), spec.before!);
+            execSync('npm install', {
+                cwd: relativeTo,
+                stdio: 'inherit' // Show npm output for debugging
+            });
+            yield spec;
+        }
+    }
+    for (const spec of sourceSpecs) {
+        if (spec.path !== 'package.json') {
+            if (spec.kind === JS.Kind.CompilationUnit) {
+                yield {
+                    ...spec,
+                    parser: () => new JavaScriptParser({sourceFileCache, relativeTo})
+                }
+            } else {
+                yield spec;
+            }
+        }
+    }
+}
+
+export function packageJson(before: string, after?: AfterRecipeText): SourceSpec<Json.Document> {
+    return {
+        ...json(before, after),
+        path: 'package.json'
+    };
+}
 
 export function javascript(before: string | null, after?: AfterRecipeText): SourceSpec<JS.CompilationUnit> {
     return {
@@ -26,7 +64,7 @@ export function javascript(before: string | null, after?: AfterRecipeText): Sour
         before: before,
         after: dedentAfter(after),
         ext: 'js',
-        parser: () => new JavaScriptParser({sourceFileCache})
+        parser: ctx => new JavaScriptParser({sourceFileCache})
     };
 }
 

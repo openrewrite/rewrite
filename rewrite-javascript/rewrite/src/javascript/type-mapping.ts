@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import ts from "typescript";
-import {JavaType} from "../java";
+import {Type} from "../java";
 import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 
 const builtInTypes = new Set([
@@ -25,7 +25,7 @@ const builtInTypes = new Set([
 ]);
 
 export class JavaScriptTypeMapping {
-    private readonly typeCache: Map<string | number, JavaType> = new Map();
+    private readonly typeCache: Map<string | number, Type> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
 
     constructor(
@@ -40,7 +40,7 @@ export class JavaScriptTypeMapping {
         );
     }
 
-    type(node: ts.Node): JavaType | undefined {
+    type(node: ts.Node): Type | undefined {
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
@@ -50,7 +50,7 @@ export class JavaScriptTypeMapping {
         return type && this.getType(type);
     }
 
-    private getType(type: ts.Type): JavaType {
+    private getType(type: ts.Type): Type {
         const signature = this.getSignature(type);
         const existing = this.typeCache.get(signature);
         if (existing) {
@@ -59,7 +59,7 @@ export class JavaScriptTypeMapping {
 
         // Set a placeholder to prevent infinite recursion during type creation
         // This is crucial for types with cyclic references (e.g., DOM types)
-        this.typeCache.set(signature, JavaType.unknownType);
+        this.typeCache.set(signature, Type.unknownType);
 
         const result = this.createType(type);
         this.typeCache.set(signature, result);
@@ -93,12 +93,12 @@ export class JavaScriptTypeMapping {
         return `synthetic:${typeString}`;
     }
 
-    primitiveType(node: ts.Node): JavaType.Primitive {
+    primitiveType(node: ts.Node): Type.Primitive {
         const type = this.type(node);
-        return JavaType.isPrimitive(type) ? type : JavaType.Primitive.None;
+        return Type.isPrimitive(type) ? type : Type.Primitive.None;
     }
 
-    variableType(node: ts.NamedDeclaration): JavaType.Variable | undefined {
+    variableType(node: ts.NamedDeclaration): Type.Variable | undefined {
         if (ts.isVariableDeclaration(node)) {
             const symbol = this.checker.getSymbolAtLocation(node.name);
             if (symbol) {
@@ -110,7 +110,7 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
-    methodType(node: ts.Node): JavaType.Method | undefined {
+    methodType(node: ts.Node): Type.Method | undefined {
         return undefined;
     }
 
@@ -196,14 +196,14 @@ export class JavaScriptTypeMapping {
     /**
      * Create a JavaType.Class from a TypeScript type and symbol.
      */
-    private createClassType(type: ts.Type, symbol: ts.Symbol, kind: JavaType.Class.Kind): JavaType.Class {
+    private createClassType(type: ts.Type, symbol: ts.Symbol, kind: Type.Class.Kind): Type.Class {
         const fullyQualifiedName = this.getFullyQualifiedName(type);
 
         // Collect all the data first
-        const typeParameters: JavaType[] = [];
-        const interfaces: JavaType.Class[] = [];
-        const methods: JavaType.Method[] = [];
-        let supertype: JavaType.Class | undefined;
+        const typeParameters: Type[] = [];
+        const interfaces: Type.Class[] = [];
+        const methods: Type.Method[] = [];
+        let supertype: Type.Class | undefined;
 
         // Get type parameters and heritage information from declarations
         if (symbol.declarations) {
@@ -231,8 +231,8 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        const classType: JavaType.Class = {
-            kind: JavaType.Kind.Class,
+        const classType: Type.Class = {
+            kind: Type.Kind.Class,
             classKind: kind,
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: typeParameters,
@@ -249,8 +249,8 @@ export class JavaScriptTypeMapping {
             // Skip methods for now (will be handled in Phase 3)
             if (!(prop.flags & ts.SymbolFlags.Method)) {
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
-                const variable: JavaType.Variable = {
-                    kind: JavaType.Kind.Variable,
+                const variable: Type.Variable = {
+                    kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class
                     type: this.getType(propType),
@@ -266,27 +266,27 @@ export class JavaScriptTypeMapping {
     /**
      * Extract supertype and interfaces from heritage clauses.
      */
-    private extractHeritage(heritageClauses: ts.NodeArray<ts.HeritageClause>, kind: JavaType.Class.Kind):
-        { supertype?: JavaType.Class, interfaces: JavaType.Class[] } {
+    private extractHeritage(heritageClauses: ts.NodeArray<ts.HeritageClause>, kind: Type.Class.Kind):
+        { supertype?: Type.Class, interfaces: Type.Class[] } {
 
-        let supertype: JavaType.Class | undefined = undefined;
-        const interfaces: JavaType.Class[] = [];
+        let supertype: Type.Class | undefined = undefined;
+        const interfaces: Type.Class[] = [];
 
         for (const clause of heritageClauses) {
             if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-                if (kind === JavaType.Class.Kind.Class && clause.types.length > 0) {
+                if (kind === Type.Class.Kind.Class && clause.types.length > 0) {
                     // For classes, extends means superclass (only first one)
                     const superType = this.checker.getTypeAtLocation(clause.types[0]);
                     const superJavaType = this.getType(superType);
-                    if (JavaType.isClass(superJavaType)) {
+                    if (Type.isClass(superJavaType)) {
                         supertype = superJavaType;
                     }
-                } else if (kind === JavaType.Class.Kind.Interface) {
+                } else if (kind === Type.Class.Kind.Interface) {
                     // For interfaces, extends means extended interfaces (can be multiple)
                     for (const extendedType of clause.types) {
                         const extType = this.checker.getTypeAtLocation(extendedType);
                         const extJavaType = this.getType(extType);
-                        if (JavaType.isClass(extJavaType)) {
+                        if (Type.isClass(extJavaType)) {
                             interfaces.push(extJavaType);
                         }
                     }
@@ -296,7 +296,7 @@ export class JavaScriptTypeMapping {
                 for (const implType of clause.types) {
                     const interfaceType = this.checker.getTypeAtLocation(implType);
                     const interfaceJavaType = this.getType(interfaceType);
-                    if (JavaType.isClass(interfaceJavaType)) {
+                    if (Type.isClass(interfaceJavaType)) {
                         interfaces.push(interfaceJavaType);
                     }
                 }
@@ -309,15 +309,15 @@ export class JavaScriptTypeMapping {
     /**
      * Create a JavaType.Class for anonymous object types.
      */
-    private createAnonymousClassType(type: ts.Type): JavaType.Class {
+    private createAnonymousClassType(type: ts.Type): Type.Class {
         // Generate a name for the anonymous type
         const typeString = this.checker.typeToString(type);
         const fullyQualifiedName = `<anonymous>${typeString}`;
 
         // Create initial class type with asRef for cyclic references
-        const classType: JavaType.Class = asRef({
-            kind: JavaType.Kind.Class,
-            classKind: JavaType.Class.Kind.Interface, // Treat anonymous objects as interfaces
+        const classType: Type.Class = asRef({
+            kind: Type.Kind.Class,
+            classKind: Type.Class.Kind.Interface, // Treat anonymous objects as interfaces
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: [],
             annotations: [],
@@ -331,8 +331,8 @@ export class JavaScriptTypeMapping {
         for (const prop of properties) {
             if (!(prop.flags & ts.SymbolFlags.Method)) {
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
-                const variable: JavaType.Variable = asRef({
-                    kind: JavaType.Kind.Variable,
+                const variable: Type.Variable = asRef({
+                    kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class
                     type: this.getType(propType),
@@ -345,46 +345,46 @@ export class JavaScriptTypeMapping {
         return classType;
     }
 
-    private createType(type: ts.Type): JavaType {
+    private createType(type: ts.Type): Type {
         // Check for literals first
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {
-                return JavaType.Primitive.Double;
+                return Type.Primitive.Double;
             } else if (type.isStringLiteral()) {
-                return JavaType.Primitive.String;
+                return Type.Primitive.String;
             }
         }
 
         // Check for primitive types
         if (type.flags === ts.TypeFlags.Null) {
-            return JavaType.Primitive.Null;
+            return Type.Primitive.Null;
         } else if (type.flags === ts.TypeFlags.Undefined) {
-            return JavaType.Primitive.None;
+            return Type.Primitive.None;
         } else if (
             type.flags === ts.TypeFlags.Number ||
             type.flags === ts.TypeFlags.NumberLiteral ||
             type.flags === ts.TypeFlags.NumberLike
         ) {
-            return JavaType.Primitive.Double;
+            return Type.Primitive.Double;
         } else if (
             type.flags === ts.TypeFlags.String ||
             type.flags === ts.TypeFlags.StringLiteral ||
             type.flags === ts.TypeFlags.StringLike
         ) {
-            return JavaType.Primitive.String;
+            return Type.Primitive.String;
         } else if (type.flags === ts.TypeFlags.Void) {
-            return JavaType.Primitive.Void;
+            return Type.Primitive.Void;
         } else if (
             type.flags === ts.TypeFlags.BigInt ||
             type.flags === ts.TypeFlags.BigIntLiteral ||
             type.flags === ts.TypeFlags.BigIntLike
         ) {
-            return JavaType.Primitive.Long;
+            return Type.Primitive.Long;
         } else if (
             (type.symbol !== undefined && type.symbol === this.regExpSymbol) ||
             this.checker.typeToString(type) === "RegExp"
         ) {
-            return JavaType.Primitive.String;
+            return Type.Primitive.String;
         }
 
         /**
@@ -396,18 +396,18 @@ export class JavaScriptTypeMapping {
             type.flags & ts.TypeFlags.BooleanLiteral ||
             type.flags & ts.TypeFlags.BooleanLike
         ) {
-            return JavaType.Primitive.Boolean;
+            return Type.Primitive.Boolean;
         }
 
         // Check for class/interface types
         const symbol = type.getSymbol?.();
         if (symbol) {
             if (symbol.flags & ts.SymbolFlags.Class) {
-                return this.createClassType(type, symbol, JavaType.Class.Kind.Class);
+                return this.createClassType(type, symbol, Type.Class.Kind.Class);
             } else if (symbol.flags & ts.SymbolFlags.Interface) {
-                return this.createClassType(type, symbol, JavaType.Class.Kind.Interface);
+                return this.createClassType(type, symbol, Type.Class.Kind.Interface);
             } else if (symbol.flags & ts.SymbolFlags.Enum) {
-                return this.createClassType(type, symbol, JavaType.Class.Kind.Enum);
+                return this.createClassType(type, symbol, Type.Class.Kind.Enum);
             } else if (symbol.flags & ts.SymbolFlags.TypeAlias) {
                 // Type aliases may resolve to class-like structures
                 const aliasedType = this.checker.getDeclaredTypeOfSymbol(symbol);
@@ -427,22 +427,22 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        return JavaType.unknownType;
+        return Type.unknownType;
     }
 }
 
-RpcCodecs.registerCodec(JavaType.Kind.Primitive, {
-    async rpcSend(after: JavaType.Primitive, q: RpcSendQueue): Promise<void> {
+RpcCodecs.registerCodec(Type.Kind.Primitive, {
+    async rpcSend(after: Type.Primitive, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, p => p.keyword);
     },
-    async rpcReceive(before: JavaType.Primitive, q: RpcReceiveQueue): Promise<JavaType.Primitive> {
+    async rpcReceive(before: Type.Primitive, q: RpcReceiveQueue): Promise<Type.Primitive> {
         const keyword: string = await q.receive(before.keyword);
-        return JavaType.Primitive.fromKeyword(keyword)!;
+        return Type.Primitive.fromKeyword(keyword)!;
     }
 });
 
-RpcCodecs.registerCodec(JavaType.Kind.Class, {
-    async rpcSend(after: JavaType.Class, q: RpcSendQueue): Promise<void> {
+RpcCodecs.registerCodec(Type.Kind.Class, {
+    async rpcSend(after: Type.Class, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, c => c.classKind);
         await q.getAndSend(after, c => c.fullyQualifiedName);
         await q.getAndSend(after, c => c.typeParameters);
@@ -452,7 +452,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Class, {
         await q.getAndSend(after, c => c.members);
         await q.getAndSend(after, c => c.methods);
     },
-    async rpcReceive(before: JavaType.Class, q: RpcReceiveQueue): Promise<JavaType.Class> {
+    async rpcReceive(before: Type.Class, q: RpcReceiveQueue): Promise<Type.Class> {
         const classKind = await q.receive(before.classKind);
         const fullyQualifiedName = await q.receive(before.fullyQualifiedName);
         const typeParameters = await q.receive(before.typeParameters);
@@ -463,7 +463,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Class, {
         const methods = await q.receive(before.methods);
 
         return asRef({
-            kind: JavaType.Kind.Class,
+            kind: Type.Kind.Class,
             classKind,
             fullyQualifiedName,
             typeParameters,
@@ -476,15 +476,15 @@ RpcCodecs.registerCodec(JavaType.Kind.Class, {
     }
 });
 
-RpcCodecs.registerCodec(JavaType.Kind.Variable, {
-    async rpcSend(after: JavaType.Variable, q: RpcSendQueue): Promise<void> {
+RpcCodecs.registerCodec(Type.Kind.Variable, {
+    async rpcSend(after: Type.Variable, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, v => v.name);
         await q.getAndSend(after, v => v.owner);
         await q.getAndSend(after, v => v.type);
         // FIXME we need to use getAndSendList here but need to think about what to use for the ID
         await q.getAndSend(after, v => v.annotations);
     },
-    async rpcReceive(before: JavaType.Variable, q: RpcReceiveQueue): Promise<JavaType.Variable> {
+    async rpcReceive(before: Type.Variable, q: RpcReceiveQueue): Promise<Type.Variable> {
         const name = await q.receive(before.name);
         const owner = await q.receive(before.owner);
         const type = await q.receive(before.type);
@@ -492,7 +492,7 @@ RpcCodecs.registerCodec(JavaType.Kind.Variable, {
         const annotations = await q.receive(before.annotations);
 
         return asRef({
-            kind: JavaType.Kind.Variable,
+            kind: Type.Kind.Variable,
             name,
             owner,
             type,
@@ -501,17 +501,17 @@ RpcCodecs.registerCodec(JavaType.Kind.Variable, {
     }
 });
 
-RpcCodecs.registerCodec(JavaType.Kind.Annotation, {
-    async rpcSend(after: JavaType.Annotation, q: RpcSendQueue): Promise<void> {
+RpcCodecs.registerCodec(Type.Kind.Annotation, {
+    async rpcSend(after: Type.Annotation, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.type);
         await q.getAndSend(after, a => a.values);
     },
-    async rpcReceive(before: JavaType.Annotation, q: RpcReceiveQueue): Promise<JavaType.Annotation> {
+    async rpcReceive(before: Type.Annotation, q: RpcReceiveQueue): Promise<Type.Annotation> {
         const type = await q.receive(before.type);
         const values = await q.receive(before.values);
 
         return asRef({
-            kind: JavaType.Kind.Annotation,
+            kind: Type.Kind.Annotation,
             type,
             values
         });

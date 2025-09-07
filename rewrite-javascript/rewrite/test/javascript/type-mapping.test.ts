@@ -1,4 +1,4 @@
-// noinspection JSUnusedLocalSymbols,TypeScriptMissingConfigOption
+// noinspection JSUnusedLocalSymbols,TypeScriptMissingConfigOption,TypeScriptCheckImport
 
 /*
  * Copyright 2025 the original author or authors.
@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, tsx, typescript} from "../../src/javascript";
-import {J, JavaType} from "../../src/java";
+import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
+import {withDir} from "tmp-promise";
 
 describe('JavaScript type mapping', () => {
     describe('primitive types', () => {
@@ -264,7 +265,7 @@ describe('JavaScript type mapping', () => {
             spec.recipe = markTypes((node, type) => {
                 // Mark HTMLElement type references
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'HTMLElement') {
-                    if (JavaType.isClass(type)) {
+                    if (Type.isClass(type)) {
                         // Verify we're getting members - HTMLElement has many properties
                         const memberNames = type.members.map(m => m.name);
                         // Check for some known HTMLElement properties
@@ -300,12 +301,62 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should map types from libraries accessible from node_modules', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark any node that has a lodash-related type
+                return Type.isClass(type) && type.fullyQualifiedName.includes('lodash') ?
+                    type.fullyQualifiedName : null;
+            });
+
+            // Use tmp-promise's withDir for automatic cleanup
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import _ from 'lodash';
+
+                                const numbers = [1, 2, 3, 4, 5];
+                                const doubled = _.map(numbers, n => n * 2);
+                                const sum = _.reduce(doubled, (a, b) => a + b, 0);
+                            `,
+                            `
+                                import /*~~(lodash)~~>*/_ from 'lodash';
+
+                                const numbers = [1, 2, 3, 4, 5];
+                                const doubled = /*~~(lodash)~~>*/_.map(numbers, n => n * 2);
+                                const sum = /*~~(lodash)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "lodash": "^4.17.21"
+                                },
+                                "devDependencies": {
+                                  "@types/lodash": "^4.14.195"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should map user-defined class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
                 // Mark class identifiers
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'Person') {
-                    return JavaType.isClass(type) ? type.fullyQualifiedName : null;
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
                 }
                 return null;
             });
@@ -320,7 +371,8 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        class /*~~(Person)~~>*/Person {
+                        class /*~~(Person)~~>*/
+                        Person {
                             name: string;
                             age: number;
                         }
@@ -334,7 +386,7 @@ describe('JavaScript type mapping', () => {
             spec.recipe = markTypes((node, type) => {
                 // Mark interface identifiers
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'User') {
-                    return JavaType.isClass(type) ? type.fullyQualifiedName : null;
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
                 }
                 return null;
             });
@@ -349,7 +401,8 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        interface /*~~(User)~~>*/User {
+                        interface /*~~(User)~~>*/
+                        User {
                             id: number;
                             email: string;
                         }
@@ -364,8 +417,8 @@ describe('JavaScript type mapping', () => {
             spec.recipe = markTypes((node, type) => {
                 // Mark array literals
                 if (node?.kind === J.Kind.NewArray) {
-                    if (JavaType.isArray(type)) {
-                        const elemTypeName = JavaType.isPrimitive(type.elemType)
+                    if (Type.isArray(type)) {
+                        const elemTypeName = Type.isPrimitive(type.elemType)
                             ? type.elemType.keyword || 'unknown'
                             : 'unknown';
                         return `Array<${elemTypeName}>`;
@@ -397,7 +450,7 @@ describe('JavaScript type mapping', () => {
                 // Mark function identifiers with their method type
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'add') {
                     // Check for Method type using kind property
-                    return type?.kind === JavaType.Kind.Method ? `(number, number) => number` : null;
+                    return type?.kind === Type.Kind.Method ? `(number, number) => number` : null;
                 }
                 return null;
             });
@@ -425,7 +478,7 @@ describe('JavaScript type mapping', () => {
             spec.recipe = markTypes((node, type) => {
                 // Mark generic function with parameterized type
                 if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'identity') {
-                    return JavaType.isParameterized(type) ? `<T>(T) => T` : null;
+                    return Type.isParameterized(type) ? `<T>(T) => T` : null;
                 }
                 return null;
             });
@@ -454,7 +507,7 @@ describe('JavaScript type mapping', () => {
                 // Mark JSX elements with their component type
                 if (node?.kind === J.Kind.NewClass && type) {
                     // JSX elements are typically mapped as NewClass in the J model
-                    return JavaType.isClass(type) ? type.fullyQualifiedName : null;
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
                 }
                 return null;
             });
@@ -481,7 +534,7 @@ describe('JavaScript type mapping', () => {
 /**
  * Helper to create a recipe that marks types
  */
-function markTypes(predicate: (node: any, type: JavaType | undefined) => string | null): Recipe {
+function markTypes(predicate: (node: any, type: Type | undefined) => string | null): Recipe {
     class TypeMarkerRecipe extends Recipe {
         name = 'Type marker';
         displayName = 'Mark types';
@@ -516,6 +569,6 @@ function markTypes(predicate: (node: any, type: JavaType | undefined) => string 
 /**
  * Helper to format primitive types for display
  */
-function formatPrimitiveType(type: JavaType | undefined): string | null {
-    return JavaType.isPrimitive(type) ? type.keyword || 'None' : null;
+function formatPrimitiveType(type: Type | undefined): string | null {
+    return Type.isPrimitive(type) ? type.keyword || 'None' : null;
 }

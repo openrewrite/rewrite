@@ -57,9 +57,8 @@ public class Assertions {
     }
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> ts = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, null);
-        spec.accept(ts);
-        return ts;
+        //noinspection LanguageMismatch
+        return javascript(before, spec);
     }
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after) {
@@ -69,8 +68,7 @@ public class Assertions {
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> ts = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, s -> after);
-        spec.accept(ts);
-        return ts;
+        //noinspection LanguageMismatch
+        return javascript(before, after, spec);
     }
 }

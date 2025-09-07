@@ -15,11 +15,11 @@
  */
 import {asRef} from "../rpc";
 
-export interface JavaType {
+export interface Type {
     readonly kind: string;
 }
 
-export namespace JavaType {
+export namespace Type {
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
@@ -36,17 +36,17 @@ export namespace JavaType {
         Variable: "org.openrewrite.java.tree.JavaType$Variable",
     }
 
-    export interface Class extends JavaType, FullyQualified {
+    export interface Class extends Type, FullyQualified {
         readonly kind: typeof Kind.Class,
         readonly classKind: Class.Kind;
         readonly fullyQualifiedName: string;
-        readonly typeParameters: JavaType[];
-        readonly supertype?: JavaType.Class;
-        readonly owningClass?: JavaType.Class;
-        readonly annotations: JavaType.Annotation[];
-        readonly interfaces: JavaType.Class[];
-        readonly members: JavaType.Variable[];
-        readonly methods: JavaType.Method[];
+        readonly typeParameters: Type[];
+        readonly supertype?: Type.Class;
+        readonly owningClass?: Type.Class;
+        readonly annotations: Type.Annotation[];
+        readonly interfaces: Type.Class[];
+        readonly members: Type.Variable[];
+        readonly methods: Type.Method[];
     }
 
     export namespace Class {
@@ -60,52 +60,52 @@ export namespace JavaType {
         }
     }
 
-    export interface Annotation extends JavaType, FullyQualified {
+    export interface Annotation extends Type, FullyQualified {
         readonly kind: typeof Kind.Annotation,
-        readonly type: JavaType.FullyQualified;
+        readonly type: Type.FullyQualified;
         readonly values: Annotation.ElementValue[];
     }
 
     export namespace Annotation {
         export interface ElementValue {
             readonly kind: typeof Kind.AnnotationElementValue;
-            readonly element: JavaType;
+            readonly element: Type;
             readonly value: any;
         }
     }
 
-    export interface Method extends JavaType {
+    export interface Method extends Type {
         readonly kind: typeof Kind.Method;
-        readonly declaringType: JavaType.FullyQualified;
+        readonly declaringType: Type.FullyQualified;
         readonly name: string;
-        readonly returnType: JavaType;
+        readonly returnType: Type;
         readonly parameterNames: string[];
-        readonly parameterTypes: JavaType[];
-        readonly thrownExceptions: JavaType[];
-        readonly annotations: JavaType.Annotation[];
+        readonly parameterTypes: Type[];
+        readonly thrownExceptions: Type[];
+        readonly annotations: Type.Annotation[];
         readonly defaultValue?: string[];
         readonly declaredFormalTypeNames: string[];
     }
 
-    export interface Variable extends JavaType {
+    export interface Variable extends Type {
         readonly kind: typeof Kind.Variable;
         readonly name: string;
-        readonly owner?: JavaType;
-        readonly type: JavaType;
-        readonly annotations: JavaType.Annotation[];
+        readonly owner?: Type;
+        readonly type: Type;
+        readonly annotations: Type.Annotation[];
     }
 
-    export interface Parameterized extends JavaType, FullyQualified {
+    export interface Parameterized extends Type, FullyQualified {
         readonly kind: typeof Kind.Parameterized;
-        readonly type: JavaType.FullyQualified;
-        readonly typeParameters: JavaType[];
+        readonly type: Type.FullyQualified;
+        readonly typeParameters: Type[];
     }
 
-    export interface GenericTypeVariable extends JavaType {
+    export interface GenericTypeVariable extends Type {
         readonly kind: typeof Kind.GenericTypeVariable;
         readonly name: string;
         readonly variance: GenericTypeVariable.Variance;
-        readonly bounds: JavaType[];
+        readonly bounds: Type[];
     }
 
     export namespace GenericTypeVariable {
@@ -116,17 +116,17 @@ export namespace JavaType {
         }
     }
 
-    export interface Array extends JavaType, FullyQualified {
+    export interface Array extends Type, FullyQualified {
         readonly kind: typeof Kind.Array;
-        readonly elemType: JavaType;
-        readonly annotations: JavaType.Annotation[];
+        readonly elemType: Type;
+        readonly annotations: Type.Annotation[];
     }
 
 
-    export class Primitive implements JavaType {
+    export class Primitive implements Type {
         private constructor(
             public readonly keyword: string,
-            public readonly kind = JavaType.Kind.Primitive
+            public readonly kind = Type.Kind.Primitive
         ) {
         }
 
@@ -194,55 +194,55 @@ export namespace JavaType {
         }
     }
 
-    export interface Union extends JavaType {
+    export interface Union extends Type {
         readonly kind: typeof Kind.Union;
-        readonly bounds: JavaType[];
+        readonly bounds: Type[];
     }
 
-    export interface Intersection extends JavaType {
+    export interface Intersection extends Type {
         readonly kind: typeof Kind.Intersection;
-        readonly bounds: JavaType[];
+        readonly bounds: Type[];
     }
 
-    export interface ShallowClass extends JavaType.Class {
+    export interface ShallowClass extends Type.Class {
         readonly kind: typeof Kind.ShallowClass;
     }
 
-    export const unknownType: JavaType = asRef({
-        kind: JavaType.Kind.Unknown
+    export const unknownType: Type = asRef({
+        kind: Type.Kind.Unknown
     });
 
-    export function isPrimitive(type?: JavaType): type is JavaType.Primitive {
-        return type?.kind === JavaType.Kind.Primitive;
+    export function isPrimitive(type?: Type): type is Type.Primitive {
+        return type?.kind === Type.Kind.Primitive;
     }
 
-    export function isClass(type?: JavaType): type is JavaType.Class {
-        return type?.kind === JavaType.Kind.Class;
+    export function isClass(type?: Type): type is Type.Class {
+        return type?.kind === Type.Kind.Class;
     }
 
-    export function isArray(type?: JavaType): type is JavaType.Array {
-        return type?.kind === JavaType.Kind.Array;
+    export function isArray(type?: Type): type is Type.Array {
+        return type?.kind === Type.Kind.Array;
     }
 
-    export function isParameterized(type?: JavaType): type is JavaType.Parameterized {
-        return type?.kind === JavaType.Kind.Parameterized;
+    export function isParameterized(type?: Type): type is Type.Parameterized {
+        return type?.kind === Type.Kind.Parameterized;
     }
 
-    export interface FullyQualified extends JavaType {
+    export interface FullyQualified extends Type {
     }
 
     export namespace FullyQualified {
         export function getFullyQualifiedName(javaType: FullyQualified): string {
             switch (javaType.kind) {
-                case JavaType.Kind.Class:
-                    return (javaType as JavaType.Class).fullyQualifiedName;
-                case JavaType.Kind.Parameterized:
-                    return getFullyQualifiedName((javaType as JavaType.Parameterized).type);
-                case JavaType.Kind.Annotation:
-                    return getFullyQualifiedName((javaType as JavaType.Annotation).type);
-                case JavaType.Kind.ShallowClass:
-                    return (javaType as JavaType.ShallowClass).fullyQualifiedName;
-                case JavaType.Kind.Unknown:
+                case Type.Kind.Class:
+                    return (javaType as Type.Class).fullyQualifiedName;
+                case Type.Kind.Parameterized:
+                    return getFullyQualifiedName((javaType as Type.Parameterized).type);
+                case Type.Kind.Annotation:
+                    return getFullyQualifiedName((javaType as Type.Annotation).type);
+                case Type.Kind.ShallowClass:
+                    return (javaType as Type.ShallowClass).fullyQualifiedName;
+                case Type.Kind.Unknown:
                     return "<unknown>";
             }
             throw new Error("Cannot get fully qualified name of type: " + JSON.stringify(javaType));

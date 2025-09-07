@@ -61,8 +61,20 @@ export class RecipeSpec {
         this.dataTableAssertions[name] = allRows;
     }
 
-    async rewriteRun(...sourceSpecs: SourceSpec<any>[]): Promise<void> {
-        const specsByKind = sourceSpecs.reduce((groups, spec) => {
+    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
+        // Flatten generators into a list of sourceSpecs
+        const flattenedSpecs: SourceSpec<any>[] = [];
+        for (const specOrGenerator of sourceSpecs) {
+            if (specOrGenerator && typeof (specOrGenerator as any).next === 'function') {
+                for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
+                    flattenedSpecs.push(spec);
+                }
+            } else {
+                flattenedSpecs.push(specOrGenerator as SourceSpec<any>);
+            }
+        }
+
+        const specsByKind = flattenedSpecs.reduce((groups, spec) => {
             const kind = spec.kind;
             if (!groups[kind]) {
                 groups[kind] = [];
