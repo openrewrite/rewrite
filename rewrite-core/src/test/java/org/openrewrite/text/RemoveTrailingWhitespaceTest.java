@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
           )
         );
     }
+
     @SuppressWarnings("TrailingWhitespacesInTextBlock")
     @Test
     void removeTrailingAll() {
@@ -77,6 +78,51 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
               """,
             """
                Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+    @SuppressWarnings("TrailingWhitespacesInTextBlock")
+    @Test
+    void removeTrailingBetween() {
+        rewriteRun(
+          text(
+            """
+               \s\s
+               Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+               \s\s 
+               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+               \s\s
+              """,
+            """
+               
+               Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+               
+               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+               
+              """,
+            SourceSpec::noTrim
+          )
+        );
+    }
+
+
+    @SuppressWarnings("TrailingWhitespacesInTextBlock")
+    @Test
+    void removeTrailingConsecutive() {
+        rewriteRun(
+          text(
+            """
+               Lorem ipsum dolor sit amet, consectetur adipiscing elit,\s\s
+               \s\s 
+               sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+              """,
+            """
+               Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+               
                sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
               """,
             SourceSpec::noTrim
