@@ -27,6 +27,7 @@ export * from "./tree";
 export * from "./visitor";
 export * from "./parser";
 export * from "./parse-error";
+export * from "./preconditions";
 export * from "./uuid";
 export * from "./util";
 export * from "./recipe";

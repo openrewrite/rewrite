@@ -19,6 +19,9 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 
+import java.util.List;
+import java.util.Map;
+
 @Value
 public class PrepareRecipeResponse {
     /**
@@ -29,7 +32,16 @@ public class PrepareRecipeResponse {
 
     RecipeDescriptor descriptor;
     String editVisitor;
+    List<Precondition> editPreconditions;
 
     @Nullable
     String scanVisitor;
+
+    List<Precondition> scanPreconditions;
+
+    @Value
+    public static class Precondition {
+        String visitorName;
+        Map<String, Object> visitorOptions;
+    }
 }

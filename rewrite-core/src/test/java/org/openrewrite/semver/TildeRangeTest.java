@@ -94,4 +94,21 @@ class TildeRangeTest {
         assertThat(tildeRange.isValid("1.0", "1.9.9")).isTrue();
         assertThat(tildeRange.isValid("1.0", "2.0.0")).isFalse();
     }
+
+    @Test
+    void compare() {
+        TildeRange tildeRange = TildeRange.build("~1.0", null).getValue();
+
+        assertThat(tildeRange).isNotNull();
+        assertThat(tildeRange.compare(null, "0.9", "~1.0")).isNegative();
+        assertThat(tildeRange.compare(null, "~1.0", "0.9")).isPositive();
+        assertThat(tildeRange.compare(null, "1.0", "~1.0")).isZero();
+        assertThat(tildeRange.compare(null, "~1.0", "1.0")).isZero();
+        assertThat(tildeRange.compare(null, "1.1", "~1.0")).isPositive();
+        assertThat(tildeRange.compare(null, "~1.0", "1.1")).isNegative();
+        assertThat(tildeRange.compare(null, "~1.0", "~1.0")).isZero();
+        assertThat(tildeRange.compare(null, "~1.0.1", "~1.0")).isPositive();
+        assertThat(tildeRange.compare(null, "1.9", "~1")).isZero();
+        assertThat(tildeRange.compare(null, "~1", "1.9")).isZero();
+    }
 }

@@ -114,7 +114,8 @@ public class GradleWrapper {
             );
         }
 
-        if (currentDistributionUrl.contains("/artifactory")) {
+        URI currentDistributionUri = URI.create(currentDistributionUrl);
+        if (currentDistributionUri.getScheme().startsWith("http") && currentDistributionUri.getPath().startsWith("/artifactory")) {
             String artifactoryUrl = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/"));
             List<GradleVersion> allVersions = listAllPrivateArtifactoryVersions(artifactoryUrl, ctx);
             return allVersions.stream()

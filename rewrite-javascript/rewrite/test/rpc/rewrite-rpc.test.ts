@@ -120,6 +120,10 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("languages", async () => {
+        expect(await client.languages()).toContainEqual(JS.Kind.CompilationUnit);
+    });
+
     test("runSearchRecipe", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier", {identifier: "hello"});
         await spec.rewriteRun(
@@ -167,6 +171,23 @@ describe("Rewrite RPC", () => {
                     "hello"
                 ),
                 path: "hello.txt"
+            }
+        );
+    });
+
+    test("runRecipeWithPreconditions", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
+            identifier: "hello",
+            requiredPath: "hello.js"
+        });
+        await spec.rewriteRun(
+            {
+                //language=javascript
+                ...javascript(
+                    "const hello = 'world'",
+                    "const /*~~>*/hello = 'world'"
+                ),
+                path: "hello.js"
             }
         );
     });

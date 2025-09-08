@@ -38,7 +38,7 @@ class ModifyAllTrees extends Recipe {
     description: string = "Add a `Marker` to all trees so that we can test " +
         "that each element is sent back to a remote RPC process.";
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends TreeVisitor<Tree, ExecutionContext> {
             protected async preVisit(tree: Tree, p: ExecutionContext): Promise<Tree> {
                 return this.produceTree(tree, p, draft => {
