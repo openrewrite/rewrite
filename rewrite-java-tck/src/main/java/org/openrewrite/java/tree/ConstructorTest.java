@@ -184,6 +184,7 @@ class ConstructorTest implements RewriteTest {
             """
               class A {
                   String stringA;
+                  A(){}
                   A(String a) {
                       String validated = a.trim();
                       this();
@@ -257,6 +258,7 @@ class ConstructorTest implements RewriteTest {
             """
               class A {
                   String value;
+                  A(){}
                   A(String input) {
                       if (input == null) {
                           this();
@@ -283,6 +285,7 @@ class ConstructorTest implements RewriteTest {
             """
               class A {
                   String someString;
+                  A(){}
                   A(String input) {
                       assert input != null : "Input must not be null";
                       assert !input.isEmpty() : "Input must not be empty";
