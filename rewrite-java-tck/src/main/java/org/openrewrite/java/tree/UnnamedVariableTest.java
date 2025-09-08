@@ -127,7 +127,9 @@ class UnnamedVariableTest implements RewriteTest {
                 J.Lambda lambda = (J.Lambda) vd.getVariables().getFirst().getInitializer();
                 List<J> lambdaParams = lambda.getParameters().getParameters();
                 assertThat(lambdaParams.getFirst()).isNotEqualTo(lambdaParams.get(1));
-                assertThat(SemanticallyEqual.areEqual(lambdaParams.getFirst(), lambdaParams.get(1))).isFalse();
+                // They are semantically equal but not registered by the compiler as
+                // a variable in scope, so they cannot be read or written to.
+                assertThat(SemanticallyEqual.areEqual(lambdaParams.getFirst(), lambdaParams.get(1))).isTrue();
             })
           )
         );
