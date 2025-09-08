@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MinimumJava17;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -273,6 +274,194 @@ class ClassDeclarationTest implements RewriteTest {
                   /*@@*/
               }
             """.replaceAll("/[*]@@[*]/", suffix)
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithMainMethod() {
+        rewriteRun(
+          java(
+            """
+              void main() {
+                  System.out.println("Hello from implicit class!");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithMultipleMethods() {
+        rewriteRun(
+          java(
+            """
+              void main() {
+                  greet("World");
+              }
+              
+              void greet(String name) {
+                  System.out.println("Hello, " + name + "!");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithFields() {
+        rewriteRun(
+          java(
+            """
+              String greeting = "Hello";
+              
+              void main() {
+                  System.out.println(greeting + ", World!");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithStaticFields() {
+        rewriteRun(
+          java(
+            """
+              static int counter = 0;
+              
+              void main() {
+                  counter++;
+                  System.out.println("Counter: " + counter);
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithImports() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              
+              void main() {
+                  List<String> names = new ArrayList<>();
+                  names.add("Alice");
+                  names.add("Bob");
+                  System.out.println(names);
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithPackageStatement() {
+        rewriteRun(
+          java(
+            """
+              package com.example;
+              
+              void main() {
+                  System.out.println("Hello from package!");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithStaticInitializer() {
+        rewriteRun(
+          java(
+            """
+              static {
+                  System.out.println("Static initializer");
+              }
+              
+              void main() {
+                  System.out.println("Main method");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithInstanceInitializer() {
+        rewriteRun(
+          java(
+            """
+              {
+                  System.out.println("Instance initializer");
+              }
+              
+              void main() {
+                  System.out.println("Main method");
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithConstructor() {
+        rewriteRun(
+          java(
+            """
+              private String name;
+              
+              Main(String name) {
+                  this.name = name;
+              }
+              
+              void main() {
+                  System.out.println("Name: " + name);
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Test
+    void implicitClassWithInnerClass() {
+        rewriteRun(
+          java(
+            """
+              void main() {
+                  Helper helper = new Helper();
+                  helper.help();
+              }
+              
+              class Helper {
+                  void help() {
+                      System.out.println("Helping!");
+                  }
+              }
+              """
           )
         );
     }
