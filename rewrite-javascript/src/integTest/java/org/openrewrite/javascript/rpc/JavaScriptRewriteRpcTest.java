@@ -118,8 +118,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JSUnusedLocalSymbols")
     @ParameterizedTest
+    @SuppressWarnings("JSUnusedLocalSymbols")
     @ValueSource(booleans = {true, false})
     void runSearchRecipeWithJavaRecipeActingAsPrecondition(boolean matchesPrecondition) {
         installRecipes();
