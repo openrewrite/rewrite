@@ -861,14 +861,14 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
-            String varName = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
-            Space space = sourceBefore(varName);
-            J.Identifier name = new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), varName,
-                    type, typeMapping.variableType(b.var.sym));
-            if ("_".equals(varName) && name.getFieldType() != null && name.getFieldType().getName().isEmpty()) {
-                name = name.withFieldType(name.getFieldType().withName("_"));
+            String name = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
+            Space space = sourceBefore(name);
+            JavaType.Variable vartype = typeMapping.variableType(b.var.sym);
+            if ("_".equals(name) && vartype != null) {
+                vartype = vartype.withName("_");
             }
-            return name;
+            return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), name,
+                    type, vartype);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
