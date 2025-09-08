@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.MinimumJava25;
+import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -126,6 +127,7 @@ class UnnamedVariableTest implements RewriteTest {
                 J.Lambda lambda = (J.Lambda) vd.getVariables().getFirst().getInitializer();
                 List<J> lambdaParams = lambda.getParameters().getParameters();
                 assertThat(lambdaParams.getFirst()).isNotEqualTo(lambdaParams.get(1));
+                assertThat(SemanticallyEqual.areEqual(lambdaParams.getFirst(), lambdaParams.get(1))).isFalse();
             })
           )
         );
