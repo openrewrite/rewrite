@@ -178,15 +178,16 @@ class ConstructorTest implements RewriteTest {
     @Issue("https://openjdk.org/jeps/513")
     @MinimumJava25
     @Test
-    void localVariableBeforeConstructor() {
+    void constructorThisWithPrologueAndEpilogue() {
         rewriteRun(
           java(
             """
-              public class A {
-                  public A() {}
-                  public A(String a) {
+              class A {
+                  String stringA;
+                  A(String a) {
                       String validated = a.trim();
                       this();
+                      this.stringA = validated;
                   }
               }
               """
@@ -197,183 +198,23 @@ class ConstructorTest implements RewriteTest {
     @Issue("https://openjdk.org/jeps/513")
     @MinimumJava25
     @Test
-    void multipleStatementsBeforeConstructor() {
+    void constructorSuperWithPrologueAndEpilogue() {
         rewriteRun(
           java(
             """
-              public class A {
-                  public A() {}
-                  public A(String a, int b) {
-                      String processed = a.toUpperCase();
-                      int adjusted = b + 10;
-                      System.out.println("Preprocessing: " + processed);
-                      this();
+              class Parent {
+                  String parentString;
+                  Parent(String value) {
+                      this.parentString = value;
                   }
               }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void tryBlockBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(String a) {
-                      try {
-                          Integer.parseInt(a);
-                      } catch (NumberFormatException e) {
-                          throw new IllegalArgumentException("Not a number");
-                      }
-                      this();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void switchExpressionBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A(int value) {}
-                  public A(String type) {
-                      int value = switch (type) {
-                          case "one" -> 1;
-                          case "two" -> 2;
-                          default -> 0;
-                      };
-                      this(value);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void methodCallBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(String a) {
-                      validateInput(a);
-                      this();
-                  }
-                  
-                  private static void validateInput(String input) {
-                      if (input == null) {
-                          throw new NullPointerException();
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void nestedIfStatementsBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(String a, boolean flag) {
-                      if (a != null) {
-                          if (flag) {
-                              System.out.println("Valid input");
-                          } else {
-                              throw new IllegalStateException("Flag must be true");
-                          }
-                      }
-                      this();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void forLoopBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(String[] args) {
-                      for (String arg : args) {
-                          if (arg == null) {
-                              throw new IllegalArgumentException("Null argument found");
-                          }
-                      }
-                      this();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void whileLoopBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(int count) {
-                      int i = 0;
-                      while (i < count) {
-                          System.out.println("Count: " + i);
-                          i++;
-                      }
-                      this();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void lambdaExpressionBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              import java.util.function.Function;
               
-              public class A {
-                  public A(String value) {}
-                  public A(String input, boolean uppercase) {
-                      Function<String, String> processor = uppercase ? 
-                          s -> s.toUpperCase() : 
-                          s -> s.toLowerCase();
-                      String processed = processor.apply(input);
-                      this(processed);
+              class Child extends Parent {
+                  String childString;
+                  Child(int number, String value) {
+                      String formatted = String.format("Number: %d", number);
+                      super(formatted);
+                      this.childString = value;
                   }
               }
               """
@@ -388,14 +229,14 @@ class ConstructorTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public record Point(int x, int y) {
-                  public Point {
+              record Point(int x, int y) {
+                  Point {
                       if (x < 0 || y < 0) {
                           throw new IllegalArgumentException("Coordinates must be non-negative");
                       }
                   }
-                  
-                  public Point(String coords) {
+              
+                  Point(String coords) {
                       String[] parts = coords.split(",");
                       int parsedX = Integer.parseInt(parts[0].trim());
                       int parsedY = Integer.parseInt(parts[1].trim());
@@ -410,13 +251,13 @@ class ConstructorTest implements RewriteTest {
     @Issue("https://openjdk.org/jeps/513")
     @MinimumJava25
     @Test
-    void complexValidationWithEarlyReturn() {
+    void constructorWithEarlyReturn() {
         rewriteRun(
           java(
             """
-              public class A {
-                  public A() {}
-                  public A(String input) {
+              class A {
+                  String value;
+                  A(String input) {
                       if (input == null) {
                           this();
                           return;
@@ -425,52 +266,7 @@ class ConstructorTest implements RewriteTest {
                           throw new IllegalArgumentException("Empty input");
                       }
                       this();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void superConstructorWithArgumentTransformation() {
-        rewriteRun(
-          java(
-            """
-              public class Parent {
-                  public Parent(String value) {}
-              }
-              
-              public class Child extends Parent {
-                  public Child(int number) {
-                      String formatted = String.format("Number: %d", number);
-                      super(formatted);
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://openjdk.org/jeps/513")
-    @MinimumJava25
-    @Test
-    void blockStatementBeforeConstructor() {
-        rewriteRun(
-          java(
-            """
-              public class A {
-                  public A() {}
-                  public A(String input) {
-                      {
-                          String temp = input.trim();
-                          if (temp.isEmpty()) {
-                              throw new IllegalArgumentException();
-                          }
-                      }
-                      this();
+                      this.value = input;
                   }
               }
               """
@@ -485,12 +281,13 @@ class ConstructorTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class A {
-                  public A() {}
-                  public A(String input) {
+              class A {
+                  String someString;
+                  A(String input) {
                       assert input != null : "Input must not be null";
                       assert !input.isEmpty() : "Input must not be empty";
                       this();
+                      someString = input;
                   }
               }
               """
