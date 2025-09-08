@@ -853,10 +853,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             type = var.withName("_");
         }
         skip("_");
-        J.Identifier name = new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
                 type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
                 type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
-        return name;
     }
 
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
