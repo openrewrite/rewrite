@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -228,6 +229,25 @@ class EnumTest implements RewriteTest {
                   A(X x) {}
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6003")
+    @Test
+    void regexpPatternInEnum() {
+        rewriteRun(
+          groovy(
+            """
+            enum E {
+                OPTION1(~/alef/)
+                final Pattern pattern
+
+                E(Pattern pattern) {
+                    this.pattern = pattern
+                }
+            }
+            """
           )
         );
     }
