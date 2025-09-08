@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-import {SourceFile, TreeKind} from "../";
+import {SourceFile, TreeKind} from "../tree";
 import {Expression, J, JavaType, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
-import getType = TypedTree.getType;
-import FunctionType = JS.FunctionType;
 
 export interface JS extends J {
 }
@@ -912,5 +910,5 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
     return tree["kind"] === JS.Kind.ExpressionStatement;
 }
 
-TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
-TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))
+TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
+TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(tree.returnType.element))

@@ -31,7 +31,7 @@ export class ChangeVersion extends Recipe {
         super(options);
     }
 
-    get editor(): JsonVisitor<ExecutionContext> {
+    async editor(): Promise<JsonVisitor<ExecutionContext>> {
         const v = this.version;
         return new class extends JsonVisitor<ExecutionContext> {
             protected async visitDocument(document: Json.Document, p: ExecutionContext): Promise<Json | undefined> {

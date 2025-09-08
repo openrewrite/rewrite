@@ -32,7 +32,7 @@ export function isParseError(tree: any): tree is ParseError {
 }
 
 export class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
-    public isAcceptable(sourceFile: SourceFile, p: P): boolean {
+    async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
         return isParseError(sourceFile);
     }
 

@@ -994,13 +994,13 @@ public class ResolvedPom {
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
-        Map<GroupArtifact, DependencyAndDependent> rootDependencies = new HashMap<>();
+        Map<GroupArtifact, DependencyAndDependent> rootDependencies = new LinkedHashMap<>();
         for (Dependency requestedDependency : getRequestedDependencies()) {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.transitiveOf(scope) == scope) {
-                // TODO can we always use the Map.put approach? Using the latest one is Maven specific, but this resolving is also used for gradle which does use highest version.
-                //  We could introduce a ResolutionStrategy to handle this and use Map.merge where we take later occurring one for LAST_WINS/MAVEN and higher version one for LATEST_WINS/GRADLE
+                // For direct dependencies that are duplicated, last declaration wins
+                // TODO: We could introduce a ResolutionStrategy to handle this differently for Gradle which uses highest version
                 rootDependencies.put(d.getGav().asGroupArtifact(), new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
             }
         }
@@ -1009,7 +1009,7 @@ public class ResolvedPom {
         int depth = 0;
         Collection<DependencyAndDependent> dependenciesAtDepth = rootDependencies.values();
         while (!dependenciesAtDepth.isEmpty()) {
-            List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
+            Map<GroupArtifact, DependencyAndDependent> dependenciesAtNextDepthMap = new LinkedHashMap<>();
 
             for (DependencyAndDependent dd : dependenciesAtDepth) {
                 // First get the dependency (relative to the pom it was defined in)
@@ -1139,7 +1139,9 @@ public class ResolvedPom {
 
                         Scope d2Scope = getDependencyScope(d2, resolvedPom);
                         if (d2Scope.isInClasspathOf(dd.getScope())) {
-                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
+                            // For transitive dependencies at same depth, first parent declaration wins
+                            GroupArtifact d2Ga = new GroupArtifact(d2.getGroupId() == null ? "" : d2.getGroupId(), d2.getArtifactId());
+                            dependenciesAtNextDepthMap.putIfAbsent(d2Ga, new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
@@ -1147,7 +1149,7 @@ public class ResolvedPom {
                 }
             }
 
-            dependenciesAtDepth = dependenciesAtNextDepth;
+            dependenciesAtDepth = dependenciesAtNextDepthMap.values();
             depth++;
         }
 

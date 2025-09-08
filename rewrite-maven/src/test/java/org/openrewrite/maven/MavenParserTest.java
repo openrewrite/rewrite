@@ -29,7 +29,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.maven.http.OkHttpSender;
@@ -45,6 +47,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.groupingBy;
 import static org.assertj.core.api.Assertions.*;
@@ -4094,6 +4097,67 @@ class MavenParserTest implements RewriteTest {
                   .containsExactly(secondVersion);
             })
           )
+        );
+    }
+
+    @MethodSource("jacksonDependencies")
+    @ParameterizedTest
+    void firstDeclarationWinsForEqualDistanceOfTransitiveDependencies(String dependencies, String resolvedTransitiveVersion) {
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  %s
+                </dependencies>
+              </project>
+              """.formatted(dependencies),
+            spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("com.fasterxml.jackson.core", "jackson-databind", Scope.Compile))
+                  .hasSize(1)
+                  .extracting(ResolvedDependency::getGav)
+                  .extracting(ResolvedGroupArtifactVersion::getVersion)
+                  .containsExactly(resolvedTransitiveVersion);
+            })
+          )
+        );
+    }
+
+    private static Stream<Arguments> jacksonDependencies() {
+        return Stream.of(
+          Arguments.of(
+            """
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-xml</artifactId>
+                <version>2.18.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.15.3</version>
+            </dependency>
+            """,
+            "2.18.0"),
+          Arguments.of(
+            """
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.15.3</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-xml</artifactId>
+                <version>2.18.0</version>
+            </dependency>
+            """,
+            "2.15.3")
         );
     }
 

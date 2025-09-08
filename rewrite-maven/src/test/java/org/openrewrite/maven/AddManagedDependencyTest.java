@@ -397,7 +397,7 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"2.14.0", "2.15.3"})
+    @ValueSource(strings = {"2.14.0", "2.15.3", "2.18.0"})
     void doesNotDowngradeVersionIfTransitiveDependencyAppearsInTreeWithDifferentVersions(String requestedVersion) {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", requestedVersion, null,
