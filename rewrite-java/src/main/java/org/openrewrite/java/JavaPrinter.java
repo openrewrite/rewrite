@@ -373,19 +373,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitBlock(Block block, PrintOutputCapture<P> p) {
-        beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
-
-        if (block.isStatic()) {
-            p.append("static");
-            visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
-        }
-
-        p.append('{');
-        visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
-        visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-        p.append('}');
-        afterSyntax(block, p);
-        return block;
+        return visitBlock(block, p, true);
     }
 
     public J visitBlock(Block block, PrintOutputCapture<P> p, boolean includeBraces) {

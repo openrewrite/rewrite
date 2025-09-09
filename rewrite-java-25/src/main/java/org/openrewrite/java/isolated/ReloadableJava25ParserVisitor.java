@@ -21,7 +21,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -56,7 +56,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -415,13 +414,14 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.RECORD)) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("record"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Record);
         } else {
+            Space prefix = whitespace();
             if (source.startsWith("class", cursor)) {
-                kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+                skip("class");
             } else {
-                kind = new J.ClassDeclaration.Kind(randomId(), whitespace(), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
                 compactSourceFile = new CompactSourceFile(randomId());
                 cursor = saveCursor;
             }
+            kind = new J.ClassDeclaration.Kind(randomId(), prefix, Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
         J.Identifier name = new J.Identifier(randomId(), compactSourceFile != null ? EMPTY : sourceBefore(node.getSimpleName().toString()),
@@ -639,9 +639,18 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         if (cu.getPackageName() != null) {
             packageDecl = new J.Package(randomId(), sourceBefore("package"), Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
-        } else if (cu.getPackageName() == null && source.startsWith("package", cursor)) {
-            markers.add(new PackageOnCompactSourceFile(randomId(),
-                    sourceBefore("package"), sourceBefore(";").getWhitespace()));
+        } else if (cu.getPackageName() == null &&
+                   cu.modle.equals(Symtab.instance(context).unnamedModule) &&
+                   cu.packge.equals(Symtab.instance(context).unnamedModule.unnamedPackage)) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            if (source.startsWith("package", cursor)) {
+                skip("package");
+                markers.add(new PackageOnCompactSourceFile(randomId(),
+                        prefix, sourceBefore(";").getWhitespace()));
+            } else {
+                cursor = saveCursor;
+            }
         }
         return new J.CompilationUnit(
                 randomId(),
