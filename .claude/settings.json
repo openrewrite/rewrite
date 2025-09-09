@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(npm run:*)",
+      "Bash(node:*)",
       "Bash(npm view:*)",
       "Bash(npx:*)",
       "Bash(npm ls:*)",

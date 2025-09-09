@@ -514,8 +514,8 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitIdentifier(ident: J.Identifier, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSendList(ident, id => id.annotations, annot => annot.id, annot => this.visit(annot, q));
         await q.getAndSend(ident, id => id.simpleName);
-        await q.getAndSend(ident, id => id.type, type => this.visitType(type, q));
-        await q.getAndSend(ident, id => id.fieldType, type => this.visitType(type, q));
+        await q.getAndSend(ident, id => asRef(id.type), type => this.visitType(type, q));
+        await q.getAndSend(ident, id => asRef(id.fieldType), type => this.visitType(type, q));
         return ident;
     }
 
@@ -1376,6 +1376,9 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         if (codec) {
             return await codec.rpcReceive(javaType, q);
         }
-        return super.visitType(javaType, q);
+        if (javaType !== undefined) {
+            throw new Error("Missing codec for Type " + javaType.kind);
+        }
+        return undefined;
     }
 }

@@ -309,7 +309,6 @@ describe('JavaScript type mapping', () => {
                     type.fullyQualifiedName : null;
             });
 
-            // Use tmp-promise's withDir for automatic cleanup
             await withDir(async (repo) => {
                 await spec.rewriteRun(
                     npm(
@@ -370,13 +369,14 @@ describe('JavaScript type mapping', () => {
                             age: number;
                         }
                     `,
+                    //@formatter:off
                     `
-                        class /*~~(Person)~~>*/
-                        Person {
+                        class /*~~(Person)~~>*/Person {
                             name: string;
                             age: number;
                         }
                     `
+                    //@formatter:on
                 )
             );
         });
@@ -400,13 +400,14 @@ describe('JavaScript type mapping', () => {
                             email: string;
                         }
                     `,
+                    //@formatter:off
                     `
-                        interface /*~~(User)~~>*/
-                        User {
+                        interface /*~~(User)~~>*/User {
                             id: number;
                             email: string;
                         }
                     `
+                    //@formatter:on
                 )
             );
         });

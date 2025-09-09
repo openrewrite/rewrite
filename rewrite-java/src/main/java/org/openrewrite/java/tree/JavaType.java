@@ -22,10 +22,12 @@ import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -35,6 +37,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
@@ -358,7 +361,7 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Class extends FullyQualified {
+    class Class extends FullyQualified implements RpcCodec<Class> {
         @With
         @Nullable
         @NonFinal
@@ -580,6 +583,46 @@ public interface JavaType {
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+        }
+
+        @Override
+        public void rpcSend(Class after, RpcSendQueue q) {
+            q.getAndSend(after, c -> Reference.asRef(c.getKind()));
+            q.getAndSend(after, c -> Reference.asRef(c.getFullyQualifiedName()));
+            q.getAndSendList(after, c -> c.getTypeParameters().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSend(after, c -> Reference.asRef(c.getSupertype()));
+            q.getAndSendList(after, c -> c.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, c -> c.getInterfaces().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, c -> c.getMembers().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, c -> c.getMethods().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+        }
+
+        @Override
+        public Class rpcReceive(Class before, RpcReceiveQueue q) {
+            Kind kind = q.receive(before.kind);
+            String fullyQualifiedName = q.receive(before.fullyQualifiedName);
+            List<JavaType> typeParameters = q.receiveList(before.getTypeParameters(), null);
+            FullyQualified supertype = q.receive(before.supertype);
+            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
+            List<FullyQualified> interfaces = q.receiveList(before.getInterfaces(), null);
+            List<Variable> members = q.receiveList(before.getMembers(), null);
+            List<Method> methods = q.receiveList(before.getMethods(), null);
+
+            // FIXME rather than creating a new class, using unsafeSet to handle circular references.
+            //  The before argument should be the one stored in the ref map.
+            return new Class(
+                    before.managedReference,
+                    before.flagsBitMap,
+                    fullyQualifiedName,
+                    kind,
+                    typeParameters,
+                    supertype,
+                    before.owningClass,
+                    annotations,
+                    interfaces,
+                    members,
+                    methods
+            );
         }
 
         @Override
@@ -1788,5 +1831,10 @@ public interface JavaType {
             return false;
         }
     }
+}
 
+class TypeIdForRpc {
+    public static @NotNull Function<Reference, Object> signature() {
+        return t -> new DefaultJavaTypeSignatureBuilder().signature(t);
+    }
 }

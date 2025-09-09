@@ -15,7 +15,12 @@
  */
 import ts from "typescript";
 import {Type} from "../java";
-import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {immerable} from "immer";
+
+// Helper class to create Type objects that immer won't traverse
+class NonDraftableType {
+    [immerable] = false;
+}
 
 const builtInTypes = new Set([
     'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
@@ -231,17 +236,20 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        const classType: Type.Class = {
+        const classType: Type.Class = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
             classKind: kind,
             fullyQualifiedName: fullyQualifiedName,
-            typeParameters: typeParameters,
+            typeParameters: typeParameters || [],
             supertype: supertype,
             annotations: [],
-            interfaces: interfaces,
+            interfaces: interfaces || [],
             members: [],  // Will be populated below
-            methods: methods
-        };
+            methods: methods || [],
+            toJSON: function() {
+                return Type.toDebugString(this);
+            }
+        }) as Type.Class;
 
         // Get members (properties)
         const properties = this.checker.getPropertiesOfType(type);
@@ -254,15 +262,18 @@ export class JavaScriptTypeMapping {
                     // Skip properties without declarations (synthetic properties)
                     continue;
                 }
-                
+
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = {
+                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class
                     type: this.getType(propType),
-                    annotations: []
-                };
+                    annotations: [],
+                    toJSON: function() {
+                        return Type.toDebugString(this);
+                    }
+                }) as Type.Variable;
                 classType.members.push(variable);
             }
         }
@@ -321,8 +332,8 @@ export class JavaScriptTypeMapping {
         const typeString = this.checker.typeToString(type);
         const fullyQualifiedName = `<anonymous>${typeString}`;
 
-        // Create initial class type with asRef for cyclic references
-        const classType: Type.Class = asRef({
+        // Create initial class type (no asRef here - RPC codec will handle references)
+        const classType: Type.Class = Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
             classKind: Type.Class.Kind.Interface, // Treat anonymous objects as interfaces
             fullyQualifiedName: fullyQualifiedName,
@@ -330,21 +341,27 @@ export class JavaScriptTypeMapping {
             annotations: [],
             interfaces: [],
             members: [],
-            methods: []
-        });
+            methods: [],
+            toJSON: function() {
+                return Type.toDebugString(this);
+            }
+        }) as Type.Class;
 
         // Get properties of the anonymous type
         const properties = this.checker.getPropertiesOfType(type);
         for (const prop of properties) {
             if (!(prop.flags & ts.SymbolFlags.Method)) {
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
-                const variable: Type.Variable = asRef({
+                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class
                     type: this.getType(propType),
-                    annotations: []
-                });
+                    annotations: [],
+                    toJSON: function() {
+                        return Type.toDebugString(this);
+                    }
+                }) as Type.Variable;
                 classType.members.push(variable);
             }
         }
@@ -437,90 +454,3 @@ export class JavaScriptTypeMapping {
         return Type.unknownType;
     }
 }
-
-RpcCodecs.registerCodec(Type.Kind.Primitive, {
-    async rpcSend(after: Type.Primitive, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, p => p.keyword);
-    },
-    async rpcReceive(before: Type.Primitive, q: RpcReceiveQueue): Promise<Type.Primitive> {
-        const keyword: string = await q.receive(before.keyword);
-        return Type.Primitive.fromKeyword(keyword)!;
-    }
-});
-
-RpcCodecs.registerCodec(Type.Kind.Class, {
-    async rpcSend(after: Type.Class, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, c => c.classKind);
-        await q.getAndSend(after, c => c.fullyQualifiedName);
-        await q.getAndSend(after, c => c.typeParameters);
-        await q.getAndSend(after, c => c.supertype);
-        await q.getAndSend(after, c => c.annotations);
-        await q.getAndSend(after, c => c.interfaces);
-        await q.getAndSend(after, c => c.members);
-        await q.getAndSend(after, c => c.methods);
-    },
-    async rpcReceive(before: Type.Class, q: RpcReceiveQueue): Promise<Type.Class> {
-        const classKind = await q.receive(before.classKind);
-        const fullyQualifiedName = await q.receive(before.fullyQualifiedName);
-        const typeParameters = await q.receive(before.typeParameters);
-        const supertype = await q.receive(before.supertype);
-        const annotations = await q.receive(before.annotations);
-        const interfaces = await q.receive(before.interfaces);
-        const members = await q.receive(before.members);
-        const methods = await q.receive(before.methods);
-
-        return asRef({
-            kind: Type.Kind.Class,
-            classKind,
-            fullyQualifiedName,
-            typeParameters,
-            supertype,
-            annotations,
-            interfaces,
-            members,
-            methods
-        });
-    }
-});
-
-RpcCodecs.registerCodec(Type.Kind.Variable, {
-    async rpcSend(after: Type.Variable, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, v => v.name);
-        await q.getAndSend(after, v => v.owner);
-        await q.getAndSend(after, v => v.type);
-        // FIXME we need to use getAndSendList here but need to think about what to use for the ID
-        await q.getAndSend(after, v => v.annotations);
-    },
-    async rpcReceive(before: Type.Variable, q: RpcReceiveQueue): Promise<Type.Variable> {
-        const name = await q.receive(before.name);
-        const owner = await q.receive(before.owner);
-        const type = await q.receive(before.type);
-        // FIXME we need to use receiveList here but need to think about what to use for the ID
-        const annotations = await q.receive(before.annotations);
-
-        return asRef({
-            kind: Type.Kind.Variable,
-            name,
-            owner,
-            type,
-            annotations
-        });
-    }
-});
-
-RpcCodecs.registerCodec(Type.Kind.Annotation, {
-    async rpcSend(after: Type.Annotation, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, a => a.type);
-        await q.getAndSend(after, a => a.values);
-    },
-    async rpcReceive(before: Type.Annotation, q: RpcReceiveQueue): Promise<Type.Annotation> {
-        const type = await q.receive(before.type);
-        const values = await q.receive(before.values);
-
-        return asRef({
-            kind: Type.Kind.Annotation,
-            type,
-            values
-        });
-    }
-});

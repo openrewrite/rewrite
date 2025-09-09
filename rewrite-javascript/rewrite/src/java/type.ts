@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {asRef} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {immerable} from "immer";
 
 export interface Type {
     readonly kind: string;
@@ -38,15 +39,16 @@ export namespace Type {
 
     export interface Class extends Type, FullyQualified {
         readonly kind: typeof Kind.Class,
-        readonly classKind: Class.Kind;
-        readonly fullyQualifiedName: string;
-        readonly typeParameters: Type[];
-        readonly supertype?: Type.Class;
-        readonly owningClass?: Type.Class;
-        readonly annotations: Type.Annotation[];
-        readonly interfaces: Type.Class[];
-        readonly members: Type.Variable[];
-        readonly methods: Type.Method[];
+        classKind: Class.Kind;
+        fullyQualifiedName: string;
+        typeParameters: Type[];
+        supertype?: Type.Class;
+        owningClass?: Type.Class;
+        annotations: Type.Annotation[];
+        interfaces: Type.Class[];
+        members: Type.Variable[];
+        methods: Type.Method[];
+        toJSON?(): string;
     }
 
     export namespace Class {
@@ -62,50 +64,51 @@ export namespace Type {
 
     export interface Annotation extends Type, FullyQualified {
         readonly kind: typeof Kind.Annotation,
-        readonly type: Type.FullyQualified;
-        readonly values: Annotation.ElementValue[];
+        type: Type.FullyQualified;
+        values: Annotation.ElementValue[];
     }
 
     export namespace Annotation {
         export interface ElementValue {
             readonly kind: typeof Kind.AnnotationElementValue;
-            readonly element: Type;
-            readonly value: any;
+            element: Type;
+            value: any;
         }
     }
 
     export interface Method extends Type {
         readonly kind: typeof Kind.Method;
-        readonly declaringType: Type.FullyQualified;
-        readonly name: string;
-        readonly returnType: Type;
-        readonly parameterNames: string[];
-        readonly parameterTypes: Type[];
-        readonly thrownExceptions: Type[];
-        readonly annotations: Type.Annotation[];
-        readonly defaultValue?: string[];
-        readonly declaredFormalTypeNames: string[];
+        declaringType: Type.FullyQualified;
+        name: string;
+        returnType: Type;
+        parameterNames: string[];
+        parameterTypes: Type[];
+        thrownExceptions: Type[];
+        annotations: Type.Annotation[];
+        defaultValue?: string[];
+        declaredFormalTypeNames: string[];
     }
 
     export interface Variable extends Type {
         readonly kind: typeof Kind.Variable;
-        readonly name: string;
-        readonly owner?: Type;
-        readonly type: Type;
-        readonly annotations: Type.Annotation[];
+        name: string;
+        owner?: Type;
+        type: Type;
+        annotations: Type.Annotation[];
+        toJSON?(): string;
     }
 
     export interface Parameterized extends Type, FullyQualified {
         readonly kind: typeof Kind.Parameterized;
-        readonly type: Type.FullyQualified;
-        readonly typeParameters: Type[];
+        type: Type.FullyQualified;
+        typeParameters: Type[];
     }
 
     export interface GenericTypeVariable extends Type {
         readonly kind: typeof Kind.GenericTypeVariable;
-        readonly name: string;
-        readonly variance: GenericTypeVariable.Variance;
-        readonly bounds: Type[];
+        name: string;
+        variance: GenericTypeVariable.Variance;
+        bounds: Type[];
     }
 
     export namespace GenericTypeVariable {
@@ -118,8 +121,8 @@ export namespace Type {
 
     export interface Array extends Type, FullyQualified {
         readonly kind: typeof Kind.Array;
-        readonly elemType: Type;
-        readonly annotations: Type.Annotation[];
+        elemType: Type;
+        annotations: Type.Annotation[];
     }
 
 
@@ -196,12 +199,12 @@ export namespace Type {
 
     export interface Union extends Type {
         readonly kind: typeof Kind.Union;
-        readonly bounds: Type[];
+        bounds: Type[];
     }
 
     export interface Intersection extends Type {
         readonly kind: typeof Kind.Intersection;
-        readonly bounds: Type[];
+        bounds: Type[];
     }
 
     export interface ShallowClass extends Type.Class {
@@ -248,4 +251,191 @@ export namespace Type {
             throw new Error("Cannot get fully qualified name of type: " + JSON.stringify(javaType));
         }
     }
+
+    /**
+     * Creates a simple string representation for debugging/testing purposes.
+     * This is automatically used by JSON.stringify when serializing Type objects.
+     * This function is non-recursive to avoid stack overflow issues.
+     */
+    export function toDebugString(type: Type): string {
+        switch (type.kind) {
+            case Type.Kind.Class:
+            case Type.Kind.ShallowClass:
+                return `Type.Class{fullyQualifiedName=${(type as Type.Class).fullyQualifiedName}}`;
+            case Type.Kind.Variable:
+                return `Type.Variable{name=${(type as Type.Variable).name}}`;
+            case Type.Kind.Method:
+                const method = type as Type.Method;
+                return `Type.Method{name=${method.name}}`;
+            case Type.Kind.Primitive:
+                return `Type.Primitive{keyword=${(type as Type.Primitive).keyword}}`;
+            case Type.Kind.Parameterized:
+                return `Type.Parameterized`;
+            case Type.Kind.Array:
+                return `Type.Array`;
+            case Type.Kind.GenericTypeVariable:
+                return `Type.GenericTypeVariable{name=${(type as Type.GenericTypeVariable).name}}`;
+            case Type.Kind.Annotation:
+                return `Type.Annotation`;
+            case Type.Kind.Union:
+                return `Type.Union{bounds=${(type as Type.Union).bounds.length}}`;
+            case Type.Kind.Intersection:
+                return `Type.Intersection{bounds=${(type as Type.Intersection).bounds.length}}`;
+            case Type.Kind.Unknown:
+                return `Type.Unknown`;
+            default:
+                return `Type{kind=${type.kind}}`;
+        }
+    }
+
+    export function signature(type: Type): string {
+        switch (type.kind) {
+            case Type.Kind.Array: {
+                const arr = type as Type.Array;
+                return signature(arr.elemType) + "[]";
+            }
+            case Type.Kind.Class:
+            case Type.Kind.ShallowClass: {
+                const clazz = type as Type.Class;
+                return clazz.fullyQualifiedName;
+            }
+            case Type.Kind.GenericTypeVariable: {
+                const generic = type as Type.GenericTypeVariable;
+                if (generic.bounds.length === 0) {
+                    return "Generic{" + generic.name + "}";
+                }
+                const bounds = generic.bounds.map(b => signature(b)).join(" & ");
+                return "Generic{" + generic.name + " extends " + bounds + "}";
+            }
+            case Type.Kind.Intersection: {
+                const intersection = type as Type.Intersection;
+                return intersection.bounds.map(b => signature(b)).join(" & ");
+            }
+            case Type.Kind.Method: {
+                const method = type as Type.Method;
+                const declaringType = signature(method.declaringType);
+                const params = method.parameterTypes.map(p => signature(p)).join(", ");
+                return declaringType + "{name=" + method.name + ",return=" + signature(method.returnType) + ",parameters=[" + params + "]}";
+            }
+            case Type.Kind.Parameterized: {
+                const parameterized = type as Type.Parameterized;
+                const baseType = signature(parameterized.type);
+                if (parameterized.typeParameters.length === 0) {
+                    return baseType;
+                }
+                const params = parameterized.typeParameters.map(p => signature(p)).join(", ");
+                return baseType + "<" + params + ">";
+            }
+            case Type.Kind.Primitive: {
+                const primitive = type as Type.Primitive;
+                return primitive.keyword;
+            }
+            case Type.Kind.Union: {
+                const union = type as Type.Union;
+                return union.bounds.map(b => signature(b)).join(" | ");
+            }
+            case Type.Kind.Unknown: {
+                return "<unknown>";
+            }
+            case Type.Kind.Variable: {
+                const variable = type as Type.Variable;
+                const ownerSig = variable.owner ? signature(variable.owner) + "{" : "";
+                const closeBrace = variable.owner ? "}" : "";
+                return ownerSig + "name=" + variable.name + ",type=" + signature(variable.type) + closeBrace;
+            }
+            case Type.Kind.Annotation: {
+                const annotation = type as Type.Annotation;
+                return "@" + signature(annotation.type);
+            }
+            default:
+                return "<unknown>";
+        }
+    }
 }
+
+RpcCodecs.registerCodec(Type.Kind.Primitive, {
+    async rpcSend(after: Type.Primitive, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, p => p.keyword);
+    },
+    async rpcReceive(before: Type.Primitive, q: RpcReceiveQueue): Promise<Type.Primitive> {
+        const keyword: string = await q.receive(before.keyword);
+        return Type.Primitive.fromKeyword(keyword)!;
+    }
+});
+
+RpcCodecs.registerCodec(Type.Kind.Class, {
+    async rpcSend(after: Type.Class, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, c => c.classKind);
+        await q.getAndSend(after, c => c.fullyQualifiedName);
+        await q.getAndSendList(after, c => (c.typeParameters || []).map(t => asRef(t)), t => Type.signature(t));
+        await q.getAndSend(after, c => asRef(c.supertype));
+        await q.getAndSendList(after, c => (c.annotations || []).map(a => asRef(a)), t => Type.signature(t));
+        await q.getAndSendList(after, c => (c.interfaces || []).map(i => asRef(i)), t => Type.signature(t));
+        await q.getAndSendList(after, c => (c.members || []).map(m => asRef(m)), t => Type.signature(t));
+        await q.getAndSendList(after, c => (c.methods || []).map(m => asRef(m)), t => Type.signature(t));
+    },
+    async rpcReceive(before: Type.Class, q: RpcReceiveQueue): Promise<Type.Class> {
+        // Mutate the before object in place to preserve reference identity
+        before.classKind = await q.receive(before.classKind);
+        before.fullyQualifiedName = await q.receive(before.fullyQualifiedName);
+        before.typeParameters = await q.receiveList(before.typeParameters) || [];
+        before.supertype = await q.receive(before.supertype);
+        before.annotations = await q.receiveList(before.annotations) || [];
+        before.interfaces = await q.receiveList(before.interfaces) || [];
+        before.members = await q.receiveList(before.members) || [];
+        before.methods = await q.receiveList(before.methods) || [];
+
+        // Add toJSON method to avoid circular reference issues during serialization
+        (before as any).toJSON = function() {
+            return Type.toDebugString(this);
+        };
+        // Mark as non-draftable to prevent immer from processing circular references
+        (before as any)[immerable] = false;
+
+        return before;
+    }
+});
+
+RpcCodecs.registerCodec(Type.Kind.Variable, {
+    async rpcSend(after: Type.Variable, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, v => asRef(v.name));
+        await q.getAndSend(after, v => v.owner ? asRef(v.owner) : undefined);
+        await q.getAndSend(after, v => asRef(v.type));
+        await q.getAndSendList(after, v => v.annotations.map(v2 => asRef(v2)), t => Type.signature(t));
+    },
+    async rpcReceive(before: Type.Variable, q: RpcReceiveQueue): Promise<Type.Variable> {
+        const name = await q.receive(before.name);
+        const owner = await q.receive(before.owner);
+        const type = await q.receive(before.type);
+        const annotations = await q.receiveList(before.annotations);
+        const variable = {
+            kind: Type.Kind.Variable,
+            name,
+            owner,
+            type,
+            annotations: annotations!,
+            toJSON: function() {
+                return Type.toDebugString(this);
+            },
+            [immerable]: false  // Mark as non-draftable
+        };
+        return variable;
+    }
+});
+
+RpcCodecs.registerCodec(Type.Kind.Annotation, {
+    async rpcSend(after: Type.Annotation, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => asRef(a.type));
+        await q.getAndSendList(after, a => a.values.map(v => asRef(v)), v => `${v.element ? Type.signature(v.element) : 'null'}:${v.value}`);
+    },
+    async rpcReceive(before: Type.Annotation, q: RpcReceiveQueue): Promise<Type.Annotation> {
+        const type = await q.receive(before.type);
+        const values = await q.receiveList(before.values);
+
+        return {
+            kind: Type.Kind.Annotation,
+            type,
+            values: values!
+        };
+    }
+});

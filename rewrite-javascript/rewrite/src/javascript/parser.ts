@@ -4089,7 +4089,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapType(node: ts.Node): Type | undefined {
-        return Object.freeze(this.typeMapping.type(node));
+        return this.typeMapping.type(node);
     }
 
     private mapPrimitiveType(node: ts.Node): Type.Primitive {

@@ -73,7 +73,7 @@ public class RpcSendQueue {
                                       Function<T, @Nullable List<U>> values,
                                       Function<U, ?> id,
                                       @Nullable Consumer<U> onChange) {
-        List<U> after = values.apply(parent);
+        List<U> after = parent == null ? null : values.apply(parent);
         //noinspection unchecked
         List<U> before = this.before == null ? null : values.apply((T) this.before);
         sendList(after, before, id, onChange);
@@ -151,6 +151,7 @@ public class RpcSendQueue {
                 return;
             }
             ref = refs.size() + 1;
+            //noinspection DataFlowIssue
             refs.put(afterVal, ref);
         }
         //noinspection unchecked
