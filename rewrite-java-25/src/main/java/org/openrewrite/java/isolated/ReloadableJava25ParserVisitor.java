@@ -38,10 +38,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
@@ -57,6 +56,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -398,9 +398,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
 
+        int saveCursor = cursor;
         ReloadableJava25ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
+        CompactSourceFile compactSourceFile = null;
 
         J.ClassDeclaration.Kind kind;
         if (hasFlag(node.getModifiers(), Flags.ENUM)) {
@@ -413,10 +415,16 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.RECORD)) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("record"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Record);
         } else {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+            if (source.startsWith("class", cursor)) {
+                kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+            } else {
+                kind = new J.ClassDeclaration.Kind(randomId(), whitespace(), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+                compactSourceFile = new CompactSourceFile(randomId());
+                cursor = saveCursor;
+            }
         }
 
-        J.Identifier name = new J.Identifier(randomId(), sourceBefore(node.getSimpleName().toString()),
+        J.Identifier name = new J.Identifier(randomId(), compactSourceFile != null ? EMPTY : sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, emptyList(), ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
@@ -504,7 +512,7 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        Space bodyPrefix = sourceBefore("{");
+        Space bodyPrefix = compactSourceFile != null ? whitespace() : sourceBefore("{");
 
         // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
         List<Tree> jcEnums = new ArrayList<>(node.getMembers().size());
@@ -594,9 +602,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                members, sourceBefore("}"));
+                members, compactSourceFile != null ? whitespace() : sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
+        return new J.ClassDeclaration(randomId(), fmt, compactSourceFile != null ? Markers.build(List.of(compactSourceFile)) : Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
                 primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
@@ -625,17 +633,20 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getPackageAnnotations(),
                 new HashMap<>(node.getPackageAnnotations().size()));
         List<J.Annotation> packageAnnotations = collectAnnotations(annotationPosTable);
+        List<Marker> markers = new ArrayList<>(styles);
 
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
-            Space packagePrefix = sourceBefore("package");
-            packageDecl = new J.Package(randomId(), packagePrefix, Markers.EMPTY,
+            packageDecl = new J.Package(randomId(), sourceBefore("package"), Markers.EMPTY,
                     convert(cu.getPackageName()), packageAnnotations);
+        } else if (cu.getPackageName() == null && source.startsWith("package", cursor)) {
+            markers.add(new PackageOnCompactSourceFile(randomId(),
+                    sourceBefore("package"), sourceBefore(";").getWhitespace()));
         }
         return new J.CompilationUnit(
                 randomId(),
                 fmt,
-                Markers.build(styles),
+                Markers.build(markers),
                 sourcePath,
                 fileAttributes,
                 charset.name(),

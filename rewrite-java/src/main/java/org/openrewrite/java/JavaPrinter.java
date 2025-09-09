@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -29,6 +27,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
@@ -389,6 +388,22 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         return block;
     }
 
+    public J visitBlock(Block block, PrintOutputCapture<P> p, boolean includeBraces) {
+        beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+
+        if (block.isStatic()) {
+            p.append("static");
+            visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
+        }
+
+        if (includeBraces) p.append('{');
+        visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+        visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+        if (includeBraces) p.append('}');
+        afterSyntax(block, p);
+        return block;
+    }
+
     protected void visitStatements(List<JRightPadded<Statement>> statements, JRightPadded.Location location, PrintOutputCapture<P> p) {
         for (JRightPadded<Statement> paddedStat : statements) {
             visitStatement(paddedStat, location, p);
@@ -539,6 +554,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 break;
         }
 
+        Optional<Marker> compactSourceFile = classDecl.getMarkers().getMarkers().stream()
+                .filter(m -> m instanceof CompactSourceFile).findFirst();
+        if (compactSourceFile.isPresent()) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visitBlock(classDecl.getBody(), p, false);
+            afterSyntax(classDecl, p);
+            return classDecl;
+        }
+
         beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         visit(classDecl.getLeadingAnnotations(), p);
@@ -563,6 +587,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, PrintOutputCapture<P> p) {
         beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
+        Optional<Marker> packageOnCompactSourceFile = cu.getMarkers().getMarkers().stream().filter(m -> m instanceof PackageOnCompactSourceFile).findFirst();
+        if (packageOnCompactSourceFile.isPresent()) {
+            PackageOnCompactSourceFile pkg  = (PackageOnCompactSourceFile) packageOnCompactSourceFile.get();
+            visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
+            p.append("package");
+            p.append(pkg.getPackageDefinition());
+            p.append(";");
+        }
         visitRightPadded(cu.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, ";", p);
         visitRightPadded(cu.getPadding().getImports(), JRightPadded.Location.IMPORT, ";", p);
         if (!cu.getImports().isEmpty()) {
