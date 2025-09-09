@@ -154,9 +154,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         String fmt = newLine + reader.prefix(lastEnd, event);
 
                         newLine = "";
-                        
+
                         Markers markers = Markers.EMPTY;
-                        
+
                         // If this is an explicit document end, check for trailing content
                         if (((DocumentEndEvent) event).getExplicit()) {
                             Event nextEvent = parser.peekEvent();
@@ -169,7 +169,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 }
                             }
                         }
-                        
+
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
