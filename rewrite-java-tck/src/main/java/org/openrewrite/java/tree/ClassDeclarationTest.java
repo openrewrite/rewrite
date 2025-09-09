@@ -292,7 +292,26 @@ class ClassDeclarationTest implements RewriteTest {
                   void main() {
                       System.out.println("Hello from implicit class!");
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
+              )
+            );
+        }
+
+        @Test
+        void implicitClassWithAbundantSpacing() {
+            rewriteRun(
+              java(
+                """
+                  
+                  void main() {
+                  
+                      System.out.println("Hello from implicit class!");
+                  
+                  }
+                  
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
@@ -309,7 +328,8 @@ class ClassDeclarationTest implements RewriteTest {
                   void greet(String name) {
                       System.out.println("Hello, " + name + "!");
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
@@ -324,7 +344,8 @@ class ClassDeclarationTest implements RewriteTest {
                   void main() {
                       System.out.println(greeting + ", World!");
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
@@ -340,7 +361,8 @@ class ClassDeclarationTest implements RewriteTest {
                       names.add("Bob");
                       System.out.println(names);
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
@@ -355,24 +377,28 @@ class ClassDeclarationTest implements RewriteTest {
                   void main() {
                       System.out.println("Hello from package!");
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
 
         @Test
-        void implicitClassWithStaticInitializer() {
+        void implicitClassWithPackageStatementWithAbundantSpacing() {
             rewriteRun(
               java(
                 """
-                  static {
-                      System.out.println("Static initializer");
-                  }
+                  
+                  package com.example;
                   
                   void main() {
-                      System.out.println("Main method");
+                  
+                      System.out.println("Hello from package!");
+                  
                   }
-                  """
+                  
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
@@ -412,7 +438,8 @@ class ClassDeclarationTest implements RewriteTest {
                           System.out.println("Helping!");
                       }
                   }
-                  """
+                  """,
+                spec -> spec.path("com/example/Main.java")
               )
             );
         }
