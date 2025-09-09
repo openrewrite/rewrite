@@ -303,13 +303,13 @@ class ClassDeclarationTest implements RewriteTest {
             rewriteRun(
               java(
                 """
-                  
+
                   void main() {
-                  
+
                       System.out.println("Hello from implicit class!");
-                  
+
                   }
-                  
+
                   """,
                 spec -> spec.path("com/example/Main.java")
               )
@@ -324,7 +324,7 @@ class ClassDeclarationTest implements RewriteTest {
                   void main() {
                       greet("World");
                   }
-                  
+
                   void greet(String name) {
                       System.out.println("Hello, " + name + "!");
                   }
@@ -340,7 +340,7 @@ class ClassDeclarationTest implements RewriteTest {
               java(
                 """
                   String greeting = "Hello";
-                  
+
                   void main() {
                       System.out.println(greeting + ", World!");
                   }
@@ -373,7 +373,7 @@ class ClassDeclarationTest implements RewriteTest {
               java(
                 """
                   package com.example;
-                  
+
                   void main() {
                       System.out.println("Hello from package!");
                   }
@@ -388,15 +388,15 @@ class ClassDeclarationTest implements RewriteTest {
             rewriteRun(
               java(
                 """
-                  
+
                   package com.example;
-                  
+
                   void main() {
-                  
+
                       System.out.println("Hello from package!");
-                  
+
                   }
-                  
+
                   """,
                 spec -> spec.path("com/example/Main.java")
               )
@@ -409,11 +409,11 @@ class ClassDeclarationTest implements RewriteTest {
               java(
                 """
                   private String name;
-                  
+
                   Main(String name) {
                       this.name = name;
                   }
-                  
+
                   void main() {
                       System.out.println("Name: " + name);
                   }
@@ -432,7 +432,7 @@ class ClassDeclarationTest implements RewriteTest {
                       Helper helper = new Helper();
                       helper.help();
                   }
-                  
+
                   class Helper {
                       void help() {
                           System.out.println("Helping!");

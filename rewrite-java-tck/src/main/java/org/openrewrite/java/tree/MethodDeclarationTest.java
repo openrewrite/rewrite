@@ -161,7 +161,7 @@ class MethodDeclarationTest implements RewriteTest {
                 """
                   class Counter {
                       private int count = 0;
-                  
+
                       void main() {
                           count++;
                           System.out.println("Count: " + count);
@@ -181,7 +181,7 @@ class MethodDeclarationTest implements RewriteTest {
                       void main() {
                           greet("World");
                       }
-                      
+
                       void greet(String name) {
                           System.out.println("Hello, " + name + "!");
                       }
@@ -206,5 +206,4 @@ class MethodDeclarationTest implements RewriteTest {
             );
         }
     }
-
 }
