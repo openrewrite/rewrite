@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -239,11 +240,11 @@ class YamlParserTest implements RewriteTest {
     void pipeLiteralInASequenceWithDoubleQuotes() {
         rewriteRun(
           yaml(
-               """
-               - "one": |
-                   two
-                 "three": "four"
-               """
+            """
+              - "one": |
+                  two
+                "three": "four"
+              """
           )
         );
     }
@@ -253,8 +254,8 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            index_patterns : []
-            """
+              index_patterns : []
+              """
           )
         );
     }
@@ -264,9 +265,9 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            AttributeDefinitions: !Dynamo
-              - AttributeName: Title
-            """
+              AttributeDefinitions: !Dynamo
+                - AttributeName: Title
+              """
           )
         );
     }
@@ -276,8 +277,8 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            AttributeDefinitions: !Dynamo Title
-            """
+              AttributeDefinitions: !Dynamo Title
+              """
           )
         );
     }
@@ -287,17 +288,17 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            age: !!int "42"
-            pi: !!float "3.14159"
-            is_valid: !!bool "true"
-            names: !!seq
-              - Alice
-              - Bob
-              - Charlie
-            person: !!map
-              name: John Doe
-              age: 30
-            """
+              age: !!int "42"
+              pi: !!float "3.14159"
+              is_valid: !!bool "true"
+              names: !!seq
+                - Alice
+                - Bob
+                - Charlie
+              person: !!map
+                name: John Doe
+                age: 30
+              """
           )
         );
     }
@@ -307,9 +308,9 @@ class YamlParserTest implements RewriteTest {
         // given
         @Language("yml") String code =
           """
-          person: !!map
-            name: Jonah Mathews
-          """;
+            person: !!map
+              name: Jonah Mathews
+            """;
 
         // when
         Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().getFirst();
@@ -337,7 +338,7 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           // Could be whatever recipe, it just proves the `IndexOutOfBoundsException` is not thrown,
           // thus proving the parser can handle a flow-style sequence ending at the boundary of the internal buffer used by SnakeYaml StreamReader.
-          spec -> spec.recipe(new DeleteKey(".nonexistent","*")),
+          spec -> spec.recipe(new DeleteKey(".nonexistent", "*")),
           yaml(yaml)
         );
     }
@@ -347,10 +348,10 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            - name: Elephant
-            - #🦍COMMENT: unicode
-            - action: Do something
-            """
+              - name: Elephant
+              - #🦍COMMENT: unicode
+              - action: Do something
+              """
           )
         );
     }
@@ -360,10 +361,10 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            - name: Elephant
-            - #🦍COMMENT: 🐶unicode
-            - action: Do something
-            """
+              - name: Elephant
+              - #🦍COMMENT: 🐶unicode
+              - action: Do something
+              """
           )
         );
     }
@@ -373,10 +374,10 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            - name: Elephant
-            - #COMMENT: unicode
-            - action: Do something
-            """
+              - name: Elephant
+              - #COMMENT: unicode
+              - action: Do something
+              """
           )
         );
     }
@@ -386,12 +387,12 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            - name: Rat
-            - #🐀COMMENT: unicode
-            - color: Black
-            - #🦍COMMENT: unicode
-            - action: Escape
-            """
+              - name: Rat
+              - #🐀COMMENT: unicode
+              - color: Black
+              - #🦍COMMENT: unicode
+              - action: Escape
+              """
           )
         );
     }
@@ -401,12 +402,12 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-            - name: Rat
-            - #🐀COMMENT: 🦍unicode
-            - color: Black
-            - #🦍COMMENT: 🎱unicode
-            - action: Escape
-            """
+              - name: Rat
+              - #🐀COMMENT: 🦍unicode
+              - color: Black
+              - #🦍COMMENT: 🎱unicode
+              - action: Escape
+              """
           )
         );
     }
@@ -466,28 +467,60 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
-    @Test
-    void yamlWithExplicitDocumentEndMarker() {
-        rewriteRun(
-          yaml(
-            """
-              key: value
-              ...
-              """
-          )
-        );
-    }
+    @Nested
+    class DocumentEnd {
+        @Test
+        void yamlWithExplicitDocumentEndMarker() {
+            rewriteRun(
+              yaml(
+                """
+                  key: value
+                  ...
+                  """
+              )
+            );
+        }
 
-    @Test
-    void yamlWithExplicitDocumentEndMarkerAndNewline() {
-        rewriteRun(
-          yaml(
-            """
-              key: value
-              ...
-              """,
-            SourceSpec::noTrim
-          )
-        );
+        @Test
+        void yamlWithExplicitDocumentEndMarkerAndNewline() {
+            rewriteRun(
+              yaml(
+                """
+                  key: value
+                  ...
+                  """,
+                SourceSpec::noTrim
+              )
+            );
+        }
+
+        @Test
+        void yamlWithCommentOnNewLineAfterExplicitDocumentEndMarker() {
+            rewriteRun(
+              yaml(
+                """
+                  key: value
+                  ...
+                  # This is a comment after the document end
+                  """
+              )
+            );
+        }
+
+        @Test
+        void multipleDocumentsWithCommentsAfterEndMarkers() {
+            rewriteRun(
+              yaml(
+                """
+                  ---
+                  first: document
+                  ... # end of first
+                  ---
+                  second: document
+                  ... # end of second
+                  """
+              )
+            );
+        }
     }
 }
