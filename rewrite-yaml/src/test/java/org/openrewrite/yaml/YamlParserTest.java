@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -461,6 +462,31 @@ class YamlParserTest implements RewriteTest {
               - item2
               other_anchor: *anchor
               """
+          )
+        );
+    }
+
+    @Test
+    void yamlWithExplicitDocumentEndMarker() {
+        rewriteRun(
+          yaml(
+            """
+              key: value
+              ...
+              """
+          )
+        );
+    }
+
+    @Test
+    void yamlWithExplicitDocumentEndMarkerAndNewline() {
+        rewriteRun(
+          yaml(
+            """
+              key: value
+              ...
+              """,
+            SourceSpec::noTrim
           )
         );
     }
