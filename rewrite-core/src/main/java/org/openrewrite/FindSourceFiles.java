@@ -63,7 +63,7 @@ public class FindSourceFiles extends Recipe {
                     Path sourcePath = sourceFile.getSourcePath();
                     if (matches(sourcePath)) {
                         results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString(),
-                                tree.getClass().getSimpleName()));
+                                tree.getClass().getSimpleName(), sourceFile.getCharset() == null ? null : sourceFile.getCharset().toString()));
                         return SearchResult.found(sourceFile);
                     }
                 }
