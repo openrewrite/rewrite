@@ -278,6 +278,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6015")
     @Test
     void uris() {
         rewriteRun(
