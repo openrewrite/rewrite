@@ -205,10 +205,15 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
 
+                        String newVersion = isBlank(version) ? "latest.release" : version;
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, null).getValue());
+                        if (versionComparator.compare(null, acc.currentMarker.getVersion(), newVersion) > 0) {
+                            return entry;
+                        }
+
                         GradleWrapper gradleWrapper = getGradleWrapper(currentDistributionUrl, ctx);
                         String gradleWrapperVersion = gradleWrapper.getVersion();
 
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, acc.currentMarker.getVersion(), gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
