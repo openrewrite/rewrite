@@ -277,4 +277,21 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void uris() {
+        rewriteRun(
+          groovy(
+            """
+            enum E {
+              LOCAL("http://localhost:8080/api/v1/clusters")
+
+              E(String uri) {
+              }
+            }
+            """
+          )
+        );
+    }
+
 }

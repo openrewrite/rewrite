@@ -467,7 +467,12 @@ public class GroovyParserVisitor {
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
                         cursor += delimiter.open.length();
-                        sourceBefore(delimiter.close);
+                        if (delimiter.close == "\"") {
+                            // This is to prevent sourceBefore interpreting // in strings as comments
+                            cursor = source.indexOf("\"", cursor) + 1;
+                        } else {
+                            sourceBefore(delimiter.close);
+                        }
                     } else {
                         name();
                     }
