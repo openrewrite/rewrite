@@ -2904,6 +2904,8 @@ public class GroovyParserVisitor {
             return isPatternOperator ? PATTERN_SINGLE_QUOTE_STRING : SINGLE_QUOTE_STRING;
         } else if (source.startsWith("[", c)) {
             return ARRAY;
+        } else if (source.startsWith("{", c)) {
+            return CLOSURE;
         }
 
         return null;

@@ -251,4 +251,30 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void closureInEnum() {
+        rewriteRun(
+          groovy(
+            """
+            import java.util.function.Function
+            enum TagNameSerializer {
+                DEFAULT('default',
+                    { String s ->
+                        return "not " + s;
+                    }
+                )
+
+                private final String type
+                private final Function<String, String> fun
+
+                private TagNameSerializer(String type, Function<String, String> fun) {
+                    this.type = type
+                    this.fun = fun
+                }
+            }
+            """
+          )
+        );
+    }
 }
