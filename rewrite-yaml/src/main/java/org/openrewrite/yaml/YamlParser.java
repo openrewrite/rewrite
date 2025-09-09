@@ -27,6 +27,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.openrewrite.yaml.marker.TrailingContent;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -153,13 +154,31 @@ public class YamlParser implements org.openrewrite.Parser {
                         String fmt = newLine + reader.prefix(lastEnd, event);
 
                         newLine = "";
+                        
+                        Markers markers = Markers.EMPTY;
+                        
+                        // If this is an explicit document end, check for trailing content
+                        if (((DocumentEndEvent) event).getExplicit()) {
+                            Event nextEvent = parser.peekEvent();
+                            if (nextEvent != null) {
+                                String trailingContent = reader.readStringFromBuffer(event.getEndMark().getIndex(), nextEvent.getStartMark().getIndex() - 1);
+                                if (!trailingContent.isEmpty()) {
+                                    // Store trailing content (like newline) as a marker
+                                    markers = markers.addIfAbsent(new TrailingContent(randomId(), trailingContent));
+                                    lastEnd = nextEvent.getStartMark().getIndex();
+                                }
+                            }
+                        }
+                        
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
-                                Markers.EMPTY,
+                                markers,
                                 ((DocumentEndEvent) event).getExplicit()
                         )));
-                        lastEnd = event.getEndMark().getIndex();
+                        if (markers.getMarkers().isEmpty()) {
+                            lastEnd = event.getEndMark().getIndex();
+                        }
                         break;
                     }
                     case DocumentStart: {

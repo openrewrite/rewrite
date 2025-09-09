@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.YamlVisitor;
+import org.openrewrite.yaml.marker.TrailingContent;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.UnaryOperator;
@@ -51,6 +52,8 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         if (end.isExplicit()) {
             p.append("...");
         }
+        end.getMarkers().findFirst(TrailingContent.class).ifPresent(t -> p.append(t.getContent()));
+        afterSyntax(end, p);
         return end;
     }
 
