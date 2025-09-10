@@ -55,6 +55,11 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
+    /** Sum of estimated time savings of all recipes that made changes to this source file.
+     * This is the potential time savings because if the before and after are identical, then no time is actually saved.
+     * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
+     * of a single occurrence for each recipe that made a change.
+     */
     private final Duration potentialTimeSavings;
     private @Nullable Duration timeSavings;
 
@@ -68,8 +73,7 @@ public class Result {
             if (recipesStack != null && !recipesStack.isEmpty()) {
                 Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
                 if (perOccurrence != null) {
-                    timeSavings = perOccurrence;
-                    break;
+                    timeSavings = timeSavings.plus(perOccurrence);
                 }
             }
         }
@@ -138,6 +142,10 @@ public class Result {
         }.reduce(root, new AtomicBoolean(false)).get();
     }
 
+    /** Sum of estimated time savings of all recipes that made changes to this source file.
+     * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
+     * of a single occurrence for each recipe that made a change.
+     */
     public Duration getTimeSavings() {
         if (timeSavings == null) {
             if (potentialTimeSavings.isZero() || isLocalAndHasNoChanges(before, after)) {
