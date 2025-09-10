@@ -448,8 +448,7 @@ public class GroovyParserVisitor {
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
 
             Space namePrefix = whitespace();
-            String enumName = field.getName();
-            skip(enumName);
+            String enumName = skip(field.getName());
 
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
 
@@ -462,7 +461,7 @@ public class GroovyParserVisitor {
                 int start = cursor;
                 int argCount = 0;
                 int depth = 0;
-                whitespace();
+                cursor = indexOfNextNonWhitespace(cursor, source);
                 while (!(source.charAt(cursor) == ')' && depth == 0)) {
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
@@ -479,15 +478,15 @@ public class GroovyParserVisitor {
                     } else {
                         name();
                     }
-                    whitespace();
+                    cursor = indexOfNextNonWhitespace(cursor, source);
                     skip(",");
-                    whitespace();
+                    cursor = indexOfNextNonWhitespace(cursor, source);
                     if (source.charAt(cursor) == '(') {
                         depth++;
-                        skip("(");
+                        cursor++;
                     } else if (depth > 0 && source.charAt(cursor) == ')') {
                         depth--;
-                        skip(")");
+                        cursor++;
                     }
                     argCount++;
                 }
@@ -2612,7 +2611,7 @@ public class GroovyParserVisitor {
     /**
      * Move the cursor after the token.
      */
-    private String skip(@Nullable String token) {
+    private @Nullable String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
             return null;
