@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Parser, ParserInput, ParserSourceReader, randomId, SourceFile} from "../";
+import {emptyMarkers} from "../markers";
+import {Parser, ParserInput, ParserSourceReader} from "../parser";
+import {randomId} from "../uuid";
+import {SourceFile} from "../tree";
 import {emptySpace, Json, space} from "./tree";
 
 export class JsonParser extends Parser {

@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
@@ -23,12 +24,65 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class TomlParserTest implements RewriteTest {
+
     @Test
     void keyValueString() {
         rewriteRun(
           toml(
             """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineString() {
+        rewriteRun(
+          toml(
+            """
+              # Multi-line string with preserved newlines
+              description = ""\"
+              This is a
+              multi-line string
+              with preserved newlines""\"
+              
+              # Multi-line string with escaped newline (line-ending backslash)
+              one-line = ""\"
+              The quick brown \\
+              fox jumps over \\
+              the lazy dog.\\
+              ""\"
+              
+              # Multi-line string containing quotes
+              quotes = ""\"
+              This has a single " quote
+              This has double "" quotes
+              This has escaped \\" quote""\"
+              
+              # Multi-line string with leading newline trimmed
+              trimmed = ""\"
+              First line after opening quotes""\"
+              
+              # Multi-line literal string (no escapes processed)
+              regex = '''
+              \\d{2}-\\d{2}-\\d{4}
+              Line with \\ backslash
+              Line with ' single quote
+              Line with '' two quotes'''
+              
+              # Multi-line literal string with various quotes
+              literal-quotes = '''
+              Single ' quote
+              Double '' quotes
+              Almost ''\\' but not quite'''
+              
+              # Multi-line basic string with escape sequences
+              escaped = ""\"
+              Tab:\\there
+              Newline:\\nhere
+              Quote:\\" Unicode:\\u00E9
+              Backslash:\\\\""\"
               """
           )
         );
@@ -44,7 +98,7 @@ class TomlParserTest implements RewriteTest {
               int3 = 0
               int4 = -17
               int5 = 1_000
-              
+
               # hexadecimal with prefix `0x`
               hex1 = 0xDEADBEEF
               hex2 = 0xdeadbeef
@@ -52,7 +106,7 @@ class TomlParserTest implements RewriteTest {
               # octal with prefix `0o`
               oct1 = 0o01234567
               oct2 = 0o755 # useful for Unix file permissions
-              
+
               # binary with prefix `0b`
               bin1 = 0b11010110
               """
@@ -69,22 +123,22 @@ class TomlParserTest implements RewriteTest {
               flt1 = +1.0
               flt2 = 3.1415
               flt3 = -0.01
-              
+
               # exponent
               flt4 = 5e+22
               flt5 = 1e06
               flt6 = -2E-2
-              
+
               # both
               flt7 = 6.626e-34
-              
+
               flt8 = 224_617.445_991_228
-              
+
               # infinity
               sf1 = inf  # positive infinity
               sf2 = +inf # positive infinity
               sf3 = -inf # negative infinity
-              
+
               # not a number
               sf4 = nan  # actual sNaN/qNaN encoding is implementation-specific
               sf5 = +nan # same as `nan`
@@ -165,7 +219,7 @@ class TomlParserTest implements RewriteTest {
               nested_arrays_of_ints = [ [ 1, 2 ], [3, 4, 5] ]
               nested_mixed_array = [ [ 1, 2 ], ["a", "b", "c"] ]
               string_array = [ "all", 'strings', ""\"are the same""\", '''type''' ]
-              
+
               # Mixed-type arrays are allowed
               numbers = [ 0.1, 0.2, 0.5, 1, 2, 5 ]
               contributors = [
@@ -175,7 +229,7 @@ class TomlParserTest implements RewriteTest {
               integers2 = [
                 1, 2, 3
               ]
-              
+
               integers3 = [
                 1,
                 2, # this is ok
@@ -193,11 +247,11 @@ class TomlParserTest implements RewriteTest {
               [table-1]
               key1 = "some string"
               key2 = 123
-              
+
               [table-2]
               key1 = "another string"
               key2 = 456
-              
+
               [dog."tater.man"]
               type.name = "pug"
               """,
@@ -219,13 +273,13 @@ class TomlParserTest implements RewriteTest {
               [[products]]
               name = "Hammer"
               sku = 738594937
-              
+
               [[products]]  # empty table within the array
-              
+
               [[products]]
               name = "Nail"
               sku = 284758393
-              
+
               color = "gray"
               """
           )
@@ -343,6 +397,46 @@ class TomlParserTest implements RewriteTest {
               """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
               #
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5988")
+    @Test
+    void arrayWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Single element with trailing comma
+              tsfresh = [
+                  "featuretools-tsfresh-primitives >= 1.0.0",
+              ]
+              
+              # Multiple elements with trailing comma
+              dependencies = [
+                  "package1",
+                  "package2",
+                  "package3",
+              ]
+              
+              # Inline array with trailing comma  
+              inline = ["value1", "value2",]
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineTableWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Inline table with trailing comma
+              point = { x = 1, y = 2, }
+              
+              # Another inline table with trailing comma
+              person = { name = "John", age = 30, }
               """
           )
         );

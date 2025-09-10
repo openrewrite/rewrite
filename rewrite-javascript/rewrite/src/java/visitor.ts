@@ -13,13 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isTree,
-    mapAsync,
-    produceAsync,
-    SourceFile,
-    TreeVisitor,
-    ValidImmerRecipeReturnType
-} from "../";
+import {isTree, SourceFile} from "../tree";
+import {mapAsync} from "../util";
+import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
 import {
     Expression,
     isJava,
@@ -34,7 +30,7 @@ import {JavaType} from "./type";
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
 
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJava(sourceFile);
     }
 

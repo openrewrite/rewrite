@@ -77,7 +77,7 @@ public class AnnotationTemplateGenerator {
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
 
                     int level = 1;
-                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Annotation) {
+                    while (annotationParent instanceof J.NewArray || annotationParent instanceof J.Assignment || annotationParent instanceof J.Annotation) {
                         level += 1;
                         if (cursor.getParent(level) == null) {
                             break;
@@ -89,8 +89,10 @@ public class AnnotationTemplateGenerator {
                         after.insert(0, " void $method() {}");
                     } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
                         after.insert(0, " int $variable;");
-                    } else if (j instanceof J.ClassDeclaration) {
-                        if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
+                    } else if (j instanceof J.ClassDeclaration || annotationParent instanceof J.ClassDeclaration) {
+                        // Check if this is a top-level class or nested class
+                        Cursor classCursor = j instanceof J.ClassDeclaration ? cursor : cursor.getParent(level);
+                        if (classCursor != null && classCursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {
                             after.insert(0, "class $Clazz {}");
                         } else {
                             after.insert(0, "static class $Clazz {}");
@@ -142,7 +144,7 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
-            if (!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
+            if (!"$Placeholder".equals(classes.get(classes.size() - 1).getName().getSimpleName())) {
                 after.append("\n@interface $Placeholder {}");
             }
             return;

@@ -19,7 +19,7 @@ import {mapAsync} from "../util";
 import {isPlainText, PlainText} from "./tree";
 
 export class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isPlainText(sourceFile);
     }
 

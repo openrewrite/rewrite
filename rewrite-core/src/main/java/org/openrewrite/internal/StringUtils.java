@@ -292,7 +292,18 @@ public class StringUtils {
      * or <code>-1</code> if no character in the string matches the predicate.
      */
     public static int indexOf(String text, Predicate<Character> test) {
-        for (int i = 0; i < text.length(); i++) {
+        return indexOf(text, 0, test);
+    }
+
+    /**
+     * @param text Text to scan
+     * @param fromIndex Start offset to scan from
+     * @param test The predicate to match
+     * @return The index of the first character for which the predicate returns <code>true</code>,
+     * or <code>-1</code> if no character in the string matches the predicate.
+     */
+    public static int indexOf(String text, int fromIndex, Predicate<Character> test) {
+        for (int i = fromIndex; i < text.length(); i++) {
             if (test.test(text.charAt(i))) {
                 return i;
             }

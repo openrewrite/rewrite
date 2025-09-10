@@ -61,11 +61,11 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -352,8 +352,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitClassInitializer(KtClassInitializer initializer, ExecutionContext data) {
         J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data).withPrefix(deepPrefix(initializer));
-        staticInit = staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
-        return staticInit;
+        return staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
     }
 
     @Override
@@ -3576,7 +3575,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private J.NewClass mapType(J.NewClass tree) {
         J.NewClass n = tree;
-        if (n.getClazz() != null && n.getClazz() instanceof J.Identifier) {
+        if (n.getClazz() instanceof J.Identifier) {
             if (n.getClazz().getType() instanceof JavaType.Parameterized) {
                 J.Identifier clazz = (J.Identifier) n.getClazz();
                 n = n.withClazz(clazz.withType(((JavaType.Parameterized) clazz.getType()).getType()));
@@ -3943,7 +3942,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static boolean isCRLF(ASTNode node) {
-        return node instanceof PsiErrorElementImpl && node.getText().equals("\r");
+        return node instanceof PsiErrorElementImpl && "\r".equals(node.getText());
     }
 
     private String nodeRangeText(@Nullable ASTNode first, @Nullable ASTNode last) {
@@ -3961,7 +3960,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private List<J.Annotation> mapAnnotations(List<KtAnnotationEntry> ktAnnotationEntries, ExecutionContext data) {
         return ktAnnotationEntries.stream()
                 .map(annotation -> (J.Annotation) annotation.accept(this, data))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {

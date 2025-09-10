@@ -19,7 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.*;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.StringJoiner;
+
+import static java.util.Collections.newSetFromMap;
 
 public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
@@ -73,7 +78,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         if (typeVariableNameStack == null) {
             typeVariableNameStack = new LinkedHashSet<>();
         }
-        if (!gtv.getName().equals("?") && !typeVariableNameStack.add(gtv.getName())) {
+        if (!"?".equals(gtv.getName()) && !typeVariableNameStack.add(gtv.getName())) {
             s.append('}');
             return s.toString();
         }
@@ -119,7 +124,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         JavaType.Parameterized pt = (JavaType.Parameterized) type;
 
         if (parameterizedStack == null) {
-            parameterizedStack = Collections.newSetFromMap(new IdentityHashMap<>());
+            parameterizedStack = newSetFromMap(new IdentityHashMap<>());
         }
         parameterizedStack.add(pt);
 

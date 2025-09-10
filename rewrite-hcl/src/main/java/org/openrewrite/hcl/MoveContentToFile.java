@@ -26,7 +26,9 @@ import org.openrewrite.hcl.tree.Space;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -100,15 +102,15 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
     @Override
     public Collection<Hcl.ConfigFile> generate(Scanned acc, ExecutionContext ctx) {
         if (acc.destinationExists || acc.toMove == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         Hcl.ConfigFile configFile = HclParser.builder().build().parse("")
                 .findFirst()
                 .map(Hcl.ConfigFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
-        configFile = configFile.withBody(Collections.singletonList(acc.toMove.withPrefix(Space.EMPTY)))
+        configFile = configFile.withBody(singletonList(acc.toMove.withPrefix(Space.EMPTY)))
                 .withSourcePath(Paths.get(destinationPath));
-        return Collections.singletonList(configFile);
+        return singletonList(configFile);
     }
 
     @Override

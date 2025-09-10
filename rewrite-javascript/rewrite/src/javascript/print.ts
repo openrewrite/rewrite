@@ -75,22 +75,17 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     override async visitExpressionStatement(statement: JS.ExpressionStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statement.prefix, p);
+        await this.visitMarkers(statement.markers, p);
         await this.visit(statement.expression, p);
         return statement;
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
-        // has no markers or prefix
+        await this.visitSpace(statementExpression.prefix, p);
+        await this.visitMarkers(statementExpression.markers, p);
         await this.visit(statementExpression.statement, p);
         return statementExpression;
-    }
-
-    override async visitTrailingTokenStatement(statement: JS.TrailingTokenStatement, p: PrintOutputCapture): Promise<J | undefined> {
-        await this.beforeSyntax(statement, p);
-        await this.visitRightPadded(statement.expression, p);
-        await this.afterSyntax(statement, p);
-        return statement;
     }
 
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
@@ -103,6 +98,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
         await this.visitLeftPaddedLocal("<", element.openName, p);
+        if (element.typeArguments) {
+            await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
+        }
         await this.visitSpace(element.afterName, p);
         await this.visitRightPaddedLocal(element.attributes, "", p);
 
@@ -1775,7 +1773,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async afterSyntaxMarkers(markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
+            p.append(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 
@@ -1785,18 +1783,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async beforeSyntaxExt(prefix: J.Space, markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
 
         await this.visitSpace(prefix, p);
         await this.visitMarkers(markers, p);
 
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
@@ -25,11 +24,10 @@ import org.openrewrite.config.DeclarativeNamedStyles;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
@@ -39,7 +37,7 @@ class ImportLayoutStyleTest {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @Test
-    void roundTripSerialize() throws JsonProcessingException {
+    void roundTripSerialize() throws Exception {
         var style = mapper.writeValueAsString(ImportLayoutStyle
                 .builder()
                 .packageToFold("java.awt.*")
@@ -57,7 +55,7 @@ class ImportLayoutStyleTest {
     }
 
     @Test
-    void deserializeInDeclarativeNamedStyles() throws IOException {
+    void deserializeInDeclarativeNamedStyles() throws Exception {
         var style = new DeclarativeNamedStyles(
                 randomId(),
                 "name",
@@ -89,7 +87,7 @@ class ImportLayoutStyleTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4196")
     void addImportInPresenceOfDuplicateOtherImport() {
         ImportLayoutStyle style = new ImportLayoutStyle(
-                Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyList(), Collections.emptyList());
+                Integer.MAX_VALUE, Integer.MAX_VALUE, emptyList(), emptyList());
         JRightPadded<J.Import> import1 = new JRightPadded<>(
                 new J.Import(
                         randomId(),
@@ -117,7 +115,7 @@ class ImportLayoutStyleTest {
                 new JLeftPadded<>(Space.SINGLE_SPACE, true, Markers.EMPTY),
                 TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
             null);
-        assertThat(style.addImport(List.of(import1, import2), importToAdd, null, Collections.emptyList()))
+        assertThat(style.addImport(List.of(import1, import2), importToAdd, null, emptyList()))
                 .containsExactlyInAnyOrder(
                         import1, import1, new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
     }
@@ -126,7 +124,7 @@ class ImportLayoutStyleTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4241")
     void addImportWithNewLineInUnsortedImportList() {
         ImportLayoutStyle style = new ImportLayoutStyle(
-          Integer.MAX_VALUE, Integer.MAX_VALUE, Collections.emptyList(), Collections.emptyList());
+          Integer.MAX_VALUE, Integer.MAX_VALUE, emptyList(), emptyList());
         JRightPadded<J.Import> import0 = new JRightPadded<>(
           new J.Import(
             randomId(),
@@ -165,6 +163,6 @@ class ImportLayoutStyleTest {
           TypeTree.build("pkg.Clazz.MEMBER_2").withPrefix(Space.SINGLE_SPACE),
           null);
 
-        assertThat(style.addImport(List.of(import0, import1, import3), importToAdd, null, Collections.emptyList()).get(1).getElement().getPrefix()).isEqualTo(Space.format("\n"));
+        assertThat(style.addImport(List.of(import0, import1, import3), importToAdd, null, emptyList()).get(1).getElement().getPrefix()).isEqualTo(Space.format("\n"));
     }
 }

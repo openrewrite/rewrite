@@ -32,7 +32,6 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -56,21 +55,17 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        client = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
-          .timeout(Duration.ofMinutes(10))
-          .build()
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env)
           .batchSize(1);
 
-        server = RewriteRpc.from(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
-          .timeout(Duration.ofMinutes(10))
-          .build()
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
           .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        client.close();
-        server.close();
+        client.shutdown();
+        server.shutdown();
     }
 
     @DocumentExample
@@ -78,8 +73,8 @@ class RewriteRpcTest implements RewriteTest {
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @SneakyThrows
               @Override
+              @SneakyThrows
               public Tree preVisit(Tree tree, ExecutionContext ctx) {
                   Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();

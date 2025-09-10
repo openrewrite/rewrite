@@ -17,16 +17,22 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveEmptyXmlTagsTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveEmptyXmlTags());
+    }
+
     @DocumentExample
     @Test
     void removeEmptyPluginRepositories() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
           xml(
             """
               <project>
@@ -53,7 +59,6 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
     @Test
     void removeNestedEmptyTags() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
           xml(
             """
               <project>
@@ -85,7 +90,6 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
     @Test
     void retainWhenThereAttributes() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
           xml(
             """
               <project>

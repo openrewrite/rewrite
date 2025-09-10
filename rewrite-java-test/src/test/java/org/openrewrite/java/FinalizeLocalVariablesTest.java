@@ -28,9 +28,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 
@@ -40,9 +40,9 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         spec.recipe(new FinalizeLocalVariables());
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     @ParameterizedTest
     @ValueSource(ints = { 11, 17, 21 })
-    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void missingTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
           s -> s.typeValidationOptions(TypeValidation.none()),
@@ -70,9 +70,9 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     @ParameterizedTest
     @ValueSource(ints = { 11, 17, 21 })
-    @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void explicitTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
           s -> s.typeValidationOptions(TypeValidation.none()),
@@ -151,7 +151,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                           mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(),
                                              new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
-                                                            J.Modifier.Type.Final, Collections.emptyList()))
+                                                            J.Modifier.Type.Final, emptyList()))
                           ), ctx);
                     }
 
@@ -170,8 +170,8 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                          .getValue() instanceof J.ForLoop.Control;
         }
 
-        @Value
         @EqualsAndHashCode(callSuper = false)
+        @Value
         private static class FindAssignmentReferencesToVariable extends JavaIsoVisitor<AtomicBoolean> {
 
             J.VariableDeclarations.NamedVariable variable;

@@ -21,11 +21,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
-import org.openrewrite.internal.ManagedThreadLocal;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
@@ -48,10 +45,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface JS extends J {
@@ -182,7 +179,7 @@ public interface JS extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -200,15 +197,12 @@ public interface JS extends J {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
                 @Override
-                public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p, Cursor parent) {
-                    try (ManagedThreadLocal.Scope<JavaScriptRewriteRpc> scope = JavaScriptRewriteRpc.current()
-                            .requireOrCreate(JavaScriptRewriteRpc.bundledInstallation(Environment.builder().build())::build)) {
-                        return scope.map(rpc -> {
-                            Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                            p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                            return tree;
-                        });
-                    }
+                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
+                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
+                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
+                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
+                    stopAfterPreVisit();
+                    return tree;
                 }
             };
         }
@@ -638,84 +632,6 @@ public interface JS extends J {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TrailingTokenStatement implements JS, Expression, Statement {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<TrailingTokenStatement.Padding> padding;
-
-        @With
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        JRightPadded<J> expression;
-
-        public J getExpression() {
-            return expression.getElement();
-        }
-
-        public TrailingTokenStatement withExpression(J expression) {
-            return getPadding().withExpression(JRightPadded.withElement(this.expression, expression));
-        }
-
-        @With
-        @Getter
-        @Nullable
-        JavaType type;
-
-        @Override
-        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
-            return v.visitTrailingTokenStatement(this, p);
-        }
-
-        @Transient
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public TrailingTokenStatement.Padding getPadding() {
-            TrailingTokenStatement.Padding p;
-            if (this.padding == null) {
-                p = new TrailingTokenStatement.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new TrailingTokenStatement.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final TrailingTokenStatement t;
-
-            public JRightPadded<J> getExpression() {
-                return t.expression;
-            }
-
-            public TrailingTokenStatement withExpression(JRightPadded<J> expression) {
-                return t.expression == expression ? t :
-                        new TrailingTokenStatement(t.id, t.prefix, t.markers, expression, t.type);
-            }
         }
     }
 
@@ -2396,7 +2312,7 @@ public interface JS extends J {
             for (J.Modifier modifier : modifiers) {
                 allAnnotations.addAll(modifier.getAnnotations());
             }
-            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
+            if (typeExpression instanceof J.AnnotatedType) {
                 allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
             }
             return allAnnotations;
@@ -3948,8 +3864,8 @@ public interface JS extends J {
         @Override
         public String toString() {
             return "ComputedPropertyMethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         public ComputedPropertyMethodDeclaration.Padding getPadding() {

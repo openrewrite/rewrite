@@ -28,7 +28,7 @@ import java.lang.annotation.Target;
  * be commented like in this example:
  * <pre>
  * // TO-BE-REMOVED(2025-12-31): for unexplainable reasons this code is required in production
- * for (int i = 0; i < 42; i++) {
+ * for (int i = 0; i != 42; i++) {
  *     System.out.println(i);
  * }
  * </pre>

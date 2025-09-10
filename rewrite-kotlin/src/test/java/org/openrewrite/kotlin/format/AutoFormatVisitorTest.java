@@ -80,7 +80,7 @@ class AutoFormatVisitorTest implements RewriteTest {
           kotlin(
             """
               package t
-              
+
               class A(
                   val a: Boolean,
                   val b: Boolean,
@@ -213,7 +213,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               import org.junit.jupiter.api.Test
 
               class GraphQLMultiQueryRequestTest {
-              
+
                   @Suppress
                   @Test
                   fun testSerializeInputClassWithProjectionAndMultipleQueries() {
@@ -324,7 +324,7 @@ class AutoFormatVisitorTest implements RewriteTest {
             """
               class A {
                   companion object {
-              
+
                       @JvmField
                       val GRANT_TYPE = "password"
                   }

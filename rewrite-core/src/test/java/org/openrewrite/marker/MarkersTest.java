@@ -17,10 +17,10 @@ package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.Objects;
 import java.util.UUID;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
@@ -29,7 +29,7 @@ class MarkersTest {
     @Test
     void computeThatDoesntChangeReference() {
         TestMarker marker = new TestMarker();
-        Markers markers = Markers.build(Collections.singletonList(marker));
+        Markers markers = Markers.build(singletonList(marker));
         assertThat(markers).isSameAs(markers.addIfAbsent(marker));
     }
 

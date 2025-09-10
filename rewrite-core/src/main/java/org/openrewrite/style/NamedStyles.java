@@ -27,6 +27,7 @@ import org.openrewrite.marker.Marker;
 
 import java.util.*;
 
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
@@ -111,7 +112,7 @@ public class NamedStyles implements Marker {
     }
 
     public <S extends Style> S getStyle(Class<S> styleClass) {
-        S ret = merge(styleClass, Collections.singletonList(this));
+        S ret = merge(styleClass, singletonList(this));
         assert(ret != null);
         return ret;
     }

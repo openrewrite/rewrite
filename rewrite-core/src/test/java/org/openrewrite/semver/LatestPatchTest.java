@@ -74,6 +74,8 @@ class LatestPatchTest {
     void compare() {
         assertThat(latestPatch.compare("1.0", "1.0.1", "1.0.2")).isLessThan(0);
         assertThat(latestPatch.compare("1.0", "1.0.0.1", "1.0.1")).isLessThan(0);
+        assertThat(latestPatch.compare(null, "1.0", "latest.patch")).isNegative();
+        assertThat(latestPatch.compare(null, "latest.patch", "1.0")).isPositive();
     }
 
     @Test

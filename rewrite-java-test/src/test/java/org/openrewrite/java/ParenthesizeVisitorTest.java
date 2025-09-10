@@ -54,7 +54,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int c = (1 * 2) + (3 * 4);
                       int d = 7 - (5 - 2);
                       int e = -(-(1));
-              
+
                       boolean k = a > 5 && b <= 10;
                       boolean l = a > 5 || (b <= 10 && c == 9);
                       boolean m = !(!k);
@@ -69,7 +69,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int c = 1 * 2 + 3 * 4;
                       int d = 7 - (5 - 2);
                       int e = -(-1);
-              
+
                       boolean k = a > 5 && b <= 10;
                       boolean l = a > 5 || b <= 10 && c == 9;
                       boolean m = !!k;
@@ -91,7 +91,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int b = (1 * 2) * 3;
                       int c = (1 - 2) + 3;
                       int d = (1 / 2) * 3;
-              
+
                       boolean e = (a > b && c > d) && a != d;
                   }
               }
@@ -103,7 +103,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int b = 1 * 2 * 3;
                       int c = 1 - 2 + 3;
                       int d = 1 / 2 * 3;
-              
+
                       boolean e = a > b && c > d && a != d;
                   }
               }
@@ -213,17 +213,17 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       String t = "Value: " + 1 + 2;
                       String u = 1 + 2 + " is the result";
                       String v = 1 + (2 + " is the result");
-              
+
                       // String concatenation with mixed types
                       String a = "Calculation: " + (1.5 * 2);
                       String b = ("Item " + 1) + ": detail";
                       String c = "Item " + (1 + ": detail");
-              
+
                       // String concatenation in conditions
                       boolean test1 = ("a" + "b").equals("ab");
                       boolean test2 = "a" + "b" == "ab";
                       boolean test3 = "x" + 1 == "x" + 1;
-              
+
                       // With method calls
                       String m1 = "Length: " + (String.valueOf(123).length());
                       String m2 = String.valueOf(1 + 2) + "0";
@@ -238,17 +238,17 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       String t = "Value: " + 1 + 2;
                       String u = 1 + 2 + " is the result";
                       String v = 1 + (2 + " is the result");
-              
+
                       // String concatenation with mixed types
                       String a = "Calculation: " + 1.5 * 2;
                       String b = "Item " + 1 + ": detail";
                       String c = "Item " + 1 + ": detail";
-              
+
                       // String concatenation in conditions
                       boolean test1 = ("a" + "b").equals("ab");
                       boolean test2 = "a" + "b" == "ab";
                       boolean test3 = "x" + 1 == "x" + 1;
-              
+
                       // With method calls
                       String m1 = "Length: " + String.valueOf(123).length();
                       String m2 = String.valueOf(1 + 2) + "0";
@@ -338,7 +338,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       System.out.println((a += b));
                       doSomething((a > b && a < 10) ? (a++) : (b--));
                   }
-              
+
                   void doSomething(int x) {}
               }
               """,
@@ -352,7 +352,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       System.out.println(a += b);
                       doSomething(a > b && a < 10 ? a++ : b--);
                   }
-              
+
                   void doSomething(int x) {}
               }
               """
@@ -492,23 +492,23 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int a = 1;
                       int b = 2;
                       int c = 3;
-              
+
                       // Binary operations
                       int result1 = a + (b * c);
-                      int result2 = (a + b) * c; 
-              
+                      int result2 = (a + b) * c;
+
                       // Non-associative operations
                       int result3 = a - (b - c);
-              
+
                       // Unary context
                       boolean result4 = !(a > b);
-              
+
                       // Method invocation context
                       String s = ((String) "value").substring(0);
-              
+
                       // Ternary expression
                       int result5 = (a > b) ? c : 0;
-              
+
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
 
@@ -523,23 +523,23 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int a = 1;
                       int b = 2;
                       int c = 3;
-              
+
                       // Binary operations
                       int result1 = a + b * c;
-                      int result2 = (a + b) * c; 
-              
+                      int result2 = (a + b) * c;
+
                       // Non-associative operations
                       int result3 = a - (b - c);
-              
+
                       // Unary context
                       boolean result4 = !(a > b);
-              
+
                       // Method invocation context
                       String s = ((String) "value").substring(0);
-              
+
                       // Ternary expression
                       int result5 = a > b ? c : 0;
-              
+
                       // Assignment inside other expressions
                       int result6 = (a = b) + c;
 

@@ -32,12 +32,12 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.PathUtils.separatorsToUnix;
 
 @Value
@@ -88,12 +88,12 @@ public class EffectiveMavenRepositories extends Recipe {
                 } else {
                     Collection<MavenRepositoryMirror> mirrors = mctx.getMirrors(settings);
                     List<MavenRepository> effectiveRepositories = Stream.concat(
-                                    settings.getActiveRepositories(settings.getActiveProfiles() == null ? Collections.emptyList() : settings.getActiveProfiles().getActiveProfiles())
+                                    settings.getActiveRepositories(settings.getActiveProfiles() == null ? emptyList() : settings.getActiveProfiles().getActiveProfiles())
                                             .stream()
                                             .map(rawRepo -> MavenRepository.builder().uri(rawRepo.getUrl()).build()),
                                     Stream.concat(mrr.getPom().getRepositories().stream(), Stream.of(MavenRepository.MAVEN_CENTRAL)))
                             .map(repository -> MavenRepositoryMirror.apply(mirrors, repository))
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     for (MavenRepository repository : effectiveRepositories) {
                         repositories.add(repository.getUri());

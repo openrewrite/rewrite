@@ -26,6 +26,12 @@ import org.openrewrite.javascript.tree.JSX;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Validates that the contents of lists and containers like JLeftPadded respect their generic types.
+ *
+ * @param <P>
+ */
+@SuppressWarnings("UnusedReturnValue")
 public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     private <T extends Tree> @Nullable T visitAndValidate(@Nullable T tree, Class<? extends Tree> expected, P p) {
@@ -96,12 +102,6 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     public JS.ExpressionStatement visitExpressionStatement(JS.ExpressionStatement expressionStatement, P p) {
         visitAndValidateNonNull(expressionStatement.getExpression(), Expression.class, p);
         return expressionStatement;
-    }
-
-    @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, P p) {
-        visitAndValidateNonNull(trailingTokenStatement.getExpression(), J.class, p);
-        return trailingTokenStatement;
     }
 
     @Override

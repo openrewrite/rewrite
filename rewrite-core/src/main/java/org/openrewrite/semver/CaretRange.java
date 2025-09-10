@@ -22,6 +22,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Integer.parseInt;
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
 
 /**
  * Allows changes that do not modify the left-most non-zero element in the [major, minor, patch] tuple.
@@ -80,14 +82,26 @@ public class CaretRange extends LatestRelease {
             lower = major + "." + minor + "." + patch + "." + micro;
         }
 
-        if (!"0".equals(major) || minor == null) {
+        if (minor == null) {
             upper = Integer.toString(parseInt(major) + 1);
-        } else if (!"0".equals(minor) || patch == null) {
-            upper = major + "." + (parseInt(minor) + 1);
-        } else if (!"0".equals(patch) && micro == null) {
-            upper = major + "." + minor + "." + patch;
+        } else if (patch == null) {
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1);
+            } else {
+                upper = (parseInt(major) + 1) + ".0";
+            }
+        } else if (micro == null) {
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1) + ".0";
+            } else {
+                upper = (parseInt(major) + 1) + ".0.0";
+            }
         } else {
-            upper = major + "." + minor + "." + patch + "." + micro;
+            if ("0".equals(major)) {
+                upper = "0." + (parseInt(minor) + 1) + ".0.0";
+            } else {
+                upper = (parseInt(major) + 1) + ".0.0.0";
+            }
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));
@@ -95,5 +109,53 @@ public class CaretRange extends LatestRelease {
 
     private static @Nullable String normalizeWildcard(@Nullable String part) {
         return "*".equals(part) || "x".equals(part) || "X".equals(part) ? null : part;
+    }
+
+    @Override
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
+        Validated<CaretRange> maybeCaretV1 = build(v1, null);
+        Validated<CaretRange> maybeCaretV2 = build(v2, null);
+        if (maybeCaretV1.isValid() && maybeCaretV2.isValid()) {
+            CaretRange caretV1 = requireNonNull(maybeCaretV1.getValue());
+            CaretRange caretV2 = requireNonNull(maybeCaretV2.getValue());
+            int compare = super.compare(currentVersion, caretV1.upperExclusive, caretV2.upperExclusive);
+            if (compare != 0) {
+                return compare;
+            }
+
+            return super.compare(currentVersion, caretV1.lower, caretV2.lower);
+        } else if (maybeCaretV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            CaretRange caretV1 = requireNonNull(maybeCaretV1.getValue());
+            int compare = super.compare(currentVersion, caretV1.upperExclusive, v2);
+            if (compare < 0) {
+                return compare;
+            } else if (compare == 0) {
+                return -1;
+            }
+
+            compare = super.compare(currentVersion, caretV1.lower, v2);
+            return Math.max(compare, 0);
+        } else if (maybeCaretV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            CaretRange caretV2 = requireNonNull(maybeCaretV2.getValue());
+            int compare = super.compare(currentVersion, v1, caretV2.upperExclusive);
+            if (compare > 0) {
+                return compare;
+            } else if (compare == 0) {
+                return 1;
+            }
+
+            compare = super.compare(currentVersion, v1, caretV2.lower);
+            return Math.min(compare, 0);
+        }
+
+        return super.compare(currentVersion, v1, v2);
     }
 }

@@ -41,7 +41,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(j, j2 => j2.id);
         await q.getAndSend(j, j2 => j2.prefix, space => this.visitSpace(space, q));
-        await q.sendMarkers(j, j2 => j2.markers);
+        await q.getAndSend(j, j2 => j2.markers);
         return j;
     }
 
@@ -273,12 +273,6 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return span;
     }
 
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, q: RpcSendQueue): Promise<J | undefined> {
-        await q.getAndSend(trailingTokenStatement, el => el.expression, el => this.visitRightPadded(el, q));
-        await q.getAndSend(trailingTokenStatement, el => asRef(el.type), el => this.visitType(el, q));
-        return trailingTokenStatement;
-    }
-
     override async visitTuple(tuple: JS.Tuple, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(tuple, el => el.elements, el => this.visitContainer(el, q));
         await q.getAndSend(tuple, el => asRef(el.type), el => this.visitType(el, q));
@@ -389,6 +383,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     override async visitJsxTag(tag: JSX.Tag, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(tag, el => el.openName, el => this.visitLeftPadded(el, q));
+        await q.getAndSend(tag, el => el.typeArguments, el => this.visitContainer(el, q));
         await q.getAndSend(tag, el => el.afterName, space => this.visitSpace(space, q));
         await q.getAndSendList(tag, el => el.attributes, attr => attr.element.id, attr => this.visitRightPadded(attr, q));
 
@@ -571,7 +566,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
         draft.id = await q.receive(j.id);
         draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
-        draft.markers = await q.receiveMarkers(j.markers);
+        draft.markers = await q.receive(j.markers);
 
         return finishDraft(draft);
     }
@@ -840,13 +835,6 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    override async visitTrailingTokenStatement(trailingTokenStatement: JS.TrailingTokenStatement, q: RpcReceiveQueue): Promise<J | undefined> {
-        const draft = createDraft(trailingTokenStatement);
-        draft.expression = await q.receive(draft.expression, el => this.visitRightPadded(el, q));
-        draft.type = await q.receive(draft.type, el => this.visitType(el, q));
-        return finishDraft(draft);
-    }
-
     override async visitTuple(tuple: JS.Tuple, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(tuple);
         draft.elements = await q.receive(draft.elements, el => this.visitContainer(el, q));
@@ -975,6 +963,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     override async visitJsxTag(tag: JSX.Tag, q: RpcReceiveQueue): Promise<J | undefined> {
         const draft = createDraft(tag);
         draft.openName = await q.receive(draft.openName, el => this.visitLeftPadded(el, q));
+        draft.typeArguments = await q.receive(draft.typeArguments, el => this.visitContainer(el, q));
         draft.afterName = await q.receive(draft.afterName, space => this.visitSpace(space, q));
         draft.attributes = await q.receiveListDefined(draft.attributes, attr => this.visitRightPadded(attr, q));
 

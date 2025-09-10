@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-import {SourceFile, TreeKind} from "../";
+import {SourceFile, TreeKind} from "../tree";
 import {Expression, J, JavaType, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
-import getType = TypedTree.getType;
-import FunctionType = JS.FunctionType;
 
 export interface JS extends J {
 }
@@ -83,7 +81,6 @@ export namespace JS {
         TaggedTemplateExpression: "org.openrewrite.javascript.tree.JS$TaggedTemplateExpression",
         TemplateExpression: "org.openrewrite.javascript.tree.JS$TemplateExpression",
         TemplateExpressionSpan: "org.openrewrite.javascript.tree.JS$TemplateExpression$Span",
-        TrailingTokenStatement: "org.openrewrite.javascript.tree.JS$TrailingTokenStatement",
         Tuple: "org.openrewrite.javascript.tree.JS$Tuple",
         TypeDeclaration: "org.openrewrite.javascript.tree.JS$TypeDeclaration",
         TypeInfo: "org.openrewrite.javascript.tree.JS$TypeInfo",
@@ -481,16 +478,6 @@ export namespace JS {
     }
 
     /**
-     * Represents a statement ending with a trailing token.
-     * @example function foo(){};
-     */
-    export interface TrailingTokenStatement extends JS, Statement, Expression {
-        readonly kind: typeof Kind.TrailingTokenStatement;
-        readonly expression: J.RightPadded<J>;
-        readonly type?: JavaType;
-    }
-
-    /**
      * Represents a tuple type in TypeScript.
      * @example type T = [string, number];
      */
@@ -868,6 +855,7 @@ export namespace JSX {
     interface BaseTag extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxTag;
         readonly openName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+        readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
     }
@@ -922,5 +910,5 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
     return tree["kind"] === JS.Kind.ExpressionStatement;
 }
 
-TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
-TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))
+TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
+TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(tree.returnType.element))
