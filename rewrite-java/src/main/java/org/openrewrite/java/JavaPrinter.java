@@ -372,22 +372,23 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitBlock(Block block, PrintOutputCapture<P> p) {
-        return visitBlock(block, p, true);
-    }
-
-    public J visitBlock(Block block, PrintOutputCapture<P> p, boolean includeBraces) {
+    public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
         beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 
         if (block.isStatic()) {
-            p.append("static");
+            p.append("init");
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
-        if (includeBraces) p.append('{');
+        boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+        if (!omitBraces) {
+            p.append("{");
+        }
         visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
         visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-        if (includeBraces) p.append('}');
+        if (!omitBraces) {
+            p.append("}");
+        }
         afterSyntax(block, p);
         return block;
     }
@@ -542,11 +543,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 break;
         }
 
-        Optional<Marker> compactSourceFile = classDecl.getMarkers().getMarkers().stream()
-                .filter(m -> m instanceof CompactSourceFile).findFirst();
-        if (compactSourceFile.isPresent()) {
+        if (classDecl.getMarkers().findFirst(CompactSourceFile.class).isPresent()) {
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
-            visitBlock(classDecl.getBody(), p, false);
+            visit(classDecl.getBody(), p);
             afterSyntax(classDecl, p);
             return classDecl;
         }
@@ -575,9 +574,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, PrintOutputCapture<P> p) {
         beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
-        Optional<Marker> packageOnCompactSourceFile = cu.getMarkers().getMarkers().stream().filter(m -> m instanceof PackageOnCompactSourceFile).findFirst();
+        Optional<PackageOnCompactSourceFile> packageOnCompactSourceFile = cu.getMarkers().findFirst(PackageOnCompactSourceFile.class);
         if (packageOnCompactSourceFile.isPresent()) {
-            PackageOnCompactSourceFile pkg  = (PackageOnCompactSourceFile) packageOnCompactSourceFile.get();
+            PackageOnCompactSourceFile pkg  = packageOnCompactSourceFile.get();
             visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
             p.append("package");
             p.append(pkg.getPackageDefinition());

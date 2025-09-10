@@ -601,10 +601,13 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         members.addAll(convertStatements(membersMultiVariablesSeparated));
         addPossibleEmptyStatementsBeforeClosingBrace(members);
 
-        J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                members, compactSourceFile != null ? whitespace() : sourceBefore("}"));
+        J.Block body = new J.Block(randomId(), bodyPrefix, compactSourceFile != null ? Markers.build(List.of(new OmitBraces(randomId()))) : Markers.EMPTY,
+                new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                members,
+                compactSourceFile != null ? whitespace() : sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, compactSourceFile != null ? Markers.build(List.of(compactSourceFile)) : Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
+        return new J.ClassDeclaration(randomId(), fmt, compactSourceFile != null ? Markers.build(List.of(compactSourceFile)) : Markers.EMPTY,
+                modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
                 primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
