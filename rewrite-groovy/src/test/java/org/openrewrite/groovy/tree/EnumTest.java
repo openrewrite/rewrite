@@ -285,7 +285,8 @@ class EnumTest implements RewriteTest {
           groovy(
             """
             enum E {
-              LOCAL("http://localhost:8080/api/v1/clusters")
+              LOCAL("http://localhost:8080/api/v1/clusters"),
+              LOCAL_WITH_ESCAPED_QUOTE("http://localhost:8080\\"/invalid/url/I/know")
 
               E(String uri) {
               }
