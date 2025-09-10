@@ -372,11 +372,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
+    public J visitBlock(Block block, PrintOutputCapture<P> p) {
         beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 
         if (block.isStatic()) {
-            p.append("init");
+            p.append("static");
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
