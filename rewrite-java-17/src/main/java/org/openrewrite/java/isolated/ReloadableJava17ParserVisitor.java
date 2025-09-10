@@ -1737,7 +1737,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    (JavaType.Variable) typeMapping.type(n)
+                                    type
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
