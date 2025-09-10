@@ -2603,9 +2603,10 @@ public class GroovyParserVisitor {
      * The cursor will be moved before first non-whitespace character.
      */
     private Space whitespace() {
-        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
-        cursor += prefix.length();
-        return format(prefix);
+        int endIndex = indexOfNextNonWhitespace(cursor, source);
+        Space space = format(source, cursor, endIndex);
+        cursor = endIndex;
+        return space;
     }
 
     /**
