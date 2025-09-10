@@ -49,6 +49,7 @@ export class JavaScriptTypeMapping {
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
+            
         } else if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
         }
@@ -62,10 +63,27 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // Set a placeholder to prevent infinite recursion during type creation
-        // This is crucial for types with cyclic references (e.g., DOM types)
-        this.typeCache.set(signature, Type.unknownType);
+        // For object types that could have circular references, create the shell first
+        // and put it in the cache, then populate it. This way circular references
+        // will point to the actual object being built, not Type.Unknown
+        if (type.flags & ts.TypeFlags.Object) {
+            const objectFlags = (type as ts.ObjectType).objectFlags;
+            if (objectFlags & ts.ObjectFlags.Anonymous) {
+                // Anonymous object type - create and cache shell, then populate
+                const classType = this.createEmptyClassType(type);
+                this.typeCache.set(signature, classType);
+                this.populateClassType(classType, type);
+                return classType;
+            } else if (type.symbol) {
+                // Named type with symbol - create and cache shell, then populate
+                const classType = this.createEmptyClassType(type);
+                this.typeCache.set(signature, classType);
+                this.populateClassType(classType, type);
+                return classType;
+            }
+        }
 
+        // For non-object types, we can create them directly without recursion concerns
         const result = this.createType(type);
         this.typeCache.set(signature, result);
         return result;
@@ -201,6 +219,64 @@ export class JavaScriptTypeMapping {
     /**
      * Create a JavaType.Class from a TypeScript type and symbol.
      */
+    private createEmptyClassType(type: ts.Type): Type.Class {
+        const symbol = type.symbol;
+        let fullyQualifiedName = symbol ? this.checker.getFullyQualifiedName(symbol) : `<anonymous>${this.checker.typeToString(type)}`;
+        
+        // Fix FQN for types from @types packages
+        // TypeScript returns "_.LoDashStatic" but we want "@types/lodash.LoDashStatic"
+        if (symbol && symbol.declarations && symbol.declarations.length > 0) {
+            const sourceFile = symbol.declarations[0].getSourceFile();
+            const fileName = sourceFile.fileName;
+            // Check if this is from @types package
+            const typesMatch = fileName.match(/node_modules\/@types\/([^/]+)/);
+            if (typesMatch) {
+                const packageName = typesMatch[1];
+                // Replace the module specifier part with @types/package
+                fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
+            }
+        }
+        
+        // Create empty class type shell (no members yet to avoid recursion)
+        const classType: Type.Class = Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Class,
+            classKind: Type.Class.Kind.Interface, // Default to interface for TypeScript types
+            fullyQualifiedName: fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function() {
+                return Type.toDebugString(this);
+            }
+        }) as Type.Class;
+
+        return classType;
+    }
+
+    private populateClassType(classType: Type.Class, type: ts.Type): void {
+        // Now populate the class type with members
+        // Since the shell is already in the cache, any recursive references will find it
+        const properties = this.checker.getPropertiesOfType(type);
+        for (const prop of properties) {
+            if (!(prop.flags & ts.SymbolFlags.Method)) {
+                const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
+                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
+                    kind: Type.Kind.Variable,
+                    name: prop.getName(),
+                    owner: classType,  // Cyclic reference to the containing class (already in cache)
+                    type: this.getType(propType), // This will find classType in cache if it's recursive
+                    annotations: [],
+                    toJSON: function() {
+                        return Type.toDebugString(this);
+                    }
+                }) as Type.Variable;
+                classType.members.push(variable);
+            }
+        }
+    }
+
     private createClassType(type: ts.Type, symbol: ts.Symbol, kind: Type.Class.Kind): Type.Class {
         const fullyQualifiedName = this.getFullyQualifiedName(type);
 
@@ -324,6 +400,7 @@ export class JavaScriptTypeMapping {
         return {supertype, interfaces};
     }
 
+    
     /**
      * Create a JavaType.Class for anonymous object types.
      */
@@ -441,15 +518,8 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // Check for object literal types
-        // noinspection JSBitwiseOperatorUsage
-        if (type.flags & ts.TypeFlags.Object) {
-            const objectFlags = (type as ts.ObjectType).objectFlags;
-            if (objectFlags & ts.ObjectFlags.Anonymous) {
-                // Anonymous object type - create a synthetic class
-                return this.createAnonymousClassType(type);
-            }
-        }
+        // Note: Object types are now handled in getType() to properly manage circular references
+        // This method should only be called for non-object types
 
         return Type.unknownType;
     }

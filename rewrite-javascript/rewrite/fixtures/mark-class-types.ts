@@ -29,6 +29,9 @@ export class MarkClassTypes extends Recipe {
 
                 // Mark lodash identifier with its type
                 if (ident.simpleName === '_' && ident.type && Type.isClass(ident.type)) {
+                    console.log(`[MarkClassTypes] Found _ identifier with type FQN: ${ident.type.fullyQualifiedName}`);
+                    console.log(`[MarkClassTypes] Type has ${ident.type.members.length} members`);
+                    
                     for (const member of ident.type.members) {
                         if (member.owner !== ident.type) {
                             throw new Error("Member owner does not match class that owns the member");

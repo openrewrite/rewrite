@@ -20,15 +20,15 @@ import {
     emptySpace,
     Expression,
     J,
-    Type,
     NameTree,
     Statement,
     TextComment,
     TrailingComma,
+    Type,
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {Generator, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
 import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
@@ -80,6 +80,7 @@ export class JavaScriptParser extends Parser {
             allowJs: true,
             checkJs: true,
             esModuleInterop: true,
+            allowSyntheticDefaultImports: true,
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
             jsx: ts.JsxEmit.Preserve,
@@ -109,7 +110,7 @@ export class JavaScriptParser extends Parser {
 
         // Create a new CompilerHost within parseInputs
         const host = ts.createCompilerHost(this.compilerOptions);
-        
+
         // Set the current directory for module resolution
         if (this.relativeTo) {
             const originalGetCurrentDirectory = host.getCurrentDirectory;
@@ -167,6 +168,7 @@ export class JavaScriptParser extends Parser {
         this.oldProgram = program;
 
         const typeChecker = program.getTypeChecker();
+        
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -582,7 +584,7 @@ export class JavaScriptParserVisitor {
         // Parse the numeric value from the text
         const text = node.text;
         let value: number | bigint;
-        
+
         // Check if it's a BigInt literal (ends with 'n')
         if (text.endsWith('n')) {
             value = BigInt(text.slice(0, -1));
@@ -593,7 +595,7 @@ export class JavaScriptParserVisitor {
             // Integer - but JavaScript doesn't distinguish, so use number
             value = parseInt(text, text.startsWith('0x') ? 16 : text.startsWith('0o') ? 8 : text.startsWith('0b') ? 2 : 10);
         }
-        
+
         return this.mapLiteral(node, value);
     }
 

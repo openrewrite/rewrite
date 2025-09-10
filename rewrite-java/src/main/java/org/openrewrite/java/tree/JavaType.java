@@ -587,10 +587,11 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Class after, RpcSendQueue q) {
-            q.getAndSend(after, c -> Reference.asRef(c.getKind()));
-            q.getAndSend(after, c -> Reference.asRef(c.getFullyQualifiedName()));
+            q.getAndSend(after, Class::getKind);
+            q.getAndSend(after, Class::getFullyQualifiedName);
             q.getAndSendList(after, c -> c.getTypeParameters().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
             q.getAndSend(after, c -> Reference.asRef(c.getSupertype()));
+            q.getAndSend(after, c -> Reference.asRef(c.getOwningClass()));
             q.getAndSendList(after, c -> c.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
             q.getAndSendList(after, c -> c.getInterfaces().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
             q.getAndSendList(after, c -> c.getMembers().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
@@ -599,30 +600,21 @@ public interface JavaType {
 
         @Override
         public Class rpcReceive(Class before, RpcReceiveQueue q) {
-            Kind kind = q.receive(before.kind);
+            Kind kind = q.receiveAndGet(before.kind, k -> Kind.valueOf(k.toString()));
             String fullyQualifiedName = q.receive(before.fullyQualifiedName);
             List<JavaType> typeParameters = q.receiveList(before.getTypeParameters(), null);
             FullyQualified supertype = q.receive(before.supertype);
+            FullyQualified owningClass = q.receive(before.owningClass);
             List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
             List<FullyQualified> interfaces = q.receiveList(before.getInterfaces(), null);
             List<Variable> members = q.receiveList(before.getMembers(), null);
             List<Method> methods = q.receiveList(before.getMethods(), null);
 
-            // FIXME rather than creating a new class, using unsafeSet to handle circular references.
-            //  The before argument should be the one stored in the ref map.
-            return new Class(
-                    before.managedReference,
-                    before.flagsBitMap,
-                    fullyQualifiedName,
-                    kind,
-                    typeParameters,
-                    supertype,
-                    before.owningClass,
-                    annotations,
-                    interfaces,
-                    members,
-                    methods
-            );
+            before.kind = kind;
+            before.fullyQualifiedName = fullyQualifiedName;
+            
+            return before.unsafeSet(typeParameters, supertype, owningClass, annotations,
+                    interfaces, members, methods);
         }
 
         @Override
@@ -1284,7 +1276,7 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Method implements JavaType {
+    class Method implements JavaType, RpcCodec<Method> {
         @With
         @Nullable
         @NonFinal
@@ -1619,11 +1611,38 @@ public interface JavaType {
             return new DefaultJavaTypeSignatureBuilder().methodSignature(this);
         }
 
+        @Override
+        public void rpcSend(Method after, RpcSendQueue q) {
+            q.getAndSend(after, m -> Reference.asRef(m.getDeclaringType()));
+            q.getAndSend(after, Method::getName);
+            q.getAndSend(after, m -> Reference.asRef(m.getReturnType()));
+            q.getAndSendList(after, Method::getParameterNames, String::toString, null);
+            q.getAndSendList(after, m -> m.getParameterTypes().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, m -> m.getThrownExceptions().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, m -> m.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendList(after, Method::getDefaultValue, String::toString, null);
+            q.getAndSendList(after, Method::getDeclaredFormalTypeNames, String::toString, null);
+        }
+
+        @Override
+        public Method rpcReceive(Method before, RpcReceiveQueue q) {
+            before.declaringType = q.receive(before.declaringType, null);
+            before.name = q.receive(before.name, null);
+            before.returnType = q.receive(before.returnType, null);
+            before.parameterNames = arrayOrNullIfEmpty(q.receiveList(before.getParameterNames(), null), EMPTY_STRING_ARRAY);
+            before.parameterTypes = arrayOrNullIfEmpty(q.receiveList(before.getParameterTypes(), null), EMPTY_JAVA_TYPE_ARRAY);
+            before.thrownExceptions = arrayOrNullIfEmpty(q.receiveList(before.getThrownExceptions(), null), EMPTY_JAVA_TYPE_ARRAY);
+            before.annotations = arrayOrNullIfEmpty(q.receiveList(before.getAnnotations(), null), EMPTY_FULLY_QUALIFIED_ARRAY);
+            before.defaultValue = q.receiveList(before.defaultValue, null);
+            before.declaredFormalTypeNames = arrayOrNullIfEmpty(q.receiveList(before.getDeclaredFormalTypeNames(), null), EMPTY_STRING_ARRAY);
+            return before;
+        }
+
     }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Variable implements JavaType {
+    class Variable implements JavaType, RpcCodec<Variable> {
         @With
         @Nullable
         @NonFinal
@@ -1737,6 +1756,29 @@ public interface JavaType {
         @Override
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().variableSignature(this);
+        }
+
+        @Override
+        public void rpcSend(Variable after, RpcSendQueue q) {
+            q.getAndSend(after, Variable::getName);  // String, no asRef needed
+            q.getAndSend(after, v -> Reference.asRef(v.getOwner()));
+            q.getAndSend(after, v -> Reference.asRef(v.getType()));
+            q.getAndSendList(after, v -> v.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+        }
+
+        @Override
+        public Variable rpcReceive(Variable before, RpcReceiveQueue q) {
+            String name = q.receive(before.name);
+            JavaType owner = q.receive(before.owner);
+            JavaType type = q.receive(before.type);
+            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
+            
+            before.name = name;
+            before.owner = owner;
+            before.type = type;
+            before.annotations = annotations == null ? null : annotations.toArray(new FullyQualified[0]);
+            
+            return before;
         }
     }
 
