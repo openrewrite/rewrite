@@ -447,10 +447,10 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         // Add itself as a sub-recipe
         selfReferencing.addUninitialized("org.openrewrite.SelfReferencing");
-        
+
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> selfReferencing.initialize(List.of(selfReferencing)))
             .isInstanceOf(RecipeIntrospectionException.class)
@@ -471,7 +471,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         DeclarativeRecipe recipeB = new DeclarativeRecipe(
             "org.openrewrite.RecipeB",
             "Recipe B",
@@ -482,13 +482,13 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         // A references B
         recipeA.addUninitialized("org.openrewrite.RecipeB");
-        
+
         // B references A
         recipeB.addUninitialized("org.openrewrite.RecipeA");
-        
+
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB)))
             .isInstanceOf(RecipeIntrospectionException.class)
@@ -510,7 +510,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         DeclarativeRecipe recipeB = new DeclarativeRecipe(
             "org.openrewrite.RecipeB",
             "Recipe B",
@@ -521,7 +521,7 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         DeclarativeRecipe recipeC = new DeclarativeRecipe(
             "org.openrewrite.RecipeC",
             "Recipe C",
@@ -532,16 +532,16 @@ class DeclarativeRecipeTest implements RewriteTest {
             false,
             emptyList()
         );
-        
+
         // A references B
         recipeA.addUninitialized("org.openrewrite.RecipeB");
-        
+
         // B references C
         recipeB.addUninitialized("org.openrewrite.RecipeC");
-        
+
         // C references A (completing the cycle)
         recipeC.addUninitialized("org.openrewrite.RecipeA");
-        
+
         // Initialize should throw RecipeIntrospectionException when cycle is detected
         assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB, recipeC)))
             .isInstanceOf(RecipeIntrospectionException.class)
