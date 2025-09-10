@@ -136,32 +136,32 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         // Create a composite recipe with 2 recipes that each have different estimated efforts
         Recipe recipe1 = new CustomEstimatedEffortFindReplaceRecipe("foo", "bar", Duration.ofMinutes(10));
         Recipe recipe2 = new CustomEstimatedEffortFindReplaceRecipe("baz", "qux", Duration.ofMinutes(5));
-        
+
         Recipe compositeRecipe = new CompositeRecipe(List.of(recipe1, recipe2));
-        
+
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(compositeRecipe)
             .afterRecipe(run -> {
                 List<Result> results = run.getChangeset().getAllResults();
                 // File 1 has no changes, so it won't appear in the results
                 assertThat(results).hasSize(3);
-                
+
                 // Sort results by path for consistent ordering
-                results.sort(Comparator.comparing(r -> r.getAfter() != null ? 
-                    r.getAfter().getSourcePath().toString() : ""));
-                
+                results.sort(Comparator.comparing(r -> r.getAfter() != null ?
+                  r.getAfter().getSourcePath().toString() : ""));
+
                 // File 2: Only first change (10 minutes)
                 Result file2Result = results.get(0);
                 assertThat(file2Result.getAfter()).isNotNull();
                 assertThat(file2Result.getAfter().getSourcePath().toString()).endsWith("file2.txt");
                 assertThat(file2Result.getTimeSavings()).isEqualTo(Duration.ofMinutes(10));
-                
+
                 // File 3: Only second change (5 minutes)
                 Result file3Result = results.get(1);
                 assertThat(file3Result.getAfter()).isNotNull();
                 assertThat(file3Result.getAfter().getSourcePath().toString()).endsWith("file3.txt");
                 assertThat(file3Result.getTimeSavings()).isEqualTo(Duration.ofMinutes(5));
-                
+
                 // File 4: Both changes (10 + 5 = 15 minutes)
                 Result file4Result = results.get(2);
                 assertThat(file4Result.getAfter()).isNotNull();
@@ -176,7 +176,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                 // File 4: 2 rows (one for recipe1, one for recipe2)
                 // Total: 4 rows
                 assertThat(rows).hasSize(4);
-                
+
                 // Check that each row has the correct estimated time saving for its recipe
                 long totalEstimatedTimeSaving = 0;
                 for (SourcesFileResults.Row row : rows) {
@@ -194,7 +194,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                         totalEstimatedTimeSaving += row.getEstimatedTimeSaving();
                     }
                 }
-                
+
                 // Verify the sum of all rows' estimated time savings
                 // File 2: 1 recipe1 (600s)
                 // File 3: 1 recipe2 (300s)  
