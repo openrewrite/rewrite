@@ -51,6 +51,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         if (end.isExplicit()) {
             p.append("...");
         }
+        p.append(end.getPostfix());
         return end;
     }
 

@@ -185,6 +185,7 @@ public interface Yaml extends Tree {
 
             String prefix;
             Markers markers;
+            String postfix;
 
             /**
              * Yaml documents may be explicitly ended with "..."
@@ -201,7 +202,7 @@ public interface Yaml extends Tree {
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), prefix, Markers.EMPTY, explicit);
+                return new End(randomId(), prefix, Markers.EMPTY, postfix, explicit);
             }
         }
     }
