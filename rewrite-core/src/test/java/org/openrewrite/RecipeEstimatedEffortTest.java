@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
@@ -30,6 +31,7 @@ import org.openrewrite.text.*;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -129,6 +131,99 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void summedEstimatedEffortForMultipleChangesToSameFile() {
+        // Create a composite recipe with 2 recipes that each have different estimated efforts
+        Recipe recipe1 = new CustomEstimatedEffortFindReplaceRecipe("foo", "bar", Duration.ofMinutes(10));
+        Recipe recipe2 = new CustomEstimatedEffortFindReplaceRecipe("baz", "qux", Duration.ofMinutes(5));
+        
+        Recipe compositeRecipe = new CompositeRecipe(List.of(recipe1, recipe2));
+        
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(compositeRecipe)
+            .afterRecipe(run -> {
+                List<Result> results = run.getChangeset().getAllResults();
+                // File 1 has no changes, so it won't appear in the results
+                assertThat(results).hasSize(3);
+                
+                // Sort results by path for consistent ordering
+                results.sort(Comparator.comparing(r -> r.getAfter() != null ? 
+                    r.getAfter().getSourcePath().toString() : ""));
+                
+                // File 2: Only first change (10 minutes)
+                Result file2Result = results.get(0);
+                assertThat(file2Result.getAfter()).isNotNull();
+                assertThat(file2Result.getAfter().getSourcePath().toString()).endsWith("file2.txt");
+                assertThat(file2Result.getTimeSavings()).isEqualTo(Duration.ofMinutes(10));
+                
+                // File 3: Only second change (5 minutes)
+                Result file3Result = results.get(1);
+                assertThat(file3Result.getAfter()).isNotNull();
+                assertThat(file3Result.getAfter().getSourcePath().toString()).endsWith("file3.txt");
+                assertThat(file3Result.getTimeSavings()).isEqualTo(Duration.ofMinutes(5));
+                
+                // File 4: Both changes (10 + 5 = 15 minutes)
+                Result file4Result = results.get(2);
+                assertThat(file4Result.getAfter()).isNotNull();
+                assertThat(file4Result.getAfter().getSourcePath().toString()).endsWith("file4.txt");
+                assertThat(file4Result.getTimeSavings()).isEqualTo(Duration.ofMinutes(15));
+            })
+            .dataTable(SourcesFileResults.Row.class, rows -> {
+                // The data table will have multiple rows per file (one for each recipe that made changes)
+                // File 1: no rows (no changes)
+                // File 2: 1 row for recipe1 
+                // File 3: 1 row for recipe2
+                // File 4: 2 rows (one for recipe1, one for recipe2)
+                // Total: 4 rows
+                assertThat(rows).hasSize(4);
+                
+                // Check that each row has the correct estimated time saving for its recipe
+                long totalEstimatedTimeSaving = 0;
+                for (SourcesFileResults.Row row : rows) {
+                    if (row.getRecipe().contains("SimpleTextReplaceRecipe")) {
+                        // First recipe has 10 minutes = 600 seconds
+                        if (row.getRecipe().contains("foo")) {
+                            assertThat(row.getEstimatedTimeSaving()).isEqualTo(600L);
+                        }
+                        // Second recipe has 5 minutes = 300 seconds
+                        else if (row.getRecipe().contains("baz")) {
+                            assertThat(row.getEstimatedTimeSaving()).isEqualTo(300L);
+                        }
+                    }
+                    if (row.getEstimatedTimeSaving() != null) {
+                        totalEstimatedTimeSaving += row.getEstimatedTimeSaving();
+                    }
+                }
+                
+                // Verify the sum of all rows' estimated time savings
+                // File 2: 1 recipe1 (600s)
+                // File 3: 1 recipe2 (300s)  
+                // File 4: 1 recipe1 (600s) + 1 recipe2 (300s)
+                // Total: 600 + 300 + 600 + 300 = 1800 seconds (30 minutes)
+                assertThat(totalEstimatedTimeSaving).isEqualTo(1800L);
+            }),
+          text(
+            "nothing here",
+            spec -> spec.path("file1.txt")
+          ),
+          text(
+            "foo is here twice, look: foo",
+            "bar is here twice, look: bar",
+            spec -> spec.path("file2.txt")
+          ),
+          text(
+            "baz is here",
+            "qux is here",
+            spec -> spec.path("file3.txt")
+          ),
+          text(
+            "foo and baz are here",
+            "bar and qux are here",
+            spec -> spec.path("file4.txt")
+          )
+        );
+    }
+
     private static void assertEstimatedEffortInFirstRowOfSourceFileResults(List<SourcesFileResults.Row> rows, Long expectedEstimatedEffort) {
         assertThat(rows)
           .first()
@@ -184,6 +279,43 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         @Override
         public Duration getEstimatedEffortPerOccurrence() {
             return Duration.ofMinutes(15);
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Value
+    private static class CustomEstimatedEffortFindReplaceRecipe extends Recipe {
+        String find;
+        String replace;
+        Duration estimatedEffort;
+
+        @Override
+        public String getDisplayName() {
+            return "Simple text replace";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Replaces text in files";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    String newText = text.getText().replace(find, replace);
+                    if (!newText.equals(text.getText())) {
+                        return text.withText(newText);
+                    }
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public Duration getEstimatedEffortPerOccurrence() {
+            return estimatedEffort;
         }
     }
 
