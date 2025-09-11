@@ -65,7 +65,6 @@ public class AnnotationMatcher {
         lexer.addErrorListener(errorListener);
         AnnotationSignatureParser parser = new AnnotationSignatureParser(new CommonTokenStream(lexer));
         parser.addErrorListener(errorListener);
-        
         this.match = parser.annotation();
         this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(match.annotationName().getText()));
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
