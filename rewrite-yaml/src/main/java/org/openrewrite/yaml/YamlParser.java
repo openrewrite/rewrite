@@ -81,7 +81,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
-                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, "", false);
+                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
                             Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null);
                             return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
@@ -138,6 +138,7 @@ public class YamlParser implements org.openrewrite.Parser {
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
+            String suffix = "";
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
@@ -153,24 +154,10 @@ public class YamlParser implements org.openrewrite.Parser {
                         String fmt = newLine + reader.prefix(lastEnd, event);
 
                         newLine = "";
-
-                        String postfix = "";
-                        int endOfMarker = event.getEndMark().getIndex();
-                        // Peek at the next event to find where to read until
-                        // (This is probably the streamEnd event)
-                        Event nextEvent = parser.peekEvent();
-                        if (nextEvent != null) {
-                            int nextStart = nextEvent.getStartMark().getIndex();
-                            if (nextStart > endOfMarker) {
-                                postfix = reader.readStringFromBuffer(endOfMarker, nextStart - 1);
-                            }
-                        }
-                        
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
                                 fmt,
                                 Markers.EMPTY,
-                                postfix,
                                 ((DocumentEndEvent) event).getExplicit()
                         )));
                         lastEnd = event.getEndMark().getIndex();
@@ -185,7 +172,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, "", false)
+                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
@@ -444,14 +431,18 @@ public class YamlParser implements org.openrewrite.Parser {
                         break;
                     }
                     case StreamEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        if (document == null && !fmt.isEmpty()) {
-                            documents.add(
-                                    new Yaml.Document(
-                                            randomId(), fmt, Markers.EMPTY, false,
-                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                                            new Yaml.Document.End(randomId(), "", Markers.EMPTY, "", false)
-                                    ));
+                        if (document == null) {
+                            String fmt = newLine + reader.prefix(lastEnd, event);
+                            if (!fmt.isEmpty()) {
+                                documents.add(
+                                        new Yaml.Document(
+                                                randomId(), fmt, Markers.EMPTY, false,
+                                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
+                                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
+                                        ));
+                            }
+                        } else {
+                            suffix = reader.prefix(lastEnd, event);
                         }
                         break;
                     }
@@ -460,7 +451,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
             if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty()) {
                 return result;
             }

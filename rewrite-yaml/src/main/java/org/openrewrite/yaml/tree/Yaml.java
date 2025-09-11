@@ -86,6 +86,9 @@ public interface Yaml extends Tree {
         @Nullable
         Checksum checksum;
 
+        @Nullable
+        String suffix;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -106,7 +109,7 @@ public interface Yaml extends Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), Markers.EMPTY,
-                    sourcePath, fileAttributes, charsetName, charsetBomMarked, checksum, documents.stream().map(Document::copyPaste).collect(toList()));
+                    sourcePath, fileAttributes, charsetName, charsetBomMarked, checksum, suffix, documents.stream().map(Document::copyPaste).collect(toList()));
         }
 
         /**
@@ -185,7 +188,6 @@ public interface Yaml extends Tree {
 
             String prefix;
             Markers markers;
-            String postfix;
 
             /**
              * Yaml documents may be explicitly ended with "..."
@@ -202,7 +204,7 @@ public interface Yaml extends Tree {
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), prefix, Markers.EMPTY, postfix, explicit);
+                return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
         }
     }
