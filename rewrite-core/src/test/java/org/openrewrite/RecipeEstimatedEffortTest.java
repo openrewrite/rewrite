@@ -150,6 +150,12 @@ class RecipeEstimatedEffortTest implements RewriteTest {
                 List<Result> results = run.getChangeset().getAllResults();
                 assertThat(results).hasSize(1);
                 assertThat(results.getFirst().getTimeSavings()).isEqualTo(Duration.ofMinutes(expectedMinutes));
+            })
+            .dataTable(SourcesFileResults.Row.class, rows -> {
+                long totalEstimatedTimeSaving = rows.stream()
+                    .mapToLong(row -> row.getEstimatedTimeSaving() != null ? row.getEstimatedTimeSaving() : 0L)
+                    .sum();
+                assertThat(totalEstimatedTimeSaving).isEqualTo(expectedMinutes * 60L);
             }),
           text(beforeContent, afterContent)
         );
