@@ -151,8 +151,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             // Cycle detected - throw exception to fail fast
             String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
             throw new RecipeIntrospectionException(
-                    "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle +
-                    " (in " + source + ")");
+                    "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
         } else {
             initializingRecipes.add(recipeName);
             declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes);
