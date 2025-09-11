@@ -16,10 +16,8 @@
  * limitations under the License.
  */
 
-import {SourceFile, TreeKind} from "../";
+import {SourceFile, TreeKind} from "../tree";
 import {Expression, J, JavaType, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
-import getType = TypedTree.getType;
-import FunctionType = JS.FunctionType;
 
 export interface JS extends J {
 }
@@ -857,6 +855,7 @@ export namespace JSX {
     interface BaseTag extends JS, Expression {
         readonly kind: typeof JS.Kind.JsxTag;
         readonly openName: J.LeftPadded<J.Identifier | J.FieldAccess | NamespacedName | J.Empty>;
+        readonly typeArguments?: J.Container<Expression>;
         readonly afterName: J.Space;
         readonly attributes: J.RightPadded<Attribute | SpreadAttribute>[];
     }
@@ -911,5 +910,5 @@ export function isExpressionStatement(tree: any): tree is JS.ExpressionStatement
     return tree["kind"] === JS.Kind.ExpressionStatement;
 }
 
-TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => getType(tree.initializer));
-TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: FunctionType) => getType(tree.returnType.element))
+TypedTree.registerTypeGetter(JS.Kind.PropertyAssignment, (tree: JS.PropertyAssignment) => TypedTree.getType(tree.initializer));
+TypedTree.registerTypeGetter(JS.Kind.FunctionType, (tree: JS.FunctionType) => TypedTree.getType(tree.returnType.element))

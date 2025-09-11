@@ -18,9 +18,10 @@ package org.openrewrite.test;
 import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.InputStream;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * Issues no HTTP requests, instead returning the supplied input stream whenever send() is invoked.
@@ -29,7 +30,7 @@ import java.util.Map;
 public class MockHttpSender implements HttpSender {
     final UncheckedSupplier<InputStream> is;
     int responseCode = 200;
-    Map<String, List<String>> responseHeaders = Collections.emptyMap();
+    Map<String, List<String>> responseHeaders = emptyMap();
 
     public MockHttpSender(UncheckedSupplier<InputStream> is) {
         this.is = is;

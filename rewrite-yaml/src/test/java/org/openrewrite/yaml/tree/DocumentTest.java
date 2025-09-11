@@ -50,7 +50,7 @@ class DocumentTest implements RewriteTest {
               ...
               ---
               type: specs.openrewrite.org/v1beta/recipe
-              
+
               ...
               """,
             spec -> spec.afterRecipe(y -> {

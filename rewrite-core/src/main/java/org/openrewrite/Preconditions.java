@@ -30,8 +30,8 @@ public class Preconditions {
         return new RecipeCheck(check, v);
     }
 
-    public static TreeVisitor<?, ExecutionContext> check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
-        return new Check(check, v);
+    public static TreeVisitor<?, ExecutionContext> check(@Nullable TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
+        return check == null ? v : new Check(check, v);
     }
 
     public static TreeVisitor<?, ExecutionContext> check(boolean check, TreeVisitor<?, ExecutionContext> v) {
@@ -160,7 +160,7 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
             return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
                     v.visit(tree, ctx) :
@@ -169,7 +169,7 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
             return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
                     v.visit(tree, ctx, parent) :

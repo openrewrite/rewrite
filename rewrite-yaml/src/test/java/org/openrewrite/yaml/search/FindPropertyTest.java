@@ -83,8 +83,8 @@ class FindPropertyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("how do I test that the search has no hits?")
+    @Test
     void findPropertyWithSpecificValueNoMatch() {
         rewriteRun(
           spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-non-matching-value")),
@@ -95,13 +95,13 @@ class FindPropertyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
       "acme.myProject.person.firstName",
       "acme.my_project.person.first_name",
     })
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new FindProperty(propertyKey, true, null)),
@@ -120,8 +120,8 @@ class FindPropertyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new FindProperty("acme.my-project.person.first-name", false, null)),

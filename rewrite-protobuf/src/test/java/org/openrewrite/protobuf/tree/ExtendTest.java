@@ -29,7 +29,7 @@ class ExtendTest implements RewriteTest {
             """
               syntax = 'proto2';
               extend google.protobuf.FieldOptions {
-                            
+
                 optional bool redacted = 22200;
               }
               """

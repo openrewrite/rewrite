@@ -156,7 +156,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               assertThat(type.getParameterTypes().getFirst()).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1)).isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(2)).matches(jt ->
-                TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
+                "java.lang.String".equals(TypeUtils.asFullyQualified(jt).getFullyQualifiedName()));
           }),
           java(
             """
@@ -184,9 +184,9 @@ class JavaTemplateTest5Test implements RewriteTest {
     Recipe replaceAnnotationRecipe = toRecipe(() -> new JavaIsoVisitor<>() {
         @Override
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            if (annotation.getSimpleName().equals("SuppressWarnings")) {
+            if ("SuppressWarnings".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
-            } else if (annotation.getSimpleName().equals("A1")) {
+            } else if ("A1".equals(annotation.getSimpleName())) {
                 return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
             return super.visitAnnotation(annotation, ctx);
@@ -336,7 +336,7 @@ class JavaTemplateTest5Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
+                  if (classDecl.getLeadingAnnotations().isEmpty() && !"Test".equals(classDecl.getSimpleName())) {
                       return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
                   }
                   return super.visitClassDeclaration(classDecl, ctx);

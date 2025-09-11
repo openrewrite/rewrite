@@ -15,7 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
+import {mapAsync} from "../util";
+import {SourceFile} from "../tree";
+import {ValidImmerRecipeReturnType} from "../visitor";
 import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS, JSX} from "./tree";
@@ -23,7 +25,7 @@ import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
-    override isAcceptable(sourceFile: SourceFile): boolean {
+    override async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJavaScript(sourceFile);
     }
 
@@ -127,6 +129,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     protected async visitJsxTag(element: JSX.Tag, p: P): Promise<J | undefined> {
         return this.produceJavaScript<JSX.Tag>(element, p, async draft => {
             draft.openName = await this.visitLeftPadded(element.openName, p);
+            draft.typeArguments = element.typeArguments && await this.visitContainer(element.typeArguments, p);
             draft.afterName = await this.visitSpace(element.afterName, p);
             draft.attributes = await mapAsync(element.attributes, attr => this.visitRightPadded(attr, p));
             draft.selfClosing = element.selfClosing && await this.visitSpace(element.selfClosing, p);

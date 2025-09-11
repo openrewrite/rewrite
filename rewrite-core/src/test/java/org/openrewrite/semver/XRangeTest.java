@@ -77,7 +77,7 @@ class XRangeTest {
     }
 
     /**
-     * 1.2.X := >=1.2.0 <1.3.1
+     * 1.2.X := >=1.2.0 <1.3.0
      */
     @Test
     void matchingMajorAndMinorVersions() {
@@ -129,5 +129,21 @@ class XRangeTest {
         assertThat(xRange.isValid(null, "3.6.1-SNAPSHOT")).isFalse();
         assertThat(xRange.isValid(null, "3.6.0")).isTrue();
         assertThat(xRange.upgrade("3.4.0", List.of("3.6.0", "3.6.1-SNAPSHOT")).orElse(null)).isEqualTo("3.6.0");
+    }
+
+    @Test
+    void compare() {
+        XRange xrange = XRange.build("1.0.x", null).getValue();
+
+        assertThat(xrange).isNotNull();
+        assertThat(xrange.compare(null, "0.9", "1.0.x")).isNegative();
+        assertThat(xrange.compare(null, "1.0.x", "0.9")).isPositive();
+        assertThat(xrange.compare(null, "1.0", "1.0.x")).isZero();
+        assertThat(xrange.compare(null, "1.0.x", "1.0")).isZero();
+        assertThat(xrange.compare(null, "1.1", "1.0.x")).isPositive();
+        assertThat(xrange.compare(null, "1.0.x", "1.1")).isNegative();
+        assertThat(xrange.compare(null, "1.0.x", "1.0.x")).isZero();
+        assertThat(xrange.compare(null, "1.x", "1.0.x")).isPositive();
+        assertThat(xrange.compare(null, "1.0.x", "1.x")).isNegative();
     }
 }

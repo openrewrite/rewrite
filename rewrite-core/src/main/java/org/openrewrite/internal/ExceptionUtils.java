@@ -15,10 +15,11 @@
  */
 package org.openrewrite.internal;
 
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import java.util.StringJoiner;
+
+import static java.util.Collections.newSetFromMap;
 
 public class ExceptionUtils {
     /**
@@ -48,7 +49,7 @@ public class ExceptionUtils {
     }
 
     public static boolean containsCircularReferences(Throwable exception) {
-        Set<Throwable> causes = Collections.newSetFromMap(new IdentityHashMap<>());
+        Set<Throwable> causes = newSetFromMap(new IdentityHashMap<>());
         causes.add(exception);
         boolean containsACircularReference = false;
         while (exception != null && exception.getCause() != null) {

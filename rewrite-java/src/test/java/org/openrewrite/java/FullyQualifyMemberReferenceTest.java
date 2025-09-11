@@ -21,9 +21,9 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -211,12 +211,12 @@ class FullyQualifyMemberReferenceTest implements RewriteTest {
             declaringClass,
             methodName,
             returnTypeObj,
-            Collections.emptyList(),
+            emptyList(),
             List.of(paramTypes),
-            Collections.emptyList(),
-            Collections.emptyList(),
+            emptyList(),
+            emptyList(),
             null,
-            Collections.emptyList()
+            emptyList()
         );
     }
 
@@ -234,7 +234,7 @@ class FullyQualifyMemberReferenceTest implements RewriteTest {
             variableName,
             ownerClass,
             type,
-            Collections.emptyList()
+            emptyList()
         );
     }
 }

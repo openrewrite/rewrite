@@ -99,7 +99,30 @@ public class RemoteArchive implements Remote {
                 //noinspection resource
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
                 if (response.isSuccessful()) {
-                    return response.getBody();
+                    InputStream body = response.getBody();
+                    if (response.getHeaders().containsKey("Content-Length")) {
+                        return new InputStream() {
+                            private final long contentLength = Long.parseLong(response.getHeaders().get("Content-Length").get(0));
+                            private long count;
+
+                            @Override
+                            public int read() throws IOException {
+                                int i = body.read();
+                                if (i != -1) {
+                                    count++;
+                                    if (count > contentLength) {
+                                        throw new IOException("Too much data received");
+                                    }
+                                } else {
+                                    if (count < contentLength) {
+                                        throw new IOException("Unexpected end of stream");
+                                    }
+                                }
+                                return i;
+                            }
+                        };
+                    }
+                    return body;
                 } else {
                     throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
                 }

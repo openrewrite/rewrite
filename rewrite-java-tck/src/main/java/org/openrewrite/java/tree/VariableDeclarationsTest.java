@@ -36,7 +36,7 @@ class VariableDeclarationsTest implements RewriteTest {
             """
               import java.util.Collections;
               import java.util.ArrayList;
-              
+
               class Test {
                   void test() {
                       ArrayList<String> categories = new ArrayList<>();
@@ -61,8 +61,8 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void finalVar() {
         rewriteRun(
           java(
@@ -266,8 +266,8 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void unknownVar() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),

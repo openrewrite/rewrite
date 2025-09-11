@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.ast.tools.GenericsUtils;
 import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -49,6 +50,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -180,6 +182,7 @@ public class GroovyParser implements Parser {
     @Override
     public GroovyParser reset() {
         typeCache.clear();
+        GenericsUtils.clearParameterizedTypeCache();
         return this;
     }
 
@@ -199,10 +202,10 @@ public class GroovyParser implements Parser {
     @SuppressWarnings("unused")
     public static class Builder extends Parser.Builder {
         @Nullable
-        private Collection<Path> classpath = Collections.emptyList();
+        private Collection<Path> classpath = emptyList();
 
         @Nullable
-        protected Collection<String> artifactNames = Collections.emptyList();
+        protected Collection<String> artifactNames = emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
@@ -251,7 +254,7 @@ public class GroovyParser implements Parser {
          */
         public Builder addClasspathEntry(Path entry) {
             if (classpath.isEmpty()) {
-                classpath = Collections.singletonList(entry);
+                classpath = singletonList(entry);
             } else if (!classpath.contains(entry)) {
                 classpath = new ArrayList<>(classpath);
                 classpath.add(entry);

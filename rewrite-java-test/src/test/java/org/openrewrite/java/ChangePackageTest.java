@@ -436,8 +436,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageNullRecursiveImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -494,8 +494,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -552,8 +552,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageRecursiveImportedStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
@@ -751,8 +751,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgument() {
         rewriteRun(
           java(
@@ -764,12 +764,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-              
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-              
+
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -803,8 +803,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamed() {
         rewriteRun(
           java(
@@ -853,8 +853,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentFullyQualified() {
         rewriteRun(
           java(
@@ -901,8 +901,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
           java(
@@ -1490,7 +1490,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import static org.openrewrite.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();
@@ -1499,7 +1499,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import static org.openrewrite.test.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();

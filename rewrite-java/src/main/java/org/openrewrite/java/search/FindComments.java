@@ -28,8 +28,8 @@ import org.openrewrite.marker.SearchResult;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false)
@@ -74,7 +74,7 @@ public class FindComments extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<Pattern> compiledPatterns = patterns.stream()
                 .map(Pattern::compile)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         return new JavaIsoVisitor<ExecutionContext>() {
 

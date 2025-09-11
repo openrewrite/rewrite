@@ -29,6 +29,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static org.openrewrite.Tree.randomId;
 
 class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
@@ -55,7 +57,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             return matchTemplate(templateTree, input);
         } catch (RuntimeException e) {
             // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
-            return new TemplateMatchResult(false, Collections.emptyList());
+            return new TemplateMatchResult(false, emptyList());
         }
     }
 
@@ -90,7 +92,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                             typedPatternByName.put(name, s);
                         }
 
-                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), type, name)));
+                        Markers markers = Markers.build(singleton(new TemplateParameter(randomId(), type, name)));
                         parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
                     }
                 } else {
@@ -122,7 +124,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {
         if (templateTree == cursor.getValue()) {
             // When `JavaTemplate#apply()` returns the input itself, it could not be matched
-            return new TemplateMatchResult(false, Collections.emptyList());
+            return new TemplateMatchResult(false, emptyList());
         }
 
         JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();

@@ -39,7 +39,6 @@ class YamlReferenceTest implements RewriteTest {
       """;
 
 
-    @ParameterizedTest
     @CsvSource({
       "application.yaml",
       "application.yml",
@@ -48,6 +47,7 @@ class YamlReferenceTest implements RewriteTest {
       "/foo/bar/application-test.yaml",
       "/foo/bar/application-test.yml",
     })
+    @ParameterizedTest
     void findJavaReferencesInYamlProperties(String filename) {
         rewriteRun(
           yaml(
@@ -73,7 +73,6 @@ class YamlReferenceTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
       "application-.yaml",
       "application-.yml",
@@ -86,6 +85,7 @@ class YamlReferenceTest implements RewriteTest {
       "/foo/bar/other.yaml",
       "/foo/bar/other.yml"
     })
+    @ParameterizedTest
     void noReferencesInMismatchedFilenames(String filename) {
         rewriteRun(
           yaml(

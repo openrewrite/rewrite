@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
@@ -28,9 +29,9 @@ import org.openrewrite.table.SourcesFileResults;
 import java.util.Collection;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.ExecutionContext.CURRENT_RECIPE;
 
 @Value
@@ -45,17 +46,16 @@ public class Generate implements RpcRequest {
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Generate> {
         private final Map<String, Object> localObjects;
-        private final Map<String, Recipe> preparedRecipes;
-        private final Map<Recipe, Cursor> recipeCursors;
+        private final PreparedRecipeCache preparedRecipes;
         private final Function<String, ?> getObject;
 
         @Override
         protected Object handle(Generate request) throws Exception {
-            Recipe recipe = preparedRecipes.get(request.getId());
+            Recipe recipe = preparedRecipes.getInstantiated().get(request.getId());
 
             ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP());
             if (ctx.getMessage(CURRENT_RECIPE) == null) {
-                WatchableExecutionContext wctx = new WatchableExecutionContext((ExecutionContext) ctx);
+                WatchableExecutionContext wctx = new WatchableExecutionContext(ctx);
                 wctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), wctx,
                         new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
                         new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
@@ -65,13 +65,13 @@ public class Generate implements RpcRequest {
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                Object acc = scanningRecipe.getAccumulator(recipeCursors.computeIfAbsent(recipe,
+                Object acc = scanningRecipe.getAccumulator(preparedRecipes.getRecipeCursors().computeIfAbsent(recipe,
                         r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
                 Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
                 generated.forEach(g -> localObjects.put(g.getId().toString(), g));
                 return generated.stream()
                         .map(SourceFile::getId)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
             return emptyList();
         }

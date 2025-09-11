@@ -120,6 +120,23 @@ class SequenceTest implements RewriteTest {
     }
 
     @Test
+    void sequenceWithAnchors() {
+        rewriteRun(
+          yaml(
+            """
+            - &first
+              A: 1
+              B: 2
+            - <<: *first
+              A: 23
+              C: 99
+              D: 123
+            """
+          )
+        );
+    }
+
+    @Test
     void inlineSequenceWithWhitespaceBeforeCommas() {
         rewriteRun(
           yaml(

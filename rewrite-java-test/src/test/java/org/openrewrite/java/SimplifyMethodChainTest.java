@@ -25,8 +25,8 @@ import static org.openrewrite.java.Assertions.java;
 
 class SimplifyMethodChainTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void simplify() {
         rewriteRun(
           spec -> spec.recipe(new SimplifyMethodChain(
@@ -37,11 +37,11 @@ class SimplifyMethodChainTest implements RewriteTest {
                   static B b() { return new B(); }
                   static C c2() { return new C(); }
               }
-                            
+
               class B {
                   C c() { return new C(); }
               }
-                            
+
               class C {
               }
               """

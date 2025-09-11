@@ -68,6 +68,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterWildcard(MethodSignatureParser.WildcardContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitWildcard(MethodSignatureParser.WildcardContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterDotDot(MethodSignatureParser.DotDotContext ctx) { }
 	/**
 	 * {@inheritDoc}

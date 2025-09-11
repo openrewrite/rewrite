@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.stream.Collectors;
-
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.table.TypeMappings.Row;
@@ -39,7 +38,7 @@ class FindTypeMappingsTest implements RewriteTest {
                 .map(row -> "%-3s%-38s%-15s%d%s".formatted(row.getCompilationUnitName(), row.getTreeName(), row.getTypeName(), row.getCount(),
                   row.getNearestNonNullTreeName() == null ? "" : "  " + row.getNearestNonNullTreeName()))
                 .sorted()
-                .collect(Collectors.joining("\n", "", "\n")))
+                .collect(joining("\n", "", "\n")))
                 .isEqualTo(
                   """
                     J  J$ClassDeclaration                    Class          1
@@ -60,7 +59,7 @@ class FindTypeMappingsTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               public class Test {
                   List<String> l = new ArrayList<>();
               }

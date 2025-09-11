@@ -68,6 +68,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Nullable
     Boolean matchUnknownTypes;
 
+    @InlineMe(replacement = "this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false)")
     public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
                                       @Nullable String returnType, @Nullable Boolean matchOverrides) {
         this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);

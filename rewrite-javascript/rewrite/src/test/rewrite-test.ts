@@ -208,7 +208,7 @@ class NoopRecipe extends Recipe {
     displayName = "Do nothing";
     description = "Default no-op test, does nothing.";
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor();
     }
 }
@@ -241,7 +241,7 @@ export class AdHocRecipe extends Recipe {
         super();
     }
 
-    get editor(): TreeVisitor<any, any> {
+    async editor(): Promise<TreeVisitor<any, any>> {
         return this.visitor;
     }
 }
@@ -249,4 +249,3 @@ export class AdHocRecipe extends Recipe {
 export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
     return new AdHocRecipe(visitor);
 }
-

@@ -66,6 +66,26 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
+    void methodWithThrows() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              import java.lang.Exception;
+
+              class A {
+                  void foo() throws Exception {
+                  }
+              }
+              """,
+            """
+              import java.lang.Exception;class A{void foo() throws Exception{}}
+              """
+          )
+        );
+    }
+
+    @Test
     void returnExpression() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2),
@@ -250,23 +270,23 @@ class MinimumViableSpacingTest implements RewriteTest {
           spec -> spec.recipe(new AutoFormat()),
           java(
             """
-            class Test {
-                String yielded(int i) {
-                    return switch (i) {
-                        default: yield"value";
-                    };
-                }
-            }
-            """,
+              class Test {
+                  String yielded(int i) {
+                      return switch (i) {
+                          default: yield"value";
+                      };
+                  }
+              }
+              """,
             """
-            class Test {
-                String yielded(int i) {
-                    return switch (i) {
-                        default: yield "value";
-                    };
-                }
-            }
-            """
+              class Test {
+                  String yielded(int i) {
+                      return switch (i) {
+                          default: yield "value";
+                      };
+                  }
+              }
+              """
           )
         );
     }
@@ -278,7 +298,7 @@ class MinimumViableSpacingTest implements RewriteTest {
           java(
             """
               import java.io.Serial;
-              
+
               class Clazz {}
               """,
             """

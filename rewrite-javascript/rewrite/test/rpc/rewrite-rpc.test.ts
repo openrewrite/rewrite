@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -14,15 +16,15 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "../../src";
-import {RewriteRpc} from "../../src/rpc";
-import {PlainText, text} from "../../src/text";
-import {json} from "../../src/json";
-import {RecipeSpec} from "../../src/test";
+import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
+import {RewriteRpc} from "@openrewrite/rewrite/rpc";
+import {PlainText, text} from "@openrewrite/rewrite/text";
+import {json} from "@openrewrite/rewrite/json";
+import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
-import {activate} from "../example-recipe";
-import {javascript, JS} from "../../src/javascript";
+import {activate} from "../../fixtures/example-recipe";
+import {javascript, JS} from "@openrewrite/rewrite/javascript";
 import fs from "node:fs";
 
 describe("Rewrite RPC", () => {
@@ -118,6 +120,21 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("languages", async () => {
+        expect(await client.languages()).toContainEqual(JS.Kind.CompilationUnit);
+    });
+
+    test("runSearchRecipe", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier", {identifier: "hello"});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                "const hello = 'world'",
+                "const /*~~>*/hello = 'world'"
+            )
+        );
+    });
+
     test("run a JSON recipe", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.npm.change-version", {version: "1.0.0"});
         await spec.rewriteRun(
@@ -154,6 +171,23 @@ describe("Rewrite RPC", () => {
                     "hello"
                 ),
                 path: "hello.txt"
+            }
+        );
+    });
+
+    test("runRecipeWithPreconditions", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
+            identifier: "hello",
+            requiredPath: "hello.js"
+        });
+        await spec.rewriteRun(
+            {
+                //language=javascript
+                ...javascript(
+                    "const hello = 'world'",
+                    "const /*~~>*/hello = 'world'"
+                ),
+                path: "hello.js"
             }
         );
     });

@@ -79,7 +79,7 @@ public class RemoveAnnotationAttribute extends Recipe {
                                 }
                                 return null;
                             }
-                        } else if (attributeName.equals("value")) {
+                        } else if ("value".equals(attributeName)) {
                             if (!didPassFirstAttribute.get()) {
                                 shouldTrimNextPrefix.set(true);
                             }
@@ -99,7 +99,7 @@ public class RemoveAnnotationAttribute extends Recipe {
                 if (a != withoutAttribute &&
                         withoutAttribute.getArguments() != null &&
                         withoutAttribute.getArguments().size() == 1) {
-                    doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
+                    doAfterVisit(SimplifySingleElementAnnotation.modifyOnly(withoutAttribute));
                 }
                 return withoutAttribute;
             }

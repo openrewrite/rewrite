@@ -15,21 +15,18 @@
  */
 package org.openrewrite.rpc.request;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ObjectMappers;
+import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -57,12 +54,9 @@ public class Visit implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Visit> {
-        private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
-
         private final Map<String, Object> localObjects;
 
-        private final Map<String, Recipe> preparedRecipes;
-        private final Map<Recipe, Cursor> recipeCursors;
+        private final PreparedRecipeCache preparedRecipes;
 
         private final Function<String, ?> getObject;
         private final Function<@Nullable List<String>, Cursor> getCursor;
@@ -71,12 +65,9 @@ public class Visit implements RpcRequest {
         protected Object handle(Visit request) throws Exception {
             Tree before = (Tree) getObject.apply(request.getTreeId());
             Object p = getVisitorP(request);
-
-            //noinspection unchecked
-            TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request, p);
-
-            Tree after = visitor.visit(before, p, getCursor.apply(
-                    request.getCursor()));
+            TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(request.getVisitor(),
+                    request.getVisitorOptions());
+            Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor()));
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
@@ -86,41 +77,13 @@ public class Visit implements RpcRequest {
             return new VisitResponse(before != after);
         }
 
-        private TreeVisitor<?, ?> instantiateVisitor(Visit request, Object p) {
-            String visitorName = request.getVisitor();
-
-            if (visitorName.startsWith("scan:")) {
-                assert p instanceof ExecutionContext;
-
-                //noinspection unchecked
-                ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
-                Object acc = recipe.getAccumulator(recipeCursors.computeIfAbsent(recipe, r -> new Cursor(null, Cursor.ROOT_VALUE)),
-                        (ExecutionContext) p);
-                return recipe.getScanner(acc);
-            } else if (visitorName.startsWith("edit:")) {
-                Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
-                return recipe.getVisitor();
-            }
-
-            Map<Object, Object> withJsonType = request.getVisitorOptions() == null ?
-                    new HashMap<>() :
-                    new HashMap<>(request.getVisitorOptions());
-            withJsonType.put("@c", visitorName);
-            try {
-                Class<?> visitorType = TypeFactory.defaultInstance().findClass(visitorName);
-                return (TreeVisitor<?, ?>) mapper.convertValue(withJsonType, visitorType);
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP());
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
 
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
-                    Recipe recipe = preparedRecipes.get(visitorName.substring(
+                    Recipe recipe = preparedRecipes.getInstantiated().get(visitorName.substring(
                             "edit:".length() /* 'scan:' has same length*/));
                     // This is really probably particular to the Java implementation,
                     // because we are carrying forward the legacy of cycles that are likely to be

@@ -157,6 +157,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             Space before = m.getPadding().getThrows().getBefore();
             if (before.getWhitespace().isEmpty()) {
                 m = m.getPadding().withThrows(m.getPadding().getThrows().withBefore(before.withWhitespace(" ")));
+                m = m.withThrows(ListUtils.mapFirst(m.getThrows(), aThrows -> {
+                    if (aThrows.getPrefix().getWhitespace().isEmpty()) {
+                        return aThrows.withPrefix(aThrows.getPrefix().withWhitespace(" "));
+                    }
+                    return aThrows;
+                }));
             }
         }
 

@@ -109,15 +109,13 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitAnnotation(JavaType.Annotation annotation, P p) {
         JavaType.Annotation a = annotation;
-        a = a.withType((JavaType.FullyQualified) visit(a.getType(), p));
-        return a;
+        return a.withType((JavaType.FullyQualified) visit(a.getType(), p));
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {
         JavaType.Array a = array;
         a = a.withElemType(visit(a.getElemType(), p));
-        a = a.withAnnotations(visit(a.getAnnotations(), p));
-        return a;
+        return a.withAnnotations(visit(a.getAnnotations(), p));
     }
 
     public JavaType visitClass(JavaType.Class aClass, P p) {
@@ -128,20 +126,17 @@ public class JavaTypeVisitor<P> {
         c = c.withInterfaces(ListUtils.map(c.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)));
         c = c.withMembers(ListUtils.map(c.getMembers(), m -> (JavaType.Variable) visit(m, p)));
         c = c.withMethods(ListUtils.map(c.getMethods(), m -> (JavaType.Method) visit(m, p)));
-        c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), t -> visit(t, p)));
-        return c;
+        return c.withTypeParameters(ListUtils.map(c.getTypeParameters(), t -> visit(t, p)));
     }
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
         JavaType.GenericTypeVariable g = generic;
-        g = g.withBounds(ListUtils.map(g.getBounds(), bound -> visit(bound, p)));
-        return g;
+        return g.withBounds(ListUtils.map(g.getBounds(), bound -> visit(bound, p)));
     }
 
     public JavaType visitIntersection(JavaType.Intersection intersection, P p) {
         JavaType.Intersection i = intersection;
-        i = i.withBounds(ListUtils.map(i.getBounds(), bound -> visit(bound, p)));
-        return i;
+        return i.withBounds(ListUtils.map(i.getBounds(), bound -> visit(bound, p)));
     }
 
     /**
@@ -157,15 +152,13 @@ public class JavaTypeVisitor<P> {
         m = m.withReturnType(visit(m.getReturnType(), p));
         m = m.withParameterTypes(ListUtils.map(m.getParameterTypes(), pt -> visit(pt, p)));
         m = m.withThrownExceptions(ListUtils.map(m.getThrownExceptions(), t -> visit(t, p)));
-        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-        return m;
+        return m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
     }
 
     public JavaType visitParameterized(JavaType.Parameterized parameterized, P p) {
         JavaType.Parameterized pa = parameterized;
         pa = pa.withType((JavaType.FullyQualified) visit(pa.getType(), p));
-        pa = pa.withTypeParameters(ListUtils.map(pa.getTypeParameters(), t -> visit(t, p)));
-        return pa;
+        return pa.withTypeParameters(ListUtils.map(pa.getTypeParameters(), t -> visit(t, p)));
     }
 
     public JavaType visitPrimitive(JavaType.Primitive primitive, P p) {
@@ -183,7 +176,6 @@ public class JavaTypeVisitor<P> {
         JavaType.Variable v = variable;
         v = v.withOwner(visit(v.getOwner(), p));
         v = v.withType(visit(variable.getType(), p));
-        v = v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
-        return v;
+        return v.withAnnotations(ListUtils.map(v.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)));
     }
 }

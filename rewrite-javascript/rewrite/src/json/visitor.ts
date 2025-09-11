@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
+import {mapAsync} from "../util";
+import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
+import {SourceFile} from "../tree";
 import {isJson, Json} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export class JsonVisitor<P> extends TreeVisitor<Json, P> {
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJson(sourceFile);
     }
 

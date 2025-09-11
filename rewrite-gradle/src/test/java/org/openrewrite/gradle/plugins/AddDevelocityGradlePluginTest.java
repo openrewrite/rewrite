@@ -140,7 +140,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
-                            
+
               rootProject.name = 'my-project'
               """
             )
@@ -159,14 +159,14 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
             """
               plugins {
               }
-                            
+
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
-                            
+
               rootProject.name = 'my-project'
               """
             )
@@ -301,18 +301,18 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               /*
                * Licensed to...
                */
-               
+
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion("""
               /*
                * Licensed to...
                */
-               
+
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
-                            
+
               rootProject.name = 'my-project'
               """
             )

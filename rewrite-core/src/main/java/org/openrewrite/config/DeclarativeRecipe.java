@@ -90,19 +90,30 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 estimatedEffortPerOccurrence;
     }
 
-    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Collection<Recipe> availableRecipes) {
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
-        initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, recipeToContributors);
+        initialize(uninitializedRecipes, recipeList, recipeMap::get);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get);
     }
 
+    @Deprecated
+    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        this.initialize(availableRecipes);
+    }
+
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
+        initialize(uninitializedRecipes, recipeList, availableRecipes);
+        initialize(uninitializedPreconditions, preconditions, availableRecipes);
+    }
+
+    @SuppressWarnings("unused")
+    @Deprecated
     public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
+        this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
@@ -111,7 +122,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 Recipe subRecipe = availableRecipes.apply(recipeFqn);
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
-                        ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
+                        ((DeclarativeRecipe) subRecipe).initialize(availableRecipes);
                     }
                     initialized.add(subRecipe);
                 } else {
@@ -123,9 +134,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                                     null));
                 }
             } else {
-                recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
                 if (recipe instanceof DeclarativeRecipe) {
-                    ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
+                    ((DeclarativeRecipe) recipe).initialize(availableRecipes);
                 }
                 initialized.add(recipe);
             }
@@ -323,7 +333,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
-        if(recipe instanceof ScanningRecipe) {
+        if (recipe instanceof ScanningRecipe) {
             //noinspection rawtypes
             ScanningRecipe scanning = (ScanningRecipe) recipe;
             //noinspection unchecked
@@ -357,7 +367,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         if (recipe instanceof ScanningRecipe) {
             // DeclarativeRecipe is technically a ScanningRecipe, but it only needs the
             // scanning phase if it or one of its sub-recipes or preconditions is a ScanningRecipe
-            if(recipe instanceof DeclarativeRecipe) {
+            if (recipe instanceof DeclarativeRecipe) {
                 for (Recipe precondition : ((DeclarativeRecipe) recipe).getPreconditions()) {
                     if (isScanningRequired(precondition)) {
                         return true;
@@ -438,30 +448,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 getExamples(), source);
     }
 
-    @Value
-    private static class NameEmail {
-        String name;
-        String email;
-    }
-
     @Override
     public List<Contributor> getContributors() {
-        if (contributors == null) {
-            Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
-            List<Contributor> combined = new ArrayList<>();
-            for (Recipe recipe : getRecipeList()) {
-                for (Contributor contributor : recipe.getContributors()) {
-                    NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
-                    contributorToLineCount.put(nameEmail, contributorToLineCount.getOrDefault(nameEmail, 0) + contributor.getLineCount());
-                }
-            }
-            for (Map.Entry<NameEmail, Integer> contributorEntry : contributorToLineCount.entrySet()) {
-                combined.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
-            }
-            combined.sort(Comparator.comparing(Contributor::getLineCount).reversed());
-            contributors = combined;
-        }
-        return contributors;
+        return emptyList();
     }
 
     @Override

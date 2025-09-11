@@ -28,9 +28,12 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Spliterators.spliteratorUnknownSize;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
@@ -104,11 +107,11 @@ public class ChangePropertyKey extends Recipe {
             Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                     .filter(Yaml.Mapping.Entry.class::isInstance)
                     .map(Yaml.Mapping.Entry.class::cast)
-                    .collect(Collectors.toCollection(ArrayDeque::new));
+                    .collect(toCollection(ArrayDeque::new));
 
             String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
                     .map(e2 -> e2.getKey().getValue())
-                    .collect(Collectors.joining("."));
+                    .collect(joining("."));
 
             if (newPropertyKey.startsWith(oldPropertyKey) &&
                     (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
@@ -228,7 +231,7 @@ public class ChangePropertyKey extends Recipe {
     }
 
     private List<String> excludedSubKeys() {
-        return except != null ? except : Collections.emptyList();
+        return except != null ? except : emptyList();
     }
 
     private class InsertSubpropertyVisitor<P> extends YamlIsoVisitor<P> {
@@ -267,7 +270,7 @@ public class ChangePropertyKey extends Recipe {
                         }));
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
-                        Yaml.Mapping newMapping = m.withEntries(Collections.singletonList(newEntry));
+                        Yaml.Mapping newMapping = m.withEntries(singletonList(newEntry));
                         Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false, null, null).visitMapping(m, p);
                         m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
                     }
