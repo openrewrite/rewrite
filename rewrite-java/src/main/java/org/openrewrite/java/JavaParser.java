@@ -371,23 +371,27 @@ public interface JavaParser extends Parser {
     }
 }
 
+@UtilityClass
 class RuntimeClasspathCache {
-    private RuntimeClasspathCache() {
-    }
-
     @Nullable
-    private static List<Path> runtimeClasspath = null;
+    private static volatile List<Path> runtimeClasspath = null;
 
     static List<Path> getRuntimeClasspath() {
-        if (runtimeClasspath == null) {
-            runtimeClasspath = new ClassGraph()
-                    .disableNestedJarScanning()
-                    .getClasspathURIs().stream()
-                    .filter(uri -> "file".equals(uri.getScheme()))
-                    .map(Paths::get)
-                    .collect(toList());
+        List<Path> paths = runtimeClasspath;
+        if (paths == null) {
+            synchronized (RuntimeClasspathCache.class) {
+                paths = runtimeClasspath;
+                if (paths == null) {
+                    runtimeClasspath = paths = new ClassGraph()
+                            .disableNestedJarScanning()
+                            .getClasspathURIs().stream()
+                            .filter(uri -> "file".equals(uri.getScheme()))
+                            .map(Paths::get)
+                            .collect(toList());
+                }
+            }
         }
-        return runtimeClasspath;
+        return paths;
     }
 }
 
