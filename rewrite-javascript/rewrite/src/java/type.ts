@@ -24,6 +24,8 @@ export namespace Type {
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
+        SingleElementValue: "org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue",
+        ArrayElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue",
         Array: "org.openrewrite.java.tree.JavaType$Array",
         Class: "org.openrewrite.java.tree.JavaType$Class",
         GenericTypeVariable: "org.openrewrite.java.tree.JavaType$GenericTypeVariable",
@@ -48,6 +50,7 @@ export namespace Type {
         interfaces: Type.Class[];
         members: Type.Variable[];
         methods: Type.Method[];
+
         toJSON?(): string;
     }
 
@@ -69,10 +72,20 @@ export namespace Type {
     }
 
     export namespace Annotation {
-        export interface ElementValue {
-            readonly kind: typeof Kind.AnnotationElementValue;
+        export type ElementValue = SingleElementValue | ArrayElementValue;
+
+        export interface SingleElementValue {
+            readonly kind: typeof Kind.SingleElementValue;
             element: Type;
-            value: any;
+            constantValue?: any;
+            referenceValue?: Type;
+        }
+
+        export interface ArrayElementValue {
+            readonly kind: typeof Kind.ArrayElementValue;
+            element: Type;
+            constantValues?: any[];
+            referenceValues?: Type[];
         }
     }
 
@@ -304,7 +317,7 @@ export namespace Type {
             }
             case Type.Kind.GenericTypeVariable: {
                 const generic = type as Type.GenericTypeVariable;
-                if (generic.bounds.length === 0) {
+                if (!generic.bounds || generic.bounds.length === 0) {
                     return "Generic{" + generic.name + "}";
                 }
                 const bounds = generic.bounds.map(b => signature(b)).join(" & ");
@@ -312,18 +325,18 @@ export namespace Type {
             }
             case Type.Kind.Intersection: {
                 const intersection = type as Type.Intersection;
-                return intersection.bounds.map(b => signature(b)).join(" & ");
+                return (intersection.bounds || []).map(b => signature(b)).join(" & ");
             }
             case Type.Kind.Method: {
                 const method = type as Type.Method;
                 const declaringType = signature(method.declaringType);
-                const params = method.parameterTypes.map(p => signature(p)).join(", ");
+                const params = (method.parameterTypes || []).map(p => signature(p)).join(", ");
                 return declaringType + "{name=" + method.name + ",return=" + signature(method.returnType) + ",parameters=[" + params + "]}";
             }
             case Type.Kind.Parameterized: {
                 const parameterized = type as Type.Parameterized;
                 const baseType = signature(parameterized.type);
-                if (parameterized.typeParameters.length === 0) {
+                if (!parameterized.typeParameters || parameterized.typeParameters.length === 0) {
                     return baseType;
                 }
                 const params = parameterized.typeParameters.map(p => signature(p)).join(", ");
@@ -335,7 +348,7 @@ export namespace Type {
             }
             case Type.Kind.Union: {
                 const union = type as Type.Union;
-                return union.bounds.map(b => signature(b)).join(" | ");
+                return (union.bounds || []).map(b => signature(b)).join(" | ");
             }
             case Type.Kind.Unknown: {
                 return "<unknown>";
@@ -406,96 +419,111 @@ RpcCodecs.registerCodec(Type.Kind.Variable, {
         await q.getAndSend(after, v => v.name);
         await q.getAndSend(after, v => v.owner ? asRef(v.owner) : undefined);
         await q.getAndSend(after, v => asRef(v.type));
-        await q.getAndSendList(after, v => v.annotations.map(v2 => asRef(v2)), t => Type.signature(t));
+        await q.getAndSendList(after, v => (v.annotations || []).map(v2 => asRef(v2)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.Variable, q: RpcReceiveQueue): Promise<Type.Variable> {
-        const name = await q.receive(before.name);
-        const owner = await q.receive(before.owner);
-        const type = await q.receive(before.type);
-        const annotations = await q.receiveList(before.annotations);
-        return {
-            kind: Type.Kind.Variable,
-            name,
-            owner,
-            type,
-            annotations: annotations!,
-            toJSON: function () {
-                return Type.toDebugString(this);
-            },
-            [immerable]: false  // Mark as non-draftable
-        } as Type.Variable;
+        // Mutate the before object in place to preserve reference identity
+        before.name = await q.receive(before.name);
+        before.owner = await q.receive(before.owner);
+        before.type = await q.receive(before.type);
+        before.annotations = await q.receiveList(before.annotations) || [];
+        return before;
     }
 });
 
 RpcCodecs.registerCodec(Type.Kind.Annotation, {
     async rpcSend(after: Type.Annotation, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => asRef(a.type));
-        await q.getAndSendList(after, a => (a.values || []).map(v => asRef(v)), v => `${v.element ? Type.signature(v.element) : 'null'}:${v.value}`);
+        await q.getAndSendList(after, a => (a.values || []).map(v => asRef(v)), v => {
+            let value: any;
+            if (v.kind === Type.Kind.SingleElementValue) {
+                const single = v as Type.Annotation.SingleElementValue;
+                value = single.constantValue !== undefined ? single.constantValue : single.referenceValue;
+            } else {
+                const array = v as Type.Annotation.ArrayElementValue;
+                value = array.constantValues || array.referenceValues;
+            }
+            return `${Type.signature(v.element)}:${value == null ? "null" : value.toString()}`;
+        });
     },
     async rpcReceive(before: Type.Annotation, q: RpcReceiveQueue): Promise<Type.Annotation> {
-        const type = await q.receive(before.type);
-        const values = await q.receiveList(before.values);
-
-        return {
-            kind: Type.Kind.Annotation,
-            type,
-            values: values || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.type = await q.receive(before.type);
+        before.values = await q.receiveList(before.values) || [];
+        return before;
     }
 });
 
-RpcCodecs.registerCodec(Type.Kind.AnnotationElementValue, {
-    async rpcSend(after: Type.Annotation.ElementValue, q: RpcSendQueue): Promise<void> {
+RpcCodecs.registerCodec(Type.Kind.SingleElementValue, {
+    async rpcSend(after: Type.Annotation.SingleElementValue, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, e => asRef(e.element));
-        await q.getAndSend(after, e => e.value);  // value is any, no asRef needed
+        await q.getAndSend(after, e => e.constantValue);
+        await q.getAndSend(after, e => asRef(e.referenceValue));
     },
-    async rpcReceive(before: Type.Annotation.ElementValue, q: RpcReceiveQueue): Promise<Type.Annotation.ElementValue> {
-        const element = await q.receive(before.element);
-        const value = await q.receive(before.value);
+    async rpcReceive(before: Type.Annotation.SingleElementValue | undefined, q: RpcReceiveQueue): Promise<Type.Annotation.SingleElementValue> {
+        if (!before) {
+            return {
+                kind: Type.Kind.SingleElementValue,
+                element: (await q.receive(undefined) as unknown) as Type,
+                constantValue: await q.receive(undefined),
+                referenceValue: await q.receive(undefined)
+            };
+        }
+        // Mutate the before object in place to preserve reference identity
+        before.element = await q.receive(before.element);
+        before.constantValue = await q.receive(before.constantValue);
+        before.referenceValue = await q.receive(before.referenceValue);
+        return before;
+    }
+});
 
-        return {
-            kind: Type.Kind.AnnotationElementValue,
-            element,
-            value
-        };
+RpcCodecs.registerCodec(Type.Kind.ArrayElementValue, {
+    async rpcSend(after: Type.Annotation.ArrayElementValue, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, e => asRef(e.element));
+        await q.getAndSendList(after, e => e.constantValues || [], v => v == null ? "null" : v.toString());
+        await q.getAndSendList(after, e => (e.referenceValues || []).map(r => asRef(r)), t => Type.signature(t));
+    },
+    async rpcReceive(before: Type.Annotation.ArrayElementValue | undefined, q: RpcReceiveQueue): Promise<Type.Annotation.ArrayElementValue> {
+        if (!before) {
+            return {
+                kind: Type.Kind.ArrayElementValue,
+                element: (await q.receive(undefined) as unknown) as Type,
+                constantValues: await q.receiveList(undefined),
+                referenceValues: await q.receiveList(undefined)
+            };
+        }
+        // Mutate the before object in place to preserve reference identity
+        before.element = await q.receive(before.element);
+        before.constantValues = await q.receiveList(before.constantValues);
+        before.referenceValues = await q.receiveList(before.referenceValues);
+        return before;
     }
 });
 
 RpcCodecs.registerCodec(Type.Kind.Method, {
     async rpcSend(after: Type.Method, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, m => asRef(m.declaringType));
-        await q.getAndSend(after, m => m.name);  // string, no asRef needed
+        await q.getAndSend(after, m => m.name);
         await q.getAndSend(after, m => asRef(m.returnType));
-        await q.getAndSendList(after, m => m.parameterNames || [], () => "param");
+        await q.getAndSendList(after, m => m.parameterNames || [], v => v);
         await q.getAndSendList(after, m => (m.parameterTypes || []).map(t => asRef(t)), t => Type.signature(t));
         await q.getAndSendList(after, m => (m.thrownExceptions || []).map(t => asRef(t)), t => Type.signature(t));
         await q.getAndSendList(after, m => (m.annotations || []).map(a => asRef(a)), t => Type.signature(t));
-        await q.getAndSendList(after, m => m.defaultValue || undefined, () => "default");
-        await q.getAndSendList(after, m => m.declaredFormalTypeNames || [], () => "type");
+        await q.getAndSendList(after, m => m.defaultValue || undefined, v => v);
+        await q.getAndSendList(after, m => m.declaredFormalTypeNames || [], v => v);
     },
     async rpcReceive(before: Type.Method, q: RpcReceiveQueue): Promise<Type.Method> {
-        const declaringType = await q.receive(before.declaringType);
-        const name = await q.receive(before.name);
-        const returnType = await q.receive(before.returnType);
-        const parameterNames = await q.receiveList(before.parameterNames);
-        const parameterTypes = await q.receiveList(before.parameterTypes);
-        const thrownExceptions = await q.receiveList(before.thrownExceptions);
-        const annotations = await q.receiveList(before.annotations);
-        const defaultValue = await q.receiveList(before.defaultValue);
-        const declaredFormalTypeNames = await q.receiveList(before.declaredFormalTypeNames);
-
-        return {
-            kind: Type.Kind.Method,
-            declaringType,
-            name,
-            returnType,
-            parameterNames: parameterNames || [],
-            parameterTypes: parameterTypes || [],
-            thrownExceptions: thrownExceptions || [],
-            annotations: annotations || [],
-            defaultValue,
-            declaredFormalTypeNames: declaredFormalTypeNames || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.declaringType = await q.receive(before.declaringType);
+        before.name = await q.receive(before.name);
+        before.returnType = await q.receive(before.returnType);
+        before.parameterNames = await q.receiveList(before.parameterNames) || [];
+        before.parameterTypes = await q.receiveList(before.parameterTypes) || [];
+        before.thrownExceptions = await q.receiveList(before.thrownExceptions) || [];
+        before.annotations = await q.receiveList(before.annotations) || [];
+        before.defaultValue = await q.receiveList(before.defaultValue);
+        before.declaredFormalTypeNames = await q.receiveList(before.declaredFormalTypeNames) || [];
+        return before;
     }
 });
 
@@ -505,14 +533,10 @@ RpcCodecs.registerCodec(Type.Kind.Array, {
         await q.getAndSendList(after, a => (a.annotations || []).map(ann => asRef(ann)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.Array, q: RpcReceiveQueue): Promise<Type.Array> {
-        const elemType = await q.receive(before.elemType);
-        const annotations = await q.receiveList(before.annotations);
-
-        return {
-            kind: Type.Kind.Array,
-            elemType,
-            annotations: annotations || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.elemType = await q.receive(before.elemType);
+        before.annotations = await q.receiveList(before.annotations) || [];
+        return before;
     }
 });
 
@@ -522,34 +546,49 @@ RpcCodecs.registerCodec(Type.Kind.Parameterized, {
         await q.getAndSendList(after, p => (p.typeParameters || []).map(t => asRef(t)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.Parameterized, q: RpcReceiveQueue): Promise<Type.Parameterized> {
-        const type = await q.receive(before.type);
-        const typeParameters = await q.receiveList(before.typeParameters);
-
-        return {
-            kind: Type.Kind.Parameterized,
-            type,
-            typeParameters: typeParameters || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.type = await q.receive(before.type);
+        before.typeParameters = await q.receiveList(before.typeParameters) || [];
+        return before;
     }
 });
 
 RpcCodecs.registerCodec(Type.Kind.GenericTypeVariable, {
     async rpcSend(after: Type.GenericTypeVariable, q: RpcSendQueue): Promise<void> {
-        await q.getAndSend(after, g => g.name);  // string, no asRef needed
-        await q.getAndSend(after, g => g.variance);  // enum, no asRef needed
+        await q.getAndSend(after, g => g.name);
+        // Convert TypeScript enum to Java enum string
+        await q.getAndSend(after, g => {
+            switch (g.variance) {
+                case Type.GenericTypeVariable.Variance.Covariant:
+                    return 'COVARIANT';
+                case Type.GenericTypeVariable.Variance.Contravariant:
+                    return 'CONTRAVARIANT';
+                case Type.GenericTypeVariable.Variance.Invariant:
+                default:
+                    return 'INVARIANT';
+            }
+        });
         await q.getAndSendList(after, g => (g.bounds || []).map(b => asRef(b)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.GenericTypeVariable, q: RpcReceiveQueue): Promise<Type.GenericTypeVariable> {
-        const name = await q.receive(before.name);
-        const variance = await q.receive(before.variance);
-        const bounds = await q.receiveList(before.bounds);
-
-        return {
-            kind: Type.Kind.GenericTypeVariable,
-            name,
-            variance,
-            bounds: bounds || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.name = await q.receive(before.name);
+        const varianceStr = await q.receive(before.variance) as any as string;
+        // Convert Java enum string to TypeScript enum
+        switch (varianceStr) {
+            case 'COVARIANT':
+                before.variance = Type.GenericTypeVariable.Variance.Covariant;
+                break;
+            case 'CONTRAVARIANT':
+                before.variance = Type.GenericTypeVariable.Variance.Contravariant;
+                break;
+            case 'INVARIANT':
+            default:
+                before.variance = Type.GenericTypeVariable.Variance.Invariant;
+                break;
+        }
+        before.bounds = await q.receiveList(before.bounds) || [];
+        return before;
     }
 });
 
@@ -558,12 +597,9 @@ RpcCodecs.registerCodec(Type.Kind.Union, {
         await q.getAndSendList(after, u => (u.bounds || []).map(b => asRef(b)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.Union, q: RpcReceiveQueue): Promise<Type.Union> {
-        const bounds = await q.receiveList(before.bounds);
-
-        return {
-            kind: Type.Kind.Union,
-            bounds: bounds || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.bounds = await q.receiveList(before.bounds) || [];
+        return before;
     }
 });
 
@@ -572,49 +608,30 @@ RpcCodecs.registerCodec(Type.Kind.Intersection, {
         await q.getAndSendList(after, i => (i.bounds || []).map(b => asRef(b)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.Intersection, q: RpcReceiveQueue): Promise<Type.Intersection> {
-        const bounds = await q.receiveList(before.bounds);
-
-        return {
-            kind: Type.Kind.Intersection,
-            bounds: bounds || []
-        };
+        // Mutate the before object in place to preserve reference identity
+        before.bounds = await q.receiveList(before.bounds) || [];
+        return before;
     }
 });
 
 RpcCodecs.registerCodec(Type.Kind.ShallowClass, {
     async rpcSend(after: Type.ShallowClass, q: RpcSendQueue): Promise<void> {
-        // ShallowClass is a subset of Class, so we send it the same way
-        await q.getAndSend(after, c => c.classKind);  // enum value, no asRef needed
-        await q.getAndSend(after, c => c.fullyQualifiedName);  // string, no asRef needed
-        await q.getAndSendList(after, c => (c.typeParameters || []).map(t => asRef(t)), t => Type.signature(t));
-        await q.getAndSend(after, c => asRef(c.supertype));
+        await q.getAndSend(after, c => c.fullyQualifiedName);
         await q.getAndSend(after, c => asRef(c.owningClass));
-        await q.getAndSendList(after, c => (c.annotations || []).map(a => asRef(a)), t => Type.signature(t));
-        await q.getAndSendList(after, c => (c.interfaces || []).map(i => asRef(i)), t => Type.signature(t));
-        await q.getAndSendList(after, c => (c.members || []).map(m => asRef(m)), t => Type.signature(t));
-        await q.getAndSendList(after, c => (c.methods || []).map(m => asRef(m)), t => Type.signature(t));
     },
     async rpcReceive(before: Type.ShallowClass, q: RpcReceiveQueue): Promise<Type.ShallowClass> {
-        // Mutate the before object in place to preserve reference identity
-        before.classKind = await q.receive(before.classKind);
+        before.classKind = Type.Class.Kind.Class;
         before.fullyQualifiedName = await q.receive(before.fullyQualifiedName);
-        before.typeParameters = await q.receiveList(before.typeParameters) || [];
-        before.supertype = await q.receive(before.supertype);
         before.owningClass = await q.receive(before.owningClass);
-        before.annotations = await q.receiveList(before.annotations) || [];
-        before.interfaces = await q.receiveList(before.interfaces) || [];
-        before.members = await q.receiveList(before.members) || [];
-        before.methods = await q.receiveList(before.methods) || [];
-
         return before;
     }
 });
 
 RpcCodecs.registerCodec(Type.Kind.Unknown, {
-    async rpcSend(after: Type, q: RpcSendQueue): Promise<void> {
+    async rpcSend(_after: Type, _q: RpcSendQueue): Promise<void> {
         // Unknown type has no additional data
     },
-    async rpcReceive(before: Type, q: RpcReceiveQueue): Promise<Type> {
+    async rpcReceive(_before: Type, _q: RpcReceiveQueue): Promise<Type> {
         return Type.unknownType;
     }
 });

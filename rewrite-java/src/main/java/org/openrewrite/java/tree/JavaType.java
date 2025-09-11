@@ -622,8 +622,8 @@ public interface JavaType {
 
         @Override
         public Class rpcReceive(Class before, RpcReceiveQueue q) {
-            Kind kind = q.receiveAndGet(before.kind, k -> Kind.valueOf(k.toString()));
-            String fullyQualifiedName = q.receive(before.fullyQualifiedName);
+            before.kind = q.receiveAndGet(before.kind, k -> Kind.valueOf(k.toString()));
+            before.fullyQualifiedName = q.receive(before.fullyQualifiedName);
             List<JavaType> typeParameters = q.receiveList(before.getTypeParameters(), null);
             FullyQualified supertype = q.receive(before.supertype);
             FullyQualified owningClass = q.receive(before.owningClass);
@@ -631,10 +631,6 @@ public interface JavaType {
             List<FullyQualified> interfaces = q.receiveList(before.getInterfaces(), null);
             List<Variable> members = q.receiveList(before.getMembers(), null);
             List<Method> methods = q.receiveList(before.getMethods(), null);
-
-            before.kind = kind;
-            before.fullyQualifiedName = fullyQualifiedName;
-
             return before.unsafeSet(typeParameters, supertype, owningClass, annotations,
                     interfaces, members, methods);
         }
@@ -685,6 +681,22 @@ public interface JavaType {
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
+        }
+
+        @Override
+        public void rpcSend(Class after, RpcSendQueue q) {
+            q.getAndSend(after, Class::getFullyQualifiedName);
+            q.getAndSend(after, c -> Reference.asRef(c.getOwningClass()));
+        }
+
+        @Override
+        public Class rpcReceive(Class before, RpcReceiveQueue q) {
+            before.kind = Kind.Class;
+            before.fullyQualifiedName = q.receive(before.fullyQualifiedName);
+            ShallowClass c = (ShallowClass) before;
+            FullyQualified owningClass = q.receive(before.getOwningClass());
+            c.unsafeSet(emptyList(), null, owningClass, emptyList(), emptyList(), emptyList(), emptyList());
+            return c;
         }
     }
 
@@ -787,7 +799,7 @@ public interface JavaType {
         }
 
         @Value
-        public static class SingleElementValue implements ElementValue {
+        public static class SingleElementValue implements ElementValue, RpcCodec<SingleElementValue> {
             JavaType element;
 
             @Nullable
@@ -808,10 +820,26 @@ public interface JavaType {
             public Object getValue() {
                 return constantValue != null ? constantValue : referenceValue;
             }
+
+            @Override
+            public void rpcSend(SingleElementValue after, RpcSendQueue q) {
+                q.getAndSend(after, e -> Reference.asRef(e.element));
+                q.getAndSend(after, e -> e.constantValue);
+                q.getAndSend(after, e -> Reference.asRef(e.referenceValue));
+            }
+
+            @Override
+            public SingleElementValue rpcReceive(SingleElementValue before, RpcReceiveQueue q) {
+                return new SingleElementValue(
+                        q.receive(before.element, null),
+                        q.receive(before.constantValue, null),
+                        q.receive(before.referenceValue, null)
+                );
+            }
         }
 
         @Value
-        public static class ArrayElementValue implements ElementValue {
+        public static class ArrayElementValue implements ElementValue, RpcCodec<ArrayElementValue> {
             JavaType element;
             Object @Nullable [] constantValues;
             JavaType @Nullable [] referenceValues;
@@ -831,6 +859,28 @@ public interface JavaType {
 
             public List<?> getValues() {
                 return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+            }
+
+            @Override
+            public void rpcSend(ArrayElementValue after, RpcSendQueue q) {
+                q.getAndSend(after, e -> Reference.asRef(e.element));
+                q.getAndSendList(after, e -> e.constantValues == null ? null : Arrays.asList(e.constantValues),
+                        Object::toString, null);
+                q.getAndSendList(after, e -> e.referenceValues == null ? null :
+                                Arrays.stream(e.referenceValues).map(Reference::asRef).collect(toList()),
+                        TypeIdForRpc.signature(), null);
+            }
+
+            @Override
+            public ArrayElementValue rpcReceive(ArrayElementValue before, RpcReceiveQueue q) {
+                JavaType element = q.receive(before.element, null);
+                List<Object> constantValues = q.receiveList(before.constantValues == null ? null : Arrays.asList(before.constantValues), null);
+                List<JavaType> referenceValues = q.receiveList(before.referenceValues == null ? null : Arrays.asList(before.referenceValues), null);
+                return new ArrayElementValue(
+                        element,
+                        constantValues == null ? null : constantValues.toArray(),
+                        referenceValues == null ? null : referenceValues.toArray(JavaType.EMPTY_JAVA_TYPE_ARRAY)
+                );
             }
         }
 
@@ -979,7 +1029,7 @@ public interface JavaType {
         }
 
         @Override
-        public FullyQualified getSupertype() {
+        public @Nullable FullyQualified getSupertype() {
             return type.getSupertype();
         }
 
@@ -1109,7 +1159,7 @@ public interface JavaType {
         @Override
         public GenericTypeVariable rpcReceive(GenericTypeVariable before, RpcReceiveQueue q) {
             before.name = q.receive(before.name);
-            before.variance = q.receive(before.variance);
+            before.variance = q.receiveAndGet(before.variance, v -> Variance.valueOf(v.toString()));
             before.bounds = arrayOrNullIfEmpty(q.receiveList(before.getBounds(), null), EMPTY_JAVA_TYPE_ARRAY);
             return before;
         }
@@ -1348,8 +1398,12 @@ public interface JavaType {
 
         @Override
         public Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
-            String keyword = q.receiveAndGet(null, java.lang.String::toString);
-            return fromKeyword(keyword);
+            String keyword = q.receive(before.getKeyword());
+            Primitive p = fromKeyword(keyword);
+            if (p == null) {
+                throw new IllegalArgumentException("Unknown primitive type keyword: " + keyword);
+            }
+            return p;
         }
     }
 

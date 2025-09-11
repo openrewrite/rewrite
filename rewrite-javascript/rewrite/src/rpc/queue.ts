@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Marker, Markers} from "../markers";
+import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
-import {asRef, isRef, Reference, ReferenceMap} from "../reference";
+import {isRef, ReferenceMap} from "../reference";
 import {Writable} from "node:stream";
 
 /**

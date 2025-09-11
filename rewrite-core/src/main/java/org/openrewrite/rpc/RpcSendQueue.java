@@ -144,14 +144,13 @@ public class RpcSendQueue {
     private void add(@Nullable Object after, @Nullable Runnable onChange) {
         Object afterVal = Reference.getValue(after);
         Integer ref = null;
-        if (after instanceof Reference) {
+        if (after instanceof Reference && afterVal != null) {
             if (refs.containsKey(afterVal)) {
                 put(new RpcObjectData(ADD, null, null, refs.get(afterVal)));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
             ref = refs.size() + 1;
-            //noinspection DataFlowIssue
             refs.put(afterVal, ref);
         }
         //noinspection unchecked
