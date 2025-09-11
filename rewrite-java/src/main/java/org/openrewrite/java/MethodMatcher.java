@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -24,6 +25,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
@@ -124,8 +126,13 @@ public class MethodMatcher {
     public MethodMatcher(String methodPattern, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
-        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                CharStreams.fromString(methodPattern))));
+        ANTLRErrorListener errorListener = new ThrowingErrorListener(methodPattern);
+        MethodSignatureLexer lexer = new MethodSignatureLexer(CharStreams.fromString(methodPattern));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
 
         new MethodSignatureParserBaseVisitor<Void>() {
 
@@ -170,22 +177,22 @@ public class MethodMatcher {
     }
 
     public static Validated<String> validate(@Nullable String signature) {
-        return Validated.test(
-                "methodPattern",
-                "Tried to construct a method matcher with an invalid method pattern. " +
-                "An example of a good method pattern is `java.util.List add(..)`.",
-                signature,
-                s -> {
-                    if (signature == null) {
-                        return true;
-                    }
-                    try {
-                        new MethodMatcher(s, null);
-                        return true;
-                    } catch (Throwable t) {
-                        return false;
-                    }
-                });
+        String property = "methodPattern";
+        try {
+            if (signature != null) {
+                new MethodMatcher(signature, null);
+            }
+            return Validated.valid(property, signature);
+        } catch (Throwable throwable) {
+            return Validated.invalid(
+                    property,
+                    signature,
+                    "Tried to construct a method matcher with an invalid method pattern. " +
+                            "An example of a good method pattern is `java.util.List add(..)`. " +
+                            throwable.getMessage(),
+                    throwable
+            );
+        }
     }
 
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
