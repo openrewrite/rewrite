@@ -539,7 +539,6 @@ class MethodMatcherTest implements RewriteTest {
           )
         );
     }
-    
     @Test
     void failsToParse() {
         assertThatThrownBy(() -> new MethodMatcher("foo(|bar)"))
