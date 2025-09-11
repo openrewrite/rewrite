@@ -1762,57 +1762,266 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void unusedPluginPropertiesAreRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.3.0.RELEASE</version>
+                    <relativePath/>
+                </parent>
+
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <properties>
+                    <kotlin.major.version>1</kotlin.major.version>
+                    <kotlin.minor.version>3</kotlin.minor.version>
+                    <kotlin.patch.version>72</kotlin.patch.version>
+                </properties>
+
+                <modelVersion>4.0.0</modelVersion>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <artifactId>kotlin-maven-plugin</artifactId>
+                            <groupId>org.jetbrains.kotlin</groupId>
+                            <version>${kotlin.major.version}.${kotlin.minor.version}.${kotlin.patch.version}</version>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+            """,
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.3.0.RELEASE</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+    
+                <modelVersion>4.0.0</modelVersion>
+                <build>
+                    <plugins>
+                        <plugin>
+                            <artifactId>kotlin-maven-plugin</artifactId>
+                            <groupId>org.jetbrains.kotlin</groupId>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
     void dependencyPropertySubstitution() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
           pomXml(
             """
-              <project>
-                  <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.5.4</version>
-                      <relativePath/>
-                  </parent>
-              
-                  <groupId>com.example</groupId>
-                  <artifactId>test</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-              
-                  <modelVersion>4.0.0</modelVersion>
-              
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.springframework</groupId>
-                          <artifactId>spring-web</artifactId>
-                          <version>${spring-framework.version}</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+
+                <modelVersion>4.0.0</modelVersion>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                        <version>${spring-framework.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
             """
-              <project>
-                  <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.5.4</version>
-                      <relativePath/>
-                  </parent>
-              
-                  <groupId>com.example</groupId>
-                  <artifactId>test</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-              
-                  <modelVersion>4.0.0</modelVersion>
-              
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.springframework</groupId>
-                          <artifactId>spring-web</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+    
+                <modelVersion>4.0.0</modelVersion>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void unusedDependencyPropertiesAreRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <properties>
+                    <spring-web.version>5.3.9</spring-web.version>
+                    <shared.version>5.3.1</shared.version>
+                </properties>
+
+                <modelVersion>4.0.0</modelVersion>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                        <version>${spring-web.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.vintage</groupId>
+                        <artifactId>junit-vintage-engine</artifactId>
+                        <version>${shared.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.httpcomponents.client5</groupId>
+                        <artifactId>httpclient5</artifactId>
+                        <version>${shared.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <properties>
+                    <shared.version>5.3.1</shared.version>
+                </properties>
+    
+                <modelVersion>4.0.0</modelVersion>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.junit.vintage</groupId>
+                        <artifactId>junit-vintage-engine</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.apache.httpcomponents.client5</groupId>
+                        <artifactId>httpclient5</artifactId>
+                        <version>${shared.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void unusedDependencyPropertiesAreNotRemovedForParentPoms() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <properties>
+                    <spring-web.version>5.3.9</spring-web.version>
+                </properties>
+
+                <modelVersion>4.0.0</modelVersion>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                        <version>${spring-web.version}</version>
+                    </dependency>
+                </dependencies>
+            </project>
+            """,
+            """
+            <project>
+                <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.4</version>
+                    <relativePath/>
+                </parent>
+    
+                <groupId>com.example</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <properties>
+                    <spring-web.version>5.3.9</spring-web.version>
+                </properties>
+    
+                <modelVersion>4.0.0</modelVersion>
+    
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-web</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
+            """
           )
         );
     }
