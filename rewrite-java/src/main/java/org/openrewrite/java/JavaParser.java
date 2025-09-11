@@ -37,6 +37,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -393,19 +394,19 @@ class RuntimeClasspathCache {
 @UtilityClass
 class JdkParserBuilderCache {
     // Cached supplier for the parser builder - initialized on first access
-    private static volatile @Nullable Function<@Nullable Void, JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
+    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
 
     static JavaParser.Builder<? extends JavaParser, ?> getBuilder() {
-        Function<@Nullable Void, JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;
+        Supplier<JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;
         if (supplier != null) {
-            return supplier.apply(null);
+            return supplier.get();
         }
 
         synchronized (JdkParserBuilderCache.class) {
             // Double-check after acquiring lock
             supplier = cachedBuilderSupplier;
             if (supplier != null) {
-                return supplier.apply(null);
+                return supplier.get();
             }
 
             // Determine Java version once
@@ -438,7 +439,7 @@ class JdkParserBuilderCache {
 
             if (supplier != null) {
                 cachedBuilderSupplier = supplier;
-                return supplier.apply(null);
+                return supplier.get();
             }
 
             throw new IllegalStateException("Unable to create a Java parser instance. " +
@@ -446,14 +447,14 @@ class JdkParserBuilderCache {
         }
     }
 
-    @Nullable
-    private static Function<Void, JavaParser.Builder<? extends JavaParser, ?>> tryCreateBuilderSupplier(String className) {
+    private static @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> tryCreateBuilderSupplier(String className) {
         try {
             Class<?> clazz = Class.forName(className);
             Method builderMethod = clazz.getDeclaredMethod("builder");
-            return unused -> {
+            return () -> {
                 try {
-                    return (JavaParser.Builder<? extends JavaParser, ?>) builderMethod.invoke(null);
+                    //noinspection rawtypes,unchecked
+                    return (JavaParser.Builder) builderMethod.invoke(null);
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to invoke builder() on " + className, e);
                 }
