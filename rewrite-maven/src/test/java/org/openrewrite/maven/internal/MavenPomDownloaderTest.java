@@ -160,7 +160,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             var centralOverride = new MavenRepository("repo", "https://google.com/definitelydoesnotexist/", null, null, true, null, null, null, null);
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try {
-                downloader.download(new GroupArtifactVersion("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
+                downloader.download(GroupArtifactVersion.of("org.openrewrite", "nonexistent", "7.0.0"), null, null, List.of(centralOverride));
                 Assertions.fail();
             } catch (MavenDownloadingException ignore) {
             }
@@ -191,7 +191,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             try {
                 new MavenPomDownloader(ctx)
-                  .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
+                  .download(GroupArtifactVersion.of("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
             }
@@ -219,7 +219,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
 
             new MavenPomDownloader(ctx)
-              .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, List.of(MAVEN_CENTRAL, nonExistentRepo));
+              .download(GroupArtifactVersion.of("org.openrewrite", "rewrite-core", "7.0.0"), null, null, List.of(MAVEN_CENTRAL, nonExistentRepo));
             assertThat(attemptedUris).isEmpty();
         }
 
@@ -240,7 +240,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             try {
                 new MavenPomDownloader(ctx)
-                  .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
+                  .download(GroupArtifactVersion.of("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
             }
@@ -272,7 +272,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .sourcePath(pomPath)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .gav(new ResolvedGroupArtifactVersion(
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "org.openrewrite", "rewrite-core", "7.0.0", null))
               .build();
             ResolvedPom resolvedPom = ResolvedPom.builder()
@@ -572,7 +572,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .uri("http://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
                   .build();
 
-                var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
+                var gav = GroupArtifactVersion.of("com.some", "an-artifact", "10.5.0-SNAPSHOT");
                 var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
 
                 var pomPath = Path.of("pom.xml");
@@ -580,7 +580,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .sourcePath(pomPath)
                   .repository(snapshotRepo)
                   .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                  .gav(new ResolvedGroupArtifactVersion(
+                  .gav(ResolvedGroupArtifactVersion.of(
                     "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
                   .build();
                 var resolvedPom = ResolvedPom.builder()
@@ -612,7 +612,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .deriveMetadataIfMissing(true)
               .build();
             MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
-              .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+              .downloadMetadata(GroupArtifact.of("fred", "fred"), null, List.of(repository));
             assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(List.of("1.0.0", "1.1.0", "2.0.0"));
         }
 
@@ -710,7 +710,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             // Does not return invalid dependency.
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx)
-                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                .download(GroupArtifactVersion.of("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
@@ -743,7 +743,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             // Does not return invalid dependency.
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx)
-                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                .download(GroupArtifactVersion.of("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
@@ -757,7 +757,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             // Do not return invalid dependency
             assertThrows(MavenDownloadingException.class, () -> new MavenPomDownloader(emptyMap(), ctx)
-              .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+              .download(GroupArtifactVersion.of("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
@@ -776,7 +776,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             // Do not throw exception since we have a jar
             var result = new MavenPomDownloader(emptyMap(), ctx)
-              .download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
+              .download(GroupArtifactVersion.of("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
             assertThat(result.getGav().getGroupId()).isEqualTo("com.some");
             assertThat(result.getGav().getArtifactId()).isEqualTo("some-artifact");
             assertThat(result.getGav().getVersion()).isEqualTo("1");
@@ -798,7 +798,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void connectTimeout() {
             var downloader = new MavenPomDownloader(ctx);
-            var gav = new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0");
+            var gav = GroupArtifactVersion.of("org.openrewrite", "rewrite-core", "7.0.0");
             var repos = singletonList(MavenRepository.builder()
               .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
 
@@ -826,20 +826,20 @@ class MavenPomDownloaderTest implements RewriteTest {
                 </project>
                 """.getBytes());
             Files.write(jar, "I'm a jar".getBytes()); // empty jars get ignored
-            return new GroupArtifactVersion("org.openrewrite", "rewrite", "1.0.0");
+            return GroupArtifactVersion.of("org.openrewrite", "rewrite", "1.0.0");
         }
 
         @Test
         void shouldNotThrowExceptionForModulesInModulesWithRightProperty() {
-            var gav = new GroupArtifactVersion("test", "test2", "${test}");
+            var gav = GroupArtifactVersion.of("test", "test2", "${test}");
 
             Path testTest2PomXml = Path.of("test/test2/pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
+              .parent(new Parent(GroupArtifactVersion.of("test", "test", "${test}"), "../pom.xml"))
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "test2", "7.0.0", null))
               .build();
 
@@ -854,8 +854,8 @@ class MavenPomDownloaderTest implements RewriteTest {
               .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
+              .parent(new Parent(GroupArtifactVersion.of("test", "root-test", "${test}"), "../pom.xml"))
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "test", "7.0.0", null))
               .build();
 
@@ -866,7 +866,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("test", "7.0.0"))
               .parent(null)
-              .gav(new ResolvedGroupArtifactVersion(
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "root-test", "7.0.0", null))
               .build();
 
@@ -885,15 +885,15 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void shouldThrowExceptionForModulesInModulesWithNoRightProperty() {
-            var gav = new GroupArtifactVersion("test", "test2", "${test}");
+            var gav = GroupArtifactVersion.of("test", "test2", "${test}");
 
             Path testTest2PomXml = Path.of("test/test2/pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(testTest2PomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
+              .parent(new Parent(GroupArtifactVersion.of("test", "test", "${test}"), "../pom.xml"))
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "test2", "7.0.0", null))
               .build();
 
@@ -908,8 +908,8 @@ class MavenPomDownloaderTest implements RewriteTest {
               .sourcePath(testPomXml)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
+              .parent(new Parent(GroupArtifactVersion.of("test", "root-test", "${test}"), "../pom.xml"))
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "test", "7.0.0", null))
               .build();
 
@@ -920,7 +920,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("tt", "7.0.0"))
               .parent(null)
-              .gav(new ResolvedGroupArtifactVersion(
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "test", "root-test", "7.0.0", null))
               .build();
 
@@ -939,15 +939,15 @@ class MavenPomDownloaderTest implements RewriteTest {
 
         @Test
         void canResolveDifferentVersionOfProjectPom() {
-            var gav = new GroupArtifactVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
+            var gav = GroupArtifactVersion.of("org.springframework.boot", "spring-boot-starter-parent", "3.0.0");
 
             Path pomPath = Path.of("pom.xml");
             Pom pom = Pom.builder()
               .sourcePath(pomPath)
               .repository(MAVEN_CENTRAL)
               .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", "2.7.0"), null))
-              .gav(new ResolvedGroupArtifactVersion(
+              .parent(new Parent(GroupArtifactVersion.of("org.springframework.boot", "spring-boot-dependencies", "2.7.0"), null))
+              .gav(ResolvedGroupArtifactVersion.of(
                 "${REPO_URL}", "org.springframework.boot", "spring-boot-starter-parent", "2.7.0", null))
               .build();
 
@@ -1056,7 +1056,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void invalidArtifact() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            var gav = GroupArtifactVersion.of("fred", "fred", "1.0.0");
             mockServer(500,
               repo1 -> mockServer(400, repo2 -> {
                   var repositories = List.of(
@@ -1082,7 +1082,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void useSnapshotTimestampVersion() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
+            var gav = GroupArtifactVersion.of("fred", "fred", "2020.0.2-20210127.131051-2");
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
@@ -1118,7 +1118,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void usesAnonymousRequestIfRepositoryRejectsCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            var gav = GroupArtifactVersion.of("fred", "fred", "1.0.0");
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
@@ -1153,7 +1153,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            var gav = GroupArtifactVersion.of("fred", "fred", "1.0.0");
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
@@ -1197,7 +1197,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void doesNotUseAuthenticationIfCredentialsCannotBeResolved() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
-            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            var gav = GroupArtifactVersion.of("fred", "fred", "1.0.0");
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override
@@ -1254,7 +1254,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .build());
 
                 var downloader = new MavenPomDownloader(emptyMap(), ctx);
-                var gav = new GroupArtifactVersion("fred", "fred", "1");
+                var gav = GroupArtifactVersion.of("fred", "fred", "1");
                 assertThrows(MavenDownloadingException.class, () -> downloader.download(gav, null, null, repositories));
             }
         }
@@ -1282,7 +1282,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .password("pass")
                   .build());
 
-                var gav = new GroupArtifactVersion("fred", "fred", "1");
+                var gav = GroupArtifactVersion.of("fred", "fred", "1");
                 var downloader = new MavenPomDownloader(emptyMap(), ctx);
                 Pom downloaded = downloader.download(gav, null, null, repositories);
                 assertThat(downloaded.getGav().getGroupId()).isEqualTo("fred");
@@ -1327,7 +1327,7 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .password("pass")
                   .build());
 
-                var gav = new GroupArtifactVersion("fred", "fred", "1");
+                var gav = GroupArtifactVersion.of("fred", "fred", "1");
                 var downloader = new MavenPomDownloader(emptyMap(), ctx);
                 assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
                   .isInstanceOf(MavenDownloadingException.class)

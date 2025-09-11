@@ -149,7 +149,7 @@ public class ChangePluginVersion extends Recipe {
 
                 try {
                     String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                            .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", selectedNewVersion, versionPattern, ctx);
+                            .select(GroupArtifactVersion.of(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", selectedNewVersion, versionPattern, ctx);
                     if (resolvedVersion == null) {
                         return m;
                     }

@@ -104,7 +104,7 @@ public class JvmTestSuite implements Trait<Statement> {
                         return AddDependencyVisitor.addDependency(
                                 (JavaSourceFile) j,
                                 gradleProject.getConfiguration(targetConfiguration),
-                                new GroupArtifactVersion(groupId, artifactId, resolvedVersion),
+                                GroupArtifactVersion.of(groupId, artifactId, resolvedVersion),
                                 classifier,
                                 ctx
                         );
@@ -136,7 +136,7 @@ public class JvmTestSuite implements Trait<Statement> {
             return version;
         }
         return new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
+                .select(GroupArtifact.of(groupId, artifactId), configuration, version, versionPattern, ctx);
     }
 
     public boolean isAcceptable(String configuration) {
