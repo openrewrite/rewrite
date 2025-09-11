@@ -55,7 +55,8 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
-    /** Sum of estimated time savings of all recipes that made changes to this source file.
+    /**
+     * Sum of estimated time savings of all recipes that made changes to this source file.
      * This is the potential time savings because if the before and after are identical, then no time is actually saved.
      * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
      * of a single occurrence for each recipe that made a change.
@@ -142,7 +143,8 @@ public class Result {
         }.reduce(root, new AtomicBoolean(false)).get();
     }
 
-    /** Sum of estimated time savings of all recipes that made changes to this source file.
+    /**
+     * Sum of estimated time savings of all recipes that made changes to this source file.
      * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
      * of a single occurrence for each recipe that made a change.
      */
@@ -278,10 +280,10 @@ public class Result {
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
             return (before == after) ||
-                    (before != null && after != null &&
-                            // Remote source files are fetched on `printAll`, let's avoid that cost.
-                            !(before instanceof Remote) && !(after instanceof Remote) &&
-                            before.printAll().equals(after.printAll()));
+                   (before != null && after != null &&
+                    // Remote source files are fetched on `printAll`, let's avoid that cost.
+                    !(before instanceof Remote) && !(after instanceof Remote) &&
+                    before.printAll().equals(after.printAll()));
         } catch (Exception e) {
             return false;
         }
