@@ -108,6 +108,7 @@ export namespace Type {
         owner?: Type;
         type: Type;
         annotations: Type.Annotation[];
+
         toJSON?(): string;
     }
 
@@ -265,41 +266,9 @@ export namespace Type {
         }
     }
 
-    /**
-     * Creates a simple string representation for debugging/testing purposes.
-     * This is automatically used by JSON.stringify when serializing Type objects.
-     * This function is non-recursive to avoid stack overflow issues.
-     */
-    export function toDebugString(type: Type): string {
-        switch (type.kind) {
-            case Type.Kind.Class:
-            case Type.Kind.ShallowClass:
-                return `Type.Class{fullyQualifiedName=${(type as Type.Class).fullyQualifiedName}}`;
-            case Type.Kind.Variable:
-                return `Type.Variable{name=${(type as Type.Variable).name}}`;
-            case Type.Kind.Method:
-                const method = type as Type.Method;
-                return `Type.Method{name=${method.name}}`;
-            case Type.Kind.Primitive:
-                return `Type.Primitive{keyword=${(type as Type.Primitive).keyword}}`;
-            case Type.Kind.Parameterized:
-                return `Type.Parameterized`;
-            case Type.Kind.Array:
-                return `Type.Array`;
-            case Type.Kind.GenericTypeVariable:
-                return `Type.GenericTypeVariable{name=${(type as Type.GenericTypeVariable).name}}`;
-            case Type.Kind.Annotation:
-                return `Type.Annotation`;
-            case Type.Kind.Union:
-                return `Type.Union{bounds=${(type as Type.Union).bounds.length}}`;
-            case Type.Kind.Intersection:
-                return `Type.Intersection{bounds=${(type as Type.Intersection).bounds.length}}`;
-            case Type.Kind.Unknown:
-                return `Type.Unknown`;
-            default:
-                return `Type{kind=${type.kind}}`;
-        }
-    }
+    // Track type variable names and parameterized types to prevent infinite recursion
+    let typeVariableNameStack: Set<string> | null = null;
+    let parameterizedStack: Set<Type> | null = null;
 
     export function signature(type: Type | undefined | null): string {
         if (!type) {
@@ -317,11 +286,45 @@ export namespace Type {
             }
             case Type.Kind.GenericTypeVariable: {
                 const generic = type as Type.GenericTypeVariable;
-                if (!generic.bounds || generic.bounds.length === 0) {
-                    return "Generic{" + generic.name + "}";
+                let result = "Generic{" + generic.name;
+                
+                // Initialize stack if needed
+                if (typeVariableNameStack === null) {
+                    typeVariableNameStack = new Set<string>();
                 }
-                const bounds = generic.bounds.map(b => signature(b)).join(" & ");
-                return "Generic{" + generic.name + " extends " + bounds + "}";
+                
+                // Check for recursion in type variable names
+                if (generic.name !== "?" && typeVariableNameStack.has(generic.name)) {
+                    return result + "}";
+                }
+                
+                // Add to stack to track
+                if (generic.name !== "?") {
+                    typeVariableNameStack.add(generic.name);
+                }
+                
+                try {
+                    if (!generic.bounds || generic.bounds.length === 0) {
+                        return result + "}";
+                    }
+                    
+                    // Filter out bounds that would cause cycles through parameterized types
+                    const safeBounds = generic.bounds.filter(b => {
+                        return !parameterizedStack || !parameterizedStack.has(b);
+                    });
+                    
+                    if (safeBounds.length > 0) {
+                        const bounds = safeBounds.map(b => signature(b)).join(" & ");
+                        result += " extends " + bounds;
+                    }
+                    
+                    return result + "}";
+                } finally {
+                    // Remove from stack when done
+                    if (generic.name !== "?") {
+                        typeVariableNameStack.delete(generic.name);
+                    }
+                }
             }
             case Type.Kind.Intersection: {
                 const intersection = type as Type.Intersection;
@@ -335,12 +338,26 @@ export namespace Type {
             }
             case Type.Kind.Parameterized: {
                 const parameterized = type as Type.Parameterized;
-                const baseType = signature(parameterized.type);
-                if (!parameterized.typeParameters || parameterized.typeParameters.length === 0) {
-                    return baseType;
+                
+                // Initialize stack if needed
+                if (parameterizedStack === null) {
+                    parameterizedStack = new Set<Type>();
                 }
-                const params = parameterized.typeParameters.map(p => signature(p)).join(", ");
-                return baseType + "<" + params + ">";
+                
+                // Add to stack to track cycles
+                parameterizedStack.add(parameterized);
+                
+                try {
+                    const baseType = signature(parameterized.type);
+                    if (!parameterized.typeParameters || parameterized.typeParameters.length === 0) {
+                        return baseType;
+                    }
+                    const params = parameterized.typeParameters.map(p => signature(p)).join(", ");
+                    return baseType + "<" + params + ">";
+                } finally {
+                    // Remove from stack when done
+                    parameterizedStack.delete(parameterized);
+                }
             }
             case Type.Kind.Primitive: {
                 const primitive = type as Type.Primitive;
@@ -402,10 +419,8 @@ RpcCodecs.registerCodec(Type.Kind.Class, {
         before.interfaces = await q.receiveList(before.interfaces) || [];
         before.members = await q.receiveList(before.members) || [];
         before.methods = await q.receiveList(before.methods) || [];
-
-        // Add toJSON method to avoid circular reference issues during serialization
         (before as any).toJSON = function () {
-            return Type.toDebugString(this);
+            return Type.signature(this);
         };
         // Mark as non-draftable to prevent immer from processing circular references
         (before as any)[immerable] = false;

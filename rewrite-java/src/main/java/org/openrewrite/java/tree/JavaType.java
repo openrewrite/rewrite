@@ -27,7 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
-import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -37,10 +36,10 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
+import static org.openrewrite.rpc.Reference.asRef;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -147,7 +146,7 @@ public interface JavaType {
 
         @Override
         public void rpcSend(MultiCatch after, RpcSendQueue q) {
-            q.getAndSendList(after, m -> m.getThrowableTypes().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, MultiCatch::getThrowableTypes, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -199,7 +198,7 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Intersection after, RpcSendQueue q) {
-            q.getAndSendList(after, i -> i.getBounds().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Intersection::getBounds, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -265,6 +264,8 @@ public interface JavaType {
             private final Function<FullyQualified, Iterator<E>> recursive;
 
             private FullyQualified rec;
+
+            @SuppressWarnings("NotNullFieldNotInitialized")
             private E peek;
 
             private Iterator<E> current;
@@ -611,13 +612,13 @@ public interface JavaType {
         public void rpcSend(Class after, RpcSendQueue q) {
             q.getAndSend(after, Class::getKind);
             q.getAndSend(after, Class::getFullyQualifiedName);
-            q.getAndSendList(after, c -> c.getTypeParameters().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSend(after, c -> Reference.asRef(c.getSupertype()));
-            q.getAndSend(after, c -> Reference.asRef(c.getOwningClass()));
-            q.getAndSendList(after, c -> c.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, c -> c.getInterfaces().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, c -> c.getMembers().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, c -> c.getMethods().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Class::getTypeParameters, TypeIdForRpc.signature(), null);
+            q.getAndSend(after, c -> asRef(c.getSupertype()));
+            q.getAndSend(after, c -> asRef(c.getOwningClass()));
+            q.getAndSendListAsRef(after, Class::getAnnotations, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Class::getInterfaces, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Class::getMembers, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Class::getMethods, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -686,7 +687,7 @@ public interface JavaType {
         @Override
         public void rpcSend(Class after, RpcSendQueue q) {
             q.getAndSend(after, Class::getFullyQualifiedName);
-            q.getAndSend(after, c -> Reference.asRef(c.getOwningClass()));
+            q.getAndSend(after, c -> asRef(c.getOwningClass()));
         }
 
         @Override
@@ -818,14 +819,15 @@ public interface JavaType {
 
             @Override
             public Object getValue() {
+                //noinspection DataFlowIssue
                 return constantValue != null ? constantValue : referenceValue;
             }
 
             @Override
             public void rpcSend(SingleElementValue after, RpcSendQueue q) {
-                q.getAndSend(after, e -> Reference.asRef(e.element));
+                q.getAndSend(after, e -> asRef(e.element));
                 q.getAndSend(after, e -> e.constantValue);
-                q.getAndSend(after, e -> Reference.asRef(e.referenceValue));
+                q.getAndSend(after, e -> asRef(e.referenceValue));
             }
 
             @Override
@@ -858,16 +860,16 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
+                //noinspection DataFlowIssue
                 return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
 
             @Override
             public void rpcSend(ArrayElementValue after, RpcSendQueue q) {
-                q.getAndSend(after, e -> Reference.asRef(e.element));
+                q.getAndSend(after, e -> asRef(e.element));
                 q.getAndSendList(after, e -> e.constantValues == null ? null : Arrays.asList(e.constantValues),
                         Object::toString, null);
-                q.getAndSendList(after, e -> e.referenceValues == null ? null :
-                                Arrays.stream(e.referenceValues).map(Reference::asRef).collect(toList()),
+                q.getAndSendListAsRef(after, e -> e.referenceValues == null ? null : Arrays.asList(e.referenceValues),
                         TypeIdForRpc.signature(), null);
             }
 
@@ -886,8 +888,9 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Annotation after, RpcSendQueue q) {
-            q.send(after, after.type, null);
-            q.getAndSendList(after, a -> a.getValues().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSend(after, a -> asRef(a.getType()));
+            q.getAndSendListAsRef(after, Annotation::getValues, v ->
+                    new DefaultJavaTypeSignatureBuilder().signature(v.getElement()) + ":" + v.getValue(), null);
         }
 
         @Override
@@ -1048,8 +1051,8 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Parameterized after, RpcSendQueue q) {
-            q.send(after, after.type, null);
-            q.getAndSendList(after, p -> p.getTypeParameters().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSend(after, a -> asRef(a.getType()), null);
+            q.getAndSendListAsRef(after, Parameterized::getTypeParameters, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -1150,10 +1153,9 @@ public interface JavaType {
 
         @Override
         public void rpcSend(GenericTypeVariable after, RpcSendQueue q) {
-            q.send(after, after.name, () -> {
-                q.send(after.variance, after.variance, null);
-                q.getAndSendList(after, v -> v.getBounds().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            });
+            q.getAndSend(after, GenericTypeVariable::getName);
+            q.getAndSend(after, GenericTypeVariable::getVariance);
+            q.getAndSendListAsRef(after, GenericTypeVariable::getBounds, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -1240,8 +1242,8 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Array after, RpcSendQueue q) {
-            q.send(after, after.elemType, null);
-            q.getAndSendList(after, a -> a.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSend(after, a -> asRef(a.getElemType()), null);
+            q.getAndSendListAsRef(after, Array::getAnnotations, TypeIdForRpc.signature(), null);
         }
 
         @Override
@@ -1746,15 +1748,15 @@ public interface JavaType {
 
         @Override
         public void rpcSend(Method after, RpcSendQueue q) {
-            q.getAndSend(after, m -> Reference.asRef(m.getDeclaringType()));
+            q.getAndSend(after, m -> asRef(m.getDeclaringType()));
             q.getAndSend(after, Method::getName);
-            q.getAndSend(after, m -> Reference.asRef(m.getReturnType()));
+            q.getAndSend(after, m -> asRef(m.getReturnType()));
             q.getAndSendList(after, Method::getParameterNames, String::toString, null);
-            q.getAndSendList(after, m -> m.getParameterTypes().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, m -> m.getThrownExceptions().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, m -> m.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
-            q.getAndSendList(after, Method::getDefaultValue, String::toString, null);
-            q.getAndSendList(after, Method::getDeclaredFormalTypeNames, String::toString, null);
+            q.getAndSendListAsRef(after, Method::getParameterTypes, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Method::getThrownExceptions, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Method::getAnnotations, TypeIdForRpc.signature(), null);
+            q.getAndSendListAsRef(after, Method::getDefaultValue, String::toString, null);
+            q.getAndSendListAsRef(after, Method::getDeclaredFormalTypeNames, String::toString, null);
         }
 
         @Override
@@ -1770,7 +1772,6 @@ public interface JavaType {
             before.declaredFormalTypeNames = arrayOrNullIfEmpty(q.receiveList(before.getDeclaredFormalTypeNames(), null), EMPTY_STRING_ARRAY);
             return before;
         }
-
     }
 
     @Getter
@@ -1894,21 +1895,18 @@ public interface JavaType {
         @Override
         public void rpcSend(Variable after, RpcSendQueue q) {
             q.getAndSend(after, Variable::getName);  // String, no asRef needed
-            q.getAndSend(after, v -> Reference.asRef(v.getOwner()));
-            q.getAndSend(after, v -> Reference.asRef(v.getType()));
-            q.getAndSendList(after, v -> v.getAnnotations().stream().map(Reference::asRef).collect(toList()), TypeIdForRpc.signature(), null);
+            q.getAndSend(after, v -> asRef(v.getOwner()));
+            q.getAndSend(after, v -> asRef(v.getType()));
+            q.getAndSendListAsRef(after, Variable::getAnnotations, TypeIdForRpc.signature(), null);
         }
 
         @Override
         public Variable rpcReceive(Variable before, RpcReceiveQueue q) {
-            String name = q.receive(before.name);
-            JavaType owner = q.receive(before.owner);
-            JavaType type = q.receive(before.type);
-            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
+            before.name = q.receive(before.name);
+            before.owner = q.receive(before.owner);
+            before.type = q.receive(before.type);
 
-            before.name = name;
-            before.owner = owner;
-            before.type = type;
+            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
             before.annotations = annotations == null ? null : annotations.toArray(new FullyQualified[0]);
 
             return before;
@@ -2020,7 +2018,7 @@ public interface JavaType {
 }
 
 class TypeIdForRpc {
-    public static @NotNull Function<Reference, Object> signature() {
+    public static @NotNull Function<? super JavaType, Object> signature() {
         return t -> new DefaultJavaTypeSignatureBuilder().signature(t);
     }
 }

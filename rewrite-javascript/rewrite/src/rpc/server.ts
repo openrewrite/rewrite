@@ -28,7 +28,7 @@ import "../java";
 import "../javascript";
 
 // Not possible to set the stack size when executing from npx for security reasons
-require('v8').setFlagsFromString('--stack-size=4000');
+require('v8').setFlagsFromString('--stack-size=8000');
 
 interface ProgramOptions {
     logFile?: string;

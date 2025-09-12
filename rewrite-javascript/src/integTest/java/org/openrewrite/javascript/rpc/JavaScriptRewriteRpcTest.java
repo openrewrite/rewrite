@@ -66,7 +66,9 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @AfterEach
     void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
-        System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        if (Files.exists(tempDir.resolve("rpc.log"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        }
     }
 
     @Override

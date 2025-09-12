@@ -88,9 +88,6 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             return s.toString();
         }
 
-//        System.out.println((gtv.getName() + " | " + (typeVariableNameStack == null ? "[]" : typeVariableNameStack.stream()
-//                .collect(Collectors.joining("->", "[", "]")))).toLowerCase());
-
         switch (gtv.getVariance()) {
             case INVARIANT:
                 break;

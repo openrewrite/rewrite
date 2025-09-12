@@ -49,7 +49,7 @@ export class JavaScriptTypeMapping {
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
-            
+
         } else if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
         }
@@ -222,7 +222,7 @@ export class JavaScriptTypeMapping {
     private createEmptyClassType(type: ts.Type): Type.Class {
         const symbol = type.symbol;
         let fullyQualifiedName = symbol ? this.checker.getFullyQualifiedName(symbol) : `<anonymous>${this.checker.typeToString(type)}`;
-        
+
         // Fix FQN for types from @types packages
         // TypeScript returns "_.LoDashStatic" but we want "@types/lodash.LoDashStatic"
         if (symbol && symbol.declarations && symbol.declarations.length > 0) {
@@ -236,9 +236,9 @@ export class JavaScriptTypeMapping {
                 fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
             }
         }
-        
+
         // Create empty class type shell (no members yet to avoid recursion)
-        const classType: Type.Class = Object.assign(new NonDraftableType(), {
+        return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
             classKind: Type.Class.Kind.Interface, // Default to interface for TypeScript types
             fullyQualifiedName: fullyQualifiedName,
@@ -247,12 +247,10 @@ export class JavaScriptTypeMapping {
             interfaces: [],
             members: [],
             methods: [],
-            toJSON: function() {
-                return Type.toDebugString(this);
+            toJSON: function () {
+                return Type.signature(this);
             }
         }) as Type.Class;
-
-        return classType;
     }
 
     private populateClassType(classType: Type.Class, type: ts.Type): void {
@@ -268,8 +266,8 @@ export class JavaScriptTypeMapping {
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive
                     annotations: [],
-                    toJSON: function() {
-                        return Type.toDebugString(this);
+                    toJSON: function () {
+                        return Type.signature(this);
                     }
                 }) as Type.Variable;
                 classType.members.push(variable);
@@ -322,8 +320,8 @@ export class JavaScriptTypeMapping {
             interfaces: interfaces || [],
             members: [],  // Will be populated below
             methods: methods || [],
-            toJSON: function() {
-                return Type.toDebugString(this);
+            toJSON: function () {
+                return Type.signature(this);
             }
         }) as Type.Class;
 
@@ -346,8 +344,8 @@ export class JavaScriptTypeMapping {
                     owner: classType,  // Cyclic reference to the containing class
                     type: this.getType(propType),
                     annotations: [],
-                    toJSON: function() {
-                        return Type.toDebugString(this);
+                    toJSON: function () {
+                        return Type.signature(this);
                     }
                 }) as Type.Variable;
                 classType.members.push(variable);
@@ -398,52 +396,6 @@ export class JavaScriptTypeMapping {
         }
 
         return {supertype, interfaces};
-    }
-
-    
-    /**
-     * Create a JavaType.Class for anonymous object types.
-     */
-    private createAnonymousClassType(type: ts.Type): Type.Class {
-        // Generate a name for the anonymous type
-        const typeString = this.checker.typeToString(type);
-        const fullyQualifiedName = `<anonymous>${typeString}`;
-
-        // Create initial class type (no asRef here - RPC codec will handle references)
-        const classType: Type.Class = Object.assign(new NonDraftableType(), {
-            kind: Type.Kind.Class,
-            classKind: Type.Class.Kind.Interface, // Treat anonymous objects as interfaces
-            fullyQualifiedName: fullyQualifiedName,
-            typeParameters: [],
-            annotations: [],
-            interfaces: [],
-            members: [],
-            methods: [],
-            toJSON: function() {
-                return Type.toDebugString(this);
-            }
-        }) as Type.Class;
-
-        // Get properties of the anonymous type
-        const properties = this.checker.getPropertiesOfType(type);
-        for (const prop of properties) {
-            if (!(prop.flags & ts.SymbolFlags.Method)) {
-                const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
-                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
-                    kind: Type.Kind.Variable,
-                    name: prop.getName(),
-                    owner: classType,  // Cyclic reference to the containing class
-                    type: this.getType(propType),
-                    annotations: [],
-                    toJSON: function() {
-                        return Type.toDebugString(this);
-                    }
-                }) as Type.Variable;
-                classType.members.push(variable);
-            }
-        }
-
-        return classType;
     }
 
     private createType(type: ts.Type): Type {
