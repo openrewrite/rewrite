@@ -52,23 +52,6 @@ class YamlParserTest implements RewriteTest {
         assertThat(title.getValue()).isEqualTo("b");
     }
 
-    @Test
-    void helmTemplateMatchingDocumentEndParsesCorrectly() {
-        rewriteRun(
-          yaml(
-            """
-              jobs:
-              # ${{ looks.like.helm.middle }}
-                steps: 
-                  - items: []
-                  # ${{ looks.like.helm.sequence }}
-                  - items: []
-              # ${{ looks.like.helm.end }}
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/2062")
     @Test
     void fourBytesUnicode() {
@@ -477,6 +460,53 @@ class YamlParserTest implements RewriteTest {
               - item1
               - item2
               other_anchor: *anchor
+              """
+          )
+        );
+    }
+
+    @Test
+    void helmTemplateMatchingDocumentEndParsesCorrectly() {
+        rewriteRun(
+          yaml(
+            """
+              # ${{ looks.like.helm.before }}
+              jobs:
+                # ${{ looks.like.helm.middle }}
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  # ${{ looks.like.helm.in-sequence }}
+                  - items2: []
+                  # ${{ looks.like.helm.end-sequence }}
+              # ${{ looks.like.helm.end }}
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  # ${{ looks.like.helm.sequence }}
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  - items2: []
+              # ${{ looks.like.helm.end }}
               """
           )
         );
