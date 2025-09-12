@@ -558,16 +558,19 @@ public class GroovyParserVisitor {
                                 "}")
                         .findFirst().get();
                 
-                JContainer<Expression> args;
-                if (parsed instanceof G.CompilationUnit) {
-                    G.CompilationUnit cu = (G.CompilationUnit) parsed;
-                    args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
-                            .getPadding().getArguments();
-                } else {
-                    // If parsing failed, create an empty arguments container
+                if (!(parsed instanceof G.CompilationUnit)) {
+                    // If parsing failed, throw an exception with helpful debugging information
                     // This can happen with complex string literals containing special characters
-                    args = JContainer.empty();
+                    throw new IllegalStateException(
+                        "Failed to parse enum constructor arguments for enum constant '" + field.getName() + 
+                        "'. Arguments string: '" + argsAsString + 
+                        "'. This may be due to complex expressions or special characters in the arguments."
+                    );
                 }
+
+                G.CompilationUnit cu = (G.CompilationUnit) parsed;
+                JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
+                        .getPadding().getArguments();
 
                 initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, args, null, typeMapping.methodType(ctor));
             }
