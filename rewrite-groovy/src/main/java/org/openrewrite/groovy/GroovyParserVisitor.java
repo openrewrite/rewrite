@@ -34,7 +34,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
@@ -549,7 +548,7 @@ public class GroovyParserVisitor {
                 }
 
                 // ... and use the information in a small class to get the constructor invocation arguments anyway
-                SourceFile parsed = GroovyParser.builder().build()
+                G.CompilationUnit cu = (G.CompilationUnit) GroovyParser.builder().build()
                         .parse("class A {\n" +
                                 "  A(" + constructorDeclarationArgs + ") {}\n" +
                                 "  def use() {\n" +
@@ -558,17 +557,6 @@ public class GroovyParserVisitor {
                                 "}")
                         .findFirst().get();
                 
-                if (!(parsed instanceof G.CompilationUnit)) {
-                    // If parsing failed, throw an exception with helpful debugging information
-                    // This can happen with complex string literals containing special characters
-                    throw new IllegalStateException(
-                        "Failed to parse enum constructor arguments for enum constant '" + field.getName() + 
-                        "'. Arguments string: '" + argsAsString + 
-                        "'. This may be due to complex expressions or special characters in the arguments."
-                    );
-                }
-
-                G.CompilationUnit cu = (G.CompilationUnit) parsed;
                 JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
                         .getPadding().getArguments();
 
