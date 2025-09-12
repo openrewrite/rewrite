@@ -15,7 +15,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
-import {J, JavaType} from "../../../src/java";
+import {J, Type} from "../../../src/java";
 
 describe('arithmetic operator mapping', () => {
     const spec = new RecipeSpec();
@@ -28,7 +28,7 @@ describe('arithmetic operator mapping', () => {
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as J.Binary;
-                expect(binary.type).toBe(JavaType.Primitive.Double);
+                expect(binary.type).toBe(Type.Primitive.Double);
             }
         }));
 
@@ -40,7 +40,7 @@ describe('arithmetic operator mapping', () => {
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
                 const binary = (cu.statements[0].element as JS.ExpressionStatement).expression as J.Binary;
-                expect(binary.type).toBe(JavaType.Primitive.String);
+                expect(binary.type).toBe(Type.Primitive.String);
             }
         }));
 

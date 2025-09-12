@@ -17,7 +17,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {JS, typescript} from "../../../src/javascript";
-import {J, JavaType} from "../../../src/java";
+import {J, Type} from "../../../src/java";
 import {tap} from "../../test-util";
 
 describe('interface mapping', () => {

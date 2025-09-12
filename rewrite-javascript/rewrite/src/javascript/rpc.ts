@@ -16,7 +16,7 @@
 import {JavaScriptVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {isJavaScript, JS, JSX} from "./tree";
-import {Expression, J, JavaType, Statement, TypedTree, TypeTree} from "../java";
+import {Expression, J, Type, Statement, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
 import {JavaReceiver, JavaSender} from "../java/rpc";
 import {Cursor, Tree, TreeKind} from "../tree";
@@ -522,7 +522,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return this.javaSender.visitSpace(space, q);
     }
 
-    override async visitType(javaType: JavaType | undefined, q: RpcSendQueue): Promise<JavaType | undefined> {
+    override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
         return this.javaSender.visitType(javaType, q);
     }
 }
@@ -643,7 +643,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.function = await q.receive(functionCall.function, select => this.visitRightPadded(select, q));
         draft.typeParameters = await q.receive(functionCall.typeParameters, typeParams => this.visitContainer(typeParams, q));
         draft.arguments = await q.receive(functionCall.arguments, args => this.visitContainer(args, q));
-        draft.functionType = await q.receive(functionCall.functionType, type => this.visitType(type, q) as unknown as JavaType.Method);
+        draft.functionType = await q.receive(functionCall.functionType, type => this.visitType(type, q) as unknown as Type.Method);
 
         return finishDraft(draft);
     }
@@ -1020,7 +1020,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.name = await q.receive(draft.name, el => this.visitDefined<ComputedPropertyName>(el, q));
         draft.parameters = await q.receive(draft.parameters, el => this.visitContainer(el, q));
         draft.body = await q.receive(draft.body, el => this.visitDefined<J.Block>(el, q));
-        draft.methodType = await q.receive(draft.methodType, el => this.visitType(el, q) as any as JavaType.Method);
+        draft.methodType = await q.receive(draft.methodType, el => this.visitType(el, q) as any as Type.Method);
         return finishDraft(draft);
     }
 
@@ -1066,7 +1066,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.propertyName = await q.receive(draft.propertyName, el => this.visitRightPadded(el, q));
         draft.name = await q.receive(draft.name, el => this.visitDefined<TypedTree>(el, q));
         draft.initializer = await q.receive(draft.initializer, el => this.visitLeftPadded(el, q));
-        draft.variableType = await q.receive(draft.variableType, el => this.visitType(el, q) as any as JavaType.Variable);
+        draft.variableType = await q.receive(draft.variableType, el => this.visitType(el, q) as any as Type.Variable);
         return finishDraft(draft);
     }
 
@@ -1118,7 +1118,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return this.javaReceiverDelegate.visitSpace(space, q);
     }
 
-    override async visitType(javaType: JavaType | undefined, q: RpcReceiveQueue): Promise<JavaType | undefined> {
+    override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
         return this.javaReceiverDelegate.visitType(javaType, q);
     }
 }

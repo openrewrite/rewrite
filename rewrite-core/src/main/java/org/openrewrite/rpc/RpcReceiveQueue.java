@@ -15,8 +15,6 @@
  */
 package org.openrewrite.rpc;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 
@@ -29,16 +27,6 @@ import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
     private static final ObjenesisStd objenesis = new ObjenesisStd();
-    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
-            .maximumSize(1_000)
-            .build((String key) -> {
-                try {
-                    Class<?> clazz = Class.forName(key);
-                    return objenesis.newInstance(clazz);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
-            });
 
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
@@ -124,6 +112,12 @@ public class RpcReceiveQueue {
                     before = message.getValueType() == null ?
                             message.getValue() :
                             newObj(message.getValueType());
+                    if (ref != null) {
+                        // For an object like JavaType that we will mutate in place rather than using
+                        // immutable updates because of its cyclic nature, the before instance will ultimately
+                        // be the same as the after instance below.
+                        refs.put(ref, before);
+                    }
                 }
                 // Intentional fall-through...
             case CHANGE:
@@ -175,8 +169,13 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        //noinspection unchecked
-        return (T) requireNonNull(instanceCache.get(type));
+        try {
+            Class<?> clazz = Class.forName(type);
+            //noinspection unchecked
+            return (T) objenesis.newInstance(clazz);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

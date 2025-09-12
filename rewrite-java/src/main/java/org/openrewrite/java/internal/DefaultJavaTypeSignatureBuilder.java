@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -55,6 +56,10 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             return variableSignature((JavaType.Variable) type);
         } else if (type instanceof JavaType.Intersection) {
             return intersectionSignature(type);
+        } else if (type instanceof JavaType.Annotation) {
+            return annotationSignature(type);
+        } else if (type instanceof JavaType.MultiCatch) {
+            return multiCatchSignature(type);
         }
 
         throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
@@ -82,9 +87,6 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             s.append('}');
             return s.toString();
         }
-
-//        System.out.println((gtv.getName() + " | " + (typeVariableNameStack == null ? "[]" : typeVariableNameStack.stream()
-//                .collect(Collectors.joining("->", "[", "]")))).toLowerCase());
 
         switch (gtv.getVariance()) {
             case INVARIANT:
@@ -164,6 +166,37 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         s.append('}');
 
+        return s.toString();
+    }
+
+    private String annotationSignature(Object type) {
+        JavaType.Annotation annotation = (JavaType.Annotation) type;
+        StringBuilder s = new StringBuilder("@");
+        s.append(signature(annotation.getType()));
+        List<JavaType.Annotation.ElementValue> values = annotation.getValues();
+        if (!values.isEmpty()) {
+            s.append('(');
+            for (int i = 0; i < values.size(); i++) {
+                if (i > 0) {
+                    s.append(',');
+                }
+                JavaType.Annotation.ElementValue value = values.get(i);
+                s.append(signature(value.getElement())).append('=').append(value.getValue());
+            }
+            s.append(')');
+        }
+        return s.toString();
+    }
+
+    private String multiCatchSignature(Object type) {
+        JavaType.MultiCatch multiCatch = (JavaType.MultiCatch) type;
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i < multiCatch.getThrowableTypes().size(); i++) {
+            if (i > 0) {
+                s.append('|');
+            }
+            s.append(signature(multiCatch.getThrowableTypes().get(i)));
+        }
         return s.toString();
     }
 }

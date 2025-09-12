@@ -17,7 +17,7 @@
  */
 import {RecipeSpec} from "../../../src/test";
 import {typescript} from "../../../src/javascript";
-import {J, JavaType} from "../../../src/java";
+import {J, Type} from "../../../src/java";
 
 describe('function mapping', () => {
     const spec = new RecipeSpec();

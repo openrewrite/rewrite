@@ -25,7 +25,7 @@ import {
     Statement, TypedTree, TypeTree
 } from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
-import {JavaType} from "./type";
+import {Type} from "./type";
 
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
@@ -50,7 +50,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
+    protected async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
         return javaType;
     }
 
@@ -241,7 +241,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.implements = await this.visitOptionalContainer(classDecl.implements, p);
             draft.permitting = await this.visitOptionalContainer(classDecl.permitting, p);
             draft.body = await this.visitDefined(classDecl.body, p) as J.Block;
-            draft.type = await this.visitType(classDecl.type, p) as JavaType.Class | undefined;
+            draft.type = await this.visitType(classDecl.type, p) as Type.Class | undefined;
         });
     }
 
@@ -426,7 +426,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return this.produceJava<J.Identifier>(ident, p, async draft => {
             draft.annotations = await mapAsync(ident.annotations, a => this.visitDefined<J.Annotation>(a, p));
             draft.type = await this.visitType(ident.type, p);
-            draft.fieldType = await this.visitType(ident.fieldType, p) as JavaType.Variable | undefined;
+            draft.fieldType = await this.visitType(ident.fieldType, p) as Type.Variable | undefined;
         });
     }
 
@@ -540,7 +540,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         literal = expression as J.Literal;
 
         return this.produceJava<J.Literal>(literal, p, async draft => {
-            draft.type = await this.visitType(literal.type, p) as JavaType.Primitive | undefined;
+            draft.type = await this.visitType(literal.type, p) as Type.Primitive | undefined;
         });
     }
 
@@ -556,8 +556,8 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.typeParameters = await this.visitOptionalContainer(memberRef.typeParameters, p);
             draft.reference = await this.visitLeftPadded(memberRef.reference, p);
             draft.type = await this.visitType(memberRef.type, p);
-            draft.methodType = await this.visitType(memberRef.methodType, p) as JavaType.Method | undefined;
-            draft.variableType = await this.visitType(memberRef.variableType, p) as JavaType.Variable | undefined;
+            draft.methodType = await this.visitType(memberRef.methodType, p) as Type.Method | undefined;
+            draft.variableType = await this.visitType(memberRef.variableType, p) as Type.Variable | undefined;
         });
     }
 
@@ -586,7 +586,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.throws = methodDecl.throws && await this.visitContainer(methodDecl.throws, p);
             draft.body = methodDecl.body && await this.visitDefined(methodDecl.body, p) as J.Block;
             draft.defaultValue = await this.visitOptionalLeftPadded(methodDecl.defaultValue, p);
-            draft.methodType = await this.visitType(methodDecl.methodType, p) as JavaType.Method | undefined;
+            draft.methodType = await this.visitType(methodDecl.methodType, p) as Type.Method | undefined;
         });
     }
 
@@ -608,7 +608,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.typeParameters = await this.visitOptionalContainer(methodInv.typeParameters, p);
             draft.name = await this.visitDefined(methodInv.name, p) as J.Identifier;
             draft.arguments = await this.visitContainer(methodInv.arguments, p);
-            draft.methodType = await this.visitType(methodInv.methodType, p) as JavaType.Method | undefined;
+            draft.methodType = await this.visitType(methodInv.methodType, p) as Type.Method | undefined;
         });
     }
 
@@ -668,7 +668,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
                 draft.body = await this.visitDefined(newClass.body, p) as J.Block;
             }
 
-            draft.constructorType = await this.visitType(newClass.constructorType, p) as JavaType.Method | undefined;
+            draft.constructorType = await this.visitType(newClass.constructorType, p) as Type.Method | undefined;
         });
     }
 
@@ -729,7 +729,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         primitive = expression as J.Primitive;
 
         return this.produceJava<J.Primitive>(primitive, p, async draft => {
-            draft.type = await this.visitType(primitive.type, p) as JavaType.Primitive;
+            draft.type = await this.visitType(primitive.type, p) as Type.Primitive;
         });
     }
 
@@ -947,7 +947,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             draft.name = await this.visitDefined(variable.name, p) as J.Identifier;
             draft.dimensionsAfterName = await mapAsync(variable.dimensionsAfterName, dim => this.visitLeftPadded(dim, p));
             draft.initializer = await this.visitOptionalLeftPadded(variable.initializer, p);
-            draft.variableType = await this.visitType(variable.variableType, p) as JavaType.Variable | undefined;
+            draft.variableType = await this.visitType(variable.variableType, p) as Type.Variable | undefined;
         });
     }
 

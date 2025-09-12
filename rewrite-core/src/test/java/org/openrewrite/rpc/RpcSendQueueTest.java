@@ -46,7 +46,7 @@ public class RpcSendQueueTest {
             latch.countDown();
         }, new IdentityHashMap<>());
 
-        q.sendList(after, before, Function.identity(), null);
+        q.sendList(after, before, Function.identity(), null, false);
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
@@ -68,7 +68,7 @@ public class RpcSendQueueTest {
             latch.countDown();
         }, new IdentityHashMap<>());
 
-        q.sendList(after, before, Function.identity(), null);
+        q.sendList(after, before, Function.identity(), null, false);
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
@@ -87,7 +87,7 @@ public class RpcSendQueueTest {
             latch.countDown();
         }, new IdentityHashMap<>());
 
-        q.sendList(after, null, Function.identity(), null);
+        q.sendList(after, null, Function.identity(), null, false);
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();

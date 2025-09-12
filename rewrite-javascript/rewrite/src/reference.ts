@@ -44,7 +44,7 @@ export function asRef<T extends {} | undefined>(obj: T): T extends undefined ? u
 }
 
 export function isRef(obj: any): obj is Reference {
-    return obj !== undefined && obj[REFERENCE_KEY] === true;
+    return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
 }
 
 export class ReferenceMap {

@@ -20,15 +20,15 @@ import {
     emptySpace,
     Expression,
     J,
-    JavaType,
     NameTree,
     Statement,
     TextComment,
     TrailingComma,
+    Type,
     TypeTree,
     VariableDeclarator,
 } from '../java';
-import {Generator, DelegatedYield, FunctionDeclaration, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
+import {DelegatedYield, FunctionDeclaration, Generator, JS, JSX, NonNullAssertion, Optional, Spread} from '.';
 import {emptyMarkers, markers, Markers, MarkersKind, ParseExceptionResult} from "../markers";
 import {NamedStyles} from "../style";
 import {Parser, ParserInput, parserInputFile, parserInputRead, ParserOptions, Parsers, SourcePath} from "../parser";
@@ -76,11 +76,15 @@ export class JavaScriptParser extends Parser {
         this.compilerOptions = {
             target: ts.ScriptTarget.Latest,
             module: ts.ModuleKind.CommonJS,
+            moduleResolution: ts.ModuleResolutionKind.Node10,
             allowJs: true,
+            checkJs: true,
             esModuleInterop: true,
+            allowSyntheticDefaultImports: true,
             experimentalDecorators: true,
             emitDecoratorMetadata: true,
-            jsx: ts.JsxEmit.Preserve
+            jsx: ts.JsxEmit.Preserve,
+            baseUrl: relativeTo || process.cwd()
         };
         this.styles = styles;
         this.sourceFileCache = sourceFileCache;
@@ -106,6 +110,12 @@ export class JavaScriptParser extends Parser {
 
         // Create a new CompilerHost within parseInputs
         const host = ts.createCompilerHost(this.compilerOptions);
+
+        // Set the current directory for module resolution
+        if (this.relativeTo) {
+            const originalGetCurrentDirectory = host.getCurrentDirectory;
+            host.getCurrentDirectory = () => this.relativeTo || originalGetCurrentDirectory();
+        }
 
         // Override getSourceFile
         host.getSourceFile = (fileName, languageVersion, onError) => {
@@ -159,6 +169,7 @@ export class JavaScriptParser extends Parser {
 
         const typeChecker = program.getTypeChecker();
 
+
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
             const sourceFile = program.getSourceFile(filePath);
@@ -181,7 +192,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker, this.relativeTo || process.cwd())
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
@@ -211,8 +222,9 @@ export class JavaScriptParserVisitor {
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeChecker: ts.TypeChecker) {
-        this.typeMapping = new JavaScriptTypeMapping(typeChecker);
+        typeChecker: ts.TypeChecker,
+        projectRoot?: string) {
+        this.typeMapping = new JavaScriptTypeMapping(typeChecker, projectRoot);
     }
 
     visit = (node: ts.Node): any => {
@@ -569,7 +581,22 @@ export class JavaScriptParserVisitor {
     }
 
     visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        // Parse the numeric value from the text
+        const text = node.text;
+        let value: number | bigint;
+
+        // Check if it's a BigInt literal (ends with 'n')
+        if (text.endsWith('n')) {
+            value = BigInt(text.slice(0, -1));
+        } else if (text.includes('.') || text.toLowerCase().includes('e')) {
+            // Floating point number
+            value = parseFloat(text);
+        } else {
+            // Integer - but JavaScript doesn't distinguish, so use number
+            value = parseInt(text, text.startsWith('0x') ? 16 : text.startsWith('0o') ? 8 : text.startsWith('0b') ? 2 : 10);
+        }
+
+        return this.mapLiteral(node, value);
     }
 
     visitTrueKeyword(node: ts.TrueLiteral): J.Literal {
@@ -653,11 +680,14 @@ export class JavaScriptParserVisitor {
     }
 
     visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        // Parse BigInt value, removing the 'n' suffix
+        const text = node.text;
+        const value = BigInt(text.slice(0, -1));
+        return this.mapLiteral(node, value);
     }
 
     visitStringLiteral(node: ts.StringLiteral): J.Literal {
-        return this.mapLiteral(node, node.text); // FIXME value not in AST
+        return this.mapLiteral(node, node.text);
     }
 
     visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
@@ -693,8 +723,8 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             annotations: [], // FIXME decorators
             simpleName: name,
-            type: type?.kind === JavaType.Kind.Variable ? (type as JavaType.Variable).type : type,
-            fieldType: type?.kind === JavaType.Kind.Variable ? type as JavaType.Variable : undefined
+            type: type?.kind === Type.Kind.Variable ? (type as Type.Variable).type : type,
+            fieldType: type?.kind === Type.Kind.Variable ? type as Type.Variable : undefined
         };
     }
 
@@ -1838,7 +1868,10 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 select,
                 typeParameters: typeArguments,
-                name,
+                name: {
+                    ...name,
+                    type: undefined
+                },
                 arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
                 methodType: this.mapMethodType(node)
             }
@@ -3155,7 +3188,7 @@ export class JavaScriptParserVisitor {
                     emptySpace)],
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node) as JavaType.Class
+            type: this.mapType(node) as Type.Class
         };
     }
 
@@ -4060,19 +4093,19 @@ export class JavaScriptParserVisitor {
         return this.prefix(getNextSibling(node)!, consume);
     }
 
-    private mapType(node: ts.Node): JavaType | undefined {
-        return Object.freeze(this.typeMapping.type(node));
+    private mapType(node: ts.Node): Type | undefined {
+        return this.typeMapping.type(node);
     }
 
-    private mapPrimitiveType(node: ts.Node): JavaType.Primitive {
+    private mapPrimitiveType(node: ts.Node): Type.Primitive {
         return this.typeMapping.primitiveType(node);
     }
 
-    private mapVariableType(node: ts.NamedDeclaration): JavaType.Variable | undefined {
+    private mapVariableType(node: ts.NamedDeclaration): Type.Variable | undefined {
         return this.typeMapping.variableType(node);
     }
 
-    private mapMethodType(node: ts.Node): JavaType.Method | undefined {
+    private mapMethodType(node: ts.Node): Type.Method | undefined {
         return this.typeMapping.methodType(node);
     }
 
