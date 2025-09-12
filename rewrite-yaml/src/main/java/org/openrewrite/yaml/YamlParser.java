@@ -474,7 +474,11 @@ public class YamlParser implements org.openrewrite.Parser {
                 @Override
                 public @Nullable Yaml visit(@Nullable Tree tree, Integer integer) {
                     Yaml visit = super.visit(tree, integer);
-                    if (visit == null || StringUtils.isBlank(visit.getPrefix())) {
+                    if (visit instanceof Yaml.Document && !StringUtils.isBlank(((Yaml.Document) visit).getEnd().getPrefix())) {
+                        Yaml.Document d = (Yaml.Document) visit;
+                        visit = d.withEnd(visitDocumentEnd(d.getEnd(), integer));
+                    }
+                    if (visit == null || (StringUtils.isBlank(visit.getPrefix()))) {
                         return visit;
                     }
                     return visit.withPrefix(restoreUuidPlaceholders(visit.getPrefix()));
@@ -513,6 +517,12 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     return s;
                 }
+
+                @Override
+                public Yaml.Document.End visitDocumentEnd(Yaml.Document.End end, Integer integer) {
+                    return end.withPrefix(restoreUuidPlaceholders(end.getPrefix()));
+                }
+
             }.visitNonNull(result, 0);
 
         } catch (IOException e) {

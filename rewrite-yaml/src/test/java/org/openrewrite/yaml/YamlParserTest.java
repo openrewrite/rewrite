@@ -52,6 +52,21 @@ class YamlParserTest implements RewriteTest {
         assertThat(title.getValue()).isEqualTo("b");
     }
 
+    @Test
+    void helmTemplateMatchingDocumentEndParsesCorrectly() {
+        rewriteRun(
+          yaml(
+            """
+              # ${{ looks.like.helm.begin }}
+              jobs:
+              # ${{ looks.like.helm.middle }}
+                steps: []
+              # ${{ looks.like.helm.end }}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2062")
     @Test
     void fourBytesUnicode() {
