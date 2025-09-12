@@ -464,4 +464,51 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void helmTemplateMatchingDocumentEndParsesCorrectly() {
+        rewriteRun(
+          yaml(
+            """
+              # ${{ looks.like.helm.before }}
+              jobs:
+                # ${{ looks.like.helm.middle }}
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  # ${{ looks.like.helm.in-sequence }}
+                  - items2: []
+                  # ${{ looks.like.helm.end-sequence }}
+              # ${{ looks.like.helm.end }}
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  # ${{ looks.like.helm.sequence }}
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  # ${{ looks.like.helm.sequence }}
+                  - items1: []
+                  - items2: []
+              """
+          ),
+          yaml(
+            """
+              jobs:
+                steps:
+                  - items1: []
+                  - items2: []
+              # ${{ looks.like.helm.end }}
+              """
+          )
+        );
+    }
 }
