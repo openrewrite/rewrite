@@ -478,7 +478,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Document d = (Yaml.Document) visit;
                         visit = d.withEnd(visitDocumentEnd(d.getEnd(), integer));
                     }
-                    if (visit == null || (StringUtils.isBlank(visit.getPrefix()))) {
+                    if (visit == null || StringUtils.isBlank(visit.getPrefix())) {
                         return visit;
                     }
                     return visit.withPrefix(restoreUuidPlaceholders(visit.getPrefix()));
