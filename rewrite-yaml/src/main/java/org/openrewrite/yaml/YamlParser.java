@@ -474,7 +474,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 @Override
                 public @Nullable Yaml visit(@Nullable Tree tree, Integer integer) {
                     Yaml visit = super.visit(tree, integer);
-                    if (visit == null || (StringUtils.isBlank(visit.getPrefix()))) {
+                    if (visit == null || StringUtils.isBlank(visit.getPrefix())) {
                         return visit;
                     }
                     return visit.withPrefix(restoreUuidPlaceholders(visit.getPrefix()));
