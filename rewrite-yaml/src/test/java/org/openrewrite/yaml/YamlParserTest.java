@@ -57,10 +57,12 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-              # ${{ looks.like.helm.begin }}
               jobs:
               # ${{ looks.like.helm.middle }}
-                steps: []
+                steps: 
+                  - items: []
+                  # ${{ looks.like.helm.sequence }}
+                  - items: []
               # ${{ looks.like.helm.end }}
               """
           )
