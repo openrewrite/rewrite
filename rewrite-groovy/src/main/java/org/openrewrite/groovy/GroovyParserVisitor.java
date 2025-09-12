@@ -462,7 +462,13 @@ public class GroovyParserVisitor {
                 int argCount = 0;
                 int depth = 0;
                 cursor = indexOfNextNonWhitespace(cursor, source);
+                // Check if there are any arguments at all
+                if (source.charAt(cursor) != ')') {
+                    argCount = 1; // Start with 1 since there's at least one argument
+                }
                 while (!(source.charAt(cursor) == ')' && depth == 0)) {
+                    int cursorBeforeIteration = cursor;
+                    
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
                         cursor += delimiter.open.length();
@@ -476,19 +482,60 @@ public class GroovyParserVisitor {
                             sourceBefore(delimiter.close);
                         }
                     } else {
+                        // Handle named arguments (map-style constructor calls) like a: "value"
                         name();
+                        cursor = indexOfNextNonWhitespace(cursor, source);
+                        if (source.charAt(cursor) == ':') {
+                            cursor++; // Skip the colon
+                            cursor = indexOfNextNonWhitespace(cursor, source);
+                            // Now parse the value after the colon
+                            delimiter = getDelimiter(null, cursor);
+                            if (delimiter != null) {
+                                cursor += delimiter.open.length();
+                                if ("\"".equals(delimiter.close)) {
+                                    cursor = source.indexOf("\"", cursor) + 1;
+                                    while (source.charAt(cursor - 2) == '\\') {
+                                        cursor = source.indexOf("\"", cursor) + 1;
+                                    }
+                                } else {
+                                    sourceBefore(delimiter.close);
+                                }
+                            } else {
+                                // Value might be a method call, identifier, or other expression
+                                name();
+                            }
+                        }
                     }
                     cursor = indexOfNextNonWhitespace(cursor, source);
-                    skip(",");
-                    cursor = indexOfNextNonWhitespace(cursor, source);
-                    if (source.charAt(cursor) == '(') {
+                    if (source.charAt(cursor) == ',') {
+                        cursor++; // Skip the comma
+                        argCount++;
+                    } else if (source.charAt(cursor) == '(') {
                         depth++;
                         cursor++;
                     } else if (depth > 0 && source.charAt(cursor) == ')') {
                         depth--;
                         cursor++;
+                    } else if (source.charAt(cursor) == ')' && depth == 0) {
+                        // We've reached the end
+                        break;
+                    } else {
+                        // Unexpected character - might be part of a complex expression
+                        // Try to advance past it to avoid getting stuck
+                        char ch = source.charAt(cursor);
+                        if (ch != ',' && ch != '(' && ch != ')') {
+                            // Could be an operator or other character we don't handle specifically
+                            cursor++;
+                        }
                     }
-                    argCount++;
+                    
+                    // Safety check: if cursor didn't advance, throw an exception to avoid infinite loop
+                    if (cursor == cursorBeforeIteration) {
+                        throw new IllegalStateException(
+                            "Parser error: unable to parse enum constructor arguments at position " + cursor + 
+                            " near '" + source.substring(Math.max(0, cursor - 20), Math.min(source.length(), cursor + 20)) + "'"
+                        );
+                    }
                 }
                 String argsAsString = source.substring(start, cursor);
                 skip(")");
