@@ -168,7 +168,7 @@ export class JavaScriptParser extends Parser {
         this.oldProgram = program;
 
         const typeChecker = program.getTypeChecker();
-        
+
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -1868,7 +1868,10 @@ export class JavaScriptParserVisitor {
                 markers: emptyMarkers,
                 select,
                 typeParameters: typeArguments,
-                name,
+                name: {
+                    ...name,
+                    type: undefined
+                },
                 arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
                 methodType: this.mapMethodType(node)
             }

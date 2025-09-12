@@ -303,7 +303,7 @@ describe('JavaScript type mapping', () => {
 
         test('should map types from libraries accessible from node_modules', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((_, type) => {
                 // Mark any node that has a lodash-related type
                 return Type.isClass(type) && type.fullyQualifiedName.includes('lodash') ?
                     type.fullyQualifiedName : null;

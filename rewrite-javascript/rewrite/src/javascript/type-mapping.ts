@@ -118,6 +118,9 @@ export class JavaScriptTypeMapping {
 
     primitiveType(node: ts.Node): Type.Primitive {
         const type = this.type(node);
+        if (Type.isClass(type) && type.fullyQualifiedName === 'lib.RegExp') {
+            return Type.Primitive.String;
+        }
         return Type.isPrimitive(type) ? type : Type.Primitive.None;
     }
 
@@ -220,20 +223,26 @@ export class JavaScriptTypeMapping {
      * Create a JavaType.Class from a TypeScript type and symbol.
      */
     private createEmptyClassType(type: ts.Type): Type.Class {
-        const symbol = type.symbol;
-        let fullyQualifiedName = symbol ? this.checker.getFullyQualifiedName(symbol) : `<anonymous>${this.checker.typeToString(type)}`;
+        // Use our custom getFullyQualifiedName method for consistent naming
+        let fullyQualifiedName = this.getFullyQualifiedName(type);
 
-        // Fix FQN for types from @types packages
-        // TypeScript returns "_.LoDashStatic" but we want "@types/lodash.LoDashStatic"
-        if (symbol && symbol.declarations && symbol.declarations.length > 0) {
-            const sourceFile = symbol.declarations[0].getSourceFile();
-            const fileName = sourceFile.fileName;
-            // Check if this is from @types package
-            const typesMatch = fileName.match(/node_modules\/@types\/([^/]+)/);
-            if (typesMatch) {
-                const packageName = typesMatch[1];
-                // Replace the module specifier part with @types/package
-                fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
+        // If getFullyQualifiedName returned unknown, fall back to TypeScript's method
+        if (fullyQualifiedName === "unknown") {
+            const symbol = type.symbol;
+            fullyQualifiedName = symbol ? this.checker.getFullyQualifiedName(symbol) : `<anonymous>${this.checker.typeToString(type)}`;
+
+            // Fix FQN for types from @types packages
+            // TypeScript returns "_.LoDashStatic" but we want "@types/lodash.LoDashStatic"
+            if (symbol && symbol.declarations && symbol.declarations.length > 0) {
+                const sourceFile = symbol.declarations[0].getSourceFile();
+                const fileName = sourceFile.fileName;
+                // Check if this is from @types package
+                const typesMatch = fileName.match(/node_modules\/@types\/([^/]+)/);
+                if (typesMatch) {
+                    const packageName = typesMatch[1];
+                    // Replace the module specifier part with @types/package
+                    fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
+                }
             }
         }
 
@@ -259,7 +268,12 @@ export class JavaScriptTypeMapping {
         const properties = this.checker.getPropertiesOfType(type);
         for (const prop of properties) {
             if (!(prop.flags & ts.SymbolFlags.Method)) {
-                const propType = this.checker.getTypeOfSymbolAtLocation(prop, prop.valueDeclaration || prop.declarations![0]);
+                const declaration = prop.valueDeclaration || (prop.declarations && prop.declarations[0]);
+                if (!declaration) {
+                    // Skip properties without declarations (synthetic/built-in properties)
+                    continue;
+                }
+                const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
                 const variable: Type.Variable = Object.assign(new NonDraftableType(), {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
