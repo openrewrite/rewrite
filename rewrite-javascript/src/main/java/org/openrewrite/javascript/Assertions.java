@@ -32,12 +32,16 @@ import java.util.function.Consumer;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.json.Assertions.json;
 
+@SuppressWarnings("unused")
 public class Assertions {
 
     private Assertions() {
     }
 
     public static SourceSpecs npm(Path relativeTo, SourceSpecs... sources) {
+        // Second pass: run npm install if needed
+        boolean alreadyInstalled = false;
+
         // First pass: write package.json files
         for (SourceSpecs multiSpec : sources) {
             if (multiSpec instanceof SourceSpec) {
@@ -45,7 +49,16 @@ public class Assertions {
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && sourcePath.toFile().getName().equals("package.json")) {
                     try {
-                        Files.write(relativeTo.resolve(sourcePath), requireNonNull(spec.getBefore()).getBytes(StandardCharsets.UTF_8));
+                        Path packageJson = relativeTo.resolve(sourcePath);
+                        if (Files.exists(packageJson)) {
+                            // If relativeTo is a non-transient directory we can optimize not having
+                            // to do npm install if the package.json hasn't changed.
+                            if (new String(Files.readAllBytes(packageJson), StandardCharsets.UTF_8).equals(spec.getBefore())) {
+                                alreadyInstalled = true;
+                                continue;
+                            }
+                        }
+                        Files.write(packageJson, requireNonNull(spec.getBefore()).getBytes(StandardCharsets.UTF_8));
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
@@ -53,8 +66,6 @@ public class Assertions {
             }
         }
 
-        // Second pass: run npm install if needed
-        boolean alreadyInstalled = false;
         for (SourceSpecs multiSpec : sources) {
             if (multiSpec instanceof SourceSpec) {
                 SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
@@ -145,6 +156,29 @@ public class Assertions {
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return javascript(before, after, spec);
+    }
+
+    public static SourceSpecs tsx(@Language("tsx") @Nullable String before) {
+        //noinspection LanguageMismatch
+        return typescript(before, s -> {
+        });
+    }
+
+    public static SourceSpecs tsx(@Language("tsx") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
+        //noinspection LanguageMismatch
+        return typescript(before, spec);
+    }
+
+    public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after) {
+        //noinspection LanguageMismatch
+        return typescript(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after,
+                                  Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
         return javascript(before, after, spec);
     }

@@ -49,7 +49,6 @@ export class JavaScriptTypeMapping {
         let type: ts.Type | undefined;
         if (ts.isExpression(node)) {
             type = this.checker.getTypeAtLocation(node);
-
         } else if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
         }
@@ -63,9 +62,19 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // For object types that could have circular references, create the shell first
-        // and put it in the cache, then populate it. This way circular references
-        // will point to the actual object being built, not Type.Unknown
+        // Check for class/interface/enum types first (they may also have Object flag)
+        const symbol = type.getSymbol?.();
+        if (symbol) {
+            if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
+                // Create and cache shell first to handle circular references
+                const classType = this.createEmptyClassType(type);
+                this.typeCache.set(signature, classType);
+                this.populateClassType(classType, type);
+                return classType;
+            }
+        }
+
+        // For anonymous object types that could have circular references
         if (type.flags & ts.TypeFlags.Object) {
             const objectFlags = (type as ts.ObjectType).objectFlags;
             if (objectFlags & ts.ObjectFlags.Anonymous) {
@@ -74,17 +83,11 @@ export class JavaScriptTypeMapping {
                 this.typeCache.set(signature, classType);
                 this.populateClassType(classType, type);
                 return classType;
-            } else if (type.symbol) {
-                // Named type with symbol - create and cache shell, then populate
-                const classType = this.createEmptyClassType(type);
-                this.typeCache.set(signature, classType);
-                this.populateClassType(classType, type);
-                return classType;
             }
         }
 
         // For non-object types, we can create them directly without recursion concerns
-        const result = this.createType(type);
+        const result = this.createPrimitiveOrUnknownType(type);
         this.typeCache.set(signature, result);
         return result;
     }
@@ -220,7 +223,8 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * Create a JavaType.Class from a TypeScript type and symbol.
+     * Create an empty JavaType.Class shell from a TypeScript type.
+     * The shell will be populated later to handle circular references.
      */
     private createEmptyClassType(type: ts.Type): Type.Class {
         // Use our custom getFullyQualifiedName method for consistent naming
@@ -246,10 +250,23 @@ export class JavaScriptTypeMapping {
             }
         }
 
+        // Determine the class kind based on symbol flags
+        let classKind = Type.Class.Kind.Interface; // Default to interface
+        const symbol = type.getSymbol?.();
+        if (symbol) {
+            if (symbol.flags & ts.SymbolFlags.Class) {
+                classKind = Type.Class.Kind.Class;
+            } else if (symbol.flags & ts.SymbolFlags.Enum) {
+                classKind = Type.Class.Kind.Enum;
+            } else if (symbol.flags & ts.SymbolFlags.Interface) {
+                classKind = Type.Class.Kind.Interface;
+            }
+        }
+
         // Create empty class type shell (no members yet to avoid recursion)
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
-            classKind: Type.Class.Kind.Interface, // Default to interface for TypeScript types
+            classKind: classKind,
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: [],
             annotations: [],
@@ -262,17 +279,114 @@ export class JavaScriptTypeMapping {
         }) as Type.Class;
     }
 
+    /**
+     * Populates the class type with members, methods, heritage, and type parameters
+     * Since the shell is already in the cache, any recursive references will find it
+     */
     private populateClassType(classType: Type.Class, type: ts.Type): void {
-        // Now populate the class type with members
-        // Since the shell is already in the cache, any recursive references will find it
+        const symbol = type.getSymbol?.();
+
+        // Try to get base types using TypeScript's getBaseTypes API
+        // This works for both local and external types (from node_modules)
+        if (type.flags & ts.TypeFlags.Object) {
+            let baseTypes: ts.Type[] | undefined;
+
+            // Check if this is a class or interface type that supports getBaseTypes
+            const objectType = type as ts.ObjectType;
+            if (objectType.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface)) {
+                try {
+                    baseTypes = (this.checker as any).getBaseTypes?.(type as ts.InterfaceType);
+                } catch (e) {
+                    // getBaseTypes might fail for some types, fall back to declaration-based extraction
+                }
+            } else if (symbol) {
+                // For constructor functions or type references, we need to get the actual class type
+                // Try to get the type of the class itself (not the constructor or instance)
+                const classSymbol = symbol.flags & ts.SymbolFlags.Alias ?
+                    this.checker.getAliasedSymbol(symbol) : symbol;
+
+                if (classSymbol && classSymbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)) {
+                    // Get the type of the class declaration itself
+                    const declaredType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
+                    if (declaredType && declaredType !== type) {
+                        try {
+                            baseTypes = (this.checker as any).getBaseTypes?.(declaredType as ts.InterfaceType);
+                        } catch (e) {
+                            // getBaseTypes might fail, fall back to declaration-based extraction
+                        }
+                    }
+                } else if (classSymbol && classSymbol.valueDeclaration && ts.isClassDeclaration(classSymbol.valueDeclaration)) {
+                    // Handle the case where the symbol is for a class value (constructor function)
+                    // Get the instance type of the class
+                    const instanceType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
+                    if (instanceType && instanceType !== type) {
+                        try {
+                            baseTypes = (this.checker as any).getBaseTypes?.(instanceType as ts.InterfaceType);
+                        } catch (e) {
+                            // getBaseTypes might fail, fall back to declaration-based extraction
+                        }
+                    }
+                }
+            }
+
+            if (baseTypes && baseTypes.length > 0) {
+                // For classes, the first base type is usually the superclass
+                // Additional base types are interfaces
+                if (classType.classKind === Type.Class.Kind.Class) {
+                    const firstBase = this.getType(baseTypes[0]);
+                    if (Type.isClass(firstBase)) {
+                        (classType as any).supertype = firstBase;
+                    }
+                    // Rest are interfaces
+                    for (let i = 1; i < baseTypes.length; i++) {
+                        const interfaceType = this.getType(baseTypes[i]);
+                        if (Type.isClass(interfaceType)) {
+                            classType.interfaces.push(interfaceType);
+                        }
+                    }
+                } else {
+                    // For interfaces, all base types are extended interfaces
+                    for (const baseType of baseTypes) {
+                        const interfaceType = this.getType(baseType);
+                        if (Type.isClass(interfaceType)) {
+                            classType.interfaces.push(interfaceType);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Extract type parameters from declarations (not provided by getBaseTypes)
+        if (symbol?.declarations) {
+            for (const declaration of symbol.declarations) {
+                if (ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)) {
+                    // Extract type parameters
+                    if (declaration.typeParameters) {
+                        for (const tp of declaration.typeParameters) {
+                            const tpType = this.checker.getTypeAtLocation(tp);
+                            classType.typeParameters.push(this.getType(tpType));
+                        }
+                    }
+                    break; // Only process the first declaration
+                }
+            }
+        }
+
+        // Get properties and methods
         const properties = this.checker.getPropertiesOfType(type);
         for (const prop of properties) {
-            if (!(prop.flags & ts.SymbolFlags.Method)) {
-                const declaration = prop.valueDeclaration || (prop.declarations && prop.declarations[0]);
-                if (!declaration) {
-                    // Skip properties without declarations (synthetic/built-in properties)
-                    continue;
-                }
+            const declaration = prop.valueDeclaration || prop.declarations?.[0];
+            if (!declaration) {
+                // Skip properties without declarations (synthetic/built-in properties)
+                continue;
+            }
+
+            if (prop.flags & ts.SymbolFlags.Method) {
+                // TODO: Create Type.Method when method support is added
+                // For now, skip methods
+                continue;
+            } else {
+                // Create Type.Variable for fields/properties
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
                 const variable: Type.Variable = Object.assign(new NonDraftableType(), {
                     kind: Type.Kind.Variable,
@@ -289,130 +403,12 @@ export class JavaScriptTypeMapping {
         }
     }
 
-    private createClassType(type: ts.Type, symbol: ts.Symbol, kind: Type.Class.Kind): Type.Class {
-        const fullyQualifiedName = this.getFullyQualifiedName(type);
-
-        // Collect all the data first
-        const typeParameters: Type[] = [];
-        const interfaces: Type.Class[] = [];
-        const methods: Type.Method[] = [];
-        let supertype: Type.Class | undefined;
-
-        // Get type parameters and heritage information from declarations
-        if (symbol.declarations) {
-            for (const declaration of symbol.declarations) {
-                if (ts.isClassDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)) {
-                    // Extract type parameters
-                    if (declaration.typeParameters) {
-                        for (const tp of declaration.typeParameters) {
-                            const tpType = this.checker.getTypeAtLocation(tp);
-                            typeParameters.push(this.getType(tpType));
-                        }
-                    }
-
-                    // Extract heritage information
-                    if (declaration.heritageClauses) {
-                        const heritage = this.extractHeritage(declaration.heritageClauses, kind);
-                        if (heritage.supertype) {
-                            supertype = heritage.supertype;
-                        }
-                        interfaces.push(...heritage.interfaces);
-                    }
-
-                    break; // Only process the first declaration
-                }
-            }
-        }
-
-        const classType: Type.Class = Object.assign(new NonDraftableType(), {
-            kind: Type.Kind.Class,
-            classKind: kind,
-            fullyQualifiedName: fullyQualifiedName,
-            typeParameters: typeParameters || [],
-            supertype: supertype,
-            annotations: [],
-            interfaces: interfaces || [],
-            members: [],  // Will be populated below
-            methods: methods || [],
-            toJSON: function () {
-                return Type.signature(this);
-            }
-        }) as Type.Class;
-
-        // Get members (properties)
-        const properties = this.checker.getPropertiesOfType(type);
-        for (const prop of properties) {
-            // Skip methods for now (will be handled in Phase 3)
-            if (!(prop.flags & ts.SymbolFlags.Method)) {
-                // Get a declaration to use for type checking
-                const declaration = prop.valueDeclaration || prop.declarations?.[0];
-                if (!declaration) {
-                    // Skip properties without declarations (synthetic properties)
-                    continue;
-                }
-
-                const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
-                    kind: Type.Kind.Variable,
-                    name: prop.getName(),
-                    owner: classType,  // Cyclic reference to the containing class
-                    type: this.getType(propType),
-                    annotations: [],
-                    toJSON: function () {
-                        return Type.signature(this);
-                    }
-                }) as Type.Variable;
-                classType.members.push(variable);
-            }
-        }
-
-        return classType;
-    }
 
     /**
-     * Extract supertype and interfaces from heritage clauses.
+     * Note: Object/Class/Interface types are handled in getType() to properly manage circular references
+     * This method should only be called for primitive and unknown types
      */
-    private extractHeritage(heritageClauses: ts.NodeArray<ts.HeritageClause>, kind: Type.Class.Kind):
-        { supertype?: Type.Class, interfaces: Type.Class[] } {
-
-        let supertype: Type.Class | undefined = undefined;
-        const interfaces: Type.Class[] = [];
-
-        for (const clause of heritageClauses) {
-            if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-                if (kind === Type.Class.Kind.Class && clause.types.length > 0) {
-                    // For classes, extends means superclass (only first one)
-                    const superType = this.checker.getTypeAtLocation(clause.types[0]);
-                    const superJavaType = this.getType(superType);
-                    if (Type.isClass(superJavaType)) {
-                        supertype = superJavaType;
-                    }
-                } else if (kind === Type.Class.Kind.Interface) {
-                    // For interfaces, extends means extended interfaces (can be multiple)
-                    for (const extendedType of clause.types) {
-                        const extType = this.checker.getTypeAtLocation(extendedType);
-                        const extJavaType = this.getType(extType);
-                        if (Type.isClass(extJavaType)) {
-                            interfaces.push(extJavaType);
-                        }
-                    }
-                }
-            } else if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
-                // Implements clause (only for classes)
-                for (const implType of clause.types) {
-                    const interfaceType = this.checker.getTypeAtLocation(implType);
-                    const interfaceJavaType = this.getType(interfaceType);
-                    if (Type.isClass(interfaceJavaType)) {
-                        interfaces.push(interfaceJavaType);
-                    }
-                }
-            }
-        }
-
-        return {supertype, interfaces};
-    }
-
-    private createType(type: ts.Type): Type {
+    private createPrimitiveOrUnknownType(type: ts.Type): Type {
         // Check for literals first
         if (type.isLiteral()) {
             if (type.isNumberLiteral()) {
@@ -466,26 +462,15 @@ export class JavaScriptTypeMapping {
             return Type.Primitive.Boolean;
         }
 
-        // Check for class/interface types
+        // Check for type aliases that may resolve to primitives
         const symbol = type.getSymbol?.();
-        if (symbol) {
-            if (symbol.flags & ts.SymbolFlags.Class) {
-                return this.createClassType(type, symbol, Type.Class.Kind.Class);
-            } else if (symbol.flags & ts.SymbolFlags.Interface) {
-                return this.createClassType(type, symbol, Type.Class.Kind.Interface);
-            } else if (symbol.flags & ts.SymbolFlags.Enum) {
-                return this.createClassType(type, symbol, Type.Class.Kind.Enum);
-            } else if (symbol.flags & ts.SymbolFlags.TypeAlias) {
-                // Type aliases may resolve to class-like structures
-                const aliasedType = this.checker.getDeclaredTypeOfSymbol(symbol);
-                if (aliasedType !== type) {
-                    return this.getType(aliasedType);
-                }
+        if (symbol && symbol.flags & ts.SymbolFlags.TypeAlias) {
+            // Type aliases may resolve to primitive types
+            const aliasedType = this.checker.getDeclaredTypeOfSymbol(symbol);
+            if (aliasedType !== type) {
+                return this.getType(aliasedType);
             }
         }
-
-        // Note: Object types are now handled in getType() to properly manage circular references
-        // This method should only be called for non-object types
 
         return Type.unknownType;
     }

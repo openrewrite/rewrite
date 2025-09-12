@@ -29,11 +29,24 @@ export function* npm(relativeTo: string, ...sourceSpecs: SourceSpec<any>[]): Gen
         if (spec.path === 'package.json') {
             // Write package.json to disk so npm install can be run
             fs.mkdirSync(relativeTo, {recursive: true});
-            fs.writeFileSync(path.join(relativeTo, 'package.json'), spec.before!);
-            execSync('npm install', {
-                cwd: relativeTo,
-                stdio: 'inherit' // Show npm output for debugging
-            });
+            const packageJsonPath = path.join(relativeTo, 'package.json');
+            
+            // Check if package.json already exists with the same content
+            let needsInstall = true;
+            if (fs.existsSync(packageJsonPath)) {
+                const existingContent = fs.readFileSync(packageJsonPath, 'utf-8');
+                if (existingContent === spec.before) {
+                    needsInstall = false;
+                }
+            }
+            
+            if (needsInstall) {
+                fs.writeFileSync(packageJsonPath, spec.before!);
+                execSync('npm install', {
+                    cwd: relativeTo,
+                    stdio: 'inherit' // Show npm output for debugging
+                });
+            }
             yield spec;
         }
     }
