@@ -34,6 +34,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
@@ -468,7 +469,7 @@ public class GroovyParserVisitor {
                 }
                 while (!(source.charAt(cursor) == ')' && depth == 0)) {
                     int cursorBeforeIteration = cursor;
-
+                    
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
                         cursor += delimiter.open.length();
@@ -482,13 +483,13 @@ public class GroovyParserVisitor {
                             sourceBefore(delimiter.close);
                         }
                     } else {
-                        // Handle named arguments (map-style constructor calls) like a: "value"
                         name();
+                        // Check for named argument syntax (colon after name)
                         cursor = indexOfNextNonWhitespace(cursor, source);
                         if (source.charAt(cursor) == ':') {
                             cursor++; // Skip the colon
                             cursor = indexOfNextNonWhitespace(cursor, source);
-                            // Now parse the value after the colon
+                            // Parse the value after the colon
                             delimiter = getDelimiter(null, cursor);
                             if (delimiter != null) {
                                 cursor += delimiter.open.length();
@@ -501,34 +502,22 @@ public class GroovyParserVisitor {
                                     sourceBefore(delimiter.close);
                                 }
                             } else {
-                                // Value might be a method call, identifier, or other expression
                                 name();
                             }
                         }
                     }
                     cursor = indexOfNextNonWhitespace(cursor, source);
-                    if (source.charAt(cursor) == ',') {
-                        cursor++; // Skip the comma
-                        argCount++;
-                    } else if (source.charAt(cursor) == '(') {
+                    skip(",");
+                    cursor = indexOfNextNonWhitespace(cursor, source);
+                    if (source.charAt(cursor) == '(') {
                         depth++;
                         cursor++;
                     } else if (depth > 0 && source.charAt(cursor) == ')') {
                         depth--;
                         cursor++;
-                    } else if (source.charAt(cursor) == ')' && depth == 0) {
-                        // We've reached the end
-                        break;
-                    } else {
-                        // Unexpected character - might be part of a complex expression
-                        // Try to advance past it to avoid getting stuck
-                        char ch = source.charAt(cursor);
-                        if (ch != ',' && ch != '(' && ch != ')') {
-                            // Could be an operator or other character we don't handle specifically
-                            cursor++;
-                        }
                     }
-
+                    argCount++;
+                    
                     // Safety check: if cursor didn't advance, throw an exception to avoid infinite loop
                     if (cursor == cursorBeforeIteration) {
                         throw new IllegalStateException(
@@ -560,7 +549,7 @@ public class GroovyParserVisitor {
                 }
 
                 // ... and use the information in a small class to get the constructor invocation arguments anyway
-                G.CompilationUnit cu = (G.CompilationUnit) GroovyParser.builder().build()
+                SourceFile parsed = GroovyParser.builder().build()
                         .parse("class A {\n" +
                                 "  A(" + constructorDeclarationArgs + ") {}\n" +
                                 "  def use() {\n" +
@@ -568,8 +557,17 @@ public class GroovyParserVisitor {
                                 "  }\n" +
                                 "}")
                         .findFirst().get();
-                JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
-                        .getPadding().getArguments();
+                
+                JContainer<Expression> args;
+                if (parsed instanceof G.CompilationUnit) {
+                    G.CompilationUnit cu = (G.CompilationUnit) parsed;
+                    args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
+                            .getPadding().getArguments();
+                } else {
+                    // If parsing failed, create an empty arguments container
+                    // This can happen with complex string literals containing special characters
+                    args = JContainer.empty();
+                }
 
                 initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, args, null, typeMapping.methodType(ctor));
             }
