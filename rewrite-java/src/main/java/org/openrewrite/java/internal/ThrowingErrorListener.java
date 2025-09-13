@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.BaseErrorListener;
 @RequiredArgsConstructor
 public class ThrowingErrorListener extends BaseErrorListener {
     private final String input;
+
     @Override
     public void syntaxError(org.antlr.v4.runtime.Recognizer<?, ?> recognizer, Object offendingSymbol, int line,
                             int charPositionInLine, String msg, org.antlr.v4.runtime.RecognitionException e) {
