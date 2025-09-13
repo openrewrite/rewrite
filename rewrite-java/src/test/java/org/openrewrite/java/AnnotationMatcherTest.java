@@ -74,6 +74,7 @@ class AnnotationMatcherTest implements RewriteTest {
             );
         }
     }
+
     @Test
     void failsToParse() {
         assertThatThrownBy(() -> new AnnotationMatcher("@foo|bar"))
