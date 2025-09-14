@@ -39,7 +39,7 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaRewriteRpcTest implements RewriteTest {
+class JavaRewriteRpcTest implements RewriteTest {
     Environment env = Environment.builder()
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
