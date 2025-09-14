@@ -24,7 +24,8 @@ import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {javascript, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 import fs from "node:fs";
 import {withDir} from "tmp-promise";
 
@@ -78,6 +79,22 @@ describe("Rewrite RPC", () => {
                 expect(await client.print(text)).toEqual("Hello Jon!");
                 return text;
             }
+        }
+    ));
+
+    test("print subtree", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("console.log('hello');"),
+            beforeRecipe: async (cu: JS.CompilationUnit) =>
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                        //language=typescript
+                        expect(await client.print(method, this.cursor!.parent!))
+                            .toEqual("console.log('hello')");
+                        return method;
+                    }
+                }).visit(cu, 0)
         }
     ));
 
@@ -228,7 +245,7 @@ describe("Rewrite RPC", () => {
     });
 
     test("JavaType.Class codecs across RPC boundaries", async () => {
-        await withDir(async (repo) => {
+        await withDir(async repo => {
             spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.mark-class-types");
 
             //language=typescript

@@ -901,7 +901,5 @@ Object.values(J.Kind).forEach(kind => {
                 }
             }
         );
-    } else if (!Object.values(TreeKind).includes(kind as any)) {
-        RpcCodecs.registerCodec(kind, javaCodec);
     }
 });

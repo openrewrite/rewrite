@@ -895,11 +895,10 @@ public interface JavaType {
 
         @Override
         public Annotation rpcReceive(Annotation before, RpcReceiveQueue q) {
-            before = new Annotation(
+            return new Annotation(
                     q.receive(before.type),
                     arrayOrNullIfEmpty(q.receiveList(before.getValues(), null), EMPTY_ANNOTATION_VALUE_ARRAY)
             );
-            return before;
         }
     }
 

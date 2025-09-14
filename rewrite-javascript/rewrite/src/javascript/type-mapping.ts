@@ -140,7 +140,129 @@ export class JavaScriptTypeMapping {
     }
 
     methodType(node: ts.Node): Type.Method | undefined {
-        return undefined;
+        let signature: ts.Signature | undefined;
+        let methodName: string;
+        let declaringType: Type.FullyQualified;
+        let declaredFormalTypeNames: string[] = [];
+
+        // Handle different kinds of nodes that represent methods or method invocations
+        if (ts.isCallExpression(node)) {
+            // For method invocations (e.g., _.map(...))
+            signature = this.checker.getResolvedSignature(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            const symbol = this.checker.getSymbolAtLocation(node.expression);
+            if (!symbol) {
+                return undefined;
+            }
+
+            // Get the method name
+            if (ts.isPropertyAccessExpression(node.expression)) {
+                methodName = node.expression.name.getText();
+                const exprType = this.checker.getTypeAtLocation(node.expression.expression);
+                declaringType = this.getType(exprType) as Type.FullyQualified;
+            } else if (ts.isIdentifier(node.expression)) {
+                methodName = node.expression.getText();
+                // For standalone functions, use the symbol's parent or module
+                const parent = (symbol as any).parent;
+                if (parent) {
+                    const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
+                    declaringType = this.getType(parentType) as Type.FullyQualified;
+                } else {
+                    declaringType = Type.unknownType as Type.FullyQualified;
+                }
+            } else {
+                methodName = symbol.getName();
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
+
+            // Get type parameters from signature
+            const typeParameters = signature.getTypeParameters();
+            if (typeParameters) {
+                for (const tp of typeParameters) {
+                    declaredFormalTypeNames.push(tp.symbol.getName());
+                }
+            }
+        } else if (ts.isMethodDeclaration(node) || ts.isMethodSignature(node)) {
+            // For method declarations
+            const symbol = this.checker.getSymbolAtLocation(node.name!);
+            if (!symbol) {
+                return undefined;
+            }
+
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = symbol.getName();
+
+            // Get the declaring type (the class/interface that contains this method)
+            const parent = node.parent;
+            if (ts.isClassDeclaration(parent) || ts.isInterfaceDeclaration(parent) || ts.isObjectLiteralExpression(parent)) {
+                const parentType = this.checker.getTypeAtLocation(parent);
+                declaringType = this.getType(parentType) as Type.FullyQualified;
+            } else {
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
+
+            // Get type parameters from node
+            if (node.typeParameters) {
+                for (const tp of node.typeParameters) {
+                    declaredFormalTypeNames.push(tp.name.getText());
+                }
+            }
+        } else if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) {
+            // For function declarations/expressions
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = node.name ? node.name.getText() : "<anonymous>";
+            declaringType = Type.unknownType as Type.FullyQualified;
+
+            // Get type parameters from node
+            if (node.typeParameters) {
+                for (const tp of node.typeParameters) {
+                    declaredFormalTypeNames.push(tp.name.getText());
+                }
+            }
+        } else {
+            // For other node types, return undefined
+            return undefined;
+        }
+
+        // Common logic for all method types
+        const returnType = signature.getReturnType();
+        const parameters = signature.getParameters();
+        const parameterTypes: Type[] = [];
+        const parameterNames: string[] = [];
+
+        for (const param of parameters) {
+            parameterNames.push(param.getName());
+            const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
+            parameterTypes.push(this.getType(paramType));
+        }
+
+        // Create the Type.Method object
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Method,
+            declaringType: declaringType,
+            name: methodName,
+            returnType: this.getType(returnType),
+            parameterNames: parameterNames,
+            parameterTypes: parameterTypes,
+            thrownExceptions: [], // JavaScript doesn't have checked exceptions
+            annotations: [],
+            defaultValue: undefined,
+            declaredFormalTypeNames: declaredFormalTypeNames,
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Method;
     }
 
     /**

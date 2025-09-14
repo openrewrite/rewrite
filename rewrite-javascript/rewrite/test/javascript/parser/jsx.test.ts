@@ -1,56 +1,58 @@
-// noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptMissingConfigOption,NpmUsedModulesInstalled
+// noinspection JSUnusedLocalSymbols,TypeScriptUnresolvedReference,TypeScriptMissingConfigOption,NpmUsedModulesInstalled,TypeScriptJSXUnresolvedComponent
 
 import {describe} from "@jest/globals";
 import {JavaScriptVisitor, JSX, npm, packageJson, tsx} from "../../../src/javascript";
 import {RecipeSpec} from "../../../src/test";
 import {J, Type} from "../../../src/java";
+import {withDir} from "tmp-promise";
 
 describe("jsx mapping", () => {
     const spec = new RecipeSpec();
 
     test("react component supertype", async () => {
-        const usesComponent = tsx(
-            `
-            import Select from 'react-select';
-            
-            const App = () => {
-              return <Select options={[]} />;
-            };
-        `
-        );
-
-        usesComponent.afterRecipe = async cu => {
-            await (new class extends JavaScriptVisitor<any> {
-                protected async visitJsxTag(tag: JSX.Tag, _: any): Promise<J | undefined> {
-                    const ident = tag.openName.element as J.Identifier;
-                    expect(Type.isClass(ident.type)).toBeTruthy();
-                    expect((ident.type as Type.Class).supertype?.fullyQualifiedName).toContain('Component');
-                    return tag;
-                }
-            }).visit(cu, 0);
-        };
-
-        await spec.rewriteRun(
-            npm(
-                '/Users/jon/Projects/github/openrewrite/rewrite/rewrite-javascript/.working-dir',
-                usesComponent,
-                //language=json
-                packageJson(
-                    `
-                      {
-                        "name": "test-project",
-                        "version": "1.0.0",
-                        "dependencies": {
-                          "react-select": "^2.4.4"
-                        },
-                        "devDependencies": {
-                          "@types/react-select": "^2.0.0"
+        await withDir(async repo => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        ...tsx(
+                            `
+                                import Select from 'react-select';
+                                
+                                const App = () => {
+                                  return <Select options={[]} />;
+                                };
+                            `
+                        ),
+                        afterRecipe: async cu => {
+                            await (new class extends JavaScriptVisitor<any> {
+                                protected async visitJsxTag(tag: JSX.Tag, _: any): Promise<J | undefined> {
+                                    const ident = tag.openName.element as J.Identifier;
+                                    expect(Type.isClass(ident.type)).toBeTruthy();
+                                    expect((ident.type as Type.Class).supertype?.fullyQualifiedName).toContain('Component');
+                                    return tag;
+                                }
+                            }).visit(cu, 0);
                         }
-                      }
-                    `
+                    },
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "react-select": "^2.4.4"
+                            },
+                            "devDependencies": {
+                              "@types/react-select": "^2.0.0"
+                            }
+                          }
+                        `
+                    )
                 )
-            )
-        );
+            );
+        }, {unsafeCleanup: true});
     });
 
     // noinspection TypeScriptMissingConfigOption

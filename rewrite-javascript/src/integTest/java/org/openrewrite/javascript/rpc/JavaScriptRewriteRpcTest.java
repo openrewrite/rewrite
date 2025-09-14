@@ -18,6 +18,7 @@ package org.openrewrite.javascript.rpc;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,6 +27,7 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
@@ -46,7 +48,7 @@ import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-//@Disabled
+@Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
@@ -59,6 +61,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .recipeInstallDir(tempDir)
           .log(tempDir.resolve("rpc.log"))
           .verboseLogging()
+          .inspectBrk()
         );
         client = JavaScriptRewriteRpc.getOrStart();
     }
@@ -74,6 +77,24 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.validateRecipeSerialization(false);
+    }
+
+    @Test
+    void printSubtree() {
+        rewriteRun(
+          typescript(
+            "console.log('hello');",
+            spec -> spec.beforeRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    System.out.println(method.getId());
+                    //language=typescript
+                    assertThat(client.print(method, getCursor().getParentOrThrow())).isEqualTo("console.log('hello')");
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
     }
 
     @DocumentExample

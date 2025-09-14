@@ -28,7 +28,6 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 public class FindMethodsTest implements RewriteTest {
-
     @AfterEach
     void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
@@ -37,17 +36,18 @@ public class FindMethodsTest implements RewriteTest {
     @Test
     void findMethods(@TempDir Path projectDir) {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("@types/lodash..* map(..)", false)),
+//          spec -> spec.recipe(new FindMethods("@types/lodash..* map(..)", false)),
+          spec -> spec.recipe(new FindMethods("*lodash..* max(..)", false)),
           npm(
             projectDir,
             typescript(
               """
                 import _ from 'lodash';
-                const result = _.map([1, 2, 3], n => n * 2);
+                const result = _.max(1, 2);
                 """,
               """
-                import /*~~>*/_ from 'lodash';
-                const result = /*~~>*/_.map([1, 2, 3], n => n * 2);
+                import _ from 'lodash';
+                const result = /*~~>*/_.max(1, 2);
                 """
             ),
             packageJson(

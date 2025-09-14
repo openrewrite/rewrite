@@ -191,7 +191,11 @@ export class RecipeSpec {
             const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;
             if (b !== undefined) {
                 if (b instanceof Promise) {
-                    return [spec, await b];
+                    const mapped = await b;
+                    if (mapped === undefined) {
+                        throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
+                    }
+                    return [spec, mapped];
                 }
                 return [spec, b as SourceFile];
             }

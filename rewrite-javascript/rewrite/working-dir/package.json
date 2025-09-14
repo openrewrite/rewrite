@@ -1,9 +1,0 @@
-
-                      {
-                        "name": "test-project",
-                        "version": "1.0.0",
-                        "dependencies": {
-                          "react-spinners": "^0.13.8"
-                        }
-                      }
-                    
