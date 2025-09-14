@@ -2017,7 +2017,7 @@ public interface JavaType {
 }
 
 class TypeIdForRpc {
-    public static @NotNull Function<? super JavaType, Object> signature() {
+    public static Function<? super JavaType, Object> signature() {
         return t -> new DefaultJavaTypeSignatureBuilder().signature(t);
     }
 }
