@@ -412,8 +412,7 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test.skip('should map array types', async () => {
-            // TODO: Implement in Phase 4
+        test('should map array types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
                 // Mark array literals
