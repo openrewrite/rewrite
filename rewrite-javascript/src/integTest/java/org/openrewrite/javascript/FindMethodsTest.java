@@ -19,15 +19,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 public class FindMethodsTest implements RewriteTest {
+
     @AfterEach
     void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
@@ -36,8 +39,9 @@ public class FindMethodsTest implements RewriteTest {
     @Test
     void findMethods(@TempDir Path projectDir) {
         rewriteRun(
-//          spec -> spec.recipe(new FindMethods("@types/lodash..* map(..)", false)),
-          spec -> spec.recipe(new FindMethods("*lodash..* max(..)", false)),
+          spec -> spec.recipe(new FindMethods("@types/lodash..* max(..)", false))
+            .dataTable(MethodCalls.Row.class, rows ->
+              assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("_.max(1, 2)")),
           npm(
             projectDir,
             typescript(

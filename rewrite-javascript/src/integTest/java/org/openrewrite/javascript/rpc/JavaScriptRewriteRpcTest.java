@@ -87,7 +87,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             spec -> spec.beforeRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                    System.out.println(method.getId());
                     //language=typescript
                     assertThat(client.print(method, getCursor().getParentOrThrow())).isEqualTo("console.log('hello')");
                     return method;

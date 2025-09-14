@@ -1,32 +1,13 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class MethodSignatureParser extends Parser {
@@ -36,18 +17,18 @@ public class MethodSignatureParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7,
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
+		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
+		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
 		Identifier=16;
 	public static final int
-		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2,
-		RULE_wildcard = 3, RULE_dotDot = 4, RULE_formalsPatternAfterDotDot = 5,
-		RULE_optionalParensTypePattern = 6, RULE_targetTypePattern = 7, RULE_formalTypePattern = 8,
+		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
+		RULE_wildcard = 3, RULE_dotDot = 4, RULE_formalsPatternAfterDotDot = 5, 
+		RULE_optionalParensTypePattern = 6, RULE_targetTypePattern = 7, RULE_formalTypePattern = 8, 
 		RULE_classNameOrInterface = 9, RULE_simpleNamePattern = 10;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"methodPattern", "formalParametersPattern", "formalsPattern", "wildcard",
-			"dotDot", "formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern",
+			"methodPattern", "formalParametersPattern", "formalsPattern", "wildcard", 
+			"dotDot", "formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
 			"formalTypePattern", "classNameOrInterface", "simpleNamePattern"
 		};
 	}
@@ -55,15 +36,15 @@ public class MethodSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'('", "')'", "'['", "']'", "','", "'.'", "'!'", "'*'", "'&&'",
+			null, null, "'('", "')'", "'['", "']'", "','", null, "'!'", "'*'", "'&&'", 
 			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA",
-			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND",
+			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", 
+			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", 
 			"SPACE", "Identifier"
 		};
 	}
@@ -149,9 +130,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitMethodPattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitMethodPattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final MethodPatternContext methodPattern() throws RecognitionException {
@@ -240,9 +221,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalParametersPattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalParametersPattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final FormalParametersPatternContext formalParametersPattern() throws RecognitionException {
@@ -328,9 +309,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalsPattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalsPattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final FormalsPatternContext formalsPattern() throws RecognitionException {
@@ -373,7 +354,7 @@ public class MethodSignatureParser extends Parser {
 						setState(50);
 						formalsPatternAfterDotDot();
 						}
-						}
+						} 
 					}
 					setState(55);
 					_errHandler.sync(this);
@@ -412,7 +393,7 @@ public class MethodSignatureParser extends Parser {
 						setState(64);
 						formalsPattern();
 						}
-						}
+						} 
 					}
 					setState(69);
 					_errHandler.sync(this);
@@ -451,7 +432,7 @@ public class MethodSignatureParser extends Parser {
 						setState(78);
 						formalsPattern();
 						}
-						}
+						} 
 					}
 					setState(83);
 					_errHandler.sync(this);
@@ -498,9 +479,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitWildcard(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitWildcard(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final WildcardContext wildcard() throws RecognitionException {
@@ -541,9 +522,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitDotDot(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitDotDot(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final DotDotContext dotDot() throws RecognitionException {
@@ -604,9 +585,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalsPatternAfterDotDot(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalsPatternAfterDotDot(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final FormalsPatternAfterDotDotContext formalsPatternAfterDotDot() throws RecognitionException {
@@ -649,7 +630,7 @@ public class MethodSignatureParser extends Parser {
 						setState(101);
 						formalsPatternAfterDotDot();
 						}
-						}
+						} 
 					}
 					setState(106);
 					_errHandler.sync(this);
@@ -700,9 +681,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitOptionalParensTypePattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitOptionalParensTypePattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final OptionalParensTypePatternContext optionalParensTypePattern() throws RecognitionException {
@@ -777,9 +758,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitTargetTypePattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitTargetTypePattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final TargetTypePatternContext targetTypePattern() throws RecognitionException {
@@ -790,6 +771,7 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		TargetTypePatternContext _localctx = new TargetTypePatternContext(_ctx, _parentState);
+		TargetTypePatternContext _prevctx = _localctx;
 		int _startState = 14;
 		enterRecursionRule(_localctx, 14, RULE_targetTypePattern, _p);
 		try {
@@ -826,6 +808,7 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
+					_prevctx = _localctx;
 					{
 					setState(131);
 					_errHandler.sync(this);
@@ -855,7 +838,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					}
+					} 
 				}
 				setState(135);
 				_errHandler.sync(this);
@@ -902,9 +885,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitFormalTypePattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitFormalTypePattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final FormalTypePatternContext formalTypePattern() throws RecognitionException {
@@ -915,6 +898,7 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		FormalTypePatternContext _localctx = new FormalTypePatternContext(_ctx, _parentState);
+		FormalTypePatternContext _prevctx = _localctx;
 		int _startState = 16;
 		enterRecursionRule(_localctx, 16, RULE_formalTypePattern, _p);
 		try {
@@ -951,6 +935,7 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
+					_prevctx = _localctx;
 					{
 					setState(148);
 					_errHandler.sync(this);
@@ -980,7 +965,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					}
+					} 
 				}
 				setState(152);
 				_errHandler.sync(this);
@@ -1039,9 +1024,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitClassNameOrInterface(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitClassNameOrInterface(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final ClassNameOrInterfaceContext classNameOrInterface() throws RecognitionException {
@@ -1052,7 +1037,7 @@ public class MethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(154);
+			setState(154); 
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -1076,7 +1061,7 @@ public class MethodSignatureParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(156);
+				setState(156); 
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,20,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -1092,7 +1077,7 @@ public class MethodSignatureParser extends Parser {
 					setState(159);
 					match(RBRACK);
 					}
-					}
+					} 
 				}
 				setState(164);
 				_errHandler.sync(this);
@@ -1136,9 +1121,9 @@ public class MethodSignatureParser extends Parser {
 		}
 		@Override
 		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
-            if (visitor instanceof MethodSignatureParserVisitor) return ((MethodSignatureParserVisitor<? extends T>) visitor).visitSimpleNamePattern(this);
-            return visitor.visitChildren(this);
-        }
+			if ( visitor instanceof MethodSignatureParserVisitor ) return ((MethodSignatureParserVisitor<? extends T>)visitor).visitSimpleNamePattern(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final SimpleNamePatternContext simpleNamePattern() throws RecognitionException {
@@ -1167,7 +1152,7 @@ public class MethodSignatureParser extends Parser {
 						setState(167);
 						match(Identifier);
 						}
-						}
+						} 
 					}
 					setState(172);
 					_errHandler.sync(this);
@@ -1202,7 +1187,7 @@ public class MethodSignatureParser extends Parser {
 						setState(178);
 						match(WILDCARD);
 						}
-						}
+						} 
 					}
 					setState(183);
 					_errHandler.sync(this);
@@ -1242,8 +1227,7 @@ public class MethodSignatureParser extends Parser {
 		return _localctx;
 	}
 
-    @Override
-    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 7:
 			return targetTypePattern_sempred((TargetTypePatternContext)_localctx, predIndex);

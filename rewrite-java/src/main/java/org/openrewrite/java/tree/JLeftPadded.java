@@ -34,7 +34,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.function.UnaryOperator;
 
@@ -49,7 +54,10 @@ import java.util.function.UnaryOperator;
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
-public class JLeftPadded<T> {
+public class JLeftPadded<T> implements RpcCodec<JLeftPadded<T>> {
+    private static final JavaSender RPC_SENDER = new JavaSender();
+    private static final JavaReceiver RPC_RECEIVER = new JavaReceiver();
+
     Space before;
     T element;
     Markers markers;
@@ -107,5 +115,15 @@ public class JLeftPadded<T> {
 
     public static <T> JLeftPadded<T> build(T element) {
         return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
+    }
+
+    @Override
+    public void rpcSend(JLeftPadded<T> after, RpcSendQueue q) {
+        RPC_SENDER.visitLeftPadded(after, q);
+    }
+
+    @Override
+    public JLeftPadded<T> rpcReceive(JLeftPadded<T> before, RpcReceiveQueue q) {
+        return RPC_RECEIVER.visitLeftPadded(before, q);
     }
 }

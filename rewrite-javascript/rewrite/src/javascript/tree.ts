@@ -16,15 +16,14 @@
  * limitations under the License.
  */
 
-import {SourceFile, TreeKind} from "../tree";
-import {Expression, J, Type, NameTree, Statement, TypedTree, TypeTree, VariableDeclarator,} from "../java";
+import {SourceFile} from "../tree";
+import {Expression, J, NameTree, Statement, Type, TypedTree, TypeTree, VariableDeclarator,} from "../java";
 
 export interface JS extends J {
 }
 
 export namespace JS {
     export const Kind = {
-        ...TreeKind,
         Alias: "org.openrewrite.javascript.tree.JS$Alias",
         ArrayBindingPattern: "org.openrewrite.javascript.tree.JS$ArrayBindingPattern",
         ArrowFunction: "org.openrewrite.javascript.tree.JS$ArrowFunction",

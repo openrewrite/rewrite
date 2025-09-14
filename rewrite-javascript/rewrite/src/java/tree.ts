@@ -21,6 +21,7 @@ import {SourceFile, Tree, TreeKind} from "../tree";
 import {Type} from "./type";
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {JavaReceiver, JavaSender} from "./rpc";
+import Space = J.Space;
 
 export interface J extends Tree {
     readonly prefix: J.Space;
@@ -55,7 +56,6 @@ export interface NameTree extends J {
 
 export namespace J {
     export const Kind = {
-        ...TreeKind,
         AnnotatedType: "org.openrewrite.java.tree.J$AnnotatedType",
         Annotation: "org.openrewrite.java.tree.J$Annotation",
         ArrayAccess: "org.openrewrite.java.tree.J$ArrayAccess",
@@ -901,5 +901,37 @@ Object.values(J.Kind).forEach(kind => {
                 }
             }
         );
+    } else if (kind === J.Kind.RightPadded) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive<T extends J | boolean>(before: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
+                return (await javaReceiver.visitRightPadded(before, q))!;
+            },
+
+            async rpcSend<T extends J | boolean>(after: J.RightPadded<T>, q: RpcSendQueue): Promise<void> {
+                await javaSender.visitRightPadded(after, q);
+            }
+        })
+    } else if (kind === J.Kind.LeftPadded) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive<T extends J | Space | number | string | boolean>(before: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+                return (await javaReceiver.visitLeftPadded(before, q))!;
+            },
+
+            async rpcSend<T extends J | Space | number | string | boolean>(after: J.LeftPadded<T>, q: RpcSendQueue): Promise<void> {
+                await javaSender.visitLeftPadded(after, q);
+            }
+        })
+    } else if (kind === J.Kind.Container) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive<T extends J>(before: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+                return (await javaReceiver.visitContainer(before, q))!;
+            },
+
+            async rpcSend<T extends J>(after: J.Container<T>, q: RpcSendQueue): Promise<void> {
+                await javaSender.visitContainer(after, q);
+            }
+        })
+    } else {
+        RpcCodecs.registerCodec(kind, javaCodec);
     }
 });
