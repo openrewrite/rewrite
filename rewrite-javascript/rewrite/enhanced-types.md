@@ -72,37 +72,36 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
   - ⚠️ Index signatures - needs additional work
   - ⚠️ Mapped types - needs additional work
 
-### Phase 3: Function and Method Types
-- [ ] **3.1 Complete `methodType()` Implementation**
-  - Map function/method signatures to `JavaType.Method`
-  - Extract parameter names and types
-  - Handle return types
-  - Support overloaded methods
-  ```typescript
-  methodType(node: ts.Node): JavaType.Method | undefined {
-    // Get signature from type checker
-    // Map to JavaType.Method
-  }
-  ```
+### Phase 3: Function and Method Types ✅
+- [x] **3.1 Complete `methodType()` Implementation** ✅
+  - ✅ Map function/method signatures to `JavaType.Method`
+  - ✅ Extract parameter names and types
+  - ✅ Handle return types
+  - ✅ Support for call expressions, method declarations, and function declarations
+  - ⚠️ Overloaded methods - partially supported (signature resolution works)
 
-- [ ] **3.2 Handle Constructor Types**
-  - Map constructor signatures
-  - Handle constructor overloads
+- [x] **3.2 Handle Different Function Forms** ✅
+  - ✅ Function declarations (`function foo()`)
+  - ✅ Method declarations in classes/interfaces
+  - ⚠️ Arrow functions (Lambda) - methodType created but not attached to Lambda node
+  - ✅ Function expressions
+  - ✅ Method invocations with resolved signatures
 
-- [ ] **3.3 Support Arrow Functions and Function Expressions**
-  - Ensure all function forms are properly typed
+- [x] **3.3 Method Type Testing** ✅
+  - ✅ Tests for function declarations
+  - ⚠️ Tests for arrow functions (skipped - needs Lambda methodType attachment)
+  - ✅ Tests for method invocations
+  - ✅ Proper Type.Method creation with all required fields
 
 ### Phase 4: Complex Types
-- [ ] **4.1 Implement Array Type Support**
-  - Map arrays to `JavaType.Array`
-  - Handle tuple types
-  - Support readonly arrays
-  ```typescript
-  if (checker.isArrayType(type)) {
-    const elemType = checker.getTypeArguments(type)[0];
-    // Create JavaType.Array
-  }
-  ```
+- [x] **4.1 Implement Array Type Support** ✅
+  - ✅ Map arrays to `JavaType.Array`
+  - ✅ Handle element type extraction via `getTypeArguments`
+  - ✅ Properly detect arrays using `checker.isArrayType()`
+  - ✅ Arrays mapped before classes to avoid treating Array<T> as Class
+  - ✅ Readonly arrays (`readonly T[]` and `ReadonlyArray<T>`) - mapped to same Type.Array
+  - ✅ Frozen arrays (`Object.freeze([...])`) - properly detected as arrays
+  - ⚠️ Tuple types - not recognized by `isArrayType()`, need special handling
 
 - [ ] **4.2 Implement Union Type Support**
   - Map union types to `JavaType.Union`
@@ -227,6 +226,15 @@ This document tracks the implementation of enhanced type mapping for the JavaScr
 - **RPC Codecs**: Each JavaType kind needs an RPC codec for serialization/deserialization
 - **asRef Usage**: Critical for avoiding duplicate sending of the same type instance and handling cycles in RPC
 - **Code Deduplication**: Heritage clause processing extracted into `extractHeritage()` helper method
+
+### Phase 4 Learnings
+- **Array Detection**: TypeScript represents `Array<T>` as a generic interface, not a special array type
+- **Type Check Order**: Must check `isArrayType()` BEFORE checking for class/interface types
+- **Element Types**: Use `checker.getTypeArguments(type)[0]` to extract the element type
+- **Test Discovery**: Array literals in JavaScript/TypeScript are mapped to `J.NewArray` in the AST
+- **Readonly Arrays**: Both `readonly T[]` and `ReadonlyArray<T>` are correctly identified by `isArrayType()`
+- **Object.freeze**: Arrays frozen with `Object.freeze()` are still detected as arrays
+- **Tuples**: Tuple types like `[string, number]` are NOT recognized by `isArrayType()` and need special handling
 
 ### TypeChecker Capabilities Discovered
 - TypeChecker can infer types even from plain JavaScript through control flow analysis

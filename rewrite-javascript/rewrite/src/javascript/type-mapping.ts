@@ -62,7 +62,15 @@ export class JavaScriptTypeMapping {
             return existing;
         }
 
-        // Check for class/interface/enum types first (they may also have Object flag)
+        // Check if this is an array type BEFORE checking for classes
+        // TypeScript represents Array<T> as a reference to the Array interface
+        if (this.checker.isArrayType(type)) {
+            const arrayType = this.createArrayType(type as ts.TypeReference);
+            this.typeCache.set(signature, arrayType);
+            return arrayType;
+        }
+
+        // Check for class/interface/enum types (but not arrays)
         const symbol = type.getSymbol?.();
         if (symbol) {
             if (symbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface | ts.SymbolFlags.Enum | ts.SymbolFlags.TypeAlias)) {
@@ -263,6 +271,24 @@ export class JavaScriptTypeMapping {
                 return Type.signature(this);
             }
         }) as Type.Method;
+    }
+
+    /**
+     * Create a JavaType.Array from a TypeScript array type
+     */
+    private createArrayType(type: ts.TypeReference): Type.Array {
+        // Get the element type (type argument of Array<T>)
+        const typeArgs = this.checker.getTypeArguments(type);
+        const elemType = typeArgs.length > 0 ? this.getType(typeArgs[0]) : Type.unknownType;
+        
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Array,
+            elemType: elemType,
+            annotations: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Array;
     }
 
     /**

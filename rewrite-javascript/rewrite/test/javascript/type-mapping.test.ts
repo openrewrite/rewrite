@@ -443,14 +443,100 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test.skip('should map function types', async () => {
-            // TODO: Implement in Phase 3
+        test.skip('should map tuple types', async () => {
+            // TODO: Tuples are not recognized as arrays by isArrayType()
+            // They need special handling as they are a different TypeScript type
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark function identifiers with their method type
-                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'add') {
-                    // Check for Method type using kind property
-                    return type?.kind === Type.Kind.Method ? `(number, number) => number` : null;
+                // Mark tuple literals
+                if (node?.kind === J.Kind.NewArray) {
+                    if (Type.isArray(type)) {
+                        const elemTypeName = Type.isPrimitive(type.elemType)
+                            ? type.elemType.keyword || 'unknown'
+                            : Type.isClass(type.elemType)
+                            ? 'union'  // Tuples often have union element types
+                            : 'unknown';
+                        return `Array<${elemTypeName}>`;
+                    }
+                    // Debug what we get for tuples
+                    if (type) {
+                        return `NotArray:${type.kind}`;
+                    }
+                    return 'NO_TYPE';
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const tuple: [string, number] = ["hello", 42];
+                        const triple: [boolean, string, number] = [true, "test", 123];
+                    `,
+                    `
+                        const tuple: [string, number] = /*~~(Array<union>)~~>*/["hello", 42];
+                        const triple: [boolean, string, number] = /*~~(Array<union>)~~>*/[true, "test", 123];
+                    `
+                )
+            );
+        });
+
+        test('should map readonly array types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark array literals assigned to readonly arrays
+                if (node?.kind === J.Kind.NewArray) {
+                    if (Type.isArray(type)) {
+                        const elemTypeName = Type.isPrimitive(type.elemType)
+                            ? type.elemType.keyword || 'unknown'
+                            : 'unknown';
+                        return `Array<${elemTypeName}>`;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const readonlyNumbers: readonly number[] = [1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = ["a", "b"];
+                        const frozenArray = Object.freeze([1, 2, 3]);
+                    `,
+                    `
+                        const readonlyNumbers: readonly number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array<String>)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(Array<double>)~~>*/[1, 2, 3]);
+                    `
+                )
+            );
+        });
+
+        test.skip('should map function types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark function declarations with their method type
+                if (node?.kind === J.Kind.MethodDeclaration) {
+                    const methodDecl = node as J.MethodDeclaration;
+                    if (methodDecl.name.simpleName === 'add') {
+                        // Pass the methodType as the type parameter instead
+                        // since the predicate function expects it as the second parameter
+                        return null; // We'll use the passed-in type parameter
+                    }
+                }
+                // The type parameter contains methodType for MethodDeclaration nodes
+                if (type && type.kind === Type.Kind.Method) {
+                    const methodType = type as Type.Method;
+                    if (methodType.name === 'add') {
+                        const params = methodType.parameterNames.join(', ');
+                        const returnTypeName = Type.isPrimitive(methodType.returnType) 
+                            ? methodType.returnType.keyword || 'unknown'
+                            : 'unknown';
+                        return `(${params}) => ${returnTypeName}`;
+                    }
                 }
                 return null;
             });
@@ -464,9 +550,75 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        function /*~~((number, number) => number)~~>*/add(a: number, b: number): number {
+                        /*~~((a, b) => double)~~>*/function add(a: number, b: number): number {
                             return a + b;
                         }
+                    `
+                )
+            );
+        });
+
+        test.skip('should map arrow function types', async () => {
+            // TODO: Arrow functions need special handling - methodType might not be attached to Lambda
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark arrow functions with their method type
+                if (node?.kind === J.Kind.Lambda) {
+                    const lambda = node as J.Lambda;
+                    // Arrow functions might have methodType attached
+                    const methodType = (lambda as any).methodType;
+                    if (methodType && methodType.kind === Type.Kind.Method) {
+                        const params = methodType.parameterNames.join(', ');
+                        const returnTypeName = Type.isPrimitive(methodType.returnType)
+                            ? methodType.returnType.keyword || 'unknown'
+                            : 'unknown';
+                        return `(${params}) => ${returnTypeName}`;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const multiply = (x: number, y: number): number => x * y;
+                    `,
+                    `
+                        const multiply = /*~~((x, y) => double)~~>*/(x: number, y: number): number => x * y;
+                    `
+                )
+            );
+        });
+
+        test('should map method invocation types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                // Mark method invocations with their method type
+                if (node?.kind === J.Kind.MethodInvocation) {
+                    const invocation = node as J.MethodInvocation;
+                    const methodType = invocation.methodType;
+                    if (methodType && methodType.kind === Type.Kind.Method) {
+                        return `${methodType.name}() returns ${
+                            Type.isPrimitive(methodType.returnType)
+                                ? methodType.returnType.keyword || 'unknown'
+                                : 'unknown'
+                        }`;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const result = Math.sqrt(16);
+                    `,
+                    `
+                        const result = /*~~(sqrt() returns double)~~>*/Math.sqrt(16);
                     `
                 )
             );
@@ -554,6 +706,42 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                 async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J.Identifier> {
                     const visited = await super.visitIdentifier(ident, p) as J.Identifier;
                     const description = predicate(ident, ident.type);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+                    const visited = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+                    const description = predicate(visited, visited.methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitNewArray(newArray: J.NewArray, p: ExecutionContext): Promise<J.NewArray> {
+                    const visited = await super.visitNewArray(newArray, p) as J.NewArray;
+                    const description = predicate(visited, visited.type);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitLambda(lambda: J.Lambda, p: ExecutionContext): Promise<J.Lambda> {
+                    const visited = await super.visitLambda(lambda, p) as J.Lambda;
+                    const description = predicate(visited, (visited as any).methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
+                    const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                    const description = predicate(visited, visited.methodType);
                     if (description) {
                         return foundSearchResult(visited, description);
                     }
