@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureLexer.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class MethodSignatureLexer extends Lexer {
@@ -31,8 +32,8 @@ public class MethodSignatureLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7,
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
+		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
+		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
 		Identifier=16;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -44,8 +45,8 @@ public class MethodSignatureLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
-			"BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", "SPACE",
+			"CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
+			"BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", "SPACE", 
 			"Identifier", "JavaLetter", "JavaLetterOrDigit"
 		};
 	}
@@ -53,15 +54,15 @@ public class MethodSignatureLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'('", "')'", "'['", "']'", "','", "'.'", "'!'", "'*'", "'&&'",
+			null, null, "'('", "')'", "'['", "']'", "','", null, "'!'", "'*'", "'&&'", 
 			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA",
-			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND",
+			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", 
+			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", 
 			"SPACE", "Identifier"
 		};
 	}
@@ -174,7 +175,7 @@ public class MethodSignatureLexer extends Lexer {
 		"\u0000\u0012\u0001\u0001\u0003\u0002\u0005\u0003\u0007\u0004\t\u0005\u000b"+
 		"\u0006\r\u0007\u000f\b\u0011\t\u0013\n\u0015\u000b\u0017\f\u0019\r\u001b"+
 		"\u000e\u001d\u000f\u001f\u0010!\u0000#\u0000\u0001\u0000\u0005\u0004\u0000"+
-		"$$AZ__az\u0002\u0000\u0000\u007f\u8000\ud800\u8000\udbff\u0001\u0000\u8000"+
+		"$$@Z__az\u0002\u0000\u0000\u007f\u8000\ud800\u8000\udbff\u0001\u0000\u8000"+
 		"\ud800\u8000\udbff\u0001\u0000\u8000\udc00\u8000\udfff\u0005\u0000$$0"+
 		"9AZ__azu\u0000\u0001\u0001\u0000\u0000\u0000\u0000\u0003\u0001\u0000\u0000"+
 		"\u0000\u0000\u0005\u0001\u0000\u0000\u0000\u0000\u0007\u0001\u0000\u0000"+
@@ -201,26 +202,25 @@ public class MethodSignatureLexer extends Lexer {
 		"9\u0002\u0001\u0000\u0000\u0000:;\u0005(\u0000\u0000;\u0004\u0001\u0000"+
 		"\u0000\u0000<=\u0005)\u0000\u0000=\u0006\u0001\u0000\u0000\u0000>?\u0005"+
 		"[\u0000\u0000?\b\u0001\u0000\u0000\u0000@A\u0005]\u0000\u0000A\n\u0001"+
-		"\u0000\u0000\u0000BC\u0005,\u0000\u0000C\f\u0001\u0000\u0000\u0000DE\u0005"+
-		".\u0000\u0000E\u000e\u0001\u0000\u0000\u0000FG\u0005!\u0000\u0000G\u0010"+
-		"\u0001\u0000\u0000\u0000HI\u0005*\u0000\u0000I\u0012\u0001\u0000\u0000"+
-		"\u0000JK\u0005&\u0000\u0000KL\u0005&\u0000\u0000L\u0014\u0001\u0000\u0000"+
-		"\u0000MN\u0005|\u0000\u0000NO\u0005|\u0000\u0000O\u0016\u0001\u0000\u0000"+
-		"\u0000PQ\u0005.\u0000\u0000QR\u0005.\u0000\u0000RS\u0005.\u0000\u0000"+
-		"S\u0018\u0001\u0000\u0000\u0000TU\u0005.\u0000\u0000UV\u0005.\u0000\u0000"+
-		"V\u001a\u0001\u0000\u0000\u0000WX\u0005#\u0000\u0000X\u001c\u0001\u0000"+
-		"\u0000\u0000YZ\u0005 \u0000\u0000Z\u001e\u0001\u0000\u0000\u0000[_\u0003"+
-		"!\u0010\u0000\\^\u0003#\u0011\u0000]\\\u0001\u0000\u0000\u0000^a\u0001"+
-		"\u0000\u0000\u0000_]\u0001\u0000\u0000\u0000_`\u0001\u0000\u0000\u0000"+
-		"` \u0001\u0000\u0000\u0000a_\u0001\u0000\u0000\u0000bi\u0007\u0000\u0000"+
-		"\u0000cd\b\u0001\u0000\u0000di\u0004\u0010\u0000\u0000ef\u0007\u0002\u0000"+
-		"\u0000fg\u0007\u0003\u0000\u0000gi\u0004\u0010\u0001\u0000hb\u0001\u0000"+
-		"\u0000\u0000hc\u0001\u0000\u0000\u0000he\u0001\u0000\u0000\u0000i\"\u0001"+
-		"\u0000\u0000\u0000jq\u0007\u0004\u0000\u0000kl\b\u0001\u0000\u0000lq\u0004"+
-		"\u0011\u0002\u0000mn\u0007\u0002\u0000\u0000no\u0007\u0003\u0000\u0000"+
-		"oq\u0004\u0011\u0003\u0000pj\u0001\u0000\u0000\u0000pk\u0001\u0000\u0000"+
-		"\u0000pm\u0001\u0000\u0000\u0000q$\u0001\u0000\u0000\u0000\u0005\u0000"+
-		"8_hp\u0000";
+		"\u0000\u0000\u0000BC\u0005,\u0000\u0000C\f\u0001\u0000\u0000\u0000DE\u0002"+
+		"./\u0000E\u000e\u0001\u0000\u0000\u0000FG\u0005!\u0000\u0000G\u0010\u0001"+
+		"\u0000\u0000\u0000HI\u0005*\u0000\u0000I\u0012\u0001\u0000\u0000\u0000"+
+		"JK\u0005&\u0000\u0000KL\u0005&\u0000\u0000L\u0014\u0001\u0000\u0000\u0000"+
+		"MN\u0005|\u0000\u0000NO\u0005|\u0000\u0000O\u0016\u0001\u0000\u0000\u0000"+
+		"PQ\u0005.\u0000\u0000QR\u0005.\u0000\u0000RS\u0005.\u0000\u0000S\u0018"+
+		"\u0001\u0000\u0000\u0000TU\u0005.\u0000\u0000UV\u0005.\u0000\u0000V\u001a"+
+		"\u0001\u0000\u0000\u0000WX\u0005#\u0000\u0000X\u001c\u0001\u0000\u0000"+
+		"\u0000YZ\u0005 \u0000\u0000Z\u001e\u0001\u0000\u0000\u0000[_\u0003!\u0010"+
+		"\u0000\\^\u0003#\u0011\u0000]\\\u0001\u0000\u0000\u0000^a\u0001\u0000"+
+		"\u0000\u0000_]\u0001\u0000\u0000\u0000_`\u0001\u0000\u0000\u0000` \u0001"+
+		"\u0000\u0000\u0000a_\u0001\u0000\u0000\u0000bi\u0007\u0000\u0000\u0000"+
+		"cd\b\u0001\u0000\u0000di\u0004\u0010\u0000\u0000ef\u0007\u0002\u0000\u0000"+
+		"fg\u0007\u0003\u0000\u0000gi\u0004\u0010\u0001\u0000hb\u0001\u0000\u0000"+
+		"\u0000hc\u0001\u0000\u0000\u0000he\u0001\u0000\u0000\u0000i\"\u0001\u0000"+
+		"\u0000\u0000jq\u0007\u0004\u0000\u0000kl\b\u0001\u0000\u0000lq\u0004\u0011"+
+		"\u0002\u0000mn\u0007\u0002\u0000\u0000no\u0007\u0003\u0000\u0000oq\u0004"+
+		"\u0011\u0003\u0000pj\u0001\u0000\u0000\u0000pk\u0001\u0000\u0000\u0000"+
+		"pm\u0001\u0000\u0000\u0000q$\u0001\u0000\u0000\u0000\u0005\u00008_hp\u0000";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

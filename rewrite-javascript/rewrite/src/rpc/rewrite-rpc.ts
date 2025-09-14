@@ -115,7 +115,7 @@ export class RewriteRpc {
             );
         }, this.options.traceGetObjectInput);
 
-        const remoteObject = await q.receive<P>(this.localObjects.get(id));
+        const remoteObject = await q.receive<P>(localObject);
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
@@ -152,7 +152,8 @@ export class RewriteRpc {
     }
 
     async print(tree: SourceFile): Promise<string>;
-    async print<T extends Tree>(tree: T, cursor?: Cursor): Promise<string> {
+    async print(tree: Tree, cursor: Cursor): Promise<string>;
+    async print(tree: Tree, cursor?: Cursor): Promise<string> {
         if (!cursor && !isSourceFile(tree)) {
             throw new Error("Cursor is required for non-SourceFile trees");
         }

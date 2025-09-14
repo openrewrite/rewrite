@@ -350,6 +350,10 @@ public class RewriteRpc {
         return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
     }
 
+    public String print(Tree tree, Cursor parent) {
+        return print(tree, parent, null);
+    }
+
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
         return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);

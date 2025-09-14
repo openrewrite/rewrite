@@ -23,9 +23,9 @@
     "build": "rm -rf ./dist tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
     "postbuild": "chmod +x dist/rpc/server.js && npm link",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run build && jest",
+    "test": "npm run build && NODE_OPTIONS='--max-old-space-size=4096' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "jest",
+    "ci:test": "NODE_OPTIONS='--max-old-space-size=4096' jest",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {

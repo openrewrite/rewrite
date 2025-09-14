@@ -1,4 +1,4 @@
-// noinspection JSUnusedLocalSymbols
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport
 
 /*
  * Copyright 2025 the original author or authors.
@@ -24,8 +24,10 @@ import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
-import {javascript, JS} from "@openrewrite/rewrite/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 import fs from "node:fs";
+import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -77,6 +79,22 @@ describe("Rewrite RPC", () => {
                 expect(await client.print(text)).toEqual("Hello Jon!");
                 return text;
             }
+        }
+    ));
+
+    test("print subtree", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("console.log('hello');"),
+            beforeRecipe: async (cu: JS.CompilationUnit) =>
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                        //language=typescript
+                        expect(await client.print(method, this.cursor!.parent!))
+                            .toEqual("console.log('hello')");
+                        return method;
+                    }
+                }).visit(cu, 0)
         }
     ));
 
@@ -224,5 +242,45 @@ describe("Rewrite RPC", () => {
         expect(clientC2.value).toEqual({k: 1});
         expect(clientC2.parent!.value).toEqual({k: 0});
         expect(clientC2.parent!.parent!.value).toEqual("root");
+    });
+
+    test("JavaType.Class codecs across RPC boundaries", async () => {
+        await withDir(async repo => {
+            spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.mark-class-types");
+
+            //language=typescript
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(
+                        `
+                            import _ from 'lodash';
+
+                            const result = _.map([1, 2, 3], n => n * 2);
+                        `,
+                        `
+                            import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+
+                            const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "lodash": "^4.17.21"
+                            },
+                            "devDependencies": {
+                              "@types/lodash": "^4.14.195"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
     });
 });

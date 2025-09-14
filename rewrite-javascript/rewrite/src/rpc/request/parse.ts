@@ -16,7 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
 import {UUID} from "node:crypto";
-import {ParserInput, Parsers} from "../../parser";
+import {Parser, ParserInput, Parsers} from "../../parser";
 import {randomId} from "../../uuid";
 import {produce} from "immer";
 import {SourceFile} from "../../tree";
