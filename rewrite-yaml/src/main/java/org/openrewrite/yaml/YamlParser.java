@@ -481,6 +481,11 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
 
                 @Override
+                public Yaml.Documents visitDocuments(Yaml.Documents documents, Integer integer) {
+                    return unwrapPrefixedMappings(super.visitDocuments(documents, integer));
+                }
+
+                @Override
                 public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
                     Yaml.Mapping m = super.visitMapping(mapping, p);
                     String opening = m.getOpeningBracePrefix();
@@ -513,6 +518,12 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     return s;
                 }
+
+                @Override
+                public Yaml.Document.End visitDocumentEnd(Yaml.Document.End end, Integer integer) {
+                    return end.withPrefix(restoreUuidPlaceholders(end.getPrefix()));
+                }
+
             }.visitNonNull(result, 0);
 
         } catch (IOException e) {
@@ -763,6 +774,30 @@ public class YamlParser implements org.openrewrite.Parser {
         public SequenceWithPrefix withClosingBracketPrefix(@Nullable String closingBracketPrefix) {
             // Cannot use super as this returns Yaml.Sequence
             return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor(), getTag(), prefix);
+        }
+
+        @Override
+        public SequenceWithPrefix withOpeningBracketPrefix(@Nullable String openingBracketPrefix) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), openingBracketPrefix, getEntries(), getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
+        }
+
+        @Override
+        public Sequence withTag(@Nullable Tag tag) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), tag, prefix);
+        }
+
+        @Override
+        public Sequence withEntries(List<Entry> entries) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), entries, getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
+        }
+
+        @Override
+        public Sequence withMarkers(Markers markers) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), markers, getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
         }
 
         public Sequence toSequence() {

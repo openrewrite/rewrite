@@ -448,8 +448,7 @@ public class GroovyParserVisitor {
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
 
             Space namePrefix = whitespace();
-            String enumName = field.getName();
-            skip(enumName);
+            String enumName = skip(field.getName());
 
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
 
@@ -462,24 +461,32 @@ public class GroovyParserVisitor {
                 int start = cursor;
                 int argCount = 0;
                 int depth = 0;
-                whitespace();
+                cursor = indexOfNextNonWhitespace(cursor, source);
                 while (!(source.charAt(cursor) == ')' && depth == 0)) {
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
                         cursor += delimiter.open.length();
-                        sourceBefore(delimiter.close);
+                        if ("\"".equals(delimiter.close)) {
+                            // This is to prevent sourceBefore interpreting // in strings as comments
+                            cursor = source.indexOf("\"", cursor) + 1;
+                            while (source.charAt(cursor - 2) == '\\') {
+                                cursor = source.indexOf("\"", cursor) + 1;
+                            }
+                        } else {
+                            sourceBefore(delimiter.close);
+                        }
                     } else {
                         name();
                     }
-                    whitespace();
+                    cursor = indexOfNextNonWhitespace(cursor, source);
                     skip(",");
-                    whitespace();
+                    cursor = indexOfNextNonWhitespace(cursor, source);
                     if (source.charAt(cursor) == '(') {
                         depth++;
-                        skip("(");
+                        cursor++;
                     } else if (depth > 0 && source.charAt(cursor) == ')') {
                         depth--;
-                        skip(")");
+                        cursor++;
                     }
                     argCount++;
                 }
@@ -2595,15 +2602,16 @@ public class GroovyParserVisitor {
      * The cursor will be moved before first non-whitespace character.
      */
     private Space whitespace() {
-        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
-        cursor += prefix.length();
-        return format(prefix);
+        int endIndex = indexOfNextNonWhitespace(cursor, source);
+        Space space = format(source, cursor, endIndex);
+        cursor = endIndex;
+        return space;
     }
 
     /**
      * Move the cursor after the token.
      */
-    private String skip(@Nullable String token) {
+    private @Nullable String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
             return null;
@@ -2904,6 +2912,8 @@ public class GroovyParserVisitor {
             return isPatternOperator ? PATTERN_SINGLE_QUOTE_STRING : SINGLE_QUOTE_STRING;
         } else if (source.startsWith("[", c)) {
             return ARRAY;
+        } else if (source.startsWith("{", c)) {
+            return CLOSURE;
         }
 
         return null;
@@ -2911,7 +2921,7 @@ public class GroovyParserVisitor {
 
     private boolean validateIsDelimiter(@Nullable ASTNode node, int c) {
         if (node == null) {
-            return false;
+            return true;
         }
         FindBinaryOperationVisitor visitor = new FindBinaryOperationVisitor(source.substring(c, c + 1), c, sourceLineNumberOffsets);
         node.visit(visitor);

@@ -846,10 +846,28 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
+    @Override
+    public J visitAnyPattern(AnyPatternTree node, Space space) {
+        JavaType type = typeMapping.type(node);
+        if (type instanceof JavaType.Variable var) {
+            type = var.withName("_");
+        }
+        skip("_");
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), "_",
+                type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+                type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+    }
+
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
-            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                    type, typeMapping.variableType(b.var.sym));
+            String name = b.getVariable().getName().isEmpty() ? "_" : b.getVariable().getName().toString();
+            Space space = sourceBefore(name);
+            JavaType.Variable vartype = typeMapping.variableType(b.var.sym);
+            if ("_".equals(name) && vartype != null) {
+                vartype = vartype.withName("_");
+            }
+            return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), name,
+                    type, vartype);
         } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
@@ -1749,21 +1767,24 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
 
-            Space namedVarPrefix = sourceBefore(n.getName().toString());
+            String varName = n.getName().isEmpty() ? "_" : n.getName().toString();
+            Space namedVarPrefix = sourceBefore(varName);
 
-            JavaType type = typeMapping.type(n);
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),
-                    type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
-                    type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+            JavaType.Variable type = typeMapping.variableType(n.sym);
+            if ("_".equals(varName) && type != null) {
+                type = type.withName("_");
+            }
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
             vars.add(
                     padRight(
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
-                                    name,
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), varName,
+                                            type != null ? type.getType() : null,
+                                            type),
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    (JavaType.Variable) typeMapping.type(n)
+                                    type
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
