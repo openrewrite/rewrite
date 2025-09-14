@@ -47,7 +47,7 @@ public class Assertions {
             if (multiSpec instanceof SourceSpec) {
                 SourceSpec<?> spec = (SourceSpec<?>) multiSpec;
                 Path sourcePath = spec.getSourcePath();
-                if (sourcePath != null && sourcePath.toFile().getName().equals("package.json")) {
+                if (sourcePath != null && "package.json".equals(sourcePath.toFile().getName())) {
                     try {
                         Path packageJson = relativeTo.resolve(sourcePath);
                         if (Files.exists(packageJson)) {
