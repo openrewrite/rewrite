@@ -153,7 +153,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             })
             .dataTable(SourcesFileResults.Row.class, rows -> {
                 long totalEstimatedTimeSaving = rows.stream()
-                    .mapToLong(row -> row.getEstimatedTimeSaving() != null ? row.getEstimatedTimeSaving() : 0L)
+                    .mapToLong(SourcesFileResults.Row::getEstimatedTimeSaving)
                     .sum();
                 assertThat(totalEstimatedTimeSaving).isEqualTo(expectedMinutes * 60L);
             }),
