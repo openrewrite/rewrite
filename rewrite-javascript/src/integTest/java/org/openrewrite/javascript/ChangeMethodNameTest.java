@@ -19,18 +19,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.ChangeMethodName;
-import org.openrewrite.java.search.FindMethods;
-import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
-public class ChangeMethodNameTest implements RewriteTest {
+class ChangeMethodNameTest implements RewriteTest {
 
     @AfterEach
     void after() {
