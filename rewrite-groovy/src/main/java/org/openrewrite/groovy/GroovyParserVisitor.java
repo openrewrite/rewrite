@@ -516,7 +516,6 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
                     argCount++;
-                    
                     // Safety check: if cursor didn't advance, throw an exception to avoid infinite loop
                     if (cursor == cursorBeforeIteration) {
                         throw new IllegalStateException(
