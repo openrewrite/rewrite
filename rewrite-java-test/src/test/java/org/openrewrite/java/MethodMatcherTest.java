@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -29,6 +30,7 @@ import org.openrewrite.test.TypeValidation;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
@@ -53,8 +55,11 @@ class MethodMatcherTest implements RewriteTest {
 
     @Test
     void invalidMethodMatcher() {
-        assertThat(MethodMatcher.validate("com.google.common.collect.*")
-          .isValid()).isFalse();
+        Validated<String> validate = MethodMatcher.validate("com.google.common.collect.*");
+        assertThat(validate.isValid()).isFalse();
+        assertThat(validate.failures()).isNotEmpty();
+        assertThat(validate.failures().getFirst().getMessage()).contains("mismatched input");
+        assertThat(validate.failures().getFirst().getException()).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -539,5 +544,11 @@ class MethodMatcherTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    void failsToParse() {
+        assertThatThrownBy(() -> new MethodMatcher("foo(|bar)"))
+          .isInstanceOf(IllegalArgumentException.class);
     }
 }
