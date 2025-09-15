@@ -53,7 +53,6 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
         @Column(displayName = "Estimated time saving",
                 description = "An estimated effort that a developer to fix manually instead of using this recipe," +
                               " in unit of seconds.")
-        @Nullable
         Long estimatedTimeSaving;
 
         @Column(displayName = "Cycle",
