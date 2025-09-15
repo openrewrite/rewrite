@@ -303,7 +303,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
                                     fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string
                                     fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null,
-                                    fields.length > 16 && !fields[16].isEmpty() ? fields[16].split("\\|") : null,  // typeAnnotations - keep | delimiter between different type contexts
+                                    fields.length > 16 && !fields[16].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[16], '|') : null,  // typeAnnotations - keep `|` delimiter between different type contexts
                                     fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null
                             ));
                         }
