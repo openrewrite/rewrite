@@ -91,8 +91,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return markers.getMarkers();
     }
 
-    @Nullable
-    Path getSourcePath() {
+    public @Nullable Path getSourcePath() {
         return sourcePath == null ? null : dir.resolve(sourcePath);
     }
 
