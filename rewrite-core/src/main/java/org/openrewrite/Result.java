@@ -70,6 +70,7 @@ public class Result {
         this.recipes = recipes;
 
         Duration timeSavings = Duration.ZERO;
+        // for each stack of recipes, take the last recipe in the stack (the leaf) and sum its estimated time savings
         for (List<Recipe> recipesStack : recipes) {
             if (recipesStack != null && !recipesStack.isEmpty()) {
                 Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
