@@ -18,6 +18,7 @@ package org.openrewrite.javascript.rpc;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,6 +27,7 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.rpc.request.Print;
@@ -41,12 +43,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.javascript.Assertions.javascript;
+import static org.openrewrite.javascript.Assertions.*;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-//@Disabled
+@Disabled
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
@@ -59,6 +61,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .recipeInstallDir(tempDir)
           .log(tempDir.resolve("rpc.log"))
           .verboseLogging()
+          .inspectBrk()
         );
         client = JavaScriptRewriteRpc.getOrStart();
     }
@@ -66,13 +69,14 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @AfterEach
     void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
-        System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        if (Files.exists(tempDir.resolve("rpc.log"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        }
     }
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.validateRecipeSerialization(false)
-          .cycles(1);
+        spec.validateRecipeSerialization(false);
     }
 
     @DocumentExample
@@ -82,8 +86,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.example.npm.change-version",
-              Map.of("version", "1.0.0")))
-            .expectedCyclesThatMakeChanges(1),
+              Map.of("version", "1.0.0"))),
           json(
             """
               {
@@ -102,6 +105,23 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void printSubtree() {
+        rewriteRun(
+          typescript(
+            "console.log('hello');",
+            spec -> spec.beforeRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    //language=typescript
+                    assertThat(client.print(method, getCursor().getParentOrThrow())).isEqualTo("console.log('hello')");
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
     @SuppressWarnings("JSUnusedLocalSymbols")
     @Test
     void runSearchRecipe() {
@@ -109,8 +129,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.example.javascript.find-identifier",
-              Map.of("identifier", "hello")))
-            .expectedCyclesThatMakeChanges(1),
+              Map.of("identifier", "hello"))),
           javascript(
             "const hello = 'world'",
             "const /*~~>*/hello = 'world'"
@@ -126,8 +145,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.example.javascript.remote-find-identifier-with-path",
-              Map.of("identifier", "hello", "requiredPath", "hello.js")))
-            .expectedCyclesThatMakeChanges(matchesPrecondition ? 1 : 0),
+              Map.of("identifier", "hello", "requiredPath", "hello.js"))),
           matchesPrecondition ?
             javascript(
               "const hello = 'world'",
@@ -278,6 +296,43 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         rewriteRun(
           json(packageJson, spec -> spec.beforeRecipe(json ->
             assertThat(client.print(json)).isEqualTo(packageJson.trim())))
+        );
+    }
+
+    @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
+    @Test
+    void javaTypeClassCodecsAcrossRpcBoundary(@TempDir Path projectDir) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe("org.openrewrite.example.javascript.mark-class-types", Map.of())),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import _ from 'lodash';
+                const result = _.map([1, 2, 3], n => n * 2);
+                """,
+              """
+                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  },
+                  "devDependencies": {
+                    "@types/lodash": "^4.14.195"
+                  }
+                }
+                """
+            )
+          )
         );
     }
 

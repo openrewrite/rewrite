@@ -17,6 +17,7 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")

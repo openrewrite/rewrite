@@ -224,10 +224,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             return defaultValue(null, p);
         }
 
-        boolean topLevel = false;
-        if (visitCount == 0) {
-            topLevel = true;
-        }
+        boolean topLevel = visitCount == 0;
 
         visitCount++;
         setCursor(new Cursor(cursor, tree));
@@ -263,7 +260,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             if (topLevel) {
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
-                         v.setCursor(getCursor());
+                        v.setCursor(getCursor());
                         //noinspection unchecked
                         t = (T) v.visit(t, p);
                     }

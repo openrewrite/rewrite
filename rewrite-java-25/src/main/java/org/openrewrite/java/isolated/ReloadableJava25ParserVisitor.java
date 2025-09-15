@@ -1770,9 +1770,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             String varName = n.getName().isEmpty() ? "_" : n.getName().toString();
             Space namedVarPrefix = sourceBefore(varName);
 
-            JavaType type = typeMapping.type(n);
-            if ("_".equals(varName) && type instanceof JavaType.Variable var) {
-                type = var.withName("_");
+            JavaType.Variable type = typeMapping.variableType(n.sym);
+            if ("_".equals(varName) && type != null) {
+                type = type.withName("_");
             }
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
@@ -1780,11 +1780,11 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                     padRight(
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), varName,
-                                            type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
-                                            type instanceof JavaType.Variable ? (JavaType.Variable) type : null),
+                                            type != null ? type.getType() : null,
+                                            type),
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    type instanceof JavaType.Variable ? (JavaType.Variable) type : null
+                                    type
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
