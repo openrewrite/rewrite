@@ -15,14 +15,12 @@
  */
 // Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.atn.ATN;
+import org.antlr.v4.runtime.atn.ATNDeserializer;
+import org.antlr.v4.runtime.atn.LexerATNSimulator;
+import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class MethodSignatureLexer extends Lexer {
@@ -32,8 +30,8 @@ public class MethodSignatureLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
+		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7,
+		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
 		Identifier=16;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -45,8 +43,8 @@ public class MethodSignatureLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
-			"BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", "SPACE", 
+			"CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
+			"BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", "SPACE",
 			"Identifier", "JavaLetter", "JavaLetterOrDigit"
 		};
 	}
@@ -54,15 +52,15 @@ public class MethodSignatureLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'('", "')'", "'['", "']'", "','", null, "'!'", "'*'", "'&&'", 
+			null, null, "'('", "')'", "'['", "']'", "','", null, "'!'", "'*'", "'&&'",
 			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", 
-			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", 
+			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA",
+			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND",
 			"SPACE", "Identifier"
 		};
 	}

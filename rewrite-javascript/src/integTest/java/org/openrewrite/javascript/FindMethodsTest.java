@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
-public class FindMethodsTest implements RewriteTest {
+class FindMethodsTest implements RewriteTest {
 
     @AfterEach
     void after() {
