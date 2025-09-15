@@ -72,6 +72,7 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     public Yaml visitDocument(Yaml.Document document, P p) {
         return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
+                .withEnd((Yaml.Document.End) visit(document.getEnd(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
     }
 

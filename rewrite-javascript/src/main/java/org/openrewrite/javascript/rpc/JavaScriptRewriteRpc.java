@@ -30,7 +30,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.StringJoiner;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -155,29 +154,43 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         @Override
         public JavaScriptRewriteRpc get() {
-            // npx --node-options="--enable-source-maps" --package=@openrewrite/rewrite@8.60.2 rewrite-js
-            StringJoiner nodeOptions = new StringJoiner(" ");
-            nodeOptions.add("--enable-source-maps");
+            Stream<@Nullable String> cmd;
+
             if (inspectBrk != null) {
-                nodeOptions.add("--inspect-brk=" + inspectBrk);
+                // Find the server.js file - check local development path first, then installed package
+                Path serverJs = Paths.get("rewrite/dist/rpc/server.js");
+                if (!Files.exists(serverJs)) {
+                    serverJs = Paths.get("node_modules/@openrewrite/rewrite/dist/rpc/server.js");
+                }
+
+                // We have to use node directly here because npx spawns a child node process. The
+                // IDE's debug configuration would connect to the npx process rather than the spawned
+                // node process and breakpoints don't get hit.
+                cmd = Stream.of(
+                        "node",
+                        "--enable-source-maps",
+                        "--inspect-brk=" + inspectBrk,
+                        serverJs.toAbsolutePath().normalize().toString(),
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        verboseLogging ? "--verbose" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                );
+            } else {
+                String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
+                cmd = Stream.of(
+                        npxPath.toString(),
+                        // For SNAPSHOT versions, assume npm link has been run and don't use --package
+                        version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
+                        "rewrite-rpc",
+                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        verboseLogging ? "--verbose" : null,
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                );
             }
 
-            String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
-            String[] cmd = Stream.of(
-                    npxPath.toString(),
-                    // For SNAPSHOT versions, assume npm link has been run and don't use --package
-                    version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
-                    "rewrite-rpc",
-                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                    verboseLogging ? "--verbose" : null,
-                    "--trace-get-object-output",
-                    recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
-            ).filter(Objects::nonNull).toArray(String[]::new);
-
-            RewriteRpcProcess process = new RewriteRpcProcess(cmd);
-            if (!nodeOptions.toString().isEmpty()) {
-                process.environment().put("NODE_OPTIONS", nodeOptions.toString());
-            }
+            RewriteRpcProcess process = new RewriteRpcProcess(cmd.filter(Objects::nonNull).toArray(String[]::new));
+//            process.trace();
+            process.environment().put("NODE_OPTIONS", "--enable-source-maps");
             process.start();
 
             return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
