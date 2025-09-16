@@ -15,7 +15,8 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
