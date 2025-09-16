@@ -201,6 +201,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 valueValue = value.getSimpleName();
                             } else if (arg.getValue() instanceof J.FieldAccess) {
                                 valueValue = arg.getValue().printTrimmed(getCursor());
+                            } else if (arg.getValue() instanceof J.MethodInvocation) {
+                                J.MethodInvocation methodInvocation = (J.MethodInvocation) arg.getValue();
+                                valueValue = extractPropertyNameFromMethodInvocation(methodInvocation);
+                            } else if (arg.getValue() instanceof G.Binary) {
+                                valueValue = extractPropertyNameFromGBinary((G.Binary) arg.getValue());
                             } else if (arg.getValue() instanceof G.GString) {
                                 G.GString value = (G.GString) arg.getValue();
                                 List<J> strings = value.getStrings();
@@ -210,6 +215,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         valueValue = ((J.Identifier) versionGStringValue.getTree()).getSimpleName();
                                     } else if (versionGStringValue.getTree() instanceof J.FieldAccess) {
                                         valueValue = versionGStringValue.getTree().printTrimmed(getCursor());
+                                    } else if (versionGStringValue.getTree() instanceof J.MethodInvocation) {
+                                        valueValue = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionGStringValue.getTree());
+                                    } else if (versionGStringValue.getTree() instanceof G.Binary) {
+                                        valueValue = extractPropertyNameFromGBinary((G.Binary) versionGStringValue.getTree());
                                     }
                                 }
                             }
@@ -358,6 +367,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                     versionVariableName = f.toString();
                                 } else if (versionValue.getTree() instanceof J.Identifier) {
                                     versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                                } else if (versionValue.getTree() instanceof J.MethodInvocation) {
+                                    versionVariableName = extractPropertyNameFromMethodInvocation((J.MethodInvocation) versionValue.getTree());
+                                } else if (versionValue.getTree() instanceof G.Binary) {
+                                    versionVariableName = extractPropertyNameFromGBinary((G.Binary) versionValue.getTree());
                                 }
                             } else if (depArg instanceof K.StringTemplate) {
                                 K.StringTemplate template = (K.StringTemplate) depArg;
@@ -414,6 +427,37 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 //noinspection ConstantValue
                 return (groupId == null || artifactId == null) ||
                        new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
+            }
+
+            /**
+             * Extract property name from method invocation patterns like {@code property('guavaVersion')}
+             * or {@code findProperty('guavaVersion')}.
+             */
+            private @Nullable String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
+                String methodName = mi.getSimpleName();
+                if ("property".equals(methodName) || "findProperty".equals(methodName)) {
+                    if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
+                        J.Literal literal = (J.Literal) mi.getArguments().get(0);
+                        if (literal.getValue() instanceof String) {
+                            return (String) literal.getValue();
+                        }
+                    }
+                }
+                return null;
+            }
+
+            /**
+             * Handle Groovy binary access like {@code project.properties['guavaVersion']}
+             * where the binary operator is {@code Access} (bracket notation).
+             */
+            private @Nullable String extractPropertyNameFromGBinary(G.Binary binary) {
+                if (binary.getOperator() == G.Binary.Type.Access && binary.getRight() instanceof J.Literal) {
+                    J.Literal right = (J.Literal) binary.getRight();
+                    if (right.getValue() instanceof String) {
+                        return (String) right.getValue();
+                    }
+                }
+                return null;
             }
 
             private void gatherVariables(J.MethodInvocation method) {
