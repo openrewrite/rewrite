@@ -31,6 +31,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -119,6 +120,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     private static final String UPDATE_VERSION_ERROR_KEY = "UPDATE_VERSION_ERROR_KEY";
+    private static final MethodMatcher PROPERTY_METHOD = new MethodMatcher("* property(String)");
+    private static final MethodMatcher FIND_PROPERTY_METHOD = new MethodMatcher("* findProperty(String)");
 
     @Value
     public static class DependencyVersionState {
@@ -434,8 +437,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              * or {@code findProperty('guavaVersion')}.
              */
             private @Nullable String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
-                String methodName = mi.getSimpleName();
-                if ("property".equals(methodName) || "findProperty".equals(methodName)) {
+                if (PROPERTY_METHOD.matches(mi, true) || FIND_PROPERTY_METHOD.matches(mi, true)) {
                     if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
                         J.Literal literal = (J.Literal) mi.getArguments().get(0);
                         if (literal.getValue() instanceof String) {
