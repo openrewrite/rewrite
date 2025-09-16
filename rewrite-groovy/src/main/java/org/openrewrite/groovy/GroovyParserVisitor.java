@@ -468,7 +468,7 @@ public class GroovyParserVisitor {
                 }
                 while (!(source.charAt(cursor) == ')' && depth == 0)) {
                     int cursorBeforeIteration = cursor;
-                    
+
                     Delimiter delimiter = getDelimiter(null, cursor);
                     if (delimiter != null) {
                         cursor += delimiter.open.length();
@@ -555,7 +555,7 @@ public class GroovyParserVisitor {
                                 "  }\n" +
                                 "}")
                         .findFirst().get();
-                
+
                 JContainer<Expression> args = ((J.NewClass) (((J.Return) ((J.MethodDeclaration) ((J.ClassDeclaration) cu.getStatements().get(0)).getBody().getStatements().get(1)).getBody().getStatements().get(0)).getExpression()))
                         .getPadding().getArguments();
 
