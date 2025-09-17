@@ -71,4 +71,35 @@ public class FindMethodsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void functionsAsDefaultExports(@TempDir Path projectDir) {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("node assert(..)", false)),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import assert from 'node:assert';
+                assert('hello', 'world');
+                """,
+              """
+                import assert from 'node:assert';
+                /*~~>*/assert('hello', 'world');
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "devDependencies": {
+                    "@types/node": "^18.16.9"
+                  }
+                }
+                """
+            )
+          )
+        );
+    }
 }

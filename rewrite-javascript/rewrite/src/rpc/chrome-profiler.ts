@@ -29,6 +29,8 @@ export class ChromeProfiler {
     private exitHandlersRegistered = false;
     private startTime: number = 0;
     private ttsCounter: number = 0;
+    private lastProfileTime: number = 0;
+    private profileNodes = new Map();
 
     constructor(outputPath?: string) {
         this.tracePath = outputPath || path.join(process.cwd(), 'rewrite.json');
@@ -36,6 +38,7 @@ export class ChromeProfiler {
 
     async start() {
         this.startTime = Date.now() * 1000; // Convert to microseconds
+        this.lastProfileTime = this.startTime;
 
         // Add initial metadata events
         this.addMetadataEvents();
@@ -275,17 +278,17 @@ export class ChromeProfiler {
     private addCpuProfileSamples(profile: any) {
         if (!profile.samples || !profile.timeDeltas || !profile.nodes) return;
 
-        let currentTime = this.startTime; // Use actual start time
-        const nodes = new Map();
+        // Use the last profile time as starting point to maintain continuity
+        let currentTime = this.lastProfileTime;
 
-        // Build node map
+        // Update nodes map with new nodes
         profile.nodes.forEach((node: any) => {
-            nodes.set(node.id, node);
+            this.profileNodes.set(node.id, node);
         });
 
         // Convert samples to trace events with actual function names
         profile.samples.forEach((nodeId: number, index: number) => {
-            const node = nodes.get(nodeId);
+            const node = this.profileNodes.get(nodeId);
             if (!node) return;
 
             currentTime += (profile.timeDeltas[index] || 0);
@@ -353,6 +356,9 @@ export class ChromeProfiler {
                 });
             }
         });
+
+        // Update lastProfileTime to maintain continuity for the next batch
+        this.lastProfileTime = currentTime;
     }
 
     private registerExitHandlers() {

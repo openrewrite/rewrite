@@ -370,7 +370,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             JavaScriptRewriteRpc.shutdownCurrent();
 
             // Check that a trace file was created
-            Path tracePath = tempDir.resolve("rewrite.json");
+            Path tracePath = tempDir.resolve("profile.json");
             assertThat(tracePath).exists();
 
             // Verify the file is valid JSON and non-empty
