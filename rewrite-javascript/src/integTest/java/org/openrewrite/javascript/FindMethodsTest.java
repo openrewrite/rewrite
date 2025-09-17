@@ -63,7 +63,7 @@ public class FindMethodsTest implements RewriteTest {
                     "lodash": "^4.17.21"
                   },
                   "devDependencies": {
-                    "@types/lodash": "^4.14.195"
+                    "@types/lodash": "^4.17.20"
                   }
                 }
                 """
