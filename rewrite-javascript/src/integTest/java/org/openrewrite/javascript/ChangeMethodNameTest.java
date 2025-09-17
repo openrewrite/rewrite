@@ -27,7 +27,7 @@ import java.nio.file.Path;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
-public class ChangeMethodNameTest implements RewriteTest {
+class ChangeMethodNameTest implements RewriteTest {
 
     @AfterEach
     void after() {

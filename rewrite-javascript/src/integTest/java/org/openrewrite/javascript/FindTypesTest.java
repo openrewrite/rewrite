@@ -18,7 +18,6 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JSX;
@@ -32,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
-public class FindTypesTest implements RewriteTest {
+class FindTypesTest implements RewriteTest {
     //    @TempDir Path projectDir;
     Path projectDir = Paths.get(".working-dir");
 

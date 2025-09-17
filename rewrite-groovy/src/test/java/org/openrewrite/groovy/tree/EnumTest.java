@@ -296,4 +296,24 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @Test
+    void enumWithNamedArguments() {
+        rewriteRun(
+          groovy(
+            """
+              enum Mapped {
+                  SOME_ENUM_CONSTANT0(a: "0"),
+                  SOME_ENUM_CONSTANT1(a: "1"),
+                  SOME_ENUM_CONSTANT2(a: "1", b: "2"),
+                  SOME_ENUM_CONSTANT3(c: "3", d: "4")
+                  
+                  Mapped(Map args) {
+                      // Constructor that accepts a map
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }
