@@ -73,6 +73,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         ).getRecipesInstalled();
     }
 
+
     public static Builder builder() {
         return new Builder();
     }
@@ -86,6 +87,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(30);
         private boolean verboseLogging;
         private @Nullable Integer inspectBrk;
+        private boolean profiler;
+        private @Nullable Integer maxHeapSize;
+        private @Nullable Path workingDirectory;
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -152,6 +156,52 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return inspectBrk(9229);
         }
 
+        /**
+         * Enable V8 CPU profiling for performance analysis. When enabled, the process will
+         * generate a CPU profile that can be analyzed to identify performance bottlenecks.
+         * The profile is saved in Chrome DevTools format (.cpuprofile) on shutdown.
+         * <p>
+         * Profiling uses the V8 Inspector API and works with both npx and direct node execution modes.
+         * The profile file can be loaded in Chrome DevTools for analysis.
+         *
+         * @param profiler Whether to enable profiling
+         * @return This builder
+         */
+        public Builder profiler(boolean profiler) {
+            this.profiler = profiler;
+            return this;
+        }
+
+        public Builder profiler() {
+            return profiler(true);
+        }
+
+        /**
+         * Set the maximum heap size for the Node.js process in megabytes.
+         * Default V8 heap size is approximately 1.5-2 GB on 64-bit systems.
+         * For large repositories with many source files, you may need to increase this.
+         *
+         * @param maxHeapSize Maximum heap size in megabytes (e.g., 4096 for 4GB)
+         * @return This builder
+         */
+        public Builder maxHeapSize(@Nullable Integer maxHeapSize) {
+            this.maxHeapSize = maxHeapSize;
+            return this;
+        }
+
+        /**
+         * Set the working directory for the Node.js process.
+         * This affects where profile logs and other output files are generated.
+         * If not set, the process inherits the current working directory.
+         *
+         * @param workingDirectory The working directory for the Node.js process
+         * @return This builder
+         */
+        public Builder workingDirectory(@Nullable Path workingDirectory) {
+            this.workingDirectory = workingDirectory;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
@@ -170,6 +220,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "node",
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
+                        profiler ? "--prof" : null,
+                        maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         verboseLogging ? "--verbose" : null,
@@ -184,13 +236,29 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString(),
+                        profiler ? "--profile" : null
                 );
             }
 
             RewriteRpcProcess process = new RewriteRpcProcess(cmd.filter(Objects::nonNull).toArray(String[]::new));
-//            process.trace();
-            process.environment().put("NODE_OPTIONS", "--enable-source-maps");
+
+            // Set working directory if specified
+            if (workingDirectory != null) {
+                process.setWorkingDirectory(workingDirectory);
+            }
+
+            // Build NODE_OPTIONS with all necessary flags
+            StringBuilder nodeOptions = new StringBuilder("--enable-source-maps");
+            if (inspectBrk == null) {
+                // When not using inspect-brk, we need to pass Node.js flags via NODE_OPTIONS
+                // since npx spawns a child process
+                // Note: --prof is not allowed in NODE_OPTIONS for security reasons
+                if (maxHeapSize != null) {
+                    nodeOptions.append(" --max-old-space-size=").append(maxHeapSize);
+                }
+            }
+            process.environment().put("NODE_OPTIONS", nodeOptions.toString());
             process.start();
 
             return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
