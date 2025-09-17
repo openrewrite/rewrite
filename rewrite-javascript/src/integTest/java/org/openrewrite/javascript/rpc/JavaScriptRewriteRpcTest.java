@@ -37,7 +37,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -387,7 +386,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
             JavaScriptRewriteRpc.shutdownCurrent();
 
             // Check that a trace file was created
-            Path tracePath = tempDir.resolve("profile.json");
+            Path tracePath = tempDir.resolve("chrome-trace.json");
             assertThat(tracePath).exists();
 
             // Verify the file is valid JSON and non-empty

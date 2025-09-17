@@ -33,7 +33,7 @@ export class ChromeProfiler {
     private profileNodes = new Map();
 
     constructor(outputPath?: string) {
-        this.tracePath = outputPath || path.join(process.cwd(), 'rewrite.json');
+        this.tracePath = outputPath || path.join(process.cwd(), 'chrome-trace.json');
     }
 
     async start() {
