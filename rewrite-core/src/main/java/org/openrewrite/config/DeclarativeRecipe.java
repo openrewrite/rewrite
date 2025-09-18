@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
@@ -68,7 +69,40 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @Setter
     private List<Recipe> recipeList = new ArrayList<>();
 
+    private List<String> excludedRecipeList;
+
+    private List<Pattern> excludedRecipePatterns;
+
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
+
+    public void setExcludedRecipeList(List<String> excludedRecipeList) {
+        final List<Pattern> patternList = new ArrayList<>();
+        final List<String> nameList = new ArrayList<>();
+        for (String name : excludedRecipeList) {
+            if (name.contains("*")) {
+                patternList.add(Pattern.compile(name));
+            } else {
+                nameList.add(name);
+            }
+        }
+        this.excludedRecipePatterns = patternList.isEmpty() ? null : patternList;
+        this.excludedRecipeList = nameList.isEmpty() ? null : nameList;
+    }
+
+    public boolean shouldExclude(final String recipeName) {
+        if (excludedRecipeList != null && excludedRecipeList.contains(recipeName)) {
+            return true;
+        }
+        if (excludedRecipePatterns == null) {
+            return false;
+        }
+        for (final Pattern pattern : excludedRecipePatterns) {
+            if (pattern.matcher(recipeName).matches()) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     @Getter
     @Setter
@@ -107,6 +141,40 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Set<String> initializingRecipes = new HashSet<>();
         initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
+        if (this.excludedRecipeList != null || this.excludedRecipePatterns != null) {
+            filterExcludeRecipe(this);
+        }
+    }
+
+    /**
+     * Recursively filter out excluded recipes from this recipe's recipeList.
+     *
+     * @param recipe the root recipe to filter from
+     */
+    private void filterExcludeRecipe(final DeclarativeRecipe recipe) {
+        final Iterator<Recipe> subIter = recipeList.iterator();
+        while(subIter.hasNext()) {
+            final Recipe sub = subIter.next();
+            final String subName = sub.getName();
+            final boolean shouldExclude = recipe.shouldExclude(subName);
+            if (shouldExclude) {
+                subIter.remove();
+                // System.out.println("Excluding recipe: " + subName);
+                final Iterator<Recipe> iter = this.uninitializedRecipes.iterator();
+                while (iter.hasNext()) {
+                    final Recipe vo = iter.next();
+                    final String recipeFqn = vo instanceof LazyLoadedRecipe
+                            ? ((LazyLoadedRecipe) vo).getRecipeFqn() : vo.getName();
+                    if (recipeFqn.equals(subName)) {
+                        iter.remove();
+                        break;
+                    }
+                }
+            }
+            if (sub instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) sub).filterExcludeRecipe(recipe);
+            }
+        } // end while
     }
 
     @SuppressWarnings("unused")

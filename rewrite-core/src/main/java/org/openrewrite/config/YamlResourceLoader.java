@@ -283,6 +283,10 @@ public class YamlResourceLoader implements ResourceLoader {
         if (recipeList == null) {
             throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
         }
+        final List<String> excludedRecipeList = (List<String>) yaml.get("excludedRecipeList");
+        if (excludedRecipeList != null) {
+            recipe.setExcludedRecipeList(excludedRecipeList);
+        }
         for (int i = 0; i < recipeList.size(); i++) {
             loadRecipe(
                     name,
