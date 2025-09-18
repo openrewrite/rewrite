@@ -2339,6 +2339,9 @@ public class GroovyParserVisitor {
         }
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
+            if (expression == null) {
+                return null;
+            }
             if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
                 return visitTypeTree(expression.getOriginType());
             }
