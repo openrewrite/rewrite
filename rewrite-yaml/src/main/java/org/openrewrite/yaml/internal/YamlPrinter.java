@@ -29,6 +29,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
         visitMarkers(documents.getMarkers(), p);
         visit(documents.getDocuments(), p);
+        p.append(documents.getSuffix());
         afterSyntax(documents, p);
         return documents;
     }

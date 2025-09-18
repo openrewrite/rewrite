@@ -138,6 +138,7 @@ public class YamlParser implements org.openrewrite.Parser {
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
+            String suffix = "";
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
@@ -430,14 +431,18 @@ public class YamlParser implements org.openrewrite.Parser {
                         break;
                     }
                     case StreamEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        if (document == null && !fmt.isEmpty()) {
-                            documents.add(
-                                    new Yaml.Document(
-                                            randomId(), fmt, Markers.EMPTY, false,
-                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                                            new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
-                                    ));
+                        if (document == null) {
+                            String fmt = newLine + reader.prefix(lastEnd, event);
+                            if (!fmt.isEmpty()) {
+                                documents.add(
+                                        new Yaml.Document(
+                                                randomId(), fmt, Markers.EMPTY, false,
+                                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
+                                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
+                                        ));
+                            }
+                        } else {
+                            suffix = reader.prefix(lastEnd, event);
                         }
                         break;
                     }
@@ -446,7 +451,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
             if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty()) {
                 return result;
             }
