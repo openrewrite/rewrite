@@ -39,10 +39,10 @@ class FindMethodsTest implements RewriteTest {
     @BeforeEach
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-            .recipeInstallDir(tempDir)
-            .log(tempDir.resolve("rpc.log"))
-            .verboseLogging()
-//          .inspectBrk()
+          .recipeInstallDir(tempDir)
+          .log(tempDir.resolve("rpc.log"))
+          .verboseLogging()
+          .inspectBrk()
         );
     }
 
@@ -97,6 +97,17 @@ class FindMethodsTest implements RewriteTest {
           typescript(
             "'hello world'.split(' ')",
             "/*~~>*/'hello world'.split(' ')"
+          )
+        );
+    }
+
+    @Test
+    void splitWithTemplateString() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("*..* split(..)", false)),
+          javascript(
+            "'hello'.split(`; ${cookieName}=`)",
+            "/*~~>*/'hello'.split(`; ${cookieName}=`)"
           )
         );
     }
