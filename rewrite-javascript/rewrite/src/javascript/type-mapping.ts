@@ -170,7 +170,29 @@ export class JavaScriptTypeMapping {
             if (ts.isPropertyAccessExpression(node.expression)) {
                 methodName = node.expression.name.getText();
                 const exprType = this.checker.getTypeAtLocation(node.expression.expression);
-                declaringType = this.getType(exprType) as Type.FullyQualified;
+                const mappedType = this.getType(exprType);
+
+                // For string methods like 'hello'.split(), ensure we have a proper declaring type
+                if (!mappedType || mappedType.kind !== Type.Kind.Class) {
+                    // If the expression type is a primitive string, use lib.String as declaring type
+                    const typeString = this.checker.typeToString(exprType);
+                    if (typeString === 'string' || exprType.flags & ts.TypeFlags.String || exprType.flags & ts.TypeFlags.StringLiteral) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            fullyQualifiedName: 'lib.String'
+                        } as Type.FullyQualified;
+                    } else if (typeString === 'number' || exprType.flags & ts.TypeFlags.Number || exprType.flags & ts.TypeFlags.NumberLiteral) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            fullyQualifiedName: 'lib.Number'
+                        } as Type.FullyQualified;
+                    } else {
+                        // Fallback for other primitive types or unknown
+                        declaringType = Type.unknownType as Type.FullyQualified;
+                    }
+                } else {
+                    declaringType = mappedType as Type.FullyQualified;
+                }
             } else if (ts.isIdentifier(node.expression)) {
                 methodName = node.expression.getText();
                 // For standalone functions, we need to determine the appropriate declaring type

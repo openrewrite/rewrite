@@ -82,7 +82,7 @@ export class RewriteRpc {
         GetLanguages.handle(this.connection);
         PrepareRecipe.handle(this.connection, registry, preparedRecipes);
         Parse.handle(this.connection, this.localObjects);
-        Print.handle(this.connection, getObject, getCursor);
+        Print.handle(this.connection, getObject);
         InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
 
         this.connection.listen();
@@ -160,7 +160,8 @@ export class RewriteRpc {
         this.localObjects.set(tree.id.toString(), tree);
         return await this.connection.sendRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
-            new Print(tree.id, this.getCursorIds(cursor))
+            new Print(tree.id, isSourceFile(tree) ? tree.kind :
+                cursor!.firstEnclosing(t => isSourceFile(t))!.kind)
         );
     }
 

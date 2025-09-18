@@ -16,6 +16,7 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
@@ -23,6 +24,8 @@ import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,10 +33,25 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindMethodsTest implements RewriteTest {
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void before() {
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+            .recipeInstallDir(tempDir)
+            .log(tempDir.resolve("rpc.log"))
+            .verboseLogging()
+//          .inspectBrk()
+        );
+    }
 
     @AfterEach
-    void after() {
+    void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
+        if (Files.exists(tempDir.resolve("rpc.log"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        }
     }
 
     @Test
@@ -73,32 +91,54 @@ class FindMethodsTest implements RewriteTest {
     }
 
     @Test
-    void functionsAsDefaultExports(@TempDir Path projectDir) {
+    void split() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("*..* split(..)", false)),
+          typescript(
+            "'hello world'.split(' ')",
+            "/*~~>*/'hello world'.split(' ')"
+          )
+        );
+    }
+
+    @Test
+    void insideRightPaddedStatement() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("node *(..)", false))
+            .dataTable(MethodCalls.Row.class, rows ->
+              assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("assert(path, 'hello world')")),
+          typescript(
+            """
+              import assert from 'node:assert'
+              
+              const publishNxProject = (path: string): void => {
+                assert(path, 'hello world')
+              }
+              """,
+            """
+              import assert from 'node:assert'
+              
+              const publishNxProject = (path: string): void => {
+                /*~~>*/assert(path, 'hello world')
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void functionsAsDefaultExports() {
         rewriteRun(
           spec -> spec.recipe(new FindMethods("node assert(..)", false)),
-          npm(
-            projectDir,
-            typescript(
+          typescript(
+            """
+              import assert from 'node:assert';
+              assert('hello', 'world');
+              """,
+            """
+              import assert from 'node:assert';
+              /*~~>*/assert('hello', 'world');
               """
-                import assert from 'node:assert';
-                assert('hello', 'world');
-                """,
-              """
-                import assert from 'node:assert';
-                /*~~>*/assert('hello', 'world');
-                """
-            ),
-            packageJson(
-              """
-                {
-                  "name": "test-project",
-                  "version": "1.0.0",
-                  "devDependencies": {
-                    "@types/node": "^18.16.9"
-                  }
-                }
-                """
-            )
           )
         );
     }
