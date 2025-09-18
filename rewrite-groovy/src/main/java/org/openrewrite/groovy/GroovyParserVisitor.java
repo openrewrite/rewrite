@@ -2338,7 +2338,10 @@ public class GroovyParserVisitor {
             queue.add(new G.Unary(randomId(), fmt, Markers.EMPTY, JLeftPadded.build(G.Unary.Type.Spread), visit(spreadExpression.getExpression()), null));
         }
 
-        public TypeTree visitVariableExpressionType(VariableExpression expression) {
+        public TypeTree visitVariableExpressionType(@Nullable VariableExpression expression) {
+            if (expression == null) {
+                return null;
+            }
             if (!expression.isDynamicTyped() && expression.getOriginType().isArray()) {
                 return visitTypeTree(expression.getOriginType());
             }
