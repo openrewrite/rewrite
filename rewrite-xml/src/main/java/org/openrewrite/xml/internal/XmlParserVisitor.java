@@ -246,6 +246,82 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     }
 
     @Override
+    public Xml visitJspscriptlet(XMLParser.JspscriptletContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String scriptletText = ctx.JSP_SCRIPTLET().getText();
+            // Extract content between <% and %>
+            String content = scriptletText.substring(2, scriptletText.length() - 2);
+            if (content.startsWith(" ")) {
+                content = content.substring(1);
+            }
+
+            return new Xml.JspScriptlet(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspexpression(XMLParser.JspexpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String expressionText = ctx.JSP_EXPRESSION().getText();
+            // Extract content between <%= and %>
+            String content = expressionText.substring(3, expressionText.length() - 2);
+            if (content.startsWith(" ")) {
+                content = content.substring(1);
+            }
+
+            return new Xml.JspExpression(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspdeclaration(XMLParser.JspdeclarationContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String declarationText = ctx.JSP_DECLARATION().getText();
+            // Extract content between <%! and %>
+            String content = declarationText.substring(3, declarationText.length() - 2);
+            if (content.startsWith(" ")) {
+                content = content.substring(1);
+            }
+
+            return new Xml.JspDeclaration(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspcomment(XMLParser.JspcommentContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String commentText = ctx.JSP_COMMENT().getText();
+            // Extract content between <%-- and --%>
+            String content = commentText.substring(4, commentText.length() - 4);
+            if (content.startsWith(" ")) {
+                content = content.substring(1);
+            }
+
+            return new Xml.JspComment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
     public Xml.Tag visitElement(XMLParser.ElementContext ctx) {
         return convert(ctx, (c, prefix) -> {
                     String name = convert(ctx.Name(0), (n, p) -> n.getText());
