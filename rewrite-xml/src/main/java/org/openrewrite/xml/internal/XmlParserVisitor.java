@@ -79,14 +79,29 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Prolog visitProlog(XMLParser.PrologContext ctx) {
-        return convert(ctx, (c, prefix) -> new Xml.Prolog(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                visitXmldecl(ctx.xmldecl()),
-                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
-                ctx.jspdirective().stream().map(this::visit).map(Xml.JspDirective.class::cast).collect(toList()))
-        );
+        return convert(ctx, (c, prefix) -> {
+            List<Misc> misc = new ArrayList<>();
+            List<Xml.JspDirective> jspDirectives = new ArrayList<>();
+
+            for (XMLParser.PrologContentContext prologContent : ctx.prologContent()) {
+                if (prologContent.misc() != null) {
+                    Xml result = visitMisc(prologContent.misc());
+                    if (result instanceof Misc) {
+                        misc.add((Misc) result);
+                    }
+                } else if (prologContent.jspdirective() != null) {
+                    jspDirectives.add((Xml.JspDirective) visitJspdirective(prologContent.jspdirective()));
+                }
+            }
+
+            return new Xml.Prolog(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    visitXmldecl(ctx.xmldecl()),
+                    misc,
+                    jspDirectives);
+        });
     }
 
     @Override
