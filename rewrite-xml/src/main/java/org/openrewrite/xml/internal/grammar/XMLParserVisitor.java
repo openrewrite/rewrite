@@ -23,6 +23,12 @@ public interface XMLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitProlog(XMLParser.PrologContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link XMLParser#prologContent}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPrologContent(XMLParser.PrologContentContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link XMLParser#xmldecl}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

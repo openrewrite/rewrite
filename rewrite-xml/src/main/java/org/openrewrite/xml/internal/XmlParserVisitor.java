@@ -86,7 +86,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             for (XMLParser.PrologContentContext prologContent : ctx.prologContent()) {
                 if (prologContent.misc() != null) {
                     Xml result = visitMisc(prologContent.misc());
-                    if (result instanceof Misc) {
+                    if (result instanceof Misc && !(result instanceof Xml.XmlDecl)) {
+                        // Skip XmlDecl as it's handled separately
                         misc.add((Misc) result);
                     }
                 } else if (prologContent.jspdirective() != null) {

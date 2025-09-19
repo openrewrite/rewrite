@@ -28,6 +28,16 @@ public interface XMLParserListener extends ParseTreeListener {
 	 */
 	void exitProlog(XMLParser.PrologContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XMLParser#prologContent}.
+	 * @param ctx the parse tree
+	 */
+	void enterPrologContent(XMLParser.PrologContentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#prologContent}.
+	 * @param ctx the parse tree
+	 */
+	void exitPrologContent(XMLParser.PrologContentContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XMLParser#xmldecl}.
 	 * @param ctx the parse tree
 	 */
