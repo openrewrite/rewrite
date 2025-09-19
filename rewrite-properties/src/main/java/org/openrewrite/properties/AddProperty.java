@@ -63,7 +63,7 @@ public class AddProperty extends Recipe {
     String delimiter;
 
     @Option(displayName = "Ordered property insertion",
-            description = "New properties will be added in unordered manner at the end of the file if given `false`. The default value is `true` and will always insert properties in ordered manner, unless given `false`.",
+            description = "Whether to attempt adding the property in an order following alphabetic sorting. The default value is `true`.",
             required = false,
             example = "false"
     )
