@@ -313,11 +313,8 @@ public class JavaSourceSet implements SourceSet {
     }
 
     private static String entryNameToClassName(String entryName) {
-        String result = entryName;
-        if (entryName.startsWith("modules/java.base/")) {
-            result = entryName.substring("modules/java.base/".length());
-        }
-        return result.substring(0, result.length() - ".class".length())
+        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
+        return entryName.substring(start, entryName.length() - ".class".length())
                 .replace('/', '.');
     }
 
