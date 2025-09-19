@@ -56,7 +56,7 @@ DTD_OPEN          :  '<!'                          -> pushMode(INSIDE_DTD) ;
 JSP_COMMENT       :  '<%--' .*? '--%>' ;
 JSP_DECLARATION   :  '<%!' .*? '%>' ;
 JSP_EXPRESSION    :  '<%=' .*? '%>' ;
-JSP_SCRIPTLET     :  '<%' ~[@=!] .*? '%>' ;  // Matches <% but not <%@, <%=, or <%!
+JSP_SCRIPTLET     :  '<%' ~[@=!-] .*? '%>' ;  // Matches <% but not <%@, <%=, <%!, or <%--
 
 TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
 

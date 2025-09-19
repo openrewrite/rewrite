@@ -44,7 +44,7 @@ xmldecl
     ;
 
 misc
-    :   (COMMENT | doctypedecl | processinginstruction)
+    :   (COMMENT | doctypedecl | processinginstruction | jspdeclaration | jspcomment)
     ;
 
 doctypedecl

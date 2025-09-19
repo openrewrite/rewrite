@@ -955,7 +955,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class JspDeclaration implements Xml, Content {
+    class JspDeclaration implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         @With
         UUID id;
@@ -992,7 +992,7 @@ public interface Xml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    class JspComment implements Xml, Content {
+    class JspComment implements Xml, Content, Misc {
         @EqualsAndHashCode.Include
         @With
         UUID id;
