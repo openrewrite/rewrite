@@ -96,6 +96,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
+        } else if (ctx.jspdeclaration() != null) {
+            return visitJspdeclaration(ctx.jspdeclaration());
+        } else if (ctx.jspcomment() != null) {
+            return visitJspcomment(ctx.jspcomment());
         } else {
             return super.visitMisc(ctx);
         }
