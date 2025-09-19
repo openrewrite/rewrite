@@ -21,10 +21,17 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.javascript.tree.JSX;
 
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Validates that the contents of lists and containers like JLeftPadded respect their generic types.
+ *
+ * @param <P>
+ */
+@SuppressWarnings("UnusedReturnValue")
 public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
 
     private <T extends Tree> @Nullable T visitAndValidate(@Nullable T tree, Class<? extends Tree> expected, P p) {
@@ -49,7 +56,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit compilationUnit, P p) {
+    public JS.CompilationUnit visitJsCompilationUnit(JS.CompilationUnit compilationUnit, P p) {
         ListUtils.map(compilationUnit.getImports(), el -> visitAndValidateNonNull(el, J.Import.class, p));
         ListUtils.map(compilationUnit.getStatements(), el -> visitAndValidateNonNull(el, Statement.class, p));
         return compilationUnit;
@@ -98,16 +105,18 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.TrailingTokenStatement visitTrailingTokenStatement(JS.TrailingTokenStatement trailingTokenStatement, P p) {
-        visitAndValidateNonNull(trailingTokenStatement.getExpression(), J.class, p);
-        return trailingTokenStatement;
-    }
-
-    @Override
     public JS.ExpressionWithTypeArguments visitExpressionWithTypeArguments(JS.ExpressionWithTypeArguments expressionWithTypeArguments, P p) {
         visitAndValidateNonNull(expressionWithTypeArguments.getClazz(), J.class, p);
         visitAndValidate(expressionWithTypeArguments.getTypeArguments(), Expression.class, p);
         return expressionWithTypeArguments;
+    }
+
+    @Override
+    public JS.FunctionCall visitFunctionCall(JS.FunctionCall functionCall, P p) {
+        visitAndValidate(functionCall.getFunction(), Expression.class, p);
+        visitAndValidate(functionCall.getTypeParameters(), Expression.class, p);
+        visitAndValidate(functionCall.getArguments(), Expression.class, p);
+        return functionCall;
     }
 
     @Override
@@ -134,7 +143,8 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.Import visitImport(JS.Import import_, P p) {
+    public JS.Import visitImportDeclaration(JS.Import import_, P p) {
+        visitAndValidate(import_.getModifiers(), J.Modifier.class, p);
         visitAndValidate(import_.getImportClause(), JS.ImportClause.class, p);
         visitAndValidate(import_.getModuleSpecifier(), Expression.class, p);
         visitAndValidate(import_.getAttributes(), JS.ImportAttributes.class, p);
@@ -182,7 +192,7 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.Binary visitBinary(JS.Binary binary, P p) {
+    public JS.Binary visitBinaryExtensions(JS.Binary binary, P p) {
         visitAndValidateNonNull(binary.getLeft(), Expression.class, p);
         visitAndValidateNonNull(binary.getRight(), Expression.class, p);
         return binary;
@@ -456,7 +466,14 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
-    public JS.AssignmentOperation visitAssignmentOperation(JS.AssignmentOperation assignmentOperation, P p) {
+    public JS.As visitAs(JS.As as_, P p) {
+        visitAndValidateNonNull(as_.getLeft(), Expression.class, p);
+        visitAndValidateNonNull(as_.getRight(), Expression.class, p);
+        return as_;
+    }
+
+    @Override
+    public JS.AssignmentOperation visitAssignmentOperationExtensions(JS.AssignmentOperation assignmentOperation, P p) {
         visitAndValidateNonNull(assignmentOperation.getVariable(), Expression.class, p);
         visitAndValidateNonNull(assignmentOperation.getAssignment(), Expression.class, p);
         return assignmentOperation;
@@ -942,4 +959,37 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
         return erroneous;
     }
 
+    @Override
+    public JSX.Tag visitJsxTag(JSX.Tag tag, P p) {
+        visitAndValidateNonNull(tag.getOpenName(), NameTree.class, p);
+        ListUtils.map(tag.getChildren(), el -> visitAndValidateNonNull(el, Expression.class, p));
+        ListUtils.map(tag.getAttributes(), el -> visitAndValidateNonNull(el, JSX.class, p));
+        return tag;
+    }
+
+    @Override
+    public JSX.Attribute visitJsxAttribute(JSX.Attribute attribute, P p) {
+        visitAndValidateNonNull(attribute.getKey(), NameTree.class, p);
+        visitAndValidate(attribute.getValue(), Expression.class, p);
+        return attribute;
+    }
+
+    @Override
+    public JSX.SpreadAttribute visitJsxSpreadAttribute(JSX.SpreadAttribute spreadAttribute, P p) {
+        visitAndValidateNonNull(spreadAttribute.getExpression(), Expression.class, p);
+        return spreadAttribute;
+    }
+
+    @Override
+    public JSX.EmbeddedExpression visitJsxEmbeddedExpression(JSX.EmbeddedExpression embeddedExpression, P p) {
+        visitAndValidateNonNull(embeddedExpression.getExpression(), Expression.class, p);
+        return embeddedExpression;
+    }
+
+    @Override
+    public JSX.NamespacedName visitJsxNamespacedName(JSX.NamespacedName namespacedName, P p) {
+        visitAndValidateNonNull(namespacedName.getNamespace(), J.Identifier.class, p);
+        visitAndValidateNonNull(namespacedName.getName(), J.Identifier.class, p);
+        return namespacedName;
+    }
 }

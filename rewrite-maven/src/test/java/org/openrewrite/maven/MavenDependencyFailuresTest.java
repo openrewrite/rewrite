@@ -28,7 +28,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -45,7 +44,12 @@ class MavenDependencyFailuresTest implements RewriteTest {
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
+            .recipe(new UpgradeParentVersion(
+              "*",
+              "*",
+              "latest.patch",
+              null,
+              null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(
                 MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
@@ -126,7 +130,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws IOException {
+    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws Exception {
         // it's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
@@ -342,9 +346,9 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
                 .matches(deps -> deps.size() == 1)
                 .extracting(deps -> deps.getFirst())
-                .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
-                  dep.getArtifactId().equals("stax-ex") &&
-                  dep.getVersion().equals("1.0"))))
+                .matches(dep -> "org.jvnet.staxex".equals(dep.getGroupId()) &&
+                  "stax-ex".equals(dep.getArtifactId()) &&
+                  "1.0".equals(dep.getVersion()))))
         );
     }
 

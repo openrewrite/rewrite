@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -43,6 +43,12 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitWildcard(MethodSignatureParser.WildcardContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#dotDot}.
 	 * @param ctx the parse tree

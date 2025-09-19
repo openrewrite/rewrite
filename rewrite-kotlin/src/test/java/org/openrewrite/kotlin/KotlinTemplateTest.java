@@ -15,11 +15,16 @@
  */
 package org.openrewrite.kotlin;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+
+import java.net.URISyntaxException;
+import java.nio.file.Path;
+import java.util.List;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -50,6 +55,49 @@ class KotlinTemplateTest implements RewriteTest {
               class Test {
                   fun foo() {
                       println("foo")
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void parserClasspath() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.toString().contains("ObjectMapper")) {
+                      return multiVariable;
+                  }
+                  maybeAddImport(ObjectMapper.class.getName(), false);
+                  Path path;
+                  try {
+                      path = Path.of(ObjectMapper.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+                  } catch (URISyntaxException e) {
+                      throw new RuntimeException(e);
+                  }
+                  return KotlinTemplate.builder("val mapper = ObjectMapper()")
+                    .parser(KotlinParser.builder().classpath(List.of(path)))
+                    .imports(ObjectMapper.class.getName())
+                    .build()
+                    .apply(getCursor(), multiVariable.getCoordinates().replace());
+              }
+          })),
+          kotlin(
+            """
+              class Test {
+                  fun foo() {
+                      val b1 = 1 == 2
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.databind.ObjectMapper
+              
+              class Test {
+                  fun foo() {
+                      val mapper = ObjectMapper()
                   }
               }
               """

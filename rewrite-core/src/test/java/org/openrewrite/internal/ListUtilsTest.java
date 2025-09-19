@@ -37,7 +37,7 @@ class ListUtilsTest {
 
         @Test
         void flatMapWithNoChangeShouldHaveReferenceEquality() {
-            var before = Arrays.asList(1, 2, 3);
+            var before = List.of(1, 2, 3);
             var after = ListUtils.flatMap(before, Collections::singletonList);
             assertThat(after).isSameAs(before);
         }
@@ -82,7 +82,7 @@ class ListUtilsTest {
     class Map {
         @Test
         void identityMap() {
-            var l = Arrays.asList(1, 2, 3);
+            var l = List.of(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
         @Test
@@ -92,7 +92,7 @@ class ListUtilsTest {
         }
         @Test
         void removeElements() {
-            var l = Arrays.asList(1, 2, 3);
+            var l = List.of(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> i % 2 == 0 ? null : e)).isEqualTo(List.of(2));
         }
         @Test

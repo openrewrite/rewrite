@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -14,16 +16,18 @@
  * limitations under the License.
  */
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "../../src";
-import {RewriteRpc} from "../../src/rpc";
-import {PlainText, text} from "../../src/text";
-import {json} from "../../src/json";
-import {RecipeSpec} from "../../src/test";
+import {Cursor, RecipeRegistry, rootCursor} from "@openrewrite/rewrite";
+import {RewriteRpc} from "@openrewrite/rewrite/rpc";
+import {PlainText, text} from "@openrewrite/rewrite/text";
+import {json} from "@openrewrite/rewrite/json";
+import {RecipeSpec} from "@openrewrite/rewrite/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
-import {activate} from "../example-recipe";
-import {javascript, JS} from "../../src/javascript";
+import {activate} from "../../fixtures/example-recipe";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
+import {J} from "@openrewrite/rewrite/java";
 import fs from "node:fs";
+import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
@@ -78,6 +82,22 @@ describe("Rewrite RPC", () => {
         }
     ));
 
+    test("print subtree", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("console.log('hello');"),
+            beforeRecipe: async (cu: JS.CompilationUnit) =>
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                        //language=typescript
+                        expect(await client.print(method, this.cursor!.parent!))
+                            .toEqual("console.log('hello')");
+                        return method;
+                    }
+                }).visit(cu, 0)
+        }
+    ));
+
     test("parse", async () => {
         let sourceFile = (await client.parse([{
             text: "console.info('hello',)",
@@ -115,6 +135,21 @@ describe("Rewrite RPC", () => {
                 ),
                 path: "hello.txt"
             }
+        );
+    });
+
+    test("languages", async () => {
+        expect(await client.languages()).toContainEqual(JS.Kind.CompilationUnit);
+    });
+
+    test("runSearchRecipe", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier", {identifier: "hello"});
+        await spec.rewriteRun(
+            //language=javascript
+            javascript(
+                "const hello = 'world'",
+                "const /*~~>*/hello = 'world'"
+            )
         );
     });
 
@@ -158,6 +193,23 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("runRecipeWithPreconditions", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.find-identifier-with-path", {
+            identifier: "hello",
+            requiredPath: "hello.js"
+        });
+        await spec.rewriteRun(
+            {
+                //language=javascript
+                ...javascript(
+                    "const hello = 'world'",
+                    "const /*~~>*/hello = 'world'"
+                ),
+                path: "hello.js"
+            }
+        );
+    });
+
     test("runRecipeWithRecipeList", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.with-recipe-list");
         await spec.rewriteRun(
@@ -190,5 +242,45 @@ describe("Rewrite RPC", () => {
         expect(clientC2.value).toEqual({k: 1});
         expect(clientC2.parent!.value).toEqual({k: 0});
         expect(clientC2.parent!.parent!.value).toEqual("root");
+    });
+
+    test("JavaType.Class codecs across RPC boundaries", async () => {
+        await withDir(async repo => {
+            spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.mark-class-types");
+
+            //language=typescript
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(
+                        `
+                            import _ from 'lodash';
+
+                            const result = _.map([1, 2, 3], n => n * 2);
+                        `,
+                        `
+                            import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+
+                            const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                        `
+                    ),
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "lodash": "^4.17.21"
+                            },
+                            "devDependencies": {
+                              "@types/lodash": "^4.14.195"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
     });
 });

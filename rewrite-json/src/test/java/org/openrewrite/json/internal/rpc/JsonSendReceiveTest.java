@@ -33,7 +33,6 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.time.Duration;
 
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -51,33 +50,23 @@ class JsonSendReceiveTest implements RewriteTest {
 
         Environment env = Environment.builder().build();
 
-        server = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut))))
-          .marketplace(env)
-          .batchSize(1)
-          .timeout(Duration.ofSeconds(10))
-          .build();
-
-        client = RewriteRpc.from(() -> new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut))))
-          .marketplace(env)
-          .batchSize(1)
-          .timeout(Duration.ofSeconds(10))
-          .startServer(true)
-          .build();
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
+          .batchSize(1);
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
+          .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        server.close();
-        client.close();
+        server.shutdown();
+        client.shutdown();
     }
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
+            @SneakyThrows
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
@@ -111,7 +100,7 @@ class JsonSendReceiveTest implements RewriteTest {
     static class ChangeValue extends JsonVisitor<Integer> {
         @Override
         public Json visitLiteral(Json.Literal literal, Integer p) {
-            if (literal.getValue().equals("value")) {
+            if ("value".equals(literal.getValue())) {
                 return literal.withValue("changed").withSource("\"changed\"");
             }
             return literal;

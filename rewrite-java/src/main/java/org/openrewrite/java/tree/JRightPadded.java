@@ -19,10 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.UnaryOperator;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A Java element that could have trailing space.
@@ -32,7 +39,10 @@ import java.util.function.UnaryOperator;
 @Value
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
-public class JRightPadded<T> {
+public class JRightPadded<T> implements RpcCodec<JRightPadded<T>> {
+    private static JavaSender RPC_SENDER = new JavaSender();
+    private static JavaReceiver RPC_RECEIVER = new JavaReceiver();
+
     T element;
     Space after;
     Markers markers;
@@ -86,8 +96,7 @@ public class JRightPadded<T> {
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
         WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
-        ANY(Space.Location.ANY)
-        ;
+        ANY(Space.Location.ANY);
 
         private final Space.Location afterLocation;
 
@@ -102,7 +111,7 @@ public class JRightPadded<T> {
 
     public static <T> List<T> getElements(@Nullable List<JRightPadded<T>> ls) {
         if (ls == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<T> list = new ArrayList<>(ls.size());
         for (JRightPadded<T> l : ls) {
@@ -139,7 +148,7 @@ public class JRightPadded<T> {
                 return before;
             }
         } else if (elements.isEmpty()) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
@@ -169,5 +178,15 @@ public class JRightPadded<T> {
     @Override
     public String toString() {
         return "JRightPadded(element=" + element + ", after=" + after + ')';
+    }
+
+    @Override
+    public void rpcSend(JRightPadded<T> after, RpcSendQueue q) {
+        RPC_SENDER.visitRightPadded(after, q);
+    }
+
+    @Override
+    public JRightPadded<T> rpcReceive(JRightPadded<T> before, RpcReceiveQueue q) {
+        return RPC_RECEIVER.visitRightPadded(before, q);
     }
 }

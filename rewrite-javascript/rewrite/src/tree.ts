@@ -15,6 +15,8 @@
  */
 import {Markers} from "./markers";
 import {UUID} from "./uuid";
+import {PlainText} from "./text";
+import {RpcCodecs} from "./rpc";
 
 export const TreeKind = {
     Checksum: "org.openrewrite.Checksum",
@@ -73,6 +75,21 @@ export class Cursor {
             current = current.parent;
         }
         return path;
+    }
+
+    parentTree(level: number = 1): Cursor | undefined {
+        let c: Cursor | undefined = this.parent;
+        let treeCount = 0;
+        while (c) {
+            if (isTree(c.value)) {
+                treeCount++;
+                if (treeCount === level) {
+                    return c;
+                }
+            }
+            c = c.parent;
+        }
+        return undefined;
     }
 
     firstEnclosing<T>(match: (value: any) => value is T): T | undefined {

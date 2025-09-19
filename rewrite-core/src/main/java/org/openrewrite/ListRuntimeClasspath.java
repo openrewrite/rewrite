@@ -23,10 +23,11 @@ import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.groupingBy;
 
 public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
     transient ClasspathReport report = new ClasspathReport(this);
@@ -56,7 +57,7 @@ public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
         try (ScanResult result = new ClassGraph().scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
             Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()
-                    .collect(Collectors.groupingBy(it -> it.getClasspathElementURI().toString()));
+                    .collect(groupingBy(it -> it.getClasspathElementURI().toString()));
             for (URI classPathUri : result.getClasspathURIs()) {
                 List<Resource> jarResources = classpathEntriesWithJarResources.get(classPathUri.toString());
                 if (jarResources == null || jarResources.isEmpty()) {
@@ -68,6 +69,6 @@ public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
                 }
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 }

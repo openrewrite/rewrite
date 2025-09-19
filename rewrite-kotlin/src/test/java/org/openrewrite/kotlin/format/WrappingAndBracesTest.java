@@ -27,7 +27,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -80,7 +80,7 @@ class WrappingAndBracesTest implements RewriteTest {
           .parser(KotlinParser.builder().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
-              Arrays.asList(
+              List.of(
                 spaces.apply(IntelliJ.spaces()),
                 wrapping.apply(IntelliJ.wrappingAndBraces())
               )
@@ -270,7 +270,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               class Test {
-                  @Suppress("ALL") 
+                  @Suppress("ALL")
                @Deprecated("", ReplaceWith("Any()"))
                  fun method(): Any {
                       return Any()
@@ -591,12 +591,12 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               class T {
                   @Suppress val i = 1
                   @Suppress val j = 1
@@ -607,14 +607,14 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress
                val i = 1
                   @Suppress
                val j = 1
               }
-              
+
               class T {
                   @Suppress
                val i = 1

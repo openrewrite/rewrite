@@ -35,6 +35,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
+            null,
             null
           )),
           properties(
@@ -56,6 +57,7 @@ class AddPropertyTest implements RewriteTest {
             "",
             "true",
             null,
+            null,
             null
           )),
           properties(
@@ -73,6 +75,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "",
             null,
+            null,
             null
           )),
           properties(
@@ -89,6 +92,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null,
             null
           )),
@@ -108,7 +112,8 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
-            ":"
+            ":",
+            null
           )),
           properties(
             """
@@ -130,7 +135,8 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
-            "    "
+            "    ",
+            null
           )),
           properties(
             """
@@ -151,6 +157,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
+            null,
             null
           )),
           properties(
@@ -169,6 +176,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             "Management metrics",
+            null,
             null
           )),
           properties(
@@ -188,6 +196,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             "Management metrics",
+            null,
             null
           )),
           properties(
@@ -207,6 +216,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null,
             null
           )),
@@ -236,6 +246,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -258,6 +269,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -294,6 +306,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -308,4 +321,42 @@ class AddPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unorderedInsertion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null,
+            false
+          )),
+          properties(
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """,
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              # sam
+              com.sam=true
+              """
+          )
+        );
+    }
+
 }

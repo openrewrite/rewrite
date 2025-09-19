@@ -15,14 +15,30 @@
  */
 package org.openrewrite.gradle.trait;
 
+import org.openrewrite.java.InlineMe;
+
+/**
+ * @deprecated Use specific matchers like {@link GradleDependency.Matcher} or {@link JvmTestSuite.Matcher} instead.
+ */
+@Deprecated
 public class Traits {
     private Traits() {
     }
 
+    /**
+     * @deprecated Use {@link GradleDependency.Matcher} instead.
+     */
+    @Deprecated
+    @InlineMe(replacement = "new GradleDependency.Matcher()", imports = "org.openrewrite.gradle.GradleDependency")
     public static GradleDependency.Matcher gradleDependency() {
         return new GradleDependency.Matcher();
     }
 
+    /**
+     * @deprecated Use {@link JvmTestSuite.Matcher} instead.
+     */
+    @Deprecated
+    @InlineMe(replacement = "new JvmTestSuite.Matcher()", imports = "org.openrewrite.gradle.JvmTestSuite")
     public static JvmTestSuite.Matcher jvmTestSuite() {
         return new JvmTestSuite.Matcher();
     }

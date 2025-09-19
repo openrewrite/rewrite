@@ -15,21 +15,19 @@
  */
 package org.openrewrite.javascript.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.junit.platform.suite.api.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.rpc.Trace;
 import org.openrewrite.test.RecipeSpec;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
-import java.nio.file.Path;
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -52,34 +50,25 @@ public class JavaToJavaScriptRpcTest {
         RecipeSpec.DEFAULTS = () -> new RecipeSpec()
           .recipe(toRecipe(() -> {
               try {
-                  PrintStream log = new PrintStream(new FileOutputStream("rpc.java.log"));
-                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.builder()
-                    .nodePath(Path.of("node"))
-                    .installationDirectory(Path.of("./rewrite/dist"))
-//                    .socket(12345)
-                    .batchSize(20)
-                    .timeout(Duration.ofMinutes(10))
-                    .build();
+                  Trace.TRACE_SENDER = true;
+                  Trace.TRACE_RECEIVER = new PrintStream(new FileOutputStream("rpc.java.log"));
+                  JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
 
-                  client
-                    .traceGetObjectOutput()
-                    .traceGetObjectInput(log);
-
-                  assertThat(client.installRecipes(new File("rewrite/dist/test/modify-all-trees.js")))
+                  assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
                     .isEqualTo(1);
                   Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
                   return new JavaVisitor<>() {
                       @Override
-                      public J preVisit(@NonNull J tree, @NonNull ExecutionContext ctx) {
+                      public J preVisit(J tree, ExecutionContext ctx) {
                           SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                           try {
                               assertThat(t.printAll()).isEqualTo(((SourceFile) tree).printAll());
                               stopAfterPreVisit();
                               return tree;
                           } finally {
-                              log.close();
-                              client.close();
+                              Trace.TRACE_RECEIVER.close();
+                              client.shutdown();
                           }
                       }
                   };
@@ -92,5 +81,6 @@ public class JavaToJavaScriptRpcTest {
     @AfterSuite
     static void afterSuite() {
         RecipeSpec.DEFAULTS = RecipeSpec::new;
+        JavaScriptRewriteRpc.shutdownCurrent();
     }
 }

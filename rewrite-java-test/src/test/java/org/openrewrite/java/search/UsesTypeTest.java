@@ -33,14 +33,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import java.util.Collections;
-              
+
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import java.util.Collections;
-              
+
               class Test {
               }
               """
@@ -77,7 +77,7 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-              
+
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -85,7 +85,7 @@ class UsesTypeTest implements RewriteTest {
             """
               /*~~>*/import java.util.ArrayList;
               import java.util.List;
-              
+
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -106,14 +106,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import static java.util.Collections.singleton;
-              
+
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
-              
+
               class Test {
               }
               """
@@ -133,14 +133,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import static java.util.Collections.singleton;
-              
+
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
-              
+
               class Test {
               }
               """
@@ -181,13 +181,13 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               class Test {
               }
               """,
             """
               /*~~>*/import java.util.List;
-              
+
               class Test {
               }
               """
@@ -203,14 +203,14 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class Test {
                   int zero = Collections.emptyList().size();
               }
               """,
             """
               /*~~>*/import java.util.Collections;
-              
+
               class Test {
                   int zero = Collections.emptyList().size();
               }
@@ -227,7 +227,7 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class Test {
                   int zero = Collections.emptyList().size();
               }
@@ -244,7 +244,7 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class Test {
                   public void foo() {
                       Collections.copy(Collections.emptyList(), Collections.emptyList());
@@ -253,7 +253,7 @@ class UsesTypeTest implements RewriteTest {
               """,
             """
               /*~~>*/import java.util.Collections;
-              
+
               class Test {
                   public void foo() {
                       Collections.copy(Collections.emptyList(), Collections.emptyList());
@@ -272,7 +272,7 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.Collections;
-              
+
               class Test {
                   public void foo() {
                       Collections.copy(Collections.emptyList(), Collections.emptyList());
@@ -290,13 +290,13 @@ class UsesTypeTest implements RewriteTest {
           java(
             """
               import java.util.Map.Entry;
-              
+
               class Test {
               }
               """,
             """
               /*~~>*/import java.util.Map.Entry;
-              
+
               class Test {
               }
               """

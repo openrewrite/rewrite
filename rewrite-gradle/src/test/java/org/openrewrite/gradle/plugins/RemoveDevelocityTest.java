@@ -31,8 +31,8 @@ class RemoveDevelocityTest implements RewriteTest {
           .recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
     }
 
-    @Test
     @DocumentExample
+    @Test
     void removeGradleEnterprise() {
         rewriteRun(
           settingsGradle(

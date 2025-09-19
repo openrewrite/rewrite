@@ -50,9 +50,7 @@ class ParentPomInsightTest implements RewriteTest {
           mavenProject("demo",
             pomXml(
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                 	<modelVersion>4.0.0</modelVersion>
                 	<parent>
                 		<groupId>org.springframework.boot</groupId>
@@ -66,9 +64,7 @@ class ParentPomInsightTest implements RewriteTest {
                 </project>
                 """,
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                 	<modelVersion>4.0.0</modelVersion>
                 	<!--~~>--><parent>
                 		<groupId>org.springframework.boot</groupId>
@@ -94,7 +90,7 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -118,19 +114,18 @@ class ParentPomInsightTest implements RewriteTest {
           mavenProject("sample",
             pomXml(
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -138,19 +133,18 @@ class ParentPomInsightTest implements RewriteTest {
                 </project>
                 """,
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -161,8 +155,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module1",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -174,8 +167,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <!--~~>--><parent>
                       <groupId>org.sample</groupId>
@@ -191,8 +183,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module2",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -204,8 +195,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <!--~~>--><parent>
                       <groupId>org.sample</groupId>
@@ -237,19 +227,18 @@ class ParentPomInsightTest implements RewriteTest {
           mavenProject("sample",
             pomXml(
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -257,19 +246,18 @@ class ParentPomInsightTest implements RewriteTest {
                 </project>
                 """,
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0</version>
-                
+
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -280,8 +268,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module1",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -293,8 +280,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <!--~~>--><parent>
                       <groupId>org.sample</groupId>
@@ -310,8 +296,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module2",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -323,8 +308,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </project>
                   """,
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <!--~~>--><parent>
                       <groupId>org.sample</groupId>
@@ -354,19 +338,18 @@ class ParentPomInsightTest implements RewriteTest {
           mavenProject("sample",
             pomXml(
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
-                
+
                   <parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -374,19 +357,18 @@ class ParentPomInsightTest implements RewriteTest {
                 </project>
                 """,
               """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
-                
+
                   <!--~~>--><parent>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-starter-parent</artifactId>
                     <version>2.5.0</version>
                   </parent>
-                
+
                   <modules>
                     <module>module1</module>
                     <module>module2</module>
@@ -397,8 +379,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module1",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -414,8 +395,7 @@ class ParentPomInsightTest implements RewriteTest {
             mavenProject("module2",
               pomXml(
                 """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
                       <groupId>org.sample</groupId>
@@ -454,13 +434,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -470,13 +450,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -507,13 +487,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -523,13 +503,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -560,13 +540,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -576,13 +556,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -613,13 +593,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -629,13 +609,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -666,13 +646,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -682,13 +662,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -707,13 +687,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -744,13 +724,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -760,13 +740,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <!--~~>--><parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -794,7 +774,7 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
@@ -803,7 +783,7 @@ class ParentPomInsightTest implements RewriteTest {
               <modules>
               	<module>child</module>
               </modules>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -817,14 +797,14 @@ class ParentPomInsightTest implements RewriteTest {
               """
                 <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <parent>
                 	<groupId>com.mycompany.app</groupId>
                 	<artifactId>my-app</artifactId>
                 	<version>1</version>
                 	<relativePath>../</relativePath>
                 </parent>
-                
+
                 <artifactId>child</artifactId>
                 </project>
                 """,
@@ -832,14 +812,14 @@ class ParentPomInsightTest implements RewriteTest {
               """
                 <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <!--~~>--><parent>
                 	<groupId>com.mycompany.app</groupId>
                 	<artifactId>my-app</artifactId>
                 	<version>1</version>
                 	<relativePath>../</relativePath>
                 </parent>
-                
+
                 <artifactId>child</artifactId>
                 </project>
                 """
@@ -857,13 +837,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -882,13 +862,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -907,13 +887,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -932,13 +912,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.0.5</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -957,13 +937,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
@@ -982,13 +962,13 @@ class ParentPomInsightTest implements RewriteTest {
             """
               <project>
               <modelVersion>4.0.0</modelVersion>
-              
+
               <parent>
               	<groupId>org.springframework.boot</groupId>
               	<artifactId>spring-boot-starter-parent</artifactId>
               	<version>3.3.3</version>
               </parent>
-              
+
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>

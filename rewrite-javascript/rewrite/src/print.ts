@@ -46,6 +46,23 @@ export namespace MarkerPrinter {
             return "";
         },
     }
+
+    export const SEARCH_MARKERS_ONLY: MarkerPrinter = {
+        beforeSyntax(marker: Marker, _cursor: Cursor, commentWrapper: CommentWrapper): string {
+            if (marker.kind == MarkersKind.SearchResult) {
+                let searchResult = marker as SearchResult;
+                return commentWrapper(searchResult.description == null ? "" : "(" + searchResult.description + ")");
+            }
+            return "";
+        },
+        beforePrefix(): string {
+            return "";
+        },
+        afterSyntax(): string {
+            return "";
+        },
+    }
+
     export const FENCED: MarkerPrinter = {
         beforeSyntax(marker: Marker, _cursor: Cursor, _commentWrapper: CommentWrapper): string {
             if (marker.kind == MarkersKind.SearchResult || marker.kind.startsWith("org.openrewrite.marker.Markup$")) {
@@ -63,6 +80,7 @@ export namespace MarkerPrinter {
             return "";
         },
     }
+
     export const SANITIZED: MarkerPrinter = {
         beforeSyntax(): string {
             return "";
@@ -125,11 +143,13 @@ export class TreePrinters {
      * @param target Helps to determine what kind of language we are dealing with when
      * printing a subtree whose LST type is shared between multiple languages in a language family.
      */
-    static printer(target: Cursor | SourceFile): TreePrinter {
-        const sourceFileKind = (isSourceFile(target) ?
+    static printer(target: Cursor | SourceFile | string): TreePrinter {
+        const sourceFileKind = typeof target === 'string' ?
+            target :
+            (isSourceFile(target) ?
                 target as SourceFile :
                 target.firstEnclosing(isSourceFile)
-        )!.kind
+            )!.kind
 
         if (!this._registry.has(sourceFileKind)) {
             throw new Error(`No printer registered for ${sourceFileKind}`)
@@ -142,6 +162,6 @@ export class TreePrinters {
     }
 }
 
-export function printer(target: Cursor | SourceFile): TreePrinter {
+export function printer(target: Cursor | SourceFile | string): TreePrinter {
     return TreePrinters.printer(target);
 }

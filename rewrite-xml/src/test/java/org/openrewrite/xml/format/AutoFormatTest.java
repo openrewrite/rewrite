@@ -101,8 +101,8 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1189")
+    @Test
     void tagContentIndentation() {
         rewriteRun(
           xml(

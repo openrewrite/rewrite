@@ -37,7 +37,9 @@ dependencies {
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
-    antlrGeneration("org.antlr:antlr4:4.13.2")
+    antlrGeneration("org.antlr:antlr4:4.13.2") {
+        exclude(group = "com.ibm.icu", module = "icu4j")
+    }
     implementation("org.antlr:antlr4-runtime:4.13.2")
     // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
     checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
@@ -71,9 +73,10 @@ dependencies {
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
+    testRuntimeOnly("jakarta.validation:jakarta.validation-api:3.1.1")
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 

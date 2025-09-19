@@ -22,8 +22,7 @@ describe('AutoformatVisitor', () => {
     const spec = new RecipeSpec()
     spec.recipe = fromVisitor(new AutoformatVisitor());
 
-    // FIXME enable again once we've fixed `StatementExpression` and `ExpressionStatement` handling
-    test.skip('everything', () => {
+    test('everything', () => {
         return spec.rewriteRun(
             // TODO there should be no newline after the default case in switch
             // TODO not sure if there should be a newline after the if and after the finally

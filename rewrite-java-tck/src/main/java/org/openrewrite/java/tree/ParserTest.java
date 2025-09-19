@@ -21,23 +21,23 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 class ParserTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4914")
-    void parseString() throws IOException {
+    @Test
+    void parseString() throws Exception {
         // path needs to be resolvable from `rewrite-java-8` etc.
         Path targetFile = Paths.get("../rewrite-java-tck/src/main/java/org/openrewrite/java/tree/ParserTest.java");
         @SuppressWarnings("SimplifyStreamApiCallChains") List<SourceFile> ignore = JavaParser.fromJavaVersion()
           .build()
           .parse(new String(Files.readAllBytes(targetFile)))
-          .collect(Collectors.toList());
+          .collect(toList());
     }
 }

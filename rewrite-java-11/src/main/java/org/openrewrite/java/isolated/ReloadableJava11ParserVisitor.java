@@ -51,12 +51,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
@@ -467,7 +467,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
         for (Tree m : node.getMembers()) {
-            // skip lomobok generated trees
+            // skip lombok generated trees
             if (isLombokGenerated(m)) {
                 continue;
             }
@@ -1595,10 +1595,10 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
-            JavaType type = typeMapping.type(n);
+            JavaType.Variable type = typeMapping.variableType(n.sym);
             J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),
-                    type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
-                    type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+                    type != null ? type.getType() : null,
+                    type);
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
 
             vars.add(
@@ -1607,7 +1607,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                                     name,
                                     dimensionsAfterName,
                                     n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
-                                    (JavaType.Variable) typeMapping.type(n)
+                                    type
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
@@ -1938,7 +1938,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = extractSymbol(tree);
-
         if (sym == null) {
             // not a symbol we can check
             return false;
@@ -2110,7 +2109,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         throw new RuntimeException(e);
                     }
                 })
-                .collect(Collectors.toMap(Field::getName, field -> {
+                .collect(toMap(Field::getName, field -> {
                     try {
                         return (Long) field.get(null);
                     } catch (IllegalAccessException e) {

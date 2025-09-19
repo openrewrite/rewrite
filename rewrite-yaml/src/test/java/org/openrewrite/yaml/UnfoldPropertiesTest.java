@@ -137,6 +137,33 @@ class UnfoldPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void unfoldFromRootWithNewLine() {
+        rewriteRun(
+          yaml(
+            """
+              logging.level.com.example: DEBUG
+              
+              management.test:
+                a.b:
+                  value: c
+              """,
+            """
+              logging:
+                level:
+                  com:
+                    example: DEBUG
+              
+              management:
+                test:
+                  a:
+                    b:
+                      value: c
+              """
+          )
+        );
+    }
+
+    @Test
     void exclusions() {
         rewriteRun(
           spec -> spec.recipe(new UnfoldProperties(List.of(
@@ -348,9 +375,9 @@ class UnfoldPropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail("Comments are not supported yet")
-    void mergeDuplicatedSectionsWitComments() {
+    @Test
+    void mergeDuplicatedSectionsWithComments() {
         rewriteRun(
           yaml(
             """

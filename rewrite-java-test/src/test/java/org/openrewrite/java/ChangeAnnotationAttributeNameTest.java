@@ -70,13 +70,13 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
           java(
             """
               import org.example.Foo;
-              
+
               @Foo(/* some comment */ "1.0")
               class A {}
               """,
             """
               import org.example.Foo;
-              
+
               @Foo(/* some comment */ bar = "1.0")
               class A {}
               """
@@ -123,7 +123,7 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
           java(
             """
               package org.example;
-              
+
               public enum E { A, B }
               """
           ),
@@ -141,14 +141,14 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
             """
               import org.example.E;
               import org.example.Foo;
-              
+
               @Foo(E.B)
               class A {}
               """,
             """
               import org.example.E;
               import org.example.Foo;
-              
+
               @Foo(bar = E.B)
               class A {}
               """

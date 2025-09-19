@@ -26,6 +26,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.reverse;
+
 /**
  * Supports a limited set of XPath expressions, specifically those documented on <a
  * href="https://www.w3schools.com/xml/xpath_syntax.asp">this page</a>.
@@ -160,7 +162,7 @@ public class XPathMatcher {
             // we have matched the whole XPath, and it does not start with the root
             return true;
         } else {
-            Collections.reverse(path);
+            reverse(path);
 
             // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
             if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
@@ -225,7 +227,7 @@ public class XPathMatcher {
                             "*".equals(part.substring(1)));
                 }
 
-                if (path.size() < i + 1 || (tag != null && !tag.getName().equals(partName) && !partName.equals("*") && !"*".equals(part))) {
+                if (path.size() < i + 1 || (tag != null && !tag.getName().equals(partName) && !"*".equals(partName) && !"*".equals(part))) {
                     return false;
                 }
             }
@@ -278,10 +280,10 @@ public class XPathMatcher {
                 boolean isFunctionCondition = selector.endsWith("()");
                 String value = condition.group(6);
                 String conjunction = condition.group(8);
-                orCondition = conjunction != null && conjunction.equals("or");
+                orCondition = "or".equals(conjunction);
 
                 // invalid conjunction if not 'or' or 'and'
-                if (!orCondition && conjunction != null && !conjunction.equals("and")) {
+                if (!orCondition && conjunction != null && !"and".equals(conjunction)) {
                     // TODO: throw exception for invalid or unsupported XPath conjunction?
                     stillMatchesConditions = false;
                     break;
@@ -327,11 +329,11 @@ public class XPathMatcher {
 
     private static boolean matchesElementAndFunction(Cursor cursor, String element, String selector, String value) {
         Namespaced namespaced = new Namespaced(cursor);
-        if (!element.equals("*") && !Objects.equals(namespaced.getName().orElse(null), element)) {
+        if (!"*".equals(element) && !Objects.equals(namespaced.getName().orElse(null), element)) {
             return false;
-        } else if (selector.equals("local-name()")) {
+        } else if ("local-name()".equals(selector)) {
             return Objects.equals(namespaced.getLocalName().orElse(null), value);
-        } else if (selector.equals("namespace-uri()")) {
+        } else if ("namespace-uri()".equals(selector)) {
             Optional<String> nsUri = namespaced.getNamespaceUri();
             return nsUri.isPresent() && nsUri.get().equals(value);
         }

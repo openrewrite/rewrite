@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -24,6 +25,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
@@ -34,9 +36,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 /**
@@ -64,14 +66,30 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher {
     //language=markdown
-    public static final String METHOD_PATTERN_DESCRIPTION = "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method invocations. " +
-                                                            "For example, to find all method invocations in the Guava library, use the pattern: " +
-                                                            "`com.google.common..*#*(..)`.<br/><br/>" +
-                                                            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
-                                                            "`..*` includes all subpackages of `com.google.common`. <br/>" +
-                                                            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
-                                                            "For more specific queries, like Guava's `ImmutableMap`, use " +
-                                                            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    public static final String METHOD_PATTERN_DECLARATIONS_DESCRIPTION =
+            "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method declarations. " +
+            "For example, to find all method declarations in the Guava library, use the pattern: " +
+            "`com.google.common..*#*(..)`.<br/><br/>" +
+            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+            "`..*` includes all subpackages of `com.google.common`. <br/>" +
+            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+            "For more specific queries, like Guava's `ImmutableMap`, use " +
+            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    //language=markdown
+    public static final String METHOD_PATTERN_INVOCATIONS_DESCRIPTION =
+            "A [method pattern](https://docs.openrewrite.org/reference/method-patterns) is used to find matching method invocations. " +
+            "For example, to find all method invocations in the Guava library, use the pattern: " +
+            "`com.google.common..*#*(..)`.<br/><br/>" +
+            "The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. <br/><br/>" +
+            "`..*` includes all subpackages of `com.google.common`. <br/>" +
+            "`*(..)` matches any method name with any number of arguments. <br/><br/>" +
+            "For more specific queries, like Guava's `ImmutableMap`, use " +
+            "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+    /**
+     * @deprecated Use {@link #METHOD_PATTERN_INVOCATIONS_DESCRIPTION} instead.
+     */
+    @Deprecated
+    public static final String METHOD_PATTERN_DESCRIPTION = METHOD_PATTERN_INVOCATIONS_DESCRIPTION;
 
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
@@ -108,8 +126,13 @@ public class MethodMatcher {
     public MethodMatcher(String methodPattern, boolean matchOverrides) {
         this.matchOverrides = matchOverrides;
 
-        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                CharStreams.fromString(methodPattern))));
+        ANTLRErrorListener errorListener = new ThrowingErrorListener(methodPattern);
+        MethodSignatureLexer lexer = new MethodSignatureLexer(CharStreams.fromString(methodPattern));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
 
         new MethodSignatureParserBaseVisitor<Void>() {
 
@@ -154,22 +177,22 @@ public class MethodMatcher {
     }
 
     public static Validated<String> validate(@Nullable String signature) {
-        return Validated.test(
-                "methodPattern",
-                "Tried to construct a method matcher with an invalid method pattern. " +
-                "An example of a good method pattern is `java.util.List add(..)`.",
-                signature,
-                s -> {
-                    if (signature == null) {
-                        return true;
-                    }
-                    try {
-                        new MethodMatcher(s, null);
-                        return true;
-                    } catch (Throwable t) {
-                        return false;
-                    }
-                });
+        String property = "methodPattern";
+        try {
+            if (signature != null) {
+                new MethodMatcher(signature, null);
+            }
+            return Validated.valid(property, signature);
+        } catch (Throwable throwable) {
+            return Validated.invalid(
+                    property,
+                    signature,
+                    "Tried to construct a method matcher with an invalid method pattern. " +
+                            "An example of a good method pattern is `java.util.List add(..)`. " +
+                            throwable.getMessage(),
+                    throwable
+            );
+        }
     }
 
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
@@ -303,7 +326,7 @@ public class MethodMatcher {
                         .stream()
                         .map(MethodMatcher::variableDeclarationsType)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
         return matchesParameterTypes(parameterTypes);
     }
 
@@ -330,7 +353,7 @@ public class MethodMatcher {
                         .stream()
                         .map(MethodMatcher::variableDeclarationsType)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
         return matchesParameterTypes(parameterTypes);
     }
 
@@ -372,8 +395,7 @@ public class MethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null &&
-            method.getSelect() instanceof J.Identifier &&
+        if (method.getSelect() instanceof J.Identifier &&
             !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
@@ -384,8 +406,8 @@ public class MethodMatcher {
 
         final String argumentSignature = argumentsFromExpressionTypes(method);
         final Pattern relaxedArgumentPattern = Pattern.compile(
-                argumentPattern.pattern().replaceAll("((?:[a-zA-Z0-9]+\\.?)+)",
-                        "($1|" + JavaType.Unknown.getInstance().getFullyQualifiedName() + ")"));
+                argumentPattern.pattern().replaceAll("((?:(?:[a-zA-Z0-9]+(?:\\[\\.\\$])?)+(,)?)+)",
+                        "($1|" + JavaType.Unknown.getInstance().getFullyQualifiedName() + "$2)"));
         return relaxedArgumentPattern.matcher(argumentSignature).matches();
     }
 
@@ -539,6 +561,12 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
     }
 
     @Override
+    public String visitWildcard(MethodSignatureParser.WildcardContext ctx) {
+        arguments.add(Argument.WILDCARD);
+        return super.visitWildcard(ctx);
+    }
+
+    @Override
     public String visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
         arguments.add(new Argument.FormalType(ctx));
         return super.visitFormalTypePattern(ctx);
@@ -562,7 +590,10 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
                     argumentPatterns.add("(" + argument.getRegex() + ",)?");
                 }
             } else { // FormalType
-                if (i > 0 && arguments.get(i - 1) != Argument.DOT_DOT) {
+                // We cannot start with a comma
+                if (i == 1 && arguments.get(0) == Argument.DOT_DOT) {
+                    argumentPatterns.add(argument.getRegex());
+                } else if (i > 0) {
                     argumentPatterns.add("," + argument.getRegex());
                 } else {
                     argumentPatterns.add(argument.getRegex());
@@ -580,6 +611,13 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
             @Override
             String getRegex() {
                 return "([^,]+,)*([^,]+)";
+            }
+        };
+
+        private static final Argument WILDCARD = new Argument() {
+            @Override
+            String getRegex() {
+                return "([^,]+)";
             }
         };
 

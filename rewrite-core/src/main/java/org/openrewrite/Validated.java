@@ -23,6 +23,7 @@ import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyIterator;
 import static java.util.stream.StreamSupport.stream;
 
 /**
@@ -158,7 +159,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
         @Override
         public Iterator<Validated<T>> iterator() {
-            return Collections.emptyIterator();
+            return emptyIterator();
         }
 
         @Override

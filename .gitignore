@@ -14,3 +14,5 @@ IDE.properties
 # ASDF https://asdf-vm.com/
 .tool-versions
 .aider*
+/worktrees
+rewrite-gradle-tooling-model/model/src/main/resources/test-manifest.txt

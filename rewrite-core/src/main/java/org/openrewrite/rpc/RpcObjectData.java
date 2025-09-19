@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -23,8 +24,11 @@ import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import lombok.With;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -34,6 +38,8 @@ import java.util.Map;
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
  */
 @Value
+@NoArgsConstructor(force = true, access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
+@RequiredArgsConstructor
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -79,9 +85,15 @@ public class RpcObjectData {
      * The stack trace of the thread that created this object. This is
      * useful in debugging asymmetries between senders/receivers.
      */
-    @With
     @Nullable
-    String trace;
+    @NonFinal
+    String trace = Trace.traceSender();
+
+    public RpcObjectData withTrace(@Nullable String trace) {
+        RpcObjectData d = new RpcObjectData(state, valueType, value, ref);
+        d.trace = null;
+        return d;
+    }
 
     public <V> @Nullable V getValue() {
         if (value instanceof Map && valueType != null) {

@@ -72,6 +72,17 @@ public interface JSX extends JS {
             return getPadding().withOpenName(JLeftPadded.withElement(this.openName, openName));
         }
 
+        @Nullable
+        JContainer<Expression> typeArguments;
+
+        public @Nullable JContainer<Expression> getTypeArguments() {
+            return typeArguments;
+        }
+
+        public Tag withTypeArguments(@Nullable JContainer<Expression> typeArguments) {
+            return getPadding().withTypeArguments(typeArguments);
+        }
+
         @Getter
         @With
         Space afterName;
@@ -164,7 +175,15 @@ public interface JSX extends JS {
             }
 
             public Tag withOpenName(JLeftPadded<NameTree> openName) {
-                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
+                return t.openName == openName ? t : new Tag(t.id, t.prefix, t.markers, openName, t.typeArguments, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
+            }
+
+            public @Nullable JContainer<Expression> getTypeArguments() {
+                return t.typeArguments;
+            }
+
+            public Tag withTypeArguments(@Nullable JContainer<Expression> typeArguments) {
+                return t.typeArguments == typeArguments ? t : new Tag(t.id, t.prefix, t.markers, t.openName, typeArguments, t.afterName, t.attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
             public List<JRightPadded<JSX>> getAttributes() {
@@ -172,7 +191,7 @@ public interface JSX extends JS {
             }
 
             public Tag withAttributes(List<JRightPadded<JSX>> attributes) {
-                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
+                return t.attributes == attributes ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.typeArguments, t.afterName, attributes, t.selfClosing, t.children, t.closingName, t.afterClosingName);
             }
 
             public @Nullable JLeftPadded<J> getClosingName() {
@@ -180,7 +199,7 @@ public interface JSX extends JS {
             }
 
             public Tag withClosingName(@Nullable JLeftPadded<J> closingName) {
-                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.afterName, t.attributes, t.selfClosing, t.children, closingName, t.afterClosingName);
+                return t.closingName == closingName ? t : new Tag(t.id, t.prefix, t.markers, t.openName, t.typeArguments, t.afterName, t.attributes, t.selfClosing, t.children, closingName, t.afterClosingName);
             }
         }
     }

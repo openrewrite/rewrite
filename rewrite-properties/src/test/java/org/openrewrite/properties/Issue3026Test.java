@@ -32,8 +32,8 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("UnusedProperty")
 class Issue3026Test implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3026")
+    @Test
     void modifyContents() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PropertiesVisitor<>() {

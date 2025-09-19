@@ -144,7 +144,7 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "${a} ${b}!"
-              
+
               val after = 0
               """
           )
@@ -159,7 +159,7 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "$a $b!"
-              
+
               val after = 0
               """
           )
@@ -190,7 +190,7 @@ class VariableDeclarationTest implements RewriteTest {
               }
               val a = Test ( )
               val b = " ${   a . value   }"
-              
+
               val after = 0
               """
           )
@@ -209,7 +209,7 @@ class VariableDeclarationTest implements RewriteTest {
                       val innerValue = 10
                   }
               }
-              
+
               val a = Test ( )
               val b = "${   a . testValue . innerValue   }"
               """
@@ -384,7 +384,7 @@ class VariableDeclarationTest implements RewriteTest {
             """
               val first : String = "1"
               val second : Int = 2
-              
+
               val l = listOf ( "foo" to first , "bar" to second )
               """
           )
@@ -452,8 +452,8 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantSetter")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @SuppressWarnings("RedundantSetter")
     @Test
     void setter() {
         rewriteRun(
@@ -560,9 +560,9 @@ class VariableDeclarationTest implements RewriteTest {
               """,
                 spec -> spec.afterRecipe(cu -> {
                     for (Statement statement : cu.getStatements()) {
-                        if (statement instanceof J.VariableDeclarations) {
-                            J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final);
-                            assertThat(J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                        if (statement instanceof J.VariableDeclarations declarations) {
+                            J.Modifier.hasModifier(declarations.getModifiers(), J.Modifier.Type.Final);
+                            assertThat(J.Modifier.hasModifier(declarations.getModifiers(), J.Modifier.Type.Final)).isTrue();
                         }
                     }
                 }))

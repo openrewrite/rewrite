@@ -16,11 +16,12 @@
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {PlainText} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
+import {TreeKind} from "../tree";
 
 async function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): Promise<PlainText.Snippet | undefined> {
     const draft: Draft<PlainText.Snippet> = createDraft(before);
     draft.id = await q.receive(before.id);
-    draft.markers = await q.receiveMarkers(before.markers);
+    draft.markers = await q.receive(before.markers);
     draft.text = await q.receive(before.text);
     return finishDraft(draft);
 }
@@ -29,7 +30,7 @@ const textCodec: RpcCodec<PlainText> = {
     async rpcReceive(before: PlainText, q: RpcReceiveQueue): Promise<PlainText> {
         const draft: Draft<PlainText> = createDraft(before);
         draft.id = await q.receive(before.id);
-        draft.markers = await q.receiveMarkers(before.markers);
+        draft.markers = await q.receive(before.markers);
         draft.sourcePath = await q.receive(before.sourcePath);
         draft.charsetName = await q.receive(before.charsetName);
         draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
@@ -42,7 +43,7 @@ const textCodec: RpcCodec<PlainText> = {
 
     async rpcSend(after: PlainText, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, p => p.id);
-        await q.sendMarkers(after, p => p.markers);
+        await q.getAndSend(after, p => p.markers);
         await q.getAndSend(after, p => p.sourcePath);
         await q.getAndSend(after, p => p.charsetName);
         await q.getAndSend(after, p => p.charsetBomMarked);
@@ -51,12 +52,14 @@ const textCodec: RpcCodec<PlainText> = {
         await q.getAndSend(after, p => p.text);
         await q.getAndSendList(after, a => a.snippets, s => s.id, async (snippet) => {
             await q.getAndSend(snippet, p => p.id);
-            await q.sendMarkers(after, p => p.markers);
+            await q.getAndSend(snippet, p => p.markers);
             await q.getAndSend(snippet, p => p.text);
         });
     }
 }
 
 Object.values(PlainText.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, textCodec);
+    if (!Object.values(TreeKind).includes(kind as any)) {
+        RpcCodecs.registerCodec(kind, textCodec);
+    }
 });

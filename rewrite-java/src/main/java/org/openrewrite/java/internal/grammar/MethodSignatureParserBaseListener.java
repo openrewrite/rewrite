@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -63,6 +63,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterWildcard(MethodSignatureParser.WildcardContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitWildcard(MethodSignatureParser.WildcardContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

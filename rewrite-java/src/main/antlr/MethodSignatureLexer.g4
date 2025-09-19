@@ -9,7 +9,10 @@ RPAREN          : ')';
 LBRACK          : '[';
 RBRACK          : ']';
 COMMA           : ',';
-DOT             : '.';
+
+// The widening of DOT to include '/' allows matching of package separators
+// in JavaScript and TypeScript import paths, e.g. @types/lodash..* map(..)
+DOT             : '.' | '/';
 
 // §3.12 Operators
 
@@ -32,6 +35,10 @@ Identifier
 fragment
 JavaLetter
     :   [a-zA-Z$_] // these are the "java letters" below 0x7F
+    |
+        // The widening of JavaLetter to include '@' allows matching package name parts
+        // in JavaScript and TypeScript import paths, e.g. @types/lodash..* map(..)
+        '@'
     |   // covers all characters above 0x7F which are not a surrogate
         ~[\u0000-\u007F\uD800-\uDBFF]
         {Character.isJavaIdentifierStart(_input.LA(-1))}?

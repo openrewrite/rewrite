@@ -15,8 +15,10 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
@@ -26,23 +28,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.*;
 
 public class TypeParameter {
 
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
     public static TemplateParameterParser parser(String value) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(value);
         TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(value));
         lexer.removeErrorListeners();
-        lexer.addErrorListener(new ThrowingErrorListener());
-
+        lexer.addErrorListener(errorListener);
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
         parser.removeErrorListeners();
-        parser.addErrorListener(new ThrowingErrorListener());
+        parser.addErrorListener(errorListener);
         return parser;
     }
 
@@ -77,9 +79,9 @@ public class TypeParameter {
                     type = JavaType.ShallowClass.build(fqn);
                 } else if (genericTypes.containsKey(fqn)) {
                     type = genericTypes.get(fqn);
-                } else if (fqn.equals("String")) {
+                } else if ("String".equals(fqn)) {
                     type = JavaType.ShallowClass.build("java.lang.String");
-                } else if (fqn.equals("Object")) {
+                } else if ("Object".equals(fqn)) {
                     type = TYPE_OBJECT;
                 } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
                     // empty
@@ -107,13 +109,13 @@ public class TypeParameter {
     public static Map<String, JavaType.GenericTypeVariable> parseGenericTypes(Set<String> genericTypes) {
         Map<String, List<TemplateParameterParser.GenericPatternContext>> contexts = genericTypes.stream()
                 .map(e -> parser(e).genericPattern())
-                .collect(Collectors.groupingBy(e -> e.genericName().getText()));
+                .collect(groupingBy(e -> e.genericName().getText()));
         if (contexts.values().stream().anyMatch(e -> e.size() > 1)) {
             throw new IllegalArgumentException("Found duplicated generic type.");
         }
 
         Map<String, JavaType.GenericTypeVariable> genericTypesMap = contexts.keySet().stream()
-                .collect(Collectors.toMap(e -> e,
+                .collect(toMap(e -> e,
                         e -> new JavaType.GenericTypeVariable(null, e, JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList())));
 
         for (String name : genericTypesMap.keySet()) {
@@ -121,20 +123,11 @@ public class TypeParameter {
             TemplateParameterParser.GenericPatternContext context = contexts.get(name).get(0);
             List<JavaType> bounds = context.type().stream()
                     .map(e -> toJavaType(e, genericTypesMap))
-                    .collect(Collectors.toList());
+                    .collect(toList());
             if (!bounds.isEmpty()) {
                 genericType.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
             }
         }
         return genericTypesMap;
-    }
-
-    private static class ThrowingErrorListener extends BaseErrorListener {
-        @Override
-        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
-            throw new IllegalArgumentException(
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
-        }
     }
 }

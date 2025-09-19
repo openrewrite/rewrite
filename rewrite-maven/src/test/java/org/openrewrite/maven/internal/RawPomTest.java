@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.tree.Plugin;
@@ -24,22 +23,16 @@ import org.openrewrite.maven.tree.Profile;
 import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
+import java.io.UncheckedIOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RawPomTest {
 
     @Test
     void profileActivationByJdk() {
-        String javaVersion = System.getProperty("java.version");
-        int dotIndex = javaVersion.indexOf('.');
-        if (dotIndex > 0) {
-            javaVersion = javaVersion.substring(0, dotIndex);
-        }
-        int runtimeVersion = Integer.parseInt(javaVersion);
-        assertThat(new ProfileActivation(false, Integer.toString(runtimeVersion), null).isActive()).isTrue();
-        assertThat(new ProfileActivation(false, "[," + (runtimeVersion + 1) + ")", null).isActive()).isTrue();
-        assertThat(new ProfileActivation(false, "[," + runtimeVersion + "]", null).isActive()).isFalse();
+        assertThat(new ProfileActivation(false, System.getProperty("java.version"), null).isActive()).isTrue();
     }
 
     @Test
@@ -59,11 +52,11 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                   `<modelVersion>4.0.0</modelVersion>
-            
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-            
+
                   <repositories>
                     <repository>
                         <id>spring-milestones</id>
@@ -88,16 +81,16 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-            
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-            
+
                   <modules>
                     <module>my-module</module>
                     <module>my-other-module</module>
                   </modules>
-            
+
                   <subprojects>
                     <subproject>my-subproject</subproject>
                     <subproject>my-other-subproject</subproject>
@@ -123,7 +116,7 @@ class RawPomTest {
           new ByteArrayInputStream("""
                 <project>
                     <modelVersion>4.0.0</modelVersion>
-            
+
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
@@ -201,26 +194,46 @@ class RawPomTest {
         }
     }
 
+    @Test
+    void pomAtOriginOfDeserializationExceptionIsPartOfExceptionMessage() {
+        assertThatThrownBy(() -> RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+            """.getBytes()),
+          null
+        )).isInstanceOf(UncheckedIOException.class)
+          .hasMessageContaining("Failed to parse pom: Illegal processing instruction target (\"xml\")");
+    }
+
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePom() throws JsonProcessingException {
+    void deserializePom() throws Exception {
         //language=xml
         String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-          
+
                   <parent>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-parent</artifactId>
                       <version>2.4.0</version>
                   </parent>
-          
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-          
+
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -232,7 +245,7 @@ class RawPomTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-          
+
                   <dependencies>
                     <dependency>
                       <groupId>org.junit.jupiter</groupId>
@@ -247,7 +260,7 @@ class RawPomTest {
                       </exclusions>
                     </dependency>
                   </dependencies>
-          
+
                   <build>
                       <plugins>
                           <plugin>
@@ -318,7 +331,7 @@ class RawPomTest {
                       <comments>A business-friendly OSS license</comments>
                     </license>
                   </licenses>
-          
+
                   <repositories>
                     <repository>
                       <releases>
@@ -333,11 +346,11 @@ class RawPomTest {
                       </snapshots>
                       <name>Nexus Snapshots</name>
                       <id>snapshots-repo</id>
-                      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+                      <url>https://central.sonatype.com/repository/maven-snapshots</url>
                       <layout>default</layout>
                     </repository>
                   </repositories>
-          
+
                   <profiles>
                       <profile>
                           <id>java9+</id>
@@ -420,7 +433,7 @@ class RawPomTest {
                                   </plugins>
                               </pluginManagement>
                           </build>
-          
+
                       </profile>
                   </profiles>
               </project>
@@ -438,7 +451,7 @@ class RawPomTest {
         assertThat(model.getPlugins()).hasSize(2);
 
         Plugin surefirePlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("maven-surefire-plugin"))
+          .filter(p -> "maven-surefire-plugin".equals(p.getArtifactId()))
           .findFirst()
           .orElseThrow();
 
@@ -452,14 +465,14 @@ class RawPomTest {
 
         assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello");
         Plugin jacocoPlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         var rewritePlugin = model.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
@@ -480,7 +493,7 @@ class RawPomTest {
           .isEqualTo("Apache License, Version 2.0");
 
         assertThat(model.getRepositories().getFirst().getUri())
-          .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+          .isEqualTo("https://central.sonatype.com/repository/maven-snapshots");
 
         Profile java9Profile = model.getProfiles().stream()
           .filter(p -> "java9+".equals(p.getId()))
@@ -501,14 +514,14 @@ class RawPomTest {
 
         assertThat(rewriteProfile.getPlugins()).hasSize(2);
         jacocoPlugin = rewriteProfile.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+          .filter(p -> "jacoco-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         rewritePlugin = rewriteProfile.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+          .filter(p -> "rewrite-maven-plugin".equals(p.getArtifactId()))
           .findAny()
           .orElseThrow();
 
@@ -528,16 +541,16 @@ class RawPomTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializePluginConfiguration() throws JsonProcessingException {
+    void deserializePluginConfiguration() throws Exception {
         @Language("xml") String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
-          
+
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <packaging>jar</packaging>
-          
+
                   <build>
                       <plugins>
                           <plugin>

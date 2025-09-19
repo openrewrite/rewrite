@@ -13,18 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
 import org.antlr.v4.runtime.atn.ParserATNSimulator;
 import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 import org.antlr.v4.runtime.tree.TerminalNode;
-
 import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
@@ -38,7 +37,7 @@ public class AnnotationSignatureParser extends Parser {
 		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4,
 		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11,
 		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19,
-		DOTDOT=20, SPACE=21, Identifier=22;
+		DOTDOT=20, WS=21, Identifier=22;
 	public static final int
 		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2,
 		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5,
@@ -55,8 +54,7 @@ public class AnnotationSignatureParser extends Parser {
 	private static String[] makeLiteralNames() {
 		return new String[] {
 			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','",
-			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'",
-			"' '"
+			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -65,7 +63,7 @@ public class AnnotationSignatureParser extends Parser {
 			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral",
 			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
 			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT",
-			"SPACE", "Identifier"
+			"WS", "Identifier"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();

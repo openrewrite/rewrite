@@ -22,19 +22,23 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BinaryOperator;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Value
 @With
-public class Markers {
+public class Markers implements RpcCodec<Markers> {
     public static final Markers EMPTY = new Markers(randomId(), emptyList());
 
     UUID id;
@@ -107,6 +111,7 @@ public class Markers {
     }
 
     public Markers removeByType(Class<? extends Marker> type) {
+        //noinspection DataFlowIssue
         return withMarkers(ListUtils.map(this.markers, m -> type.equals(m.getClass()) ? null : m));
     }
 
@@ -143,7 +148,7 @@ public class Markers {
     /**
      * Add a new marker or update some existing marker.
      *
-     * @param m   A marker, which may or may not already exist already.
+     * @param m   A marker, which may or may not already exist.
      * @param <M> The marker type.
      * @return If a marker already exists that matches by object equality, an unchanged markers reference
      * is returned. Otherwise, the supplied marker is added.
@@ -164,5 +169,17 @@ public class Markers {
                 .filter(markerType::isInstance)
                 .map(markerType::cast)
                 .findFirst();
+    }
+
+    @Override
+    public void rpcSend(Markers after, RpcSendQueue q) {
+        q.getAndSend(this, Markers::getId);
+        q.getAndSendList(this, Markers::getMarkers, Marker::getId, null);
+    }
+
+    @Override
+    public Markers rpcReceive(Markers before, RpcReceiveQueue q) {
+        return withId(q.receiveAndGet(getId(), UUID::fromString))
+                .withMarkers(requireNonNull(q.receiveList(getMarkers(), null)));
     }
 }

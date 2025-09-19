@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,14 +34,15 @@ public class RpcReceiveQueueTest {
     @BeforeEach
     void setUp() {
         batches = new ArrayDeque<>();
-        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), new IdentityHashMap<Object, Integer>(), false);
-        rq = new RpcReceiveQueue(new HashMap<>(), null, batches::removeFirst);
+        IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
+        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs);
+        rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst);
     }
 
     @Test
     void add() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
 
@@ -59,7 +59,7 @@ public class RpcReceiveQueueTest {
     @SuppressWarnings("UnnecessaryLocalVariable")
     void noChange() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText noChange = before;
@@ -75,7 +75,7 @@ public class RpcReceiveQueueTest {
     @Test
     void changeId() {
         PlainText before = PlainText.builder()
-          .sourcePath(Paths.get("foo.txt"))
+          .sourcePath(Path.of("foo.txt"))
           .text("hello")
           .build();
         PlainText newId = before.withId(Tree.randomId());
@@ -92,7 +92,7 @@ public class RpcReceiveQueueTest {
         List<RpcObjectData> encoded = new ArrayList<>();
         for (RpcObjectData data : batch) {
             if (data.getValue() instanceof UUID || data.getValue() instanceof Path) {
-                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef(), data.getTrace()));
+                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef()));
             } else {
                 encoded.add(data);
             }

@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.config.DeclarativeRecipe;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 import org.openrewrite.table.SourcesFileErrors;
@@ -36,7 +37,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -64,8 +64,8 @@ class RecipeSchedulerTest implements RewriteTest {
                         assertThat(err.getMessage()).isEqualTo("boom");
                         assertThat(err.getDetail())
                           .matches("org.openrewrite.BoomException: boom" +
-                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)" +
-                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)");
+                            "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)" +
+                            "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)");
                     });
               }
             ),
@@ -79,7 +79,20 @@ class RecipeSchedulerTest implements RewriteTest {
     @Test
     void exceptionDuringGenerate() {
         rewriteRun(
-          spec -> spec.recipe(new BoomGenerateRecipe())
+          spec -> spec.recipe(new BoomGenerateRecipe(false))
+            .executionContext(new InMemoryExecutionContext())
+            .dataTable(SourcesFileErrors.Row.class, rows ->
+              assertThat(rows)
+                .singleElement()
+                .extracting(SourcesFileErrors.Row::getRecipe)
+                .isEqualTo("org.openrewrite.BoomGenerateRecipe"))
+        );
+    }
+
+    @Test
+    void recipeRunExceptionDuringGenerate() {
+        rewriteRun(
+          spec -> spec.recipe(new BoomGenerateRecipe(true))
             .executionContext(new InMemoryExecutionContext())
             .dataTable(SourcesFileErrors.Row.class, rows ->
               assertThat(rows)
@@ -144,7 +157,7 @@ class RecipeSchedulerTest implements RewriteTest {
         );
         recipe.addUninitialized(new RecipeWritingToFile(1));
         recipe.addUninitialized(new RecipeWritingToFile(2));
-        recipe.initialize(List.of(), Map.of());
+        recipe.initialize(List.of());
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(recipe),
           text("foo", "bar")
@@ -176,9 +189,11 @@ class BoomRecipe extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class BoomGenerateRecipe extends ScanningRecipe<Integer> {
+
+    boolean wrapAsRecipeRunException;
 
     @Override
     public String getDisplayName() {
@@ -202,7 +217,7 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
-        throw new BoomException();
+        throw wrapAsRecipeRunException ? new RecipeRunException(new BoomException(), null) : new BoomException();
     }
 }
 
@@ -275,7 +290,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         Path workingDirectory = validateExecutionContext(ctx);
         assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
-        assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
+        assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
         assertDoesNotThrow(() -> {
             assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
         });
@@ -291,7 +306,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                   .view(ctx).getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
-                assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));
+                assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
                 assertDoesNotThrow(() -> {
                     assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
                 });

@@ -16,6 +16,7 @@
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 import {createDraft, Draft, finishDraft} from "immer";
 import {MarkersKind, ParseExceptionResult} from "./markers";
+import {RecipeRegistry} from "./recipe";
 
 export * from "./data-table";
 export * from "./execution";
@@ -26,10 +27,17 @@ export * from "./tree";
 export * from "./visitor";
 export * from "./parser";
 export * from "./parse-error";
+export * from "./preconditions";
 export * from "./uuid";
 export * from "./util";
 export * from "./recipe";
 export * from "./run";
+
+// register all recipes in this package
+export async function activate(registry: RecipeRegistry): Promise<void> {
+    const {OrderImports} = await import("./recipe/order-imports.js");
+    registry.register(OrderImports);
+}
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
     async rpcSend(after: ParseExceptionResult, q: RpcSendQueue): Promise<void> {
