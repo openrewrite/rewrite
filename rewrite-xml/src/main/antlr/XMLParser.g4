@@ -36,11 +36,7 @@ document
     ;
 
 prolog
-    :   xmldecl? prologContent*
-    ;
-
-prologContent
-    :   misc | jspdirective
+    :   xmldecl? misc* jspdirective*
     ;
 
 xmldecl

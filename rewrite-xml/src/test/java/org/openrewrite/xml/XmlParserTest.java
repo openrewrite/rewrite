@@ -175,12 +175,12 @@ class XmlParserTest implements RewriteTest {
             //language=html
             """
               <!DOCTYPE html>
-              <%!
-                private String greeting = "Hello";
-              %>
               <%@ page language="java" contentType="text/html; charset=UTF-8" %>
               <html>
                 <body>
+                  <%!
+                    private String greeting = "Hello";
+                  %>
                   <%-- Display greeting --%>
                   <h1><%= greeting %> from JSP!</h1>
                   <%
