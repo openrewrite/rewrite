@@ -31,9 +31,8 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    // Allow non-LTS versions before Java 17 to use this parser
-    sourceCompatibility = JavaVersion.VERSION_15.toString()
-    targetCompatibility = JavaVersion.VERSION_15.toString()
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+    targetCompatibility = JavaVersion.VERSION_17.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
