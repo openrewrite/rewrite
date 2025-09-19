@@ -34,7 +34,7 @@ java {
 tasks.named("licenseFormat") { enabled = false }
 
 tasks.withType<JavaCompile>().configureEach {
-    // allows --add-exports to in spite of the JDK's restrictions on this
+    // Allow non-LTS versions before Java 25 to use this parser
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
 

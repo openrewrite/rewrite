@@ -32,7 +32,7 @@ java {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    // allows --add-exports to in spite of the JDK's restrictions on this
+    // Allow non-LTS versions before Java 21 to use this parser
     sourceCompatibility = JavaVersion.VERSION_17.toString()
     targetCompatibility = JavaVersion.VERSION_17.toString()
 
