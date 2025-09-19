@@ -282,8 +282,8 @@ public class JavaSourceSet implements SourceSet {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                        String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
-                        if (pathStr.endsWith(".class")) {
+                        if (file.getFileName().toString().endsWith(".class")) {
+                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
                             String s = entryNameToClassName(pathStr);
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
