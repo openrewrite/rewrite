@@ -16,7 +16,6 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
@@ -24,8 +23,6 @@ import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,25 +30,9 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindMethodsTest implements RewriteTest {
-    @TempDir
-    Path tempDir;
-
-    @BeforeEach
-    void before() {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-          .recipeInstallDir(tempDir)
-          .log(tempDir.resolve("rpc.log"))
-          .verboseLogging()
-          .inspectBrk()
-        );
-    }
-
     @AfterEach
-    void after() throws IOException {
+    void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
-        if (Files.exists(tempDir.resolve("rpc.log"))) {
-            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
-        }
     }
 
     @Test

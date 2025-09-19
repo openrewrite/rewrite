@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.Environment;
@@ -29,15 +30,29 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+@Getter
 public class JavaScriptRewriteRpc extends RewriteRpc {
     private static final RewriteRpcProcessManager<JavaScriptRewriteRpc> MANAGER = new RewriteRpcProcessManager<>(builder());
 
-    JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
+    /**
+     * The command used to start the RPC process. Useful for logging and diagnostics.
+     */
+    private final String command;
+    private final Map<String, String> commandEnv;
+
+    JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace, String command, Map<String, String> commandEnv) {
         super(jsonRpc, marketplace);
+        this.command = command;
+        this.commandEnv = commandEnv;
+    }
+
+    public static @Nullable JavaScriptRewriteRpc get() {
+        return MANAGER.get();
     }
 
     public static JavaScriptRewriteRpc getOrStart() {
@@ -241,7 +256,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 );
             }
 
-            RewriteRpcProcess process = new RewriteRpcProcess(cmd.filter(Objects::nonNull).toArray(String[]::new));
+            String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
+            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
             // Set working directory if specified
             if (workingDirectory != null) {
@@ -261,7 +277,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             process.environment().put("NODE_OPTIONS", nodeOptions.toString());
             process.start();
 
-            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace)
+            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace,
+                    String.join(" ", cmdArr), process.environment())
                     .livenessCheck(process::getLivenessCheck)
                     .timeout(timeout);
         }
