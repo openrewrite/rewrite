@@ -901,10 +901,9 @@ public class SemanticallyEqual {
             } else if (value instanceof Number) {
                 if (!(compareToValue instanceof Number)) {
                     return false;
-                } else if (value instanceof Double && compareToValue instanceof Double) {
+                } else if ((value instanceof Double || value instanceof Float) &&
+                        (compareToValue instanceof Double || compareToValue instanceof Float)) {
                     return ((Number) value).doubleValue() == ((Number) compareToValue).doubleValue();
-                } else if (value instanceof Float && compareToValue instanceof Float) {
-                    return ((Number) value).floatValue() == ((Number) compareToValue).floatValue();
                 } else if ((value instanceof Integer ||
                         value instanceof Long ||
                         value instanceof Short ||
