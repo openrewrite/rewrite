@@ -168,7 +168,7 @@ public interface JavaParser extends Parser {
                         .forName("org.openrewrite.java.Java25Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 //Fall through, look for a parser on an older version.
             }
         }
@@ -179,7 +179,7 @@ public interface JavaParser extends Parser {
                         .forName("org.openrewrite.java.Java21Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 //Fall through, look for a parser on an older version.
             }
         }
@@ -190,7 +190,7 @@ public interface JavaParser extends Parser {
                         .forName("org.openrewrite.java.Java17Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 //Fall through, look for a parser on an older version.
             }
         }
@@ -201,7 +201,7 @@ public interface JavaParser extends Parser {
                         .forName("org.openrewrite.java.Java11Parser")
                         .getDeclaredMethod("builder")
                         .invoke(null);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 //Fall through, look for a parser on an older version.
             }
         }
@@ -211,7 +211,7 @@ public interface JavaParser extends Parser {
                     .forName("org.openrewrite.java.Java8Parser")
                     .getDeclaredMethod("builder")
                     .invoke(null);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             //Fall through to an exception without making this the "cause".
         }
 
