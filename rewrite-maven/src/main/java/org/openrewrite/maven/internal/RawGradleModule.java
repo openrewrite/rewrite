@@ -100,7 +100,7 @@ public class RawGradleModule {
         DependencyAttributes attributes;
 
         GroupArtifactVersion asGav() {
-            return new GroupArtifactVersion(group, module, version == null ? null : version.getRequires());
+            return GroupArtifactVersion.of(group, module, version == null ? null : version.getRequires());
         }
     }
 

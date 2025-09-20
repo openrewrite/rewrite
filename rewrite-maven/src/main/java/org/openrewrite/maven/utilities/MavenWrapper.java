@@ -116,7 +116,7 @@ public class MavenWrapper {
 
         List<MavenRepository> repositories = singletonList(repository);
         try {
-            GroupArtifact wrapperDistributionGroupArtifact = new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper-distribution");
+            GroupArtifact wrapperDistributionGroupArtifact = GroupArtifact.of("org.apache.maven.wrapper", "maven-wrapper-distribution");
             MavenMetadata wrapperMetadata = pomDownloader.downloadMetadata(wrapperDistributionGroupArtifact, null, repositories);
             String resolvedWrapperVersion = wrapperMetadata.getVersioning()
                     .getVersions()
@@ -124,10 +124,10 @@ public class MavenWrapper {
                     .filter(v -> wrapperVersionComparator.isValid(null, v))
                     .max((v1, v2) -> wrapperVersionComparator.compare(null, v1, v2))
                     .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven wrapper version to select from."));
-            String resolvedWrapperUri = getDownloadUriFor(repository, new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper"), resolvedWrapperVersion, null, "jar");
+            String resolvedWrapperUri = getDownloadUriFor(repository, GroupArtifact.of("org.apache.maven.wrapper", "maven-wrapper"), resolvedWrapperVersion, null, "jar");
             String resolvedWrapperDistributionUri = getDownloadUriFor(repository, wrapperDistributionGroupArtifact, resolvedWrapperVersion, wrapperDistributionType.classifier, "zip");
 
-            GroupArtifact distributionGroupArtifact = new GroupArtifact("org.apache.maven", "apache-maven");
+            GroupArtifact distributionGroupArtifact = GroupArtifact.of("org.apache.maven", "apache-maven");
             MavenMetadata distributionMetadata = pomDownloader.downloadMetadata(distributionGroupArtifact, null, repositories);
             String resolvedDistributionVersion = distributionMetadata.getVersioning()
                     .getVersions()

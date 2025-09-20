@@ -16,14 +16,50 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
-import lombok.With;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 
 @Value
-@With
 public class GroupArtifact implements Serializable {
+    private static final Cache<String, GroupArtifact> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
+
     String groupId;
     String artifactId;
+
+    /**
+     * Static factory method of() should be used instead. This is temporarily still public for minimally-disruptive deprecation.
+     */
+    @Deprecated
+    @InlineMe(replacement = "GroupArtifact.of(groupId, artifactId)", imports = "org.openrewrite.maven.tree.GroupArtifact")
+    public GroupArtifact(String groupId, String artifactId) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+    }
+
+    @JsonCreator
+    public static GroupArtifact of(
+            @Nullable String groupId,
+            String artifactId) {
+        String finalGroup = groupId == null ? "" : groupId;
+        String key = finalGroup + ":" + artifactId;
+
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new GroupArtifact(finalGroup, artifactId));
+    }
+
+    public GroupArtifact withGroupId(String groupId) {
+        return groupId.equals(this.groupId) ? this : of(groupId, artifactId);
+    }
+
+    public GroupArtifact withArtifactId(String artifactId) {
+        return artifactId.equals(this.artifactId) ? this : of(groupId, artifactId);
+    }
 }

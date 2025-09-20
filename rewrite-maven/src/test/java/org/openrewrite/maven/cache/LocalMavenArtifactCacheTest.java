@@ -59,7 +59,7 @@ class LocalMavenArtifactCacheTest {
 
     private static ResolvedDependency findDependency() {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
-        ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
+        ResolvedGroupArtifactVersion recipeGav = ResolvedGroupArtifactVersion.of(
           "https://repo1.maven.org/maven2",
           "org.openrewrite.recipe",
           "rewrite-testing-frameworks",
