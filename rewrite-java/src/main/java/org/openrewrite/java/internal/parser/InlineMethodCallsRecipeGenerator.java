@@ -1,5 +1,22 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.internal.parser;
 
+import lombok.AllArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 
 import java.io.IOException;
@@ -7,7 +24,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class InlineMethodCallsRecipeGenerator {
@@ -23,10 +43,14 @@ public class InlineMethodCallsRecipeGenerator {
         Path inputPath = Paths.get(args[0]);
         Path outputPath = Paths.get(args[1]);
 
+        generate(inputPath, outputPath);
+    }
+
+    static void generate(Path tsvFile, Path outputPath) {
         List<InlineMeMethod> inlineMethods = new ArrayList<>();
 
         TypeTable.Reader reader = new TypeTable.Reader(new InMemoryExecutionContext());
-        try (InputStream is = Files.newInputStream(inputPath)) {
+        try (InputStream is = Files.newInputStream(tsvFile)) {
             reader.parseTsvAndProcess(is, TypeTable.Reader.Options.matchAll(), (gav, classes, nestedTypes) -> {
                 if (gav == null) {
                     return;
@@ -58,13 +82,13 @@ public class InlineMethodCallsRecipeGenerator {
         }
     }
 
-    private static @org.jspecify.annotations.Nullable InlineMeMethod extractInlineMeMethod(TypeTable.GroupArtifactVersion gav,
-                                                         TypeTable.ClassDefinition classDef,
-                                                         TypeTable.Member member) {
+    private static @Nullable InlineMeMethod extractInlineMeMethod(TypeTable.GroupArtifactVersion gav,
+                                                                  TypeTable.ClassDefinition classDef,
+                                                                  TypeTable.Member member) {
         try {
             // Parse the annotations to find @InlineMe
             List<AnnotationDeserializer.AnnotationInfo> annotations =
-                AnnotationDeserializer.parseAnnotations(member.getAnnotations());
+                    AnnotationDeserializer.parseAnnotations(member.getAnnotations());
 
             for (AnnotationDeserializer.AnnotationInfo annotation : annotations) {
                 if (INLINE_ME_DESCRIPTOR.equals(annotation.getDescriptor())) {
@@ -103,13 +127,11 @@ public class InlineMethodCallsRecipeGenerator {
                         String methodPattern = buildMethodPattern(classDef, member);
 
                         return new InlineMeMethod(
-                            gav,
-                            classDef.getName().replace('/', '.'),
-                            member.getName(),
-                            methodPattern,
-                            replacement,
-                            imports,
-                            staticImports
+                                gav,
+                                methodPattern,
+                                replacement,
+                                imports,
+                                staticImports
                         );
                     }
                 }
@@ -140,7 +162,6 @@ public class InlineMethodCallsRecipeGenerator {
         StringBuilder yaml = new StringBuilder();
         yaml.append("#\n");
         yaml.append("# Generated InlineMe recipes from TypeTable\n");
-        yaml.append("# Generated at: ").append(new Date()).append("\n");
         yaml.append("#\n\n");
 
         yaml.append("type: specs.openrewrite.org/v1beta/recipe\n");
@@ -153,14 +174,14 @@ public class InlineMethodCallsRecipeGenerator {
 
         // Group methods by GAV for better organization
         Map<TypeTable.GroupArtifactVersion, List<InlineMeMethod>> methodsByGav =
-            methods.stream().collect(Collectors.groupingBy(m -> m.gav));
+                methods.stream().collect(Collectors.groupingBy(m -> m.gav));
 
         for (Map.Entry<TypeTable.GroupArtifactVersion, List<InlineMeMethod>> entry : methodsByGav.entrySet()) {
             TypeTable.GroupArtifactVersion gav = entry.getKey();
             List<InlineMeMethod> gavMethods = entry.getValue();
 
             yaml.append("\n  # From ").append(gav.getGroupId()).append(":").append(gav.getArtifactId())
-                .append(":").append(gav.getVersion()).append("\n");
+                    .append(":").append(gav.getVersion()).append("\n");
 
             for (InlineMeMethod method : gavMethods) {
                 yaml.append("  - org.openrewrite.java.InlineMethodCalls:\n");
@@ -191,25 +212,12 @@ public class InlineMethodCallsRecipeGenerator {
         return value.replace("'", "''");
     }
 
+    @AllArgsConstructor
     private static class InlineMeMethod {
         final TypeTable.GroupArtifactVersion gav;
-        final String className;
-        final String methodName;
         final String methodPattern;
         final String replacement;
         final List<String> imports;
         final List<String> staticImports;
-
-        InlineMeMethod(TypeTable.GroupArtifactVersion gav, String className, String methodName,
-                      String methodPattern, String replacement,
-                      List<String> imports, List<String> staticImports) {
-            this.gav = gav;
-            this.className = className;
-            this.methodName = methodName;
-            this.methodPattern = methodPattern;
-            this.replacement = replacement;
-            this.imports = imports;
-            this.staticImports = staticImports;
-        }
     }
 }

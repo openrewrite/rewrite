@@ -39,10 +39,7 @@ class InlineMethodCallsRecipeGeneratorTest {
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
-        InlineMethodCallsRecipeGenerator.main(new String[]{
-          inputTsv.toString(),
-          outputYaml.toString()
-        });
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Verify the output was created
         assertThat(outputYaml).exists();
@@ -74,10 +71,7 @@ class InlineMethodCallsRecipeGeneratorTest {
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
-        InlineMethodCallsRecipeGenerator.main(new String[]{
-          inputTsv.toString(),
-          outputYaml.toString()
-        });
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Verify the output was created
         assertThat(outputYaml).exists();
@@ -110,10 +104,7 @@ class InlineMethodCallsRecipeGeneratorTest {
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
-        InlineMethodCallsRecipeGenerator.main(new String[]{
-          inputTsv.toString(),
-          outputYaml.toString()
-        });
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Verify the output was created
         assertThat(outputYaml).exists();
