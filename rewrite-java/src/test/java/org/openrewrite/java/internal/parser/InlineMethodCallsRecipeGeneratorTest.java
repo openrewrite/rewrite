@@ -29,94 +29,127 @@ class InlineMethodCallsRecipeGeneratorTest {
     void generateRecipesFromTypeTable(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file
         Path inputTsv = tempDir.resolve("test.tsv");
-        String tsvContent = """
+        Files.writeString(inputTsv, """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\toldMethod\t(Ljava/lang/String;)V\t\tinput\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"newMethod(input)",imports=[s"java.util.List"])\t\t\t
-          """;
-        Files.write(inputTsv, tsvContent.getBytes());
+          """);
 
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
-        // Verify the output was created
-        assertThat(outputYaml).exists();
-
         // Read and verify the content
-        String yamlContent = Files.readString(outputYaml);
-        assertThat(yamlContent)
-          .contains("type: specs.openrewrite.org/v1beta/recipe")
-          .contains("name: org.openrewrite.java.InlineMethodCallsGenerated")
-          .contains("org.openrewrite.java.InlineMethodCalls:")
-          .contains("methodPattern: 'com.example.TestClass oldMethod(..)'")
-          .contains("replacement: 'newMethod(input)'")
-          .contains("imports:")
-          .contains("- 'java.util.List'");
+        //language=yaml
+        assertThat(outputYaml).hasContent("""
+          #
+          # Generated InlineMe recipes from TypeTable
+          #
+
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.java.InlineMethodCallsGenerated
+          displayName: Inline methods annotated with @InlineMe
+          description: >
+            Automatically generated recipes to inline method calls based on @InlineMe annotations
+            discovered in the classpath.
+          recipeList:
+
+            # From com.example:test-lib:1.0.0
+            - org.openrewrite.java.InlineMethodCalls:
+                methodPattern: 'com.example.TestClass oldMethod(..)'
+                replacement: 'newMethod(input)'
+                imports:
+                  - 'java.util.List'
+                classpathFromResources:
+                  - 'test-lib-1.0.0'
+          """);
     }
 
     @Test
     void handleMultipleAnnotatedMethods(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file with multiple annotated methods
         Path inputTsv = tempDir.resolve("test.tsv");
-        String tsvContent = """
+        Files.writeString(inputTsv, """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tmethod1\t()V\t\t\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement1()")\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tmethod2\t(I)V\t\tnum\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement2(num)",staticImports=[s"java.util.Collections.emptyList"])\t\t\t
-          """;
-        Files.write(inputTsv, tsvContent.getBytes());
+          """);
 
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
-        // Verify the output was created
-        assertThat(outputYaml).exists();
-
         // Read and verify the content
-        String yamlContent = Files.readString(outputYaml);
+        //language=yaml
+        assertThat(outputYaml).hasContent("""
+          #
+          # Generated InlineMe recipes from TypeTable
+          #
 
-        // Check for both methods
-        assertThat(yamlContent)
-          .contains("methodPattern: 'com.example.TestClass method1(..)'")
-          .contains("replacement: 'replacement1()'")
-          .contains("methodPattern: 'com.example.TestClass method2(..)'")
-          .contains("replacement: 'replacement2(num)'")
-          .contains("staticImports:")
-          .contains("- 'java.util.Collections.emptyList'");
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.java.InlineMethodCallsGenerated
+          displayName: Inline methods annotated with @InlineMe
+          description: >
+            Automatically generated recipes to inline method calls based on @InlineMe annotations
+            discovered in the classpath.
+          recipeList:
+
+            # From com.example:test-lib:1.0.0
+            - org.openrewrite.java.InlineMethodCalls:
+                methodPattern: 'com.example.TestClass method1(..)'
+                replacement: 'replacement1()'
+                classpathFromResources:
+                  - 'test-lib-1.0.0'
+            - org.openrewrite.java.InlineMethodCalls:
+                methodPattern: 'com.example.TestClass method2(..)'
+                replacement: 'replacement2(num)'
+                staticImports:
+                  - 'java.util.Collections.emptyList'
+                classpathFromResources:
+                  - 'test-lib-1.0.0'
+          """);
     }
 
     @Test
     void skipMethodsWithoutInlineMeAnnotation(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file with a mix of annotated and non-annotated methods
         Path inputTsv = tempDir.resolve("test.tsv");
-        String tsvContent = """
+        Files.writeString(inputTsv, """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tregularMethod\t()V\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tannotatedMethod\t()V\t\t\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement()")\t\t\t
-          """;
-        Files.write(inputTsv, tsvContent.getBytes());
+          """);
 
         Path outputYaml = tempDir.resolve("output.yaml");
 
         // Run the generator
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
-        // Verify the output was created
-        assertThat(outputYaml).exists();
-
         // Read and verify the content
-        String yamlContent = Files.readString(outputYaml);
+        //language=yaml
+        assertThat(outputYaml).hasContent("""
+          #
+          # Generated InlineMe recipes from TypeTable
+          #
 
-        // Should only contain the annotated method
-        assertThat(yamlContent)
-          .contains("methodPattern: 'com.example.TestClass annotatedMethod(..)'")
-          .contains("replacement: 'replacement()'")
-          // Should not contain the regular method
-          .doesNotContain("regularMethod");
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.java.InlineMethodCallsGenerated
+          displayName: Inline methods annotated with @InlineMe
+          description: >
+            Automatically generated recipes to inline method calls based on @InlineMe annotations
+            discovered in the classpath.
+          recipeList:
+
+            # From com.example:test-lib:1.0.0
+            - org.openrewrite.java.InlineMethodCalls:
+                methodPattern: 'com.example.TestClass annotatedMethod(..)'
+                replacement: 'replacement()'
+                classpathFromResources:
+                  - 'test-lib-1.0.0'
+          """);
     }
 }

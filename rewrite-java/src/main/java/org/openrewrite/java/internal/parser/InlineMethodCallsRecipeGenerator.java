@@ -25,7 +25,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -131,7 +130,8 @@ public class InlineMethodCallsRecipeGenerator {
                                 methodPattern,
                                 replacement,
                                 imports,
-                                staticImports
+                                staticImports,
+                                gav.getArtifactId() + "-" + gav.getVersion()
                         );
                     }
                 }
@@ -201,6 +201,9 @@ public class InlineMethodCallsRecipeGenerator {
                         yaml.append("        - '").append(escapeYaml(imp)).append("'\n");
                     }
                 }
+
+                yaml.append("      classpathFromResources:\n");
+                yaml.append("        - '").append(escapeYaml(method.classpathResource)).append("'\n");
             }
         }
 
@@ -219,5 +222,6 @@ public class InlineMethodCallsRecipeGenerator {
         final String replacement;
         final List<String> imports;
         final List<String> staticImports;
+        final String classpathResource;
     }
 }
