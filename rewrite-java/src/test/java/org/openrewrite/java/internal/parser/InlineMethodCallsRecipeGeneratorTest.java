@@ -56,7 +56,7 @@ class InlineMethodCallsRecipeGeneratorTest {
 
             # From com.example:test-lib:1.0.0
             - org.openrewrite.java.InlineMethodCalls:
-                methodPattern: 'com.example.TestClass oldMethod(..)'
+                methodPattern: 'com.example.TestClass oldMethod(java.lang.String)'
                 replacement: 'newMethod(input)'
                 imports:
                   - 'java.util.List'
@@ -97,12 +97,12 @@ class InlineMethodCallsRecipeGeneratorTest {
 
             # From com.example:test-lib:1.0.0
             - org.openrewrite.java.InlineMethodCalls:
-                methodPattern: 'com.example.TestClass method1(..)'
+                methodPattern: 'com.example.TestClass method1()'
                 replacement: 'replacement1()'
                 classpathFromResources:
                   - 'test-lib-1.0.0'
             - org.openrewrite.java.InlineMethodCalls:
-                methodPattern: 'com.example.TestClass method2(..)'
+                methodPattern: 'com.example.TestClass method2(int)'
                 replacement: 'replacement2(num)'
                 staticImports:
                   - 'java.util.Collections.emptyList'
@@ -143,7 +143,7 @@ class InlineMethodCallsRecipeGeneratorTest {
 
             # From com.example:test-lib:1.0.0
             - org.openrewrite.java.InlineMethodCalls:
-                methodPattern: 'com.example.TestClass annotatedMethod(..)'
+                methodPattern: 'com.example.TestClass annotatedMethod()'
                 replacement: 'replacement()'
                 classpathFromResources:
                   - 'test-lib-1.0.0'

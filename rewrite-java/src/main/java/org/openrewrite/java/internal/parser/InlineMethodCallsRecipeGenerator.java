@@ -152,10 +152,89 @@ public class InlineMethodCallsRecipeGenerator {
             methodName = className.substring(className.lastIndexOf('.') + 1);
         }
 
-        // Build parameter pattern - using (..) to match any parameters
-        String paramPattern = "(..)";
+        // Parse method descriptor to extract parameter types
+        String descriptor = member.getDescriptor();
+        String paramPattern = parseMethodParameters(descriptor);
 
         return className + " " + methodName + paramPattern;
+    }
+
+    private static String parseMethodParameters(String descriptor) {
+        if (descriptor == null || !descriptor.startsWith("(")) {
+            return "()";
+        }
+
+        List<String> paramTypes = new ArrayList<>();
+        int i = 1; // Skip opening '('
+        while (i < descriptor.length() && descriptor.charAt(i) != ')') {
+            String type = parseType(descriptor, i);
+            paramTypes.add(type);
+            i += getTypeLength(descriptor, i);
+        }
+
+        if (paramTypes.isEmpty()) {
+            return "()";
+        }
+        return "(" + String.join(", ", paramTypes) + ")";
+    }
+
+    private static String parseType(String descriptor, int start) {
+        char c = descriptor.charAt(start);
+        switch (c) {
+            case 'B':
+                return "byte";
+            case 'C':
+                return "char";
+            case 'D':
+                return "double";
+            case 'F':
+                return "float";
+            case 'I':
+                return "int";
+            case 'J':
+                return "long";
+            case 'S':
+                return "short";
+            case 'Z':
+                return "boolean";
+            case 'V':
+                return "void";
+            case 'L':
+                // Object type - extract class name
+                int semicolon = descriptor.indexOf(';', start);
+                String className = descriptor.substring(start + 1, semicolon);
+                return className.replace('/', '.');
+            case '[':
+                // Array type
+                String elementType = parseType(descriptor, start + 1);
+                return elementType + "[]";
+            default:
+                return "Object"; // Fallback
+        }
+    }
+
+    private static int getTypeLength(String descriptor, int start) {
+        char c = descriptor.charAt(start);
+        switch (c) {
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'F':
+            case 'I':
+            case 'J':
+            case 'S':
+            case 'Z':
+            case 'V':
+                return 1;
+            case 'L':
+                // Object type - find the semicolon
+                return descriptor.indexOf(';', start) - start + 1;
+            case '[':
+                // Array type - recurse for element type
+                return 1 + getTypeLength(descriptor, start + 1);
+            default:
+                return 1;
+        }
     }
 
     private static void generateYamlRecipes(List<InlineMeMethod> methods, Path outputPath) throws IOException {
