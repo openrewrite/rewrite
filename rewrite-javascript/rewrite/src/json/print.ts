@@ -75,7 +75,7 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return jsonObject;
     }
 
-    protected async visitSpace(space: Json.Space, p: PrintOutputCapture): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, p: PrintOutputCapture): Promise<Json.Space> {
         p.append(space.whitespace);
         for (const comment of space.comments) {
             await this.visitMarkers(comment.markers, p);

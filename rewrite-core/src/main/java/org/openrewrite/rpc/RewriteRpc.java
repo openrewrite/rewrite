@@ -158,28 +158,33 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
-    public <P> @Nullable Tree visit(Tree sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
         // Set the local state of this tree, so that when the remote asks for it, we know what to send.
-        localObjects.put(sourceFile.getId().toString(), sourceFile);
+        localObjects.put(tree.getId().toString(), tree);
 
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
-        VisitResponse response = send("Visit", new Visit(visitorName, null,
-                sourceFile.getId().toString(), pId, cursorIds), VisitResponse.class);
+        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
+                .getClass().getName();
+        VisitResponse response = send("Visit", new Visit(visitorName, sourceFileType, null,
+                tree.getId().toString(), pId, cursorIds), VisitResponse.class);
         return response.isModified() ?
-                getObject(sourceFile.getId().toString()) :
-                sourceFile;
+                getObject(tree.getId().toString(), sourceFileType) :
+                tree;
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
         String ctxId = maybeUnwrapExecutionContext(ctx);
-        List<String> generated = send("Generate", new Generate(remoteRecipeId, ctxId),
+        GenerateResponse response = send("Generate", new Generate(remoteRecipeId, ctxId),
                 GenerateResponse.class);
-        if (!generated.isEmpty()) {
-            return generated.stream()
-                    .map(this::<SourceFile>getObject)
-                    .collect(toList());
+        if (!response.getIds().isEmpty()) {
+            List<SourceFile> generated = new ArrayList<>(response.getIds().size());
+            for (int i = 0; i < response.getIds().size(); i++) {
+                String id = response.getIds().get(i);
+                generated.add(getObject(id, response.getSourceFileTypes().get(i)));
+            }
+            return generated;
         }
         return emptyList();
     }
@@ -263,7 +268,8 @@ public class RewriteRpc {
         };
     }
 
-    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo, Parser parser, ExecutionContext ctx) {
+    public Stream<SourceFile> parse(Iterable<Parser.Input> inputs, @Nullable Path relativeTo,
+                                    Parser parser, String sourceFileType, ExecutionContext ctx) {
         List<Parser.Input> inputList = new ArrayList<>();
         List<Parse.Input> mappedInputs = new ArrayList<>();
         for (Parser.Input input : inputs) {
@@ -306,7 +312,7 @@ public class RewriteRpc {
                 SourceFile sourceFile = null;
                 parsingListener.startedParsing(input);
                 try {
-                    sourceFile = parser.requirePrintEqualsInput(getObject(id), input, relativeTo, ctx);
+                    sourceFile = parser.requirePrintEqualsInput(getObject(id, sourceFileType), input, relativeTo, ctx);
                 } catch (Exception e) {
                     sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
                 } finally {
@@ -378,12 +384,15 @@ public class RewriteRpc {
     }
 
     @VisibleForTesting
-    public <T> T getObject(String id) {
+    public <T> T getObject(String id, @Nullable String sourceFileType) {
         // Check if we have a cached version of this object
         Object localObject = localObjects.get(id);
 
-        RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
-                new GetObject(id), GetObjectResponse.class));
+        RpcReceiveQueue q = new RpcReceiveQueue(
+                remoteRefs,
+                () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
+                sourceFileType
+        );
         Object remoteObject = q.receive(localObject, null);
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -439,12 +448,12 @@ public class RewriteRpc {
     }
 
     @VisibleForTesting
-    Cursor getCursor(@Nullable List<String> cursorIds) {
+    Cursor getCursor(@Nullable List<String> cursorIds, @Nullable String sourceFileType) {
         Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
         if (cursorIds != null) {
             for (int i = cursorIds.size() - 1; i >= 0; i--) {
                 String cursorId = cursorIds.get(i);
-                Object cursorObject = getObject(cursorId);
+                Object cursorObject = getObject(cursorId, sourceFileType);
                 remoteObjects.put(cursorId, cursorObject);
                 cursor = new Cursor(cursor, cursorObject);
             }

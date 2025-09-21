@@ -45,7 +45,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    public async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
@@ -995,7 +995,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return right ? this.visitRightPadded(right, p) : undefined;
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
         return produceAsync<J.RightPadded<T>>(right, async draft => {
             this.cursor = new Cursor(right, this.cursor);
             if (isTree(right.element)) {
@@ -1011,7 +1011,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return left ? this.visitLeftPadded(left, p) : undefined;
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
             this.cursor = new Cursor(left, this.cursor);
             draft.before = await this.visitSpace(left.before, p);
@@ -1029,7 +1029,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return container ? this.visitContainer(container, p) : undefined;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         return produceAsync<J.Container<T>>(container, async draft => {
             this.cursor = new Cursor(container, this.cursor);
             draft.before = await this.visitSpace(container.before, p);

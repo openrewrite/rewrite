@@ -31,7 +31,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.unmodifiableList;
 
@@ -69,12 +68,13 @@ public class JavaScriptParser implements Parser {
         Stream<SourceFile> smallFileStream = Stream.empty();
         if (!smallFiles.isEmpty()) {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
-            smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this, ctx).map(source -> {
+            smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
+                    JS.CompilationUnit.class.getName(), ctx).map(source -> {
                 try {
                     validator.visit(source, 0);
                     return source;
                 } catch (Exception e) {
-                    Optional<Input> input = StreamSupport.stream(smallFiles.spliterator(), false)
+                    Optional<Input> input = smallFiles.stream()
                             .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
                             .findFirst();
                     return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);

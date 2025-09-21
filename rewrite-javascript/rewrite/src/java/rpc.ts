@@ -20,6 +20,7 @@ import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
 import {Type} from "./type";
+import Space = J.Space;
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -1382,3 +1383,70 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return undefined;
     }
 }
+
+export function registerJLanguageCodecs(sourceFileType: string,
+                                        receiver: JavaVisitor<RpcReceiveQueue>,
+                                        sender: JavaVisitor<RpcSendQueue>,
+                                        extendedKinds?: any) {
+    const kinds = new Set([
+        ...Object.values(J.Kind),
+        ...(extendedKinds ? Object.values(extendedKinds) : [])
+    ]);
+
+    // Register codec for all Java AST node types
+    for (const kind of kinds) {
+        if (kind === J.Kind.Space) {
+            RpcCodecs.registerCodec(kind, {
+                async rpcReceive(before: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
+                    return (await receiver.visitSpace(before, q))!;
+                },
+
+                async rpcSend(after: J.Space, q: RpcSendQueue): Promise<void> {
+                    await sender.visitSpace(after, q);
+                }
+            }, sourceFileType);
+        } else if (kind === J.Kind.RightPadded) {
+            RpcCodecs.registerCodec(kind, {
+                async rpcReceive<T extends J | boolean>(before: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
+                    return (await receiver.visitRightPadded(before, q))!;
+                },
+
+                async rpcSend<T extends J | boolean>(after: J.RightPadded<T>, q: RpcSendQueue): Promise<void> {
+                    await sender.visitRightPadded(after, q);
+                }
+            }, sourceFileType);
+        } else if (kind === J.Kind.LeftPadded) {
+            RpcCodecs.registerCodec(kind, {
+                async rpcReceive<T extends J | Space | number | string | boolean>(before: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+                    return (await receiver.visitLeftPadded(before, q))!;
+                },
+
+                async rpcSend<T extends J | Space | number | string | boolean>(after: J.LeftPadded<T>, q: RpcSendQueue): Promise<void> {
+                    await sender.visitLeftPadded(after, q);
+                }
+            }, sourceFileType);
+        } else if (kind === J.Kind.Container) {
+            RpcCodecs.registerCodec(kind, {
+                async rpcReceive<T extends J>(before: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+                    return (await receiver.visitContainer(before, q))!;
+                },
+
+                async rpcSend<T extends J>(after: J.Container<T>, q: RpcSendQueue): Promise<void> {
+                    await sender.visitContainer(after, q);
+                }
+            }, sourceFileType);
+        } else {
+            RpcCodecs.registerCodec(kind as string, {
+                async rpcReceive(before: J, q: RpcReceiveQueue): Promise<J> {
+                    return (await receiver.visit(before, q))!;
+                },
+
+                async rpcSend(after: J, q: RpcSendQueue): Promise<void> {
+                    await sender.visit(after, q);
+                }
+            }, sourceFileType);
+        }
+    }
+}
+
+registerJLanguageCodecs(J.Kind.CompilationUnit, new JavaReceiver(), new JavaSender());

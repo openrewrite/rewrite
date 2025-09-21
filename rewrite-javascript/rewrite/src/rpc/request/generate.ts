@@ -17,7 +17,11 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor} from "../../tree";
 import {ExecutionContext} from "../../execution";
-import {UUID} from "node:crypto";
+
+export interface GenerateResponse {
+    ids: string[]
+    sourceFileTypes: string[]
+}
 
 export class Generate {
     constructor(private readonly id: string, private readonly p: string) {
@@ -28,8 +32,13 @@ export class Generate {
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any): void {
-        connection.onRequest(new rpc.RequestType<Generate, UUID[], Error>("Generate"), async (request) => {
+        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), async (request) => {
             const recipe = preparedRecipes.get(request.id);
+            const response = {
+                ids: [],
+                sourceFileTypes: []
+            } as GenerateResponse;
+
             if (recipe && recipe instanceof ScanningRecipe) {
                 let cursor = recipeCursors.get(recipe);
                 if (!cursor) {
@@ -39,12 +48,15 @@ export class Generate {
                 const ctx = getObject(request.p) as ExecutionContext;
                 const acc = recipe.accumulator(cursor, ctx);
                 const generated = await recipe.generate(acc, ctx)
-                return generated.map(g => {
+
+                for (const g of generated) {
                     localObjects.set(g.id.toString(), g);
-                    return g.id;
-                })
+                    response.ids.push(g.id.toString());
+                    response.sourceFileTypes.push(g.kind);
+                }
+
             }
-            return []
+            return response;
         });
     }
 }

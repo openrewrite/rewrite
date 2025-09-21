@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 import {JsonVisitor} from "./visitor";
-import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Json} from "./tree";
 import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft} from "immer";
-import {TreeKind} from "../tree";
 
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
@@ -76,7 +75,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         return obj;
     }
 
-    protected async visitSpace(space: Json.Space, q: RpcSendQueue): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, q: RpcSendQueue): Promise<Json.Space> {
         await q.getAndSendList(space, s => s.comments, c => c.text + c.suffix, async c => {
             await q.getAndSend(c, c2 => c2.multiline);
             await q.getAndSend(c, c2 => c2.text);
@@ -87,7 +86,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         return space;
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, q: RpcSendQueue): Promise<Json.RightPadded<T> | undefined> {
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, q: RpcSendQueue): Promise<Json.RightPadded<T> | undefined> {
         await q.getAndSend(right, r => r.element, j => this.visit(j, q));
         await q.getAndSend(right, r => asRef(r.after), async space => await this.visitSpace(space, q));
         await q.getAndSend(right, r => r.markers);
@@ -158,7 +157,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         return finishDraft(draft);
     }
 
-    protected async visitSpace(space: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
         return produceAsync<Json.Space>(space, async draft => {
             draft.comments = await q.receiveListDefined(space.comments, async c => {
                 return await produceAsync(c, async draft => {
@@ -172,7 +171,7 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: RpcReceiveQueue): Promise<Json.RightPadded<T> | undefined> {
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: RpcReceiveQueue): Promise<Json.RightPadded<T> | undefined> {
         if (!right) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty padding")
         }
@@ -184,18 +183,40 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     }
 }
 
-const jsonCodec: RpcCodec<Json> = {
-    async rpcReceive(before: Json, q: RpcReceiveQueue): Promise<Json> {
-        return (await new JsonReceiver().visit(before, q))!;
-    },
+const receiver = new JsonReceiver();
+const sender = new JsonSender();
 
-    async rpcSend(after: Json, q: RpcSendQueue): Promise<void> {
-        await new JsonSender().visit(after, q);
+// Register codec for all Java AST node types
+for (const kind of Object.values(Json.Kind)) {
+    if (kind === Json.Kind.Space) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive(before: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
+                return (await receiver.visitSpace(before, q))!;
+            },
+
+            async rpcSend(after: Json.Space, q: RpcSendQueue): Promise<void> {
+                await sender.visitSpace(after, q);
+            }
+        }, Json.Kind.Document);
+    } else if (kind === Json.Kind.RightPadded) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive<T extends Json>(before: Json.RightPadded<T>, q: RpcReceiveQueue): Promise<Json.RightPadded<T>> {
+                return (await receiver.visitRightPadded(before, q))!;
+            },
+
+            async rpcSend<T extends Json>(after: Json.RightPadded<T>, q: RpcSendQueue): Promise<void> {
+                await sender.visitRightPadded(after, q);
+            }
+        }, Json.Kind.Document);
+    } else {
+        RpcCodecs.registerCodec(kind as string, {
+            async rpcReceive(before: Json, q: RpcReceiveQueue): Promise<Json> {
+                return (await receiver.visit(before, q))!;
+            },
+
+            async rpcSend(after: Json, q: RpcSendQueue): Promise<void> {
+                await sender.visit(after, q);
+            }
+        }, Json.Kind.Document);
     }
 }
-
-Object.values(Json.Kind).forEach(kind => {
-    if (!Object.values(TreeKind).includes(kind as any)) {
-        RpcCodecs.registerCodec(kind, jsonCodec);
-    }
-});

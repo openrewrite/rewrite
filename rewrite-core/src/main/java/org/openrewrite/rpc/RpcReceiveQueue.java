@@ -31,9 +31,12 @@ public class RpcReceiveQueue {
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
     private final Supplier<List<RpcObjectData>> pull;
+    private final @Nullable String sourceFileType;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
+                           @Nullable String sourceFileType) {
         this.refs = refs;
+        this.sourceFileType = sourceFileType;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
@@ -125,11 +128,11 @@ public class RpcReceiveQueue {
 
                 // TODO handle enums here
 
+                RpcCodec<T> rpcCodec;
                 if (onChange != null) {
                     after = onChange.apply(before);
-                } else if (before instanceof RpcCodec) {
-                    //noinspection unchecked
-                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if ((rpcCodec = RpcCodec.forInstance(before, sourceFileType)) != null) {
+                    after = rpcCodec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
                 } else {
@@ -144,7 +147,8 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> @Nullable List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
+    @SuppressWarnings("DataFlowIssue")
+    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:

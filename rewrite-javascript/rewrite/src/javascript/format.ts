@@ -159,7 +159,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         }) as J.ClassDeclaration;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
         return produce(ret, draft => {
             if (draft.elements.length > 1) {
@@ -1088,7 +1088,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         const ret = await super.visitLeftPadded(left, p);
         if (ret == undefined) {
             return ret;

@@ -133,7 +133,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         // the same view of the data tables.
         String id = ctx.getMessage("org.openrewrite.rpc.id");
         if (id != null) {
-            rpc.getObject(id);
+            rpc.getObject(id, null);
         }
     }
 }
