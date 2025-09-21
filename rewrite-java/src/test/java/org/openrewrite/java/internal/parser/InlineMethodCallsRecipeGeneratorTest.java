@@ -48,10 +48,10 @@ class InlineMethodCallsRecipeGeneratorTest {
 
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
-          displayName: Inline methods annotated with @InlineMe
+          displayName: Inline methods annotated with `@InlineMe`
           description: >
-            Automatically generated recipes to inline method calls based on @InlineMe annotations
-            discovered in the classpath.
+            Automatically generated recipes to inline method calls based on `@InlineMe` annotations
+            discovered in the type table.
           recipeList:
 
             # From com.example:test-lib:1.0.0
@@ -89,10 +89,10 @@ class InlineMethodCallsRecipeGeneratorTest {
 
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
-          displayName: Inline methods annotated with @InlineMe
+          displayName: Inline methods annotated with `@InlineMe`
           description: >
-            Automatically generated recipes to inline method calls based on @InlineMe annotations
-            discovered in the classpath.
+            Automatically generated recipes to inline method calls based on `@InlineMe` annotations
+            discovered in the type table.
           recipeList:
 
             # From com.example:test-lib:1.0.0
@@ -135,10 +135,10 @@ class InlineMethodCallsRecipeGeneratorTest {
 
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
-          displayName: Inline methods annotated with @InlineMe
+          displayName: Inline methods annotated with `@InlineMe`
           description: >
-            Automatically generated recipes to inline method calls based on @InlineMe annotations
-            discovered in the classpath.
+            Automatically generated recipes to inline method calls based on `@InlineMe` annotations
+            discovered in the type table.
           recipeList:
 
             # From com.example:test-lib:1.0.0

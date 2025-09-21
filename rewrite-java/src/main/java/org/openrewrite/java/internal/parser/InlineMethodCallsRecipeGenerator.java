@@ -166,10 +166,10 @@ public class InlineMethodCallsRecipeGenerator {
 
         yaml.append("type: specs.openrewrite.org/v1beta/recipe\n");
         yaml.append("name: org.openrewrite.java.InlineMethodCallsGenerated\n");
-        yaml.append("displayName: Inline methods annotated with @InlineMe\n");
+        yaml.append("displayName: Inline methods annotated with `@InlineMe`\n");
         yaml.append("description: >\n");
-        yaml.append("  Automatically generated recipes to inline method calls based on @InlineMe annotations\n");
-        yaml.append("  discovered in the classpath.\n");
+        yaml.append("  Automatically generated recipes to inline method calls based on `@InlineMe` annotations\n");
+        yaml.append("  discovered in the type table.\n");
         yaml.append("recipeList:\n");
 
         // Group methods by GAV for better organization
