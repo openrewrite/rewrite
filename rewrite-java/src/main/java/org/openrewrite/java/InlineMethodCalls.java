@@ -61,7 +61,8 @@ public class InlineMethodCalls extends Recipe {
 
     @Option(displayName = "Classpath from resources",
             description = "List of paths to JAR files on the classpath for parsing the replacement template.",
-            required = false)
+            required = false,
+            example = "[\"guava-33.4.8-jre\"]")
     @Nullable
     Set<String> classpathFromResources;
 

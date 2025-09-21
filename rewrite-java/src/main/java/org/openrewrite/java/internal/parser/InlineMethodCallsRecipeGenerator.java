@@ -27,7 +27,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.groupingBy;
 import java.util.zip.GZIPInputStream;
 
 import static java.lang.String.format;
@@ -259,7 +259,7 @@ public class InlineMethodCallsRecipeGenerator {
 
         // Group methods by GAV for better organization
         Map<TypeTable.GroupArtifactVersion, List<InlineMeMethod>> methodsByGav =
-                methods.stream().collect(Collectors.groupingBy(m -> m.gav));
+                methods.stream().collect(groupingBy(m -> m.gav));
 
         for (Map.Entry<TypeTable.GroupArtifactVersion, List<InlineMeMethod>> entry : methodsByGav.entrySet()) {
             TypeTable.GroupArtifactVersion gav = entry.getKey();
