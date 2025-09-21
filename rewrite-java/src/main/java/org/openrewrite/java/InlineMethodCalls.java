@@ -278,4 +278,3 @@ public class InlineMethodCalls extends Recipe {
 
     }
 }
-
