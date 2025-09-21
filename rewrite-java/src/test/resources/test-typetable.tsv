@@ -1,2 +1,0 @@
-groupId	artifactId	version	classAccess	className	classSignature	classSuperclassSignature	classSuperinterfaceSignatures	access	name	descriptor	signature	parameterNames	exceptions	elementAnnotations	parameterAnnotations	typeAnnotations	constantValue
-com.example	test-lib	1.0.0	1	com/example/TestClass			java/lang/Object		1	oldMethod	(Ljava/lang/String;)V		input		@Lorg/openrewrite/java/InlineMe;(replacement="snewMethod(input)",imports=["java.util.List"])
