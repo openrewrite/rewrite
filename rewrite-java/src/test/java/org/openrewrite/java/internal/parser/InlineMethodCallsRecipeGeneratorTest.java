@@ -55,7 +55,7 @@ class InlineMethodCallsRecipeGeneratorTest {
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
           displayName: Inline methods annotated with `@InlineMe`
-          description: >
+          description: >-
             Automatically generated recipes to inline method calls based on `@InlineMe` annotations
             discovered in the type table.
           recipeList:
@@ -100,7 +100,7 @@ class InlineMethodCallsRecipeGeneratorTest {
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
           displayName: Inline methods annotated with `@InlineMe`
-          description: >
+          description: >-
             Automatically generated recipes to inline method calls based on `@InlineMe` annotations
             discovered in the type table.
           recipeList:
@@ -150,7 +150,7 @@ class InlineMethodCallsRecipeGeneratorTest {
           type: specs.openrewrite.org/v1beta/recipe
           name: org.openrewrite.java.InlineMethodCallsGenerated
           displayName: Inline methods annotated with `@InlineMe`
-          description: >
+          description: >-
             Automatically generated recipes to inline method calls based on `@InlineMe` annotations
             discovered in the type table.
           recipeList:

@@ -252,7 +252,7 @@ public class InlineMethodCallsRecipeGenerator {
         yaml.append("type: specs.openrewrite.org/v1beta/recipe\n");
         yaml.append(format("name: %s\n", recipeName));
         yaml.append("displayName: Inline methods annotated with `@InlineMe`\n");
-        yaml.append("description: >\n");
+        yaml.append("description: >-\n");
         yaml.append("  Automatically generated recipes to inline method calls based on `@InlineMe` annotations\n");
         yaml.append("  discovered in the type table.\n");
         yaml.append("recipeList:\n");
