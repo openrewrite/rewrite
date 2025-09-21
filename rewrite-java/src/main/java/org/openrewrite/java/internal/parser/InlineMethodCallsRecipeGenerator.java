@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
-public class InlineMethodCallsRecipeGenerator {
+import static java.util.Objects.requireNonNull;
 
-    private static final String INLINE_ME_DESCRIPTOR = "Lorg/openrewrite/java/InlineMe;";
+public class InlineMethodCallsRecipeGenerator {
 
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -88,10 +88,9 @@ public class InlineMethodCallsRecipeGenerator {
         try {
             // Parse the annotations to find @InlineMe
             List<AnnotationDeserializer.AnnotationInfo> annotations =
-                    AnnotationDeserializer.parseAnnotations(member.getAnnotations());
-
+                    AnnotationDeserializer.parseAnnotations(requireNonNull(member.getAnnotations()));
             for (AnnotationDeserializer.AnnotationInfo annotation : annotations) {
-                if (INLINE_ME_DESCRIPTOR.equals(annotation.getDescriptor())) {
+                if (annotation.getDescriptor().endsWith("/InlineMe;")) {
                     // Extract annotation values
                     String replacement = null;
                     List<String> imports = new ArrayList<>();
@@ -161,7 +160,7 @@ public class InlineMethodCallsRecipeGenerator {
     }
 
     private static String parseMethodParameters(String descriptor) {
-        if (descriptor == null || !descriptor.startsWith("(")) {
+        if (!descriptor.startsWith("(")) {
             return "()";
         }
 
