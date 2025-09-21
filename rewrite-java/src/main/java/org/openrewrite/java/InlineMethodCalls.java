@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -30,6 +31,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
 @EqualsAndHashCode(callSuper = false)
+@Value
 public class InlineMethodCalls extends Recipe {
 
     @Option(displayName = "Method pattern",
@@ -55,16 +57,6 @@ public class InlineMethodCalls extends Recipe {
             example = "[\"java.util.Collections.emptyList\"]")
     @Nullable
     Set<String> staticImports;
-
-    public InlineMethodCalls() {
-    }
-
-    public InlineMethodCalls(String methodPattern, String replacement, @Nullable Set<String> imports, @Nullable Set<String> staticImports) {
-        this.methodPattern = methodPattern;
-        this.replacement = replacement;
-        this.imports = imports;
-        this.staticImports = staticImports;
-    }
 
     @Override
     public String getDisplayName() {
@@ -303,3 +295,4 @@ public class InlineMethodCalls extends Recipe {
         Object[] parameters;
     }
 }
+
