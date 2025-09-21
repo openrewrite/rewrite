@@ -34,6 +34,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "Lib deprecated()",
               "this.replacement()",
               null,
+              null,
               null)),
           java(
             """
@@ -72,6 +73,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "Lib deprecated()",
               "replacement()",
               null,
+              null,
               null)),
           java(
             """
@@ -107,6 +109,7 @@ class InlineMethodCallsTest implements RewriteTest {
           spec -> spec.recipe(new InlineMethodCalls(
               "Lib getDeadlineMillis()",
               "getDeadline().toMillis()",
+              null,
               null,
               null)),
           java(
@@ -162,6 +165,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "MyClass setDeadline(long)",
               "this.setDeadline(Duration.ofMillis(millis))",
               Set.of("java.time.Duration"),
+              null,
               null)),
           java(
             """
@@ -214,6 +218,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "com.google.frobber.Frobber create(String)",
               "Frobber.fromName(name)",
               Set.of("com.google.frobber.Frobber"),
+              null,
               null)),
           java(
             """
@@ -266,6 +271,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "com.google.frobber.MyClass <constructor>()",
               "MyClass.create()",
               Set.of("com.google.frobber.MyClass"),
+              null,
               null)),
           java(
             """
@@ -315,6 +321,7 @@ class InlineMethodCallsTest implements RewriteTest {
               "MyClass <constructor>(String)",
               "new MyClass(one, \"two\")",
               null,
+              null,
               null)),
           java(
             """
@@ -357,6 +364,7 @@ class InlineMethodCallsTest implements RewriteTest {
           spec -> spec.recipe(new InlineMethodCalls(
               "MyClass <constructor>(String)",
               "new MyClass(one, null)",
+              null,
               null,
               null)),
           java(
@@ -401,6 +409,7 @@ class InlineMethodCallsTest implements RewriteTest {
           spec -> spec.recipe(new InlineMethodCalls(
               "Calculator compute(int, int, int)",
               "this.addAndMultiply(x, y, z)",
+              null,
               null,
               null)),
           java(
@@ -449,6 +458,7 @@ class InlineMethodCallsTest implements RewriteTest {
           spec -> spec.recipe(new InlineMethodCalls(
               "Builder configure(String, int)",
               "this.withName(name).withAge(age)",
+              null,
               null,
               null)),
           java(
@@ -505,6 +515,7 @@ class InlineMethodCallsTest implements RewriteTest {
           spec -> spec.recipe(new InlineMethodCalls(
               "MathUtils doubleAndSquare(int)",
               "square(x + x)",
+              null,
               null,
               null)),
           java(

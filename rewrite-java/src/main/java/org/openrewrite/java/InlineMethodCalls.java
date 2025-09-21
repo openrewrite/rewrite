@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -58,6 +58,12 @@ public class InlineMethodCalls extends Recipe {
     @Nullable
     Set<String> staticImports;
 
+    @Option(displayName = "Classpath from resources",
+            description = "List of paths to JAR files on the classpath for parsing the replacement template.",
+            required = false)
+    @Nullable
+    Set<String> classpathFromResources;
+
     @Override
     public String getDisplayName() {
         return "Inline method calls";
@@ -72,54 +78,40 @@ public class InlineMethodCalls extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher matcher = new MethodMatcher(methodPattern, true);
-        InlineMeValues inlineValues = new InlineMeValues(
-                replacement,
-                imports != null ? imports : emptySet(),
-                staticImports != null ? staticImports : emptySet());
-
-        return new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!matcher.matches(mi)) {
-                    return mi;
+                if (matcher.matches(method)) {
+                    return replace(method, ctx);
                 }
-                Template template = inlineValues.template(mi);
-                if (template == null) {
-                    return mi;
-                }
-                removeAndAddImports(method, inlineValues.getImports(), inlineValues.getStaticImports());
-                J replacement = JavaTemplate.builder(template.getString())
-                        .contextSensitive()
-                        .imports(inlineValues.getImports().toArray(new String[0]))
-                        .staticImports(inlineValues.getStaticImports().toArray(new String[0]))
-                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-                        .build()
-                        .apply(updateCursor(mi), mi.getCoordinates().replace(), template.getParameters());
-                return avoidMethodSelfReferences(mi, replacement);
+                return super.visitMethodInvocation(method, ctx);
             }
 
             @Override
             public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, ctx);
-                if (!matcher.matches(nc)) {
-                    return nc;
+                if (matcher.matches(newClass)) {
+                    return replace(newClass, ctx);
                 }
-                Template template = inlineValues.template(nc);
-                if (template == null) {
-                    return nc;
-                }
-                removeAndAddImports(newClass, inlineValues.getImports(), inlineValues.getStaticImports());
-                J replacement = JavaTemplate.builder(template.getString())
-                        .contextSensitive()
-                        .imports(inlineValues.getImports().toArray(new String[0]))
-                        .staticImports(inlineValues.getStaticImports().toArray(new String[0]))
-                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-                        .build()
-                        .apply(updateCursor(nc), nc.getCoordinates().replace(), template.getParameters());
-                return avoidMethodSelfReferences(nc, replacement);
+                return super.visitNewClass(newClass, ctx);
             }
 
+            private J replace(MethodCall methodCall, ExecutionContext ctx) {
+                Template template = new Template(methodCall);
+                Set<String> importsSet = imports != null ? imports : emptySet();
+                Set<String> staticImportsSet = staticImports != null ? staticImports : emptySet();
+                removeAndAddImports(methodCall, importsSet, staticImportsSet);
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(template.getString())
+                        .contextSensitive()
+                        .imports(importsSet.toArray(new String[0]))
+                        .staticImports(staticImportsSet.toArray(new String[0]));
+                if (classpathFromResources != null && !classpathFromResources.isEmpty()) {
+                    templateBuilder.javaParser(JavaParser.fromJavaVersion()
+                            .classpathFromResources(ctx, classpathFromResources.toArray(new String[0])));
+                }
+                J applied = templateBuilder.build()
+                        .apply(updateCursor(methodCall), methodCall.getCoordinates().replace(), template.getParameters());
+                return avoidMethodSelfReferences(methodCall, applied);
+            }
 
             private void removeAndAddImports(MethodCall method, Set<String> templateImports, Set<String> templateStaticImports) {
                 Set<String> originalImports = findOriginalImports(method);
@@ -165,12 +157,12 @@ public class InlineMethodCalls extends Recipe {
                     }
 
                     @Override
-                    public J visitMethodInvocation(J.MethodInvocation methodInvocation, Set<String> staticImports) {
-                        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, staticImports);
+                    public J visitMethodInvocation(J.MethodInvocation methodInvocation, Set<String> staticImports1) {
+                        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, staticImports1);
                         // Check if this is a static method invocation without a select (meaning it might be statically imported)
                         JavaType.Method methodType = mi.getMethodType();
                         if (mi.getSelect() == null && methodType != null && methodType.hasFlags(Flag.Static)) {
-                            staticImports.add(format("%s.%s",
+                            staticImports1.add(format("%s.%s",
                                     methodType.getDeclaringType().getFullyQualifiedName(),
                                     methodType.getName()));
                         }
@@ -178,13 +170,13 @@ public class InlineMethodCalls extends Recipe {
                     }
 
                     @Override
-                    public J visitIdentifier(J.Identifier identifier, Set<String> staticImports) {
-                        J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, staticImports);
+                    public J visitIdentifier(J.Identifier identifier, Set<String> staticImports1) {
+                        J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, staticImports1);
                         // Check if this is a static field reference
                         JavaType.Variable fieldType = id.getFieldType();
                         if (fieldType != null && fieldType.hasFlags(Flag.Static)) {
                             if (fieldType.getOwner() instanceof JavaType.FullyQualified) {
-                                staticImports.add(format("%s.%s",
+                                staticImports1.add(format("%s.%s",
                                         ((JavaType.FullyQualified) fieldType.getOwner()).getFullyQualifiedName(),
                                         fieldType.getName()));
                             }
@@ -194,11 +186,11 @@ public class InlineMethodCalls extends Recipe {
                 }.reduce(method, new HashSet<>());
             }
 
-            private J avoidMethodSelfReferences(MethodCall original, J replacement) {
-                JavaType.Method replacementMethodType = replacement instanceof MethodCall ?
-                        ((MethodCall) replacement).getMethodType() : null;
+            private J avoidMethodSelfReferences(MethodCall original, J replacement1) {
+                JavaType.Method replacementMethodType = replacement1 instanceof MethodCall ?
+                        ((MethodCall) replacement1).getMethodType() : null;
                 if (replacementMethodType == null) {
-                    return replacement;
+                    return replacement1;
                 }
 
                 Cursor cursor = getCursor();
@@ -217,31 +209,25 @@ public class InlineMethodCalls extends Recipe {
                         return original;
                     }
                 }
-                return replacement;
+                return replacement1;
             }
-        };
+        });
     }
 
+    private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
+
     @Value
-    private static class InlineMeValues {
-        private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
+    private class Template {
+        String string;
+        Object[] parameters;
 
-        String replacement;
-        Set<String> imports;
-        Set<String> staticImports;
-
-        @Nullable
-        Template template(MethodCall original) {
-            JavaType.Method methodType = original.getMethodType();
-            if (methodType == null) {
-                return null;
-            }
-            String templateString = createTemplateString(original, replacement, methodType);
-            List<Object> parameters = createParameters(templateString, original);
-            return new Template(templateString, parameters.toArray(new Object[0]));
+        Template(MethodCall original) {
+            JavaType.Method methodType = requireNonNull(original.getMethodType());
+            string = createTemplateString(original, methodType);
+            parameters = createParameters(string, original);
         }
 
-        private static String createTemplateString(MethodCall original, String replacement, JavaType.Method methodType) {
+        private String createTemplateString(MethodCall original, JavaType.Method methodType) {
             String templateString;
             if (original instanceof J.NewClass && replacement.startsWith("this(")) {
                 // For constructor-to-constructor replacement, replace "this" with "new ClassName"
@@ -263,7 +249,7 @@ public class InlineMethodCalls extends Recipe {
             return templateString;
         }
 
-        private static List<Object> createParameters(String templateString, MethodCall original) {
+        private Object[] createParameters(String templateString, MethodCall original) {
             Map<String, Expression> lookup = new HashMap<>();
             if (original instanceof J.MethodInvocation) {
                 Expression select = ((J.MethodInvocation) original).getSelect();
@@ -285,14 +271,9 @@ public class InlineMethodCalls extends Recipe {
                     parameters.add(o);
                 }
             }
-            return parameters;
+            return parameters.toArray();
         }
-    }
 
-    @Value
-    private static class Template {
-        String string;
-        Object[] parameters;
     }
 }
 
