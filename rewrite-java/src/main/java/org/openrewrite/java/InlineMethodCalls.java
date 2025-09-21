@@ -30,6 +30,7 @@ import static java.lang.String.format;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
+@Incubating(since = "8.63.0")
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class InlineMethodCalls extends Recipe {
@@ -148,21 +149,21 @@ public class InlineMethodCalls extends Recipe {
                 // Collect all regular and static imports used in the original method call
                 return new JavaVisitor<Set<String>>() {
                     @Override
-                    public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> strings) {
-                        JavaType jt = super.visitType(javaType, strings);
+                    public @Nullable JavaType visitType(@Nullable JavaType javaType, Set<String> imports) {
+                        JavaType jt = super.visitType(javaType, imports);
                         if (jt instanceof JavaType.FullyQualified) {
-                            strings.add(((JavaType.FullyQualified) jt).getFullyQualifiedName());
+                            imports.add(((JavaType.FullyQualified) jt).getFullyQualifiedName());
                         }
                         return jt;
                     }
 
                     @Override
-                    public J visitMethodInvocation(J.MethodInvocation methodInvocation, Set<String> staticImports1) {
-                        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, staticImports1);
+                    public J visitMethodInvocation(J.MethodInvocation methodInvocation, Set<String> staticImports) {
+                        J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(methodInvocation, staticImports);
                         // Check if this is a static method invocation without a select (meaning it might be statically imported)
                         JavaType.Method methodType = mi.getMethodType();
                         if (mi.getSelect() == null && methodType != null && methodType.hasFlags(Flag.Static)) {
-                            staticImports1.add(format("%s.%s",
+                            staticImports.add(format("%s.%s",
                                     methodType.getDeclaringType().getFullyQualifiedName(),
                                     methodType.getName()));
                         }
@@ -170,13 +171,13 @@ public class InlineMethodCalls extends Recipe {
                     }
 
                     @Override
-                    public J visitIdentifier(J.Identifier identifier, Set<String> staticImports1) {
-                        J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, staticImports1);
+                    public J visitIdentifier(J.Identifier identifier, Set<String> staticImports) {
+                        J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, staticImports);
                         // Check if this is a static field reference
                         JavaType.Variable fieldType = id.getFieldType();
                         if (fieldType != null && fieldType.hasFlags(Flag.Static)) {
                             if (fieldType.getOwner() instanceof JavaType.FullyQualified) {
-                                staticImports1.add(format("%s.%s",
+                                staticImports.add(format("%s.%s",
                                         ((JavaType.FullyQualified) fieldType.getOwner()).getFullyQualifiedName(),
                                         fieldType.getName()));
                             }
@@ -186,11 +187,11 @@ public class InlineMethodCalls extends Recipe {
                 }.reduce(method, new HashSet<>());
             }
 
-            private J avoidMethodSelfReferences(MethodCall original, J replacement1) {
-                JavaType.Method replacementMethodType = replacement1 instanceof MethodCall ?
-                        ((MethodCall) replacement1).getMethodType() : null;
+            private J avoidMethodSelfReferences(MethodCall original, J replacement) {
+                JavaType.Method replacementMethodType = replacement instanceof MethodCall ?
+                        ((MethodCall) replacement).getMethodType() : null;
                 if (replacementMethodType == null) {
-                    return replacement1;
+                    return replacement;
                 }
 
                 Cursor cursor = getCursor();
@@ -209,7 +210,7 @@ public class InlineMethodCalls extends Recipe {
                         return original;
                     }
                 }
-                return replacement1;
+                return replacement;
             }
         });
     }
