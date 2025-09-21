@@ -43,7 +43,7 @@ class InlineMethodCallsRecipeGeneratorTest {
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");
-        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml, "org.openrewrite.java.InlineMethodCallsGenerated");
 
         // Read and verify the content
         //language=yaml
@@ -88,7 +88,7 @@ class InlineMethodCallsRecipeGeneratorTest {
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");
-        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml, "org.openrewrite.java.InlineMethodCallsGenerated");
 
         // Read and verify the content
         //language=yaml
@@ -138,7 +138,7 @@ class InlineMethodCallsRecipeGeneratorTest {
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");
-        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
+        InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml, "org.openrewrite.java.InlineMethodCallsGenerated");
 
         // Read and verify the content
         //language=yaml

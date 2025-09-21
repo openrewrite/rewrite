@@ -30,23 +30,25 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class InlineMethodCallsRecipeGenerator {
 
     public static void main(String[] args) {
-        if (args.length < 2) {
+        if (args.length < 3) {
             System.err.println("Usage: InlineMethodCallsRecipeGenerator <input-tsv-path> <output-yaml-path>");
             System.exit(1);
         }
 
         Path inputPath = Paths.get(args[0]);
         Path outputPath = Paths.get(args[1]);
+        String recipeName = args[2];
 
-        generate(inputPath, outputPath);
+        generate(inputPath, outputPath, recipeName);
     }
 
-    static void generate(Path tsvFile, Path outputPath) {
+    static void generate(Path tsvFile, Path outputPath, String recipeName) {
         List<InlineMeMethod> inlineMethods = new ArrayList<>();
 
         TypeTable.Reader reader = new TypeTable.Reader(new InMemoryExecutionContext());
@@ -73,7 +75,7 @@ public class InlineMethodCallsRecipeGenerator {
             });
 
             // Generate YAML recipes
-            generateYamlRecipes(inlineMethods, outputPath);
+            generateYamlRecipes(inlineMethods, outputPath, recipeName);
 
             System.out.println("Generated " + inlineMethods.size() + " inline recipes to " + outputPath);
 
@@ -241,14 +243,14 @@ public class InlineMethodCallsRecipeGenerator {
         }
     }
 
-    private static void generateYamlRecipes(List<InlineMeMethod> methods, Path outputPath) throws IOException {
+    private static void generateYamlRecipes(List<InlineMeMethod> methods, Path outputPath, String recipeName) throws IOException {
         StringBuilder yaml = new StringBuilder();
         yaml.append("#\n");
         yaml.append("# Generated InlineMe recipes from TypeTable\n");
         yaml.append("#\n\n");
 
         yaml.append("type: specs.openrewrite.org/v1beta/recipe\n");
-        yaml.append("name: org.openrewrite.java.InlineMethodCallsGenerated\n");
+        yaml.append(format("name: %s\n", recipeName));
         yaml.append("displayName: Inline methods annotated with `@InlineMe`\n");
         yaml.append("description: >\n");
         yaml.append("  Automatically generated recipes to inline method calls based on `@InlineMe` annotations\n");
