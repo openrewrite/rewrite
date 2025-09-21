@@ -90,50 +90,54 @@ public class InlineMethodCallsRecipeGenerator {
             List<AnnotationDeserializer.AnnotationInfo> annotations =
                     AnnotationDeserializer.parseAnnotations(requireNonNull(member.getAnnotations()));
             for (AnnotationDeserializer.AnnotationInfo annotation : annotations) {
-                if (annotation.getDescriptor().endsWith("/InlineMe;")) {
-                    // Extract annotation values
-                    String replacement = null;
-                    List<String> imports = new ArrayList<>();
-                    List<String> staticImports = new ArrayList<>();
+                if (!annotation.getDescriptor().endsWith("/InlineMe;")) {
+                    continue;
+                }
 
-                    List<AnnotationDeserializer.AttributeInfo> attributes = annotation.getAttributes();
-                    if (attributes != null) {
-                        for (AnnotationDeserializer.AttributeInfo attr : attributes) {
-                            switch (attr.getName()) {
-                                case "replacement":
-                                    replacement = (String) attr.getValue();
-                                    break;
-                                case "imports":
-                                    if (attr.getValue() instanceof Object[]) {
-                                        for (Object imp : (Object[]) attr.getValue()) {
-                                            imports.add((String) imp);
-                                        }
-                                    }
-                                    break;
-                                case "staticImports":
-                                    if (attr.getValue() instanceof Object[]) {
-                                        for (Object imp : (Object[]) attr.getValue()) {
-                                            staticImports.add((String) imp);
-                                        }
-                                    }
-                                    break;
+                List<AnnotationDeserializer.AttributeInfo> attributes = annotation.getAttributes();
+                if (attributes == null) {
+                    continue;
+                }
+
+                // Extract annotation values
+                String replacement = null;
+                List<String> imports = new ArrayList<>();
+                List<String> staticImports = new ArrayList<>();
+
+                for (AnnotationDeserializer.AttributeInfo attr : attributes) {
+                    switch (attr.getName()) {
+                        case "replacement":
+                            replacement = (String) attr.getValue();
+                            break;
+                        case "imports":
+                            if (attr.getValue() instanceof Object[]) {
+                                for (Object imp : (Object[]) attr.getValue()) {
+                                    imports.add((String) imp);
+                                }
                             }
-                        }
+                            break;
+                        case "staticImports":
+                            if (attr.getValue() instanceof Object[]) {
+                                for (Object imp : (Object[]) attr.getValue()) {
+                                    staticImports.add((String) imp);
+                                }
+                            }
+                            break;
                     }
+                }
 
-                    if (replacement != null) {
-                        // Build the method pattern
-                        String methodPattern = buildMethodPattern(classDef, member);
+                if (replacement != null) {
+                    // Build the method pattern
+                    String methodPattern = buildMethodPattern(classDef, member);
 
-                        return new InlineMeMethod(
-                                gav,
-                                methodPattern,
-                                replacement,
-                                imports,
-                                staticImports,
-                                gav.getArtifactId() + "-" + gav.getVersion()
-                        );
-                    }
+                    return new InlineMeMethod(
+                            gav,
+                            methodPattern,
+                            replacement,
+                            imports,
+                            staticImports,
+                            gav.getArtifactId() + "-" + gav.getVersion()
+                    );
                 }
             }
         } catch (Exception e) {
