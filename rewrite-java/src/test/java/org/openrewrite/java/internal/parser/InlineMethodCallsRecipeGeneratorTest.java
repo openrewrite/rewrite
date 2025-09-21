@@ -18,8 +18,10 @@ package org.openrewrite.java.internal.parser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,12 +30,16 @@ class InlineMethodCallsRecipeGeneratorTest {
     @Test
     void generateRecipesFromTypeTable(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file
-        Path inputTsv = tempDir.resolve("test.tsv");
-        Files.writeString(inputTsv, """
+        Path inputTsv = tempDir.resolve("test.tsv.gz");
+        String tsvContent = """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\toldMethod\t(Ljava/lang/String;)V\t\tinput\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"newMethod(input)",imports=[s"java.util.List"])\t\t\t
-          """);
+          """;
+        try (OutputStream os = Files.newOutputStream(inputTsv);
+             GZIPOutputStream gzos = new GZIPOutputStream(os)) {
+            gzos.write(tsvContent.getBytes());
+        }
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");
@@ -68,13 +74,17 @@ class InlineMethodCallsRecipeGeneratorTest {
     @Test
     void handleMultipleAnnotatedMethods(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file with multiple annotated methods
-        Path inputTsv = tempDir.resolve("test.tsv");
-        Files.writeString(inputTsv, """
+        Path inputTsv = tempDir.resolve("test.tsv.gz");
+        String tsvContent = """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tmethod1\t()V\t\t\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement1()")\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tmethod2\t(I)V\t\tnum\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement2(num)",staticImports=[s"java.util.Collections.emptyList"])\t\t\t
-          """);
+          """;
+        try (OutputStream os = Files.newOutputStream(inputTsv);
+             GZIPOutputStream gzos = new GZIPOutputStream(os)) {
+            gzos.write(tsvContent.getBytes());
+        }
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");
@@ -114,13 +124,17 @@ class InlineMethodCallsRecipeGeneratorTest {
     @Test
     void skipMethodsWithoutInlineMeAnnotation(@TempDir Path tempDir) throws Exception {
         // Create a test TypeTable TSV file with a mix of annotated and non-annotated methods
-        Path inputTsv = tempDir.resolve("test.tsv");
-        Files.writeString(inputTsv, """
+        Path inputTsv = tempDir.resolve("test.tsv.gz");
+        String tsvContent = """
           groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t-1\t\t\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tregularMethod\t()V\t\t\t\t\t\t\t
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tannotatedMethod\t()V\t\t\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement()")\t\t\t
-          """);
+          """;
+        try (OutputStream os = Files.newOutputStream(inputTsv);
+             GZIPOutputStream gzos = new GZIPOutputStream(os)) {
+            gzos.write(tsvContent.getBytes());
+        }
 
         // Run the generator
         Path outputYaml = tempDir.resolve("output.yaml");

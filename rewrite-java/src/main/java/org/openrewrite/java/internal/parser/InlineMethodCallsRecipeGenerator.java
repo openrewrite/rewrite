@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 
 public class InlineMethodCallsRecipeGenerator {
 
@@ -49,8 +50,8 @@ public class InlineMethodCallsRecipeGenerator {
         List<InlineMeMethod> inlineMethods = new ArrayList<>();
 
         TypeTable.Reader reader = new TypeTable.Reader(new InMemoryExecutionContext());
-        try (InputStream is = Files.newInputStream(tsvFile)) {
-            reader.parseTsvAndProcess(is, TypeTable.Reader.Options.matchAll(), (gav, classes, nestedTypes) -> {
+        try (InputStream is = Files.newInputStream(tsvFile); InputStream inflate = new GZIPInputStream(is)) {
+            reader.parseTsvAndProcess(inflate, TypeTable.Reader.Options.matchAll(), (gav, classes, nestedTypes) -> {
                 if (gav == null) {
                     return;
                 }
