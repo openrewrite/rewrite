@@ -35,9 +35,8 @@ class InlineMethodCallsRecipeGeneratorTest {
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\toldMethod\t(Ljava/lang/String;)V\t\tinput\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"newMethod(input)",imports=[s"java.util.List"])\t\t\t
           """);
 
-        Path outputYaml = tempDir.resolve("output.yaml");
-
         // Run the generator
+        Path outputYaml = tempDir.resolve("output.yaml");
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Read and verify the content
@@ -77,9 +76,8 @@ class InlineMethodCallsRecipeGeneratorTest {
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tmethod2\t(I)V\t\tnum\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement2(num)",staticImports=[s"java.util.Collections.emptyList"])\t\t\t
           """);
 
-        Path outputYaml = tempDir.resolve("output.yaml");
-
         // Run the generator
+        Path outputYaml = tempDir.resolve("output.yaml");
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Read and verify the content
@@ -124,9 +122,8 @@ class InlineMethodCallsRecipeGeneratorTest {
           com.example\ttest-lib\t1.0.0\t1\tcom/example/TestClass\t\tjava/lang/Object\t\t1\tannotatedMethod\t()V\t\t\t\t@Lorg/openrewrite/java/InlineMe;(replacement=s"replacement()")\t\t\t
           """);
 
-        Path outputYaml = tempDir.resolve("output.yaml");
-
         // Run the generator
+        Path outputYaml = tempDir.resolve("output.yaml");
         InlineMethodCallsRecipeGenerator.generate(inputTsv, outputYaml);
 
         // Read and verify the content
