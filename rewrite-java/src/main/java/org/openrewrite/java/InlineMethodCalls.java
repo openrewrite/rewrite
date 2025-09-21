@@ -34,6 +34,7 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class InlineMethodCalls extends Recipe {
+    private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
 
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations.",
@@ -84,7 +85,7 @@ public class InlineMethodCalls extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (matcher.matches(method)) {
-                    return replace(method, ctx);
+                    return replaceMethodCall(method, ctx);
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -92,26 +93,16 @@ public class InlineMethodCalls extends Recipe {
             @Override
             public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 if (matcher.matches(newClass)) {
-                    return replace(newClass, ctx);
+                    return replaceMethodCall(newClass, ctx);
                 }
                 return super.visitNewClass(newClass, ctx);
             }
 
-            private J replace(MethodCall methodCall, ExecutionContext ctx) {
-                Template template = new Template(methodCall);
+            private J replaceMethodCall(MethodCall methodCall, ExecutionContext ctx) {
                 Set<String> importsSet = imports != null ? imports : emptySet();
                 Set<String> staticImportsSet = staticImports != null ? staticImports : emptySet();
                 removeAndAddImports(methodCall, importsSet, staticImportsSet);
-                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(template.getString())
-                        .contextSensitive()
-                        .imports(importsSet.toArray(new String[0]))
-                        .staticImports(staticImportsSet.toArray(new String[0]));
-                if (classpathFromResources != null && !classpathFromResources.isEmpty()) {
-                    templateBuilder.javaParser(JavaParser.fromJavaVersion()
-                            .classpathFromResources(ctx, classpathFromResources.toArray(new String[0])));
-                }
-                J applied = templateBuilder.build()
-                        .apply(updateCursor(methodCall), methodCall.getCoordinates().replace(), template.getParameters());
+                J applied = applyJavaTemplate(methodCall, getCursor(), importsSet, staticImportsSet, ctx);
                 return avoidMethodSelfReferences(methodCall, applied);
             }
 
@@ -188,6 +179,70 @@ public class InlineMethodCalls extends Recipe {
                 }.reduce(method, new HashSet<>());
             }
 
+            J applyJavaTemplate(MethodCall methodCall, Cursor cursor, Set<String> importsSet, Set<String> staticImportsSet, ExecutionContext ctx) {
+                JavaType.Method methodType = requireNonNull(methodCall.getMethodType());
+                String string = createTemplateString(methodCall, methodType);
+                Object[] parameters = createParameters(string, methodCall);
+
+                JavaTemplate.Builder templateBuilder = JavaTemplate.builder(string)
+                        .contextSensitive()
+                        .imports(importsSet.toArray(new String[0]))
+                        .staticImports(staticImportsSet.toArray(new String[0]));
+                if (classpathFromResources != null && !classpathFromResources.isEmpty()) {
+                    templateBuilder.javaParser(JavaParser.fromJavaVersion()
+                            .classpathFromResources(ctx, classpathFromResources.toArray(new String[0])));
+                }
+                return templateBuilder.build()
+                        .apply(cursor, methodCall.getCoordinates().replace(), parameters);
+            }
+
+            private String createTemplateString(MethodCall original, JavaType.Method methodType) {
+                String templateString;
+                if (original instanceof J.NewClass && replacement.startsWith("this(")) {
+                    // For constructor-to-constructor replacement, replace "this" with "new ClassName"
+                    templateString = "new " + methodType.getDeclaringType().getClassName() + replacement.substring(4);
+                } else if (original instanceof J.MethodInvocation &&
+                        ((J.MethodInvocation) original).getSelect() == null &&
+                        replacement.startsWith("this.")) {
+                    templateString = replacement.substring(5);
+                } else {
+                    templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
+                }
+                List<String> originalParameterNames = methodType.getParameterNames();
+                for (String parameterName : originalParameterNames) {
+                    // Replace parameter names with their values in the templateString
+                    templateString = templateString
+                            .replaceFirst(format("\\b%s\\b", parameterName), format("#{%s:any()}", parameterName))
+                            .replaceAll(format("(?<!\\{)\\b%s\\b", parameterName), format("#{%s}", parameterName));
+                }
+                return templateString;
+            }
+
+            private Object[] createParameters(String templateString, MethodCall original) {
+                Map<String, Expression> lookup = new HashMap<>();
+                if (original instanceof J.MethodInvocation) {
+                    Expression select = ((J.MethodInvocation) original).getSelect();
+                    if (select != null) {
+                        lookup.put("this", select);
+                    }
+                }
+                List<String> originalParameterNames = requireNonNull(original.getMethodType()).getParameterNames();
+                for (int i = 0; i < originalParameterNames.size(); i++) {
+                    String originalName = originalParameterNames.get(i);
+                    Expression originalValue = original.getArguments().get(i);
+                    lookup.put(originalName, originalValue);
+                }
+                List<Object> parameters = new ArrayList<>();
+                Matcher matcher = TEMPLATE_IDENTIFIER.matcher(templateString);
+                while (matcher.find()) {
+                    Expression o = lookup.get(matcher.group(1));
+                    if (o != null) {
+                        parameters.add(o);
+                    }
+                }
+                return parameters.toArray();
+            }
+
             private J avoidMethodSelfReferences(MethodCall original, J replacement) {
                 JavaType.Method replacementMethodType = replacement instanceof MethodCall ?
                         ((MethodCall) replacement).getMethodType() : null;
@@ -214,67 +269,5 @@ public class InlineMethodCalls extends Recipe {
                 return replacement;
             }
         });
-    }
-
-    private static final Pattern TEMPLATE_IDENTIFIER = Pattern.compile("#\\{(\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*):any\\(.*?\\)}");
-
-    @Value
-    private class Template {
-        String string;
-        Object[] parameters;
-
-        Template(MethodCall original) {
-            JavaType.Method methodType = requireNonNull(original.getMethodType());
-            string = createTemplateString(original, methodType);
-            parameters = createParameters(string, original);
-        }
-
-        private String createTemplateString(MethodCall original, JavaType.Method methodType) {
-            String templateString;
-            if (original instanceof J.NewClass && replacement.startsWith("this(")) {
-                // For constructor-to-constructor replacement, replace "this" with "new ClassName"
-                templateString = "new " + methodType.getDeclaringType().getClassName() + replacement.substring(4);
-            } else if (original instanceof J.MethodInvocation &&
-                    ((J.MethodInvocation) original).getSelect() == null &&
-                    replacement.startsWith("this.")) {
-                templateString = replacement.substring(5);
-            } else {
-                templateString = replacement.replaceAll("\\bthis\\b", "#{this:any()}");
-            }
-            List<String> originalParameterNames = methodType.getParameterNames();
-            for (String parameterName : originalParameterNames) {
-                // Replace parameter names with their values in the templateString
-                templateString = templateString
-                        .replaceFirst(format("\\b%s\\b", parameterName), format("#{%s:any()}", parameterName))
-                        .replaceAll(format("(?<!\\{)\\b%s\\b", parameterName), format("#{%s}", parameterName));
-            }
-            return templateString;
-        }
-
-        private Object[] createParameters(String templateString, MethodCall original) {
-            Map<String, Expression> lookup = new HashMap<>();
-            if (original instanceof J.MethodInvocation) {
-                Expression select = ((J.MethodInvocation) original).getSelect();
-                if (select != null) {
-                    lookup.put("this", select);
-                }
-            }
-            List<String> originalParameterNames = requireNonNull(original.getMethodType()).getParameterNames();
-            for (int i = 0; i < originalParameterNames.size(); i++) {
-                String originalName = originalParameterNames.get(i);
-                Expression originalValue = original.getArguments().get(i);
-                lookup.put(originalName, originalValue);
-            }
-            List<Object> parameters = new ArrayList<>();
-            Matcher matcher = TEMPLATE_IDENTIFIER.matcher(templateString);
-            while (matcher.find()) {
-                Expression o = lookup.get(matcher.group(1));
-                if (o != null) {
-                    parameters.add(o);
-                }
-            }
-            return parameters.toArray();
-        }
-
     }
 }
