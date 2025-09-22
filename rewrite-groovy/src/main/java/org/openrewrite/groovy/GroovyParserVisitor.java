@@ -515,13 +515,12 @@ public class GroovyParserVisitor {
                         depth--;
                         cursor++;
                     }
-                    argCount++;
-                    // Safety check: if cursor didn't advance, throw an exception to avoid infinite loop
                     if (cursor == cursorBeforeIteration) {
-                        throw new IllegalStateException(
-                                "Parser error: unable to parse enum constructor arguments at position " + cursor +
-                                        " near '" + source.substring(Math.max(0, cursor - 20), Math.min(source.length(), cursor + 20)) + "'"
-                        );
+                        // We are not facing an opening of a new parens/delimiter, no whitespace, just a usual piece of code - e.g. an operator like `+`.
+                        // As we are not parsing it, just grabing the code into a String, it's safe to advance.
+                        cursor++;
+                    } else {
+                        argCount++;
                     }
                 }
                 String argsAsString = source.substring(start, cursor);
