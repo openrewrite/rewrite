@@ -149,4 +149,20 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
         j = j.withMarkers(visitMarkers(j.getMarkers(), p));
         return j.withAttributes(ListUtils.map(j.getAttributes(), a -> visitAndCast(a, p)));
     }
+
+    public Xml visitJspScriptlet(Xml.JspScriptlet jspScriptlet, P p) {
+        return jspScriptlet.withMarkers(visitMarkers(jspScriptlet.getMarkers(), p));
+    }
+
+    public Xml visitJspExpression(Xml.JspExpression jspExpression, P p) {
+        return jspExpression.withMarkers(visitMarkers(jspExpression.getMarkers(), p));
+    }
+
+    public Xml visitJspDeclaration(Xml.JspDeclaration jspDeclaration, P p) {
+        return jspDeclaration.withMarkers(visitMarkers(jspDeclaration.getMarkers(), p));
+    }
+
+    public Xml visitJspComment(Xml.JspComment jspComment, P p) {
+        return jspComment.withMarkers(visitMarkers(jspComment.getMarkers(), p));
+    }
 }

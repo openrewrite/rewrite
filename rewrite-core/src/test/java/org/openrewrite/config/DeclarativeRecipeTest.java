@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -431,5 +432,123 @@ class DeclarativeRecipeTest implements RewriteTest {
                 }
             };
         }
+    }
+
+    @Test
+    void selfReferencingRecipeDetectedAsCycle() {
+        // Test that a recipe referencing itself is detected as a cycle
+        DeclarativeRecipe selfReferencing = new DeclarativeRecipe(
+            "org.openrewrite.SelfReferencing",
+            "Self Referencing Recipe",
+            "A recipe that references itself",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        // Add itself as a sub-recipe
+        selfReferencing.addUninitialized("org.openrewrite.SelfReferencing");
+
+        // Initialize should throw RecipeIntrospectionException when cycle is detected
+        assertThatThrownBy(() -> selfReferencing.initialize(List.of(selfReferencing)))
+            .isInstanceOf(RecipeIntrospectionException.class)
+            .hasMessageContaining("creates a cycle")
+            .hasMessageContaining("org.openrewrite.SelfReferencing -> org.openrewrite.SelfReferencing");
+    }
+
+    @Test
+    void mutuallyRecursiveRecipesDetectedAsCycle() {
+        // Test that mutually recursive recipes are detected as a cycle
+        DeclarativeRecipe recipeA = new DeclarativeRecipe(
+            "org.openrewrite.RecipeA",
+            "Recipe A",
+            "Recipe A that references Recipe B",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        DeclarativeRecipe recipeB = new DeclarativeRecipe(
+            "org.openrewrite.RecipeB",
+            "Recipe B",
+            "Recipe B that references Recipe A",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        // A references B
+        recipeA.addUninitialized("org.openrewrite.RecipeB");
+
+        // B references A
+        recipeB.addUninitialized("org.openrewrite.RecipeA");
+
+        // Initialize should throw RecipeIntrospectionException when cycle is detected
+        assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB)))
+            .isInstanceOf(RecipeIntrospectionException.class)
+            .hasMessageContaining("creates a cycle")
+            .hasMessageContaining("RecipeA")
+            .hasMessageContaining("RecipeB");
+    }
+
+    @Test
+    void deeperCyclicReferencesDetectedAsCycle() {
+        // Test that deeper cyclic references (A -> B -> C -> A) are detected as a cycle
+        DeclarativeRecipe recipeA = new DeclarativeRecipe(
+            "org.openrewrite.RecipeA",
+            "Recipe A",
+            "Recipe A that references Recipe B",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        DeclarativeRecipe recipeB = new DeclarativeRecipe(
+            "org.openrewrite.RecipeB",
+            "Recipe B",
+            "Recipe B that references Recipe C",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        DeclarativeRecipe recipeC = new DeclarativeRecipe(
+            "org.openrewrite.RecipeC",
+            "Recipe C",
+            "Recipe C that references Recipe A",
+            emptySet(),
+            null,
+            URI.create("test"),
+            false,
+            emptyList()
+        );
+
+        // A references B
+        recipeA.addUninitialized("org.openrewrite.RecipeB");
+
+        // B references C
+        recipeB.addUninitialized("org.openrewrite.RecipeC");
+
+        // C references A (completing the cycle)
+        recipeC.addUninitialized("org.openrewrite.RecipeA");
+
+        // Initialize should throw RecipeIntrospectionException when cycle is detected
+        assertThatThrownBy(() -> recipeA.initialize(List.of(recipeA, recipeB, recipeC)))
+            .isInstanceOf(RecipeIntrospectionException.class)
+            .hasMessageContaining("creates a cycle")
+            // The cycle path should show A -> B -> C -> A
+            .hasMessageContaining("RecipeA")
+            .hasMessageContaining("RecipeB")
+            .hasMessageContaining("RecipeC");
     }
 }

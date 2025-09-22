@@ -130,14 +130,7 @@ public class RewriteRpc {
             }
         });
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
-        jsonRpc.rpc("Print", new JsonRpcMethod<Print>() {
-            @Override
-            protected Object handle(Print request) {
-                Tree tree = getObject(request.getTreeId());
-                Cursor cursor = getCursor(request.getCursor());
-                return tree.print(new Cursor(cursor, tree));
-            }
-        });
+        jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
     }
@@ -343,16 +336,29 @@ public class RewriteRpc {
     }
 
     public String print(SourceFile tree) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), null);
+        return print(tree, new Cursor(null, tree), null);
     }
 
     public String print(SourceFile tree, Print.@Nullable MarkerPrinter markerPrinter) {
-        return print(tree, new Cursor(null, Cursor.ROOT_VALUE), markerPrinter);
+        return print(tree, new Cursor(null, tree), markerPrinter);
+    }
+
+    public String print(Tree tree, Cursor parent) {
+        return print(tree, parent, null);
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
         localObjects.put(tree.getId().toString(), tree);
-        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent), markerPrinter), String.class);
+        return send(
+                "Print",
+                new Print(
+                        tree.getId().toString(),
+                        (tree instanceof SourceFile ? tree : parent.firstEnclosingOrThrow(SourceFile.class))
+                                .getClass().getName(),
+                        markerPrinter
+                ),
+                String.class
+        );
     }
 
     @VisibleForTesting

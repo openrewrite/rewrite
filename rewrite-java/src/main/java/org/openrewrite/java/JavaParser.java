@@ -459,7 +459,7 @@ class JdkParserBuilderCache {
                 try {
                     //noinspection rawtypes,unchecked
                     return (JavaParser.Builder) builderMethod.invoke(null);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     throw new RuntimeException("Failed to invoke builder() on " + className, e);
                 }
             };
