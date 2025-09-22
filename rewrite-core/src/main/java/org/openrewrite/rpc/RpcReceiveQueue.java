@@ -131,7 +131,7 @@ public class RpcReceiveQueue {
                 RpcCodec<T> rpcCodec;
                 if (onChange != null) {
                     after = onChange.apply(before);
-                } else if ((rpcCodec = RpcCodec.forInstance(before, sourceFileType)) != null) {
+                } else if (before != null && (rpcCodec = RpcCodec.forInstance(before, sourceFileType)) != null) {
                     after = rpcCodec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();

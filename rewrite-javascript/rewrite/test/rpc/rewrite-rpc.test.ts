@@ -259,9 +259,9 @@ describe("Rewrite RPC", () => {
                             const result = _.map([1, 2, 3], n => n * 2);
                         `,
                         `
-                            import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                            import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
 
-                            const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                            const result = /*~~(_.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
                         `
                     ),
                     //language=json

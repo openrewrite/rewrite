@@ -54,9 +54,9 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @BeforeEach
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-            .recipeInstallDir(tempDir)
-            .log(tempDir.resolve("rpc.log"))
-            .verboseLogging()
+          .recipeInstallDir(tempDir)
+          .log(tempDir.resolve("rpc.log"))
+          .verboseLogging()
         );
     }
 

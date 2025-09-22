@@ -323,11 +323,11 @@ describe('JavaScript type mapping', () => {
                                 const sum = _.reduce(doubled, (a, b) => a + b, 0);
                             `,
                             `
-                                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                                import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
 
                                 const numbers = [1, 2, 3, 4, 5];
-                                const doubled = /*~~(@types/lodash.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
-                                const sum = /*~~(@types/lodash.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
+                                const doubled = /*~~(_.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
+                                const sum = /*~~(_.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
                             `
                         ),
                         //language=json
@@ -466,16 +466,16 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map array types', async () => {
+        test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals
+                // Mark array literals - arrays are now treated as class types
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        // Arrays should now be mapped as lib.Array class type
+                        if (type.fullyQualifiedName === 'lib.Array') {
+                            return 'lib.Array';
+                        }
                     }
                     return null;
                 }
@@ -490,8 +490,8 @@ describe('JavaScript type mapping', () => {
                         let strings: Array<string> = ["a", "b"];
                     `,
                     `
-                        let numbers: number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        let strings: Array<string> = /*~~(Array<String>)~~>*/["a", "b"];
+                        let numbers: number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
+                        let strings: Array<string> = /*~~(lib.Array)~~>*/["a", "b"];
                     `
                 )
             );
@@ -536,16 +536,16 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map readonly array types', async () => {
+        test('should map readonly array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals assigned to readonly arrays
+                // Mark array literals assigned to readonly arrays - arrays are now class types
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        // Both readonly and regular arrays should be mapped as lib.Array
+                        if (type.fullyQualifiedName === 'lib.Array') {
+                            return 'lib.Array';
+                        }
                     }
                     return null;
                 }
@@ -561,9 +561,9 @@ describe('JavaScript type mapping', () => {
                         const frozenArray = Object.freeze([1, 2, 3]);
                     `,
                     `
-                        const readonlyNumbers: readonly number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array<String>)~~>*/["a", "b"];
-                        const frozenArray = Object.freeze(/*~~(Array<double>)~~>*/[1, 2, 3]);
+                        const readonlyNumbers: readonly number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(lib.Array)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(lib.Array)~~>*/[1, 2, 3]);
                     `
                 )
             );
