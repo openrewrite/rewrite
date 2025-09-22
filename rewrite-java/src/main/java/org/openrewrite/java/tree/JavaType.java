@@ -1234,7 +1234,7 @@ public interface JavaType {
 
         @Override
         public @Nullable Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
-            String keyword = q.receiveAndGet(null, String::toString);
+            String keyword = q.receiveAndGet(null, java.lang.String::toString);
             return fromKeyword(keyword);
         }
     }
