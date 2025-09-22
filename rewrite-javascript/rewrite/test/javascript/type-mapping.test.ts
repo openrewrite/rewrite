@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
@@ -195,7 +195,7 @@ describe('JavaScript type mapping', () => {
         // TODO: These will be implemented in Phase 2/3
         test.skip('should map type annotations', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((_node, _type) => {
                 // Will mark type reference nodes when implemented
                 return null;
             });
@@ -305,7 +305,7 @@ describe('JavaScript type mapping', () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((_, type) => {
                 // Mark any node that has a lodash-related type
-                return Type.isClass(type) && type.fullyQualifiedName.includes('lodash') ?
+                return Type.isClass(type) && type.fullyQualifiedName.includes('LoDash') ?
                     type.fullyQualifiedName : null;
             });
 
@@ -616,7 +616,7 @@ describe('JavaScript type mapping', () => {
         test.skip('should map arrow function types', async () => {
             // TODO: Arrow functions need special handling - methodType might not be attached to Lambda
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark arrow functions with their method type
                 if (node?.kind === J.Kind.Lambda) {
                     const lambda = node as J.Lambda;
@@ -649,7 +649,7 @@ describe('JavaScript type mapping', () => {
 
         test('should map method invocation types', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark method invocations with their method type
                 if (node?.kind === J.Kind.MethodInvocation) {
                     const invocation = node as J.MethodInvocation;

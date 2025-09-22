@@ -426,11 +426,86 @@ export class JavaScriptTypeMapping {
             return "unknown";
         }
 
-        // Use TypeScript's built-in getFullyQualifiedName
+        // First, check if this symbol is an import/alias
+        // For imported types, we want to use the module specifier instead of the file path
+        if (symbol.flags & ts.SymbolFlags.Alias) {
+            const aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+            if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
+                // Try to find the import declaration to get the module specifier
+                let importNode: ts.Node | undefined = symbol.declarations[0];
+
+                // Traverse up to find the ImportDeclaration or ImportSpecifier
+                while (importNode && importNode.parent && !ts.isImportDeclaration(importNode) && !ts.isImportSpecifier(importNode)) {
+                    importNode = importNode.parent;
+                }
+
+                let moduleSpecifier: string | undefined;
+
+                if (importNode && ts.isImportSpecifier(importNode)) {
+                    // Named import like: import { ClipLoader } from 'react-spinners'
+                    // ImportSpecifier -> NamedImports -> ImportClause -> ImportDeclaration
+                    const namedImports = importNode.parent; // NamedImports
+                    if (namedImports && ts.isNamedImports(namedImports)) {
+                        const importClause = namedImports.parent; // ImportClause
+                        if (importClause && ts.isImportClause(importClause)) {
+                            const importDecl = importClause.parent; // ImportDeclaration
+                            if (importDecl && ts.isImportDeclaration(importDecl) && ts.isStringLiteral(importDecl.moduleSpecifier)) {
+                                moduleSpecifier = importDecl.moduleSpecifier.text;
+                            }
+                        }
+                    }
+                } else if (importNode && ts.isImportDeclaration(importNode)) {
+                    // Default or namespace import
+                    if (ts.isStringLiteral(importNode.moduleSpecifier)) {
+                        moduleSpecifier = importNode.moduleSpecifier.text;
+                    }
+                }
+
+                if (moduleSpecifier) {
+                    // Build the fully qualified name from module specifier + symbol name
+                    const symbolName = symbol.getName();
+                    return `${moduleSpecifier}.${symbolName}`;
+                }
+            }
+        }
+
+        // Fall back to TypeScript's built-in getFullyQualifiedName
         // This returns names with quotes that we need to clean up
         // e.g., '"React"."Component"' -> 'React.Component'
         const tsQualifiedName = this.checker.getFullyQualifiedName(symbol);
-        const cleanedName = tsQualifiedName.replace(/"/g, '');
+        let cleanedName = tsQualifiedName.replace(/"/g, '');
+
+        // Check if this is a file path from node_modules (happens with some packages)
+        // TypeScript sometimes returns full paths instead of module names
+        if (cleanedName.includes('node_modules/')) {
+            // Extract the module name from the path
+            // Example: /private/var/.../node_modules/react-spinners/src/index.ClipLoader
+            // Should become: react-spinners.ClipLoader
+            const nodeModulesIndex = cleanedName.indexOf('node_modules/');
+            const afterNodeModules = cleanedName.substring(nodeModulesIndex + 'node_modules/'.length);
+
+            // Split by '/' to get parts of the path
+            const pathParts = afterNodeModules.split('/');
+
+            if (pathParts.length > 0) {
+                // First part is the package name (might be scoped like @types)
+                let packageName = pathParts[0];
+
+                // Handle scoped packages
+                if (packageName.startsWith('@') && pathParts.length > 1) {
+                    packageName = `${packageName}/${pathParts[1]}`;
+                }
+
+                // Find the symbol name (everything after the last dot in the original cleaned name)
+                const lastDotIndex = cleanedName.lastIndexOf('.');
+                if (lastDotIndex > 0) {
+                    const symbolName = cleanedName.substring(lastDotIndex + 1);
+                    cleanedName = `${packageName}.${symbolName}`;
+                } else {
+                    cleanedName = packageName;
+                }
+            }
+        }
 
         // If it's just a simple name without dots, check if it's a built-in type
         if (!cleanedName.includes('.')) {
