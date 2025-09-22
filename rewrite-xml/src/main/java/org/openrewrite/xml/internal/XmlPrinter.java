@@ -206,6 +206,46 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         return jsp;
     }
 
+    @Override
+    public Xml visitJspScriptlet(Xml.JspScriptlet jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%");
+        p.append(jsp.getContent());
+        p.append("%>");
+        afterSyntax(jsp, p);
+        return jsp;
+    }
+
+    @Override
+    public Xml visitJspExpression(Xml.JspExpression jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%=");
+        p.append(jsp.getContent());
+        p.append("%>");
+        afterSyntax(jsp, p);
+        return jsp;
+    }
+
+    @Override
+    public Xml visitJspDeclaration(Xml.JspDeclaration jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%!");
+        p.append(jsp.getContent());
+        p.append("%>");
+        afterSyntax(jsp, p);
+        return jsp;
+    }
+
+    @Override
+    public Xml visitJspComment(Xml.JspComment jsp, PrintOutputCapture<P> p) {
+        beforeSyntax(jsp, p);
+        p.append("<%--");
+        p.append(jsp.getContent());
+        p.append("--%>");
+        afterSyntax(jsp, p);
+        return jsp;
+    }
+
     private static final UnaryOperator<String> XML_MARKER_WRAPPER =
             out -> "<!--~~" + out + (out.isEmpty() ? "" : "~~") + ">-->";
 

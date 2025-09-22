@@ -73,23 +73,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         spec.validateRecipeSerialization(false);
     }
 
-    @Test
-    void printSubtree() {
-        rewriteRun(
-          typescript(
-            "console.log('hello');",
-            spec -> spec.beforeRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
-                    //language=typescript
-                    assertThat(client().print(method, getCursor().getParentOrThrow())).isEqualTo("console.log('hello')");
-                    return method;
-                }
-            }.visit(cu, 0))
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void runRecipe() {
@@ -112,6 +95,23 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
               }
               """,
             spec -> spec.path("package.json")
+          )
+        );
+    }
+
+    @Test
+    void printSubtree() {
+        rewriteRun(
+          typescript(
+            "console.log('hello');",
+            spec -> spec.beforeRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                    //language=typescript
+                    assertThat(client().print(method, getCursor().getParentOrThrow())).isEqualTo("console.log('hello')");
+                    return method;
+                }
+            }.visit(cu, 0))
           )
         );
     }

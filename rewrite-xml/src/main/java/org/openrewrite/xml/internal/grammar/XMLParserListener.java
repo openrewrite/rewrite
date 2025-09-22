@@ -153,6 +153,46 @@ public interface XMLParserListener extends ParseTreeListener {
 	 */
 	void exitJspdirective(XMLParser.JspdirectiveContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspscriptlet}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspscriptlet(XMLParser.JspscriptletContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspscriptlet}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspscriptlet(XMLParser.JspscriptletContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspexpression}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspexpression(XMLParser.JspexpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspexpression}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspexpression(XMLParser.JspexpressionContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspdeclaration}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspdeclaration(XMLParser.JspdeclarationContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspdeclaration}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspdeclaration(XMLParser.JspdeclarationContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link XMLParser#jspcomment}.
+	 * @param ctx the parse tree
+	 */
+	void enterJspcomment(XMLParser.JspcommentContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link XMLParser#jspcomment}.
+	 * @param ctx the parse tree
+	 */
+	void exitJspcomment(XMLParser.JspcommentContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link XMLParser#reference}.
 	 * @param ctx the parse tree
 	 */
