@@ -316,4 +316,25 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @Test
+    void expressionsInArguments() {
+        rewriteRun(
+          groovy(
+            """
+            enum Status {
+                GOOD(PREFIX + " one. ", PREFIX + " two. ")
+
+                public static final String PREFIX = "{object}"
+                String a
+                String b
+
+                Status(String a, String b) {
+                    this.a = a
+                    this.b = b
+                }
+            }
+            """
+          )
+        );
+    }
 }
