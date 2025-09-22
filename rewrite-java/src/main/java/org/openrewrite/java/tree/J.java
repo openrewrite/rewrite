@@ -5779,7 +5779,7 @@ public interface J extends Tree, RpcCodec<J> {
         Expression expression;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return clazz.getType();
         }
 
