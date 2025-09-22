@@ -24,20 +24,22 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import static java.util.stream.Collectors.groupingBy;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.groupingBy;
 
 public class InlineMethodCallsRecipeGenerator {
 
     public static void main(String[] args) {
         if (args.length < 3) {
-            System.err.println("Usage: InlineMethodCallsRecipeGenerator <input-tsv-path> <output-yaml-path>");
+            System.err.println("Usage: InlineMethodCallsRecipeGenerator <input-tsv-path> <output-yaml-path> <recipe-name>");
             System.exit(1);
         }
 
@@ -245,6 +247,16 @@ public class InlineMethodCallsRecipeGenerator {
 
     private static void generateYamlRecipes(List<InlineMeMethod> methods, Path outputPath, String recipeName) throws IOException {
         StringBuilder yaml = new StringBuilder();
+        Path licenseHeader = Paths.get("gradle/licenseHeader.txt");
+        if (Files.isRegularFile(licenseHeader)) {
+            try (Stream<String> lines = Files.lines(licenseHeader)) {
+                lines.forEach(line -> yaml
+                        .append("# ")
+                        .append(line.replace("${year}", String.valueOf(Year.now().getValue())))
+                        .append("\n"));
+            }
+        }
+
         yaml.append("#\n");
         yaml.append("# Generated InlineMe recipes from TypeTable\n");
         yaml.append("#\n\n");
