@@ -20,6 +20,7 @@ import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
+import {ChromeProfiler} from './chrome-profiler';
 
 // Include all languages you want this server to support.
 import "../text";
@@ -37,6 +38,7 @@ interface ProgramOptions {
     traceGetObjectOutput?: boolean;
     traceGetObjectInput?: boolean;
     recipeInstallDir?: string;
+    profile?: boolean;
 }
 
 async function main() {
@@ -49,9 +51,17 @@ async function main() {
         .option('--trace-get-object-output', 'enable `GetObject` output tracing')
         .option('--trace-get-object-input', 'enable `GetObject` input tracing')
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
+        .option('--profile', 'enable profiling')
         .parse();
 
     const options = program.opts() as ProgramOptions;
+
+    // Chrome profiling
+    let profiler: ChromeProfiler | undefined;
+    if (options.profile) {
+        profiler = new ChromeProfiler();
+        profiler.start().catch(console.error);
+    }
 
     let recipeInstallDir: string;
     if (!options.recipeInstallDir) {
@@ -65,6 +75,9 @@ async function main() {
 
         // Register cleanup on exit
         process.on('SIGINT', async () => {
+            if (profiler) {
+                await profiler.stop();
+            }
             if (recipeCleanup) {
                 await recipeCleanup();
             }
@@ -72,6 +85,9 @@ async function main() {
         });
 
         process.on('SIGTERM', async () => {
+            if (profiler) {
+                await profiler.stop();
+            }
             if (recipeCleanup) {
                 await recipeCleanup();
             }
@@ -81,6 +97,19 @@ async function main() {
         recipeInstallDir = await setupRecipeDir();
     } else {
         recipeInstallDir = options.recipeInstallDir;
+
+        // Register cleanup for profiler when no recipe cleanup is needed
+        if (profiler) {
+            process.on('SIGINT', async () => {
+                await profiler.stop();
+                process.exit(0);
+            });
+
+            process.on('SIGTERM', async () => {
+                await profiler.stop();
+                process.exit(0);
+            });
+        }
     }
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;

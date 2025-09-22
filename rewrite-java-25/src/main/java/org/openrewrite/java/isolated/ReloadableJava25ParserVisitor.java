@@ -2232,17 +2232,17 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
-    private final Function<Tree, Space> semiDelim = _ -> {
+    private final Function<Tree, Space> semiDelim = t -> {
         Space prefix = whitespace();
         skip(";");
         return prefix;
     };
-    private final Function<Tree, Space> commaDelim = _ -> {
+    private final Function<Tree, Space> commaDelim = t -> {
         Space prefix = whitespace();
         skip(",");
         return prefix;
     };
-    private final Function<Tree, Space> noDelim = _ -> EMPTY;
+    private final Function<Tree, Space> noDelim = t -> EMPTY;
 
     private Space whitespace() {
         int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);

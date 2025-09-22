@@ -170,16 +170,63 @@ export class JavaScriptTypeMapping {
             if (ts.isPropertyAccessExpression(node.expression)) {
                 methodName = node.expression.name.getText();
                 const exprType = this.checker.getTypeAtLocation(node.expression.expression);
-                declaringType = this.getType(exprType) as Type.FullyQualified;
+                const mappedType = this.getType(exprType);
+
+                // For string methods like 'hello'.split(), ensure we have a proper declaring type
+                if (!mappedType || mappedType.kind !== Type.Kind.Class) {
+                    // If the expression type is a primitive string, use lib.String as declaring type
+                    const typeString = this.checker.typeToString(exprType);
+                    if (typeString === 'string' || exprType.flags & ts.TypeFlags.String || exprType.flags & ts.TypeFlags.StringLiteral) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            fullyQualifiedName: 'lib.String'
+                        } as Type.FullyQualified;
+                    } else if (typeString === 'number' || exprType.flags & ts.TypeFlags.Number || exprType.flags & ts.TypeFlags.NumberLiteral) {
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            fullyQualifiedName: 'lib.Number'
+                        } as Type.FullyQualified;
+                    } else {
+                        // Fallback for other primitive types or unknown
+                        declaringType = Type.unknownType as Type.FullyQualified;
+                    }
+                } else {
+                    declaringType = mappedType as Type.FullyQualified;
+                }
             } else if (ts.isIdentifier(node.expression)) {
                 methodName = node.expression.getText();
-                // For standalone functions, use the symbol's parent or module
-                const parent = (symbol as any).parent;
-                if (parent) {
-                    const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
-                    declaringType = this.getType(parentType) as Type.FullyQualified;
+                // For standalone functions, we need to determine the appropriate declaring type
+                const exprType = this.checker.getTypeAtLocation(node.expression);
+                const funcType = this.getType(exprType);
+
+                if (funcType && funcType.kind === Type.Kind.Class) {
+                    const fqn = (funcType as Type.Class).fullyQualifiedName;
+                    const lastDot = fqn.lastIndexOf('.');
+
+                    if (lastDot > 0) {
+                        // For functions from modules, use the module part as declaring type
+                        // Examples:
+                        // - "node.assert" -> declaring type: "node"
+                        // - "@types/lodash.map" -> declaring type: "@types/lodash"
+                        // - "@types/express.express" -> declaring type: "@types/express"
+                        declaringType = {
+                            kind: Type.Kind.Class,
+                            fullyQualifiedName: fqn.substring(0, lastDot)
+                        } as Type.FullyQualified;
+                    } else {
+                        // No dots in the name - the type IS the module itself
+                        // This handles single-name modules like "axios", "lodash" etc.
+                        declaringType = funcType as Type.FullyQualified;
+                    }
                 } else {
-                    declaringType = Type.unknownType as Type.FullyQualified;
+                    // Try to use the symbol's parent or module
+                    const parent = (symbol as any).parent;
+                    if (parent) {
+                        const parentType = this.checker.getDeclaredTypeOfSymbol(parent);
+                        declaringType = this.getType(parentType) as Type.FullyQualified;
+                    } else {
+                        declaringType = Type.unknownType as Type.FullyQualified;
+                    }
                 }
             } else {
                 methodName = symbol.getName();
@@ -330,6 +377,30 @@ export class JavaScriptTypeMapping {
         if (sourceFile.isDeclarationFile || fileName.includes("node_modules")) {
             const packageName = this.extractPackageName(fileName);
             if (packageName) {
+                // Special handling for @types/node - these are Node.js built-in modules
+                // and should be mapped to "node.*" instead of "@types/node.*"
+                if (packageName === "@types/node") {
+                    // Extract the module name from the file path
+                    // e.g., /node_modules/@types/node/assert.d.ts -> assert
+                    // e.g., /node_modules/@types/node/fs/promises.d.ts -> fs/promises
+                    const nodeMatch = fileName.match(/node_modules\/@types\/node\/([^.]+)\.d\.ts/);
+                    if (nodeMatch) {
+                        const modulePath = nodeMatch[1];
+                        // For default exports from Node modules, we want the module to be the "class"
+                        // But we still need to include the type name for proper identification
+                        if (typeName === "default" || typeName === modulePath) {
+                            // This is likely the default export, just use the module name
+                            return `node.${modulePath}`;
+                        }
+                        // For named exports, include both module and type name
+                        if (modulePath.includes('/')) {
+                            return `node.${modulePath.replace(/\//g, '.')}.${typeName}`;
+                        }
+                        return `node.${modulePath}.${typeName}`;
+                    }
+                    // Fallback for @types/node types that don't match the pattern
+                    return `node.${typeName}`;
+                }
                 return `${packageName}.${typeName}`;
             }
         }
@@ -392,8 +463,22 @@ export class JavaScriptTypeMapping {
                 const typesMatch = fileName.match(/node_modules\/@types\/([^/]+)/);
                 if (typesMatch) {
                     const packageName = typesMatch[1];
-                    // Replace the module specifier part with @types/package
-                    fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
+                    // Special handling for @types/node - use "node" prefix instead
+                    if (packageName === "node") {
+                        // Extract the module name from the file path if possible
+                        const nodeMatch = fileName.match(/node_modules\/@types\/node\/([^.]+)\.d\.ts/);
+                        if (nodeMatch) {
+                            const modulePath = nodeMatch[1];
+                            // Replace the module specifier with node.module
+                            fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `node.${modulePath}.`);
+                        } else {
+                            // Fallback: just use "node" prefix
+                            fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `node.`);
+                        }
+                    } else {
+                        // Replace the module specifier part with @types/package
+                        fullyQualifiedName = fullyQualifiedName.replace(/^[^.]+\./, `@types/${packageName}.`);
+                    }
                 }
             }
         }

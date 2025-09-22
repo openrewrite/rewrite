@@ -96,6 +96,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
+        } else if (ctx.jspdeclaration() != null) {
+            return visitJspdeclaration(ctx.jspdeclaration());
+        } else if (ctx.jspcomment() != null) {
+            return visitJspcomment(ctx.jspcomment());
         } else {
             return super.visitMisc(ctx);
         }
@@ -241,6 +245,70 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     type,
                     attributes,
                     prefix(ctx.DIRECTIVE_CLOSE())
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspscriptlet(XMLParser.JspscriptletContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String scriptletText = ctx.JSP_SCRIPTLET().getText();
+            // Extract content between <% and %>, preserving all whitespace
+            String content = scriptletText.substring(2, scriptletText.length() - 2);
+
+            return new Xml.JspScriptlet(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspexpression(XMLParser.JspexpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String expressionText = ctx.JSP_EXPRESSION().getText();
+            // Extract content between <%= and %>, preserving all whitespace
+            String content = expressionText.substring(3, expressionText.length() - 2);
+
+            return new Xml.JspExpression(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspdeclaration(XMLParser.JspdeclarationContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String declarationText = ctx.JSP_DECLARATION().getText();
+            // Extract content between <%! and %>, preserving all whitespace
+            String content = declarationText.substring(3, declarationText.length() - 2);
+
+            return new Xml.JspDeclaration(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
+            );
+        });
+    }
+
+    @Override
+    public Xml visitJspcomment(XMLParser.JspcommentContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String commentText = ctx.JSP_COMMENT().getText();
+            // Extract content between <%-- and --%>, preserving all whitespace
+            String content = commentText.substring(4, commentText.length() - 4);
+
+            return new Xml.JspComment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    content
             );
         });
     }
