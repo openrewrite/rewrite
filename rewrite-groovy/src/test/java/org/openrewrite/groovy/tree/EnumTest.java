@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -228,6 +229,111 @@ class EnumTest implements RewriteTest {
                   A(X x) {}
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6003")
+    @Test
+    void regexpPatternInEnum() {
+        rewriteRun(
+          groovy(
+            """
+            enum E {
+                OPTION1(~/alef/)
+                final Pattern pattern
+
+                E(Pattern pattern) {
+                    this.pattern = pattern
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void closureInEnum() {
+        rewriteRun(
+          groovy(
+            """
+            import java.util.function.Function
+            enum TagNameSerializer {
+                DEFAULT('default',
+                    { String s ->
+                        return "not " + s;
+                    }
+                )
+
+                private final String type
+                private final Function<String, String> fun
+
+                private TagNameSerializer(String type, Function<String, String> fun) {
+                    this.type = type
+                    this.fun = fun
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6015")
+    @Test
+    void uris() {
+        rewriteRun(
+          groovy(
+            """
+            enum E {
+              LOCAL("http://localhost:8080/api/v1/clusters"),
+              LOCAL_WITH_ESCAPED_QUOTE("http://localhost:8080\\"/invalid/url/I/know")
+
+              E(String uri) {
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void enumWithNamedArguments() {
+        rewriteRun(
+          groovy(
+            """
+              enum Mapped {
+                  SOME_ENUM_CONSTANT0(a: "0"),
+                  SOME_ENUM_CONSTANT1(a: "1"),
+                  SOME_ENUM_CONSTANT2(a: "1", b: "2"),
+                  SOME_ENUM_CONSTANT3(c: "3", d: "4")
+                  
+                  Mapped(Map args) {
+                      // Constructor that accepts a map
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void expressionsInArguments() {
+        rewriteRun(
+          groovy(
+            """
+            enum Status {
+                GOOD(PREFIX + " one. ", PREFIX + " two. ")
+
+                public static final String PREFIX = "{object}"
+                String a
+                String b
+
+                Status(String a, String b) {
+                    this.a = a
+                    this.b = b
+                }
+            }
+            """
           )
         );
     }

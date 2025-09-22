@@ -17,15 +17,11 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static java.util.Objects.requireNonNull;
-import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
 
@@ -62,14 +58,6 @@ public class RpcSendQueue {
         batch.clear();
     }
 
-    public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
-        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
-            Markers markers = Reference.getValue(markersRef);
-            getAndSend(requireNonNull(markers), Markers::getId);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
-        });
-    }
-
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }
@@ -81,14 +69,29 @@ public class RpcSendQueue {
         send(after, before, onChange == null || after == null ? null : () -> onChange.accept(after));
     }
 
+    public <T, U> void getAndSendListAsRef(@Nullable T parent,
+                                           Function<T, @Nullable List<U>> values,
+                                           Function<? super U, ?> id,
+                                           @Nullable Consumer<U> onChange) {
+        getAndSendList(parent, values, id, onChange, true);
+    }
+
     public <T, U> void getAndSendList(@Nullable T parent,
                                       Function<T, @Nullable List<U>> values,
-                                      Function<U, ?> id,
+                                      Function<? super U, ?> id,
                                       @Nullable Consumer<U> onChange) {
-        List<U> after = values.apply(parent);
+        getAndSendList(parent, values, id, onChange, false);
+    }
+
+    private <T, U> void getAndSendList(@Nullable T parent,
+                                       Function<T, @Nullable List<U>> values,
+                                       Function<? super U, ?> id,
+                                       @Nullable Consumer<U> onChange,
+                                       boolean asRef) {
+        List<U> after = parent == null ? null : values.apply(parent);
         //noinspection unchecked
         List<U> before = this.before == null ? null : values.apply((T) this.before);
-        sendList(after, before, id, onChange);
+        sendList(after, before, id, onChange, asRef);
     }
 
     public <T> void send(@Nullable T after, @Nullable T before, @Nullable Runnable onChange) {
@@ -109,10 +112,11 @@ public class RpcSendQueue {
         }
     }
 
-    public <T> void sendList(@Nullable List<T> after,
-                             @Nullable List<T> before,
-                             Function<T, ?> id,
-                             @Nullable Consumer<T> onChange) {
+    <T> void sendList(@Nullable List<T> after,
+                      @Nullable List<T> before,
+                      Function<? super T, ?> id,
+                      @Nullable Consumer<T> onChange,
+                      boolean asRef) {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
@@ -122,7 +126,7 @@ public class RpcSendQueue {
                 Integer beforePos = beforeIdx.get(id.apply(anAfter));
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == null) {
-                    add(anAfter, onChangeRun);
+                    add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
@@ -137,7 +141,7 @@ public class RpcSendQueue {
         });
     }
 
-    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<T, ?> id) {
+    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
         Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
         if (before != null) {
             for (int i = 0; i < before.size(); i++) {
@@ -156,7 +160,7 @@ public class RpcSendQueue {
     private void add(@Nullable Object after, @Nullable Runnable onChange) {
         Object afterVal = Reference.getValue(after);
         Integer ref = null;
-        if (after instanceof Reference) {
+        if (after instanceof Reference && afterVal != null) {
             if (refs.containsKey(afterVal)) {
                 put(new RpcObjectData(ADD, null, null, refs.get(afterVal)));
                 // No onChange call because the remote will be using an instance from its ref cache

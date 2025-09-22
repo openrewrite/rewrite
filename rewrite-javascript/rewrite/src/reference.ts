@@ -33,14 +33,17 @@ export function asRef<T extends {} | undefined>(obj: T): T extends undefined ? u
     try {
         // Spread would create a new object. This can be used multiple times on the
         // same object without changing the reference.
-        Object.assign(obj, {[REFERENCE_KEY]: true});
+        (obj as any)[REFERENCE_KEY] = true;
         return obj as any;
-    } catch (Error) {
-        return obj as any;
+    } catch {
+        // The object is frozen/sealed/non-extensible. Clone to a new object.
+        const cloned = {...obj as any};
+        cloned[REFERENCE_KEY] = true;
+        return cloned;
     }
 }
 
-export function isRef(obj?: any): obj is Reference {
+export function isRef(obj: any): obj is Reference {
     return obj !== undefined && obj !== null && obj[REFERENCE_KEY] === true;
 }
 

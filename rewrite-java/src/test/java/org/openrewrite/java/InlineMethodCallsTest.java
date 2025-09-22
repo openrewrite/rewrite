@@ -17,30 +17,29 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Set;
 
 import static org.openrewrite.java.Assertions.java;
 
 class InlineMethodCallsTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new InlineMethodCalls());
-    }
 
     @DocumentExample
     @Test
     void inlineMeSimple() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib deprecated()",
+              "this.replacement()",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class Lib {
                   @Deprecated
-                  @InlineMe(replacement = "this.replacement()")
                   public void deprecated() {}
 
                   public void replacement() {}
@@ -51,11 +50,8 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class Lib {
                   @Deprecated
-                  @InlineMe(replacement = "this.replacement()")
                   public void deprecated() {}
 
                   public void replacement() {}
@@ -73,13 +69,16 @@ class InlineMethodCallsTest implements RewriteTest {
     void inlineMeNonStatic() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib deprecated()",
+              "replacement()",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class Lib {
                   @Deprecated
-                  @InlineMe(replacement = "this.replacement()")
                   public void deprecated() {}
                   public void replacement() {}
 
@@ -89,11 +88,8 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class Lib {
                   @Deprecated
-                  @InlineMe(replacement = "this.replacement()")
                   public void deprecated() {}
                   public void replacement() {}
 
@@ -110,9 +106,14 @@ class InlineMethodCallsTest implements RewriteTest {
     void inlineMeChained() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Lib getDeadlineMillis()",
+              "getDeadline().toMillis()",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
               import java.time.Duration;
 
               class Lib {
@@ -123,7 +124,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.getDeadline().toMillis()")
                   public long getDeadlineMillis() {
                       return getDeadline().toMillis();
                   }
@@ -134,7 +134,6 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
               import java.time.Duration;
 
               class Lib {
@@ -145,7 +144,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.getDeadline().toMillis()")
                   public long getDeadlineMillis() {
                       return getDeadline().toMillis();
                   }
@@ -163,10 +161,14 @@ class InlineMethodCallsTest implements RewriteTest {
     void instanceMethodWithImports() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "MyClass setDeadline(long)",
+              "this.setDeadline(Duration.ofMillis(millis))",
+              Set.of("java.time.Duration"),
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
                   private java.time.Duration deadline;
 
@@ -175,9 +177,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "this.setDeadline(Duration.ofMillis(millis))",
-                      imports = {"java.time.Duration"})
                   public void setDeadline(long millis) {
                       setDeadline(java.time.Duration.ofMillis(millis));
                   }
@@ -188,8 +187,6 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               import java.time.Duration;
 
               class MyClass {
@@ -200,9 +197,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "this.setDeadline(Duration.ofMillis(millis))",
-                      imports = {"java.time.Duration"})
                   public void setDeadline(long millis) {
                       setDeadline(Duration.ofMillis(millis));
                   }
@@ -220,11 +214,15 @@ class InlineMethodCallsTest implements RewriteTest {
     void staticMethodReplacement() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "com.google.frobber.Frobber create(String)",
+              "Frobber.fromName(name)",
+              Set.of("com.google.frobber.Frobber"),
+              null,
+              null)),
           java(
             """
               package com.google.frobber;
-
-              import org.openrewrite.java.InlineMe;
 
               class Frobber {
 
@@ -233,9 +231,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "Frobber.fromName(name)",
-                      imports = {"com.google.frobber.Frobber"})
                   public static Frobber create(String name) {
                       return fromName(name);
                   }
@@ -248,8 +243,6 @@ class InlineMethodCallsTest implements RewriteTest {
             """
               package com.google.frobber;
 
-              import org.openrewrite.java.InlineMe;
-
               class Frobber {
 
                   public static Frobber fromName(String name) {
@@ -257,9 +250,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "Frobber.fromName(name)",
-                      imports = {"com.google.frobber.Frobber"})
                   public static Frobber create(String name) {
                       return fromName(name);
                   }
@@ -277,18 +267,19 @@ class InlineMethodCallsTest implements RewriteTest {
     void constructorToFactoryMethod() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "com.google.frobber.MyClass <constructor>()",
+              "MyClass.create()",
+              Set.of("com.google.frobber.MyClass"),
+              null,
+              null)),
           java(
             """
               package com.google.frobber;
 
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "MyClass.create()",
-                      imports = {"com.google.frobber.MyClass"})
                   public MyClass() {
                   }
 
@@ -304,14 +295,9 @@ class InlineMethodCallsTest implements RewriteTest {
             """
               package com.google.frobber;
 
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
 
                   @Deprecated
-                  @InlineMe(
-                      replacement = "MyClass.create()",
-                      imports = {"com.google.frobber.MyClass"})
                   public MyClass() {
                   }
 
@@ -331,13 +317,16 @@ class InlineMethodCallsTest implements RewriteTest {
     @Test
     void constructorAddLiteralString() {
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "MyClass <constructor>(String)",
+              "new MyClass(one, \"two\")",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
                   @Deprecated
-                  @InlineMe(replacement = "this(one, \\"two\\")")
                   public MyClass(String one) {
                       this("one", "two");
                   }
@@ -351,11 +340,8 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
                   @Deprecated
-                  @InlineMe(replacement = "this(one, \\"two\\")")
                   public MyClass(String one) {
                       this("one", "two");
                   }
@@ -375,13 +361,16 @@ class InlineMethodCallsTest implements RewriteTest {
     @Test
     void constructorAddLiteralNull() {
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "MyClass <constructor>(String)",
+              "new MyClass(one, null)",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
                   @Deprecated
-                  @InlineMe(replacement = "this(one, null)")
                   public MyClass(String one) {
                       this("one", null);
                   }
@@ -395,11 +384,8 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class MyClass {
                   @Deprecated
-                  @InlineMe(replacement = "this(one, null)")
                   public MyClass(String one) {
                       this("one", null);
                   }
@@ -420,10 +406,14 @@ class InlineMethodCallsTest implements RewriteTest {
     void multipleParameters() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Calculator compute(int, int, int)",
+              "this.addAndMultiply(x, y, z)",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class Calculator {
 
                   public int addAndMultiply(int a, int b, int c) {
@@ -431,7 +421,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.addAndMultiply(x, y, z)")
                   public int compute(int x, int y, int z) {
                       return addAndMultiply(x, y, z);
                   }
@@ -442,8 +431,6 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class Calculator {
 
                   public int addAndMultiply(int a, int b, int c) {
@@ -451,7 +438,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.addAndMultiply(x, y, z)")
                   public int compute(int x, int y, int z) {
                       return addAndMultiply(x, y, z);
                   }
@@ -469,10 +455,14 @@ class InlineMethodCallsTest implements RewriteTest {
     void nestedMethodCalls() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "Builder configure(String, int)",
+              "this.withName(name).withAge(age)",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class Builder {
 
                   public Builder withName(String name) {
@@ -484,7 +474,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.withName(name).withAge(age)")
                   public Builder configure(String name, int age) {
                       return withName(name).withAge(age);
                   }
@@ -495,8 +484,6 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class Builder {
 
                   public Builder withName(String name) {
@@ -508,7 +495,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.withName(name).withAge(age)")
                   public Builder configure(String name, int age) {
                       return withName(name).withAge(age);
                   }
@@ -526,10 +512,14 @@ class InlineMethodCallsTest implements RewriteTest {
     void sameArgumentUsedTwice() {
         //language=java
         rewriteRun(
+          spec -> spec.recipe(new InlineMethodCalls(
+              "MathUtils doubleAndSquare(int)",
+              "square(x + x)",
+              null,
+              null,
+              null)),
           java(
             """
-              import org.openrewrite.java.InlineMe;
-
               class MathUtils {
 
                   public int square(int n) {
@@ -537,7 +527,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.square(x + x)")
                   public int doubleAndSquare(int x) {
                       return square(x + x);
                   }
@@ -548,8 +537,6 @@ class InlineMethodCallsTest implements RewriteTest {
               }
               """,
             """
-              import org.openrewrite.java.InlineMe;
-
               class MathUtils {
 
                   public int square(int n) {
@@ -557,7 +544,6 @@ class InlineMethodCallsTest implements RewriteTest {
                   }
 
                   @Deprecated
-                  @InlineMe(replacement = "this.square(x + x)")
                   public int doubleAndSquare(int x) {
                       return square(x + x);
                   }

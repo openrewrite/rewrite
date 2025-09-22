@@ -282,8 +282,8 @@ public class JavaSourceSet implements SourceSet {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                        String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
-                        if (pathStr.endsWith(".class")) {
+                        if (file.getFileName().toString().endsWith(".class")) {
+                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
                             String s = entryNameToClassName(pathStr);
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -313,11 +313,8 @@ public class JavaSourceSet implements SourceSet {
     }
 
     private static String entryNameToClassName(String entryName) {
-        String result = entryName;
-        if (entryName.startsWith("modules/java.base/")) {
-            result = entryName.substring("modules/java.base/".length());
-        }
-        return result.substring(0, result.length() - ".class".length())
+        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
+        return entryName.substring(start, entryName.length() - ".class".length())
                 .replace('/', '.');
     }
 

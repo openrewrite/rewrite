@@ -28,7 +28,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void targetToStatic() {
         rewriteRun(
           spec -> spec.recipes(
-            new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null),
+              new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false),
             new ChangeMethodName("b.B nonStatic()", "foo", null, null)
           ),
           java(
@@ -73,7 +73,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void staticTargetToStatic() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null, false)),
           java(
             """
               package b;
@@ -116,7 +116,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
           java(
             """
               package a;
@@ -149,7 +149,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void staticMethodCalledOnInstanceToCallOnClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
           java(
             """
               package a;
@@ -191,7 +191,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void keepImportComments() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null, false)),
           java(
             """
               package org.codehaus.plexus.util;

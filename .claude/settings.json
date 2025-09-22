@@ -1,6 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "mcp__ide__getDiagnostics",
+      "Bash(npm search:*)",
+      "Bash(npm run:*)",
+      "Bash(node:*)",
       "Bash(npm view:*)",
       "Bash(npx:*)",
       "Bash(npm ls:*)",

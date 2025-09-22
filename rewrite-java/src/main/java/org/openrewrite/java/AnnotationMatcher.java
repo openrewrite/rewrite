@@ -15,10 +15,12 @@
  */
 package org.openrewrite.java;
 
+import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -57,8 +59,13 @@ public class AnnotationMatcher {
     private final boolean matchMetaAnnotations;
 
     public AnnotationMatcher(String signature, @Nullable Boolean matchesMetaAnnotations) {
-        this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
-                .annotation();
+        ANTLRErrorListener errorListener = new ThrowingErrorListener(signature);
+        AnnotationSignatureLexer lexer = new AnnotationSignatureLexer(CharStreams.fromString(signature));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        AnnotationSignatureParser parser = new AnnotationSignatureParser(new CommonTokenStream(lexer));
+        parser.addErrorListener(errorListener);
+        this.match = parser.annotation();
         this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(match.annotationName().getText()));
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
     }

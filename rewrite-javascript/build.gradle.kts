@@ -17,6 +17,7 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-json"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
@@ -128,6 +129,9 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 }
 
 val npmPack = tasks.register<Tar>("npmPack") {
+    from("rewrite/src") {
+        into("package/src")
+    }
     from(npmBuild) {
         into("package/dist/")
     }

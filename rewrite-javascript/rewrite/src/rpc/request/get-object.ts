@@ -15,7 +15,7 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
-import {ReferenceMap} from "../reference";
+import {ReferenceMap} from "../../reference";
 
 export class GetObject {
     constructor(private readonly id: string, private readonly lastKnownId?: string) {

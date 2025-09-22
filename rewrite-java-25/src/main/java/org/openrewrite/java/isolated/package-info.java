@@ -13,16 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.rpc;
+@NullMarked
+@NonNullFields
+package org.openrewrite.java.isolated;
 
-import lombok.Value;
-import org.openrewrite.FileAttributes;
-
-import java.nio.file.Path;
-
-@Value
-public class ParserInput {
-    Path sourcePath;
-    String text;
-    FileAttributes fileAttributes;
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

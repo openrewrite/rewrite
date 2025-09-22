@@ -109,10 +109,10 @@ export abstract class Recipe {
     /**
      * Returns the visitor that performs the transformation. This method is called by the
      * recipe framework during execution and must be overridden by concrete recipe implementations.
-     * 
+     *
      * @returns A visitor that performs the recipe's transformation
      */
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor()
     }
 
@@ -159,31 +159,31 @@ export abstract class ScanningRecipe<P> extends Recipe {
 
     abstract initialValue(ctx: ExecutionContext): P
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         const editorWithContext = (cursor: Cursor, ctx: ExecutionContext) =>
             this.editorWithData(this.accumulator(cursor, ctx));
 
         return new class extends TreeVisitor<any, ExecutionContext> {
             private delegate?: TreeVisitor<any, ExecutionContext>
 
-            isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): boolean {
-                return this.delegateForCtx(ctx).isAcceptable(sourceFile, ctx);
+            async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
+                return (await this.delegateForCtx(ctx)).isAcceptable(sourceFile, ctx);
             }
 
             async visit<R extends Tree>(tree: Tree, ctx: ExecutionContext, parent?: Cursor): Promise<R | undefined> {
-                return this.delegateForCtx(ctx).visit(tree, ctx, parent);
+                return (await this.delegateForCtx(ctx)).visit(tree, ctx, parent);
             }
 
-            private delegateForCtx(ctx: ExecutionContext) {
+            private async delegateForCtx(ctx: ExecutionContext) {
                 if (!this.delegate) {
-                    this.delegate = editorWithContext(this.cursor, ctx);
+                    this.delegate = await editorWithContext(this.cursor, ctx);
                 }
                 return this.delegate;
             }
         }
     }
 
-    editorWithData(acc: P): TreeVisitor<any, ExecutionContext> {
+    async editorWithData(acc: P): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor();
     }
 
@@ -191,7 +191,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return [];
     }
 
-    scanner(acc: P): TreeVisitor<any, ExecutionContext> {
+    async scanner(acc: P): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor();
     }
 }

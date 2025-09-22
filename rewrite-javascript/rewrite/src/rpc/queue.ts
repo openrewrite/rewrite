@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, Marker, Markers, MarkersKind} from "../markers";
+import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
-import {asRef, isRef, Reference, ReferenceMap} from "./reference";
+import {isRef, ReferenceMap} from "../reference";
 import {Writable} from "node:stream";
 
 /**
@@ -90,12 +90,7 @@ export class RpcSendQueue {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
-        if (after.kind === MarkersKind.Markers) {
-            // FIXME check if we can solve this via RpcCodec
-            await this.sendMarkers(undefined!, _ => after);
-        } else {
-            await this.send(after, before);
-        }
+        await this.send(after, before);
 
         const result = this.q;
         result.push({state: RpcObjectState.END_OF_OBJECT});
@@ -109,16 +104,6 @@ export class RpcSendQueue {
             d.trace = trace("Sender");
         }
         this.q.push(d);
-    }
-
-    sendMarkers<T extends { markers: Markers }>(parent: T, markersFn: (parent: T) => any): Promise<void> {
-        return this.getAndSend(parent, t2 => asRef(markersFn(t2)), async (markersRef: Markers & Reference) => {
-            await this.getAndSend(markersRef, m => m.id);
-            await this.getAndSendList(markersRef,
-                (m) => m.markers,
-                (marker: Marker) => marker.id
-            );
-        });
     }
 
     getAndSend<T, U>(parent: T,
@@ -303,6 +288,12 @@ export class RpcReceiveQueue {
                         before = message.valueType === undefined ?
                             message.value :
                             this.newObj(message.valueType);
+                        if (ref !== undefined) {
+                            // For an object like JavaType that we will mutate in place rather than using
+                            // immutable updates because of its cyclic nature, the before instance will ultimately
+                            // be the same as the after instance below.
+                            this.refs.set(ref, before);
+                        }
                     }
                 // Intentional fall-through...
                 case RpcObjectState.CHANGE:
