@@ -92,7 +92,7 @@ public class PsiTreePrinter {
         return printJTree(tree);
     }
 
-    public static String print(@Nullable FirElement firElement) {
+    public static @Nullable String print(@Nullable FirElement firElement) {
         if (firElement == null) {
             return "null";
         }

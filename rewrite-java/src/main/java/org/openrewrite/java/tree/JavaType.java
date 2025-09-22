@@ -907,7 +907,7 @@ public interface JavaType {
         }
 
         @Override
-        public FullyQualified getSupertype() {
+        public @Nullable FullyQualified getSupertype() {
             return type.getSupertype();
         }
 
@@ -1233,8 +1233,8 @@ public interface JavaType {
         }
 
         @Override
-        public Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
-            String keyword = q.receiveAndGet(null, java.lang.String::toString);
+        public @Nullable Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
+            String keyword = q.receiveAndGet(null, String::toString);
             return fromKeyword(keyword);
         }
     }
