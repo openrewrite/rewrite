@@ -173,8 +173,11 @@ export class JavaScriptTypeMapping {
                 const objSymbol = this.checker.getSymbolAtLocation(node.expression.expression);
                 let isImport = false;
                 if (objSymbol) {
-                    const aliasedSymbol = this.checker.getAliasedSymbol(objSymbol);
-                    isImport = aliasedSymbol && aliasedSymbol !== objSymbol;
+                    // Only call getAliasedSymbol if the symbol is actually an alias
+                    if (objSymbol.flags & ts.SymbolFlags.Alias) {
+                        const aliasedSymbol = this.checker.getAliasedSymbol(objSymbol);
+                        isImport = aliasedSymbol && aliasedSymbol !== objSymbol;
+                    }
                 }
 
                 const exprType = this.checker.getTypeAtLocation(node.expression.expression);
@@ -251,7 +254,10 @@ export class JavaScriptTypeMapping {
 
                 if (symbol) {
                     // Check if this is an aliased symbol (i.e., an import)
-                    const aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+                    let aliasedSymbol: ts.Symbol | undefined;
+                    if (symbol.flags & ts.SymbolFlags.Alias) {
+                        aliasedSymbol = this.checker.getAliasedSymbol(symbol);
+                    }
 
                     // If getAliasedSymbol returns something different, it's an import
                     if (aliasedSymbol && aliasedSymbol !== symbol) {
