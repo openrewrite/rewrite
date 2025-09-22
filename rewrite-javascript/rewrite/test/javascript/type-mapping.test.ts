@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
@@ -350,6 +350,60 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('should map tsx types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                // Mark any node that has a lodash-related type
+                if (Type.isClass(type) && type.fullyQualifiedName.includes('react-spinners')) {
+                    expect(type.supertype?.fullyQualifiedName).toBe('React.Component');
+                    return type.fullyQualifiedName;
+                } else {
+                    return null;
+                }
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=tsx
+                        tsx(
+                            `
+                                import {ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return <ClipLoader color="#36d7b7"/>;
+                                };
+                            `,
+                            `
+                                import {/*~~(react-spinners.ClipLoader)~~>*/ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return </*~~(react-spinners.ClipLoader)~~>*/ClipLoader color="#36d7b7"/>;
+                                };
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react": "^16.8.0",
+                                  "react-spinners": "^0.5.0"
+                                },
+                                "devDependencies": {
+                                  "@types/react": "^16.8.0"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
         test('should map user-defined class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
@@ -454,8 +508,8 @@ describe('JavaScript type mapping', () => {
                         const elemTypeName = Type.isPrimitive(type.elemType)
                             ? type.elemType.keyword || 'unknown'
                             : Type.isClass(type.elemType)
-                            ? 'union'  // Tuples often have union element types
-                            : 'unknown';
+                                ? 'union'  // Tuples often have union element types
+                                : 'unknown';
                         return `Array<${elemTypeName}>`;
                     }
                     // Debug what we get for tuples
@@ -532,7 +586,7 @@ describe('JavaScript type mapping', () => {
                     const methodType = type as Type.Method;
                     if (methodType.name === 'add') {
                         const params = methodType.parameterNames.join(', ');
-                        const returnTypeName = Type.isPrimitive(methodType.returnType) 
+                        const returnTypeName = Type.isPrimitive(methodType.returnType)
                             ? methodType.returnType.keyword || 'unknown'
                             : 'unknown';
                         return `(${params}) => ${returnTypeName}`;
@@ -550,7 +604,8 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        /*~~((a, b) => double)~~>*/function add(a: number, b: number): number {
+                        /*~~((a, b) => double)~~>*/
+                        function add(a: number, b: number): number {
                             return a + b;
                         }
                     `
@@ -647,35 +702,6 @@ describe('JavaScript type mapping', () => {
                         function /*~~(<T>(T) => T)~~>*/identity<T>(value: T): T {
                             return value;
                         }
-                    `
-                )
-            );
-        });
-
-        test.skip('should map JSX element types', async () => {
-            // TODO: Implement in Phase 7
-            const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
-                // Mark JSX elements with their component type
-                if (node?.kind === J.Kind.NewClass && type) {
-                    // JSX elements are typically mapped as NewClass in the J model
-                    return Type.isClass(type) ? type.fullyQualifiedName : null;
-                }
-                return null;
-            });
-
-            await spec.rewriteRun(
-                //language=tsx
-                tsx(
-                    `
-                        import React from 'react';
-
-                        const element = <div className="test">Hello</div>;
-                    `,
-                    `
-                        import React from 'react';
-
-                        const element = /*~~(JSX.IntrinsicElements.div)~~>*/<div className="test">Hello</div>;
                     `
                 )
             );

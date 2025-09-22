@@ -38,7 +38,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findMethods(@TempDir Path projectDir) {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("@types/lodash..* max(..)", false))
+          spec -> spec.recipe(new FindMethods("_.LoDashStatic max(..)", false))
             .dataTable(MethodCalls.Row.class, rows ->
               assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("_.max(1, 2)")),
           npm(
@@ -119,7 +119,7 @@ class FindMethodsTest implements RewriteTest {
     }
 
     @Test
-    void functionsAsDefaultExports() {
+    void nodeBuiltinModules() {
         rewriteRun(
           spec -> spec.recipe(new FindMethods("node assert(..)", false)),
           typescript(
@@ -131,6 +131,42 @@ class FindMethodsTest implements RewriteTest {
               import assert from 'node:assert';
               /*~~>*/assert('hello', 'world');
               """
+          )
+        );
+    }
+
+    @Test
+    void defaultExportFunctions(@TempDir Path projectDir) {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("express <default>(..)", false))
+            .dataTable(MethodCalls.Row.class, rows ->
+              assertThat(rows.stream().map(MethodCalls.Row::getMethod)).containsExactly("express()")),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import express from 'express';
+                const app = express();
+                """,
+              """
+                import express from 'express';
+                const app = /*~~>*/express();
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "express": "^4.18.2"
+                  },
+                  "devDependencies": {
+                    "@types/express": "^4.17.21"
+                  }
+                }
+                """
+            )
           )
         );
     }

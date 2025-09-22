@@ -56,5 +56,6 @@ classNameOrInterface
 simpleNamePattern
     :    Identifier (WILDCARD Identifier)* WILDCARD?
     |    WILDCARD (Identifier WILDCARD)* Identifier?
+    |    JAVASCRIPT_DEFAULT_METHOD
     |    CONSTRUCTOR
     ;

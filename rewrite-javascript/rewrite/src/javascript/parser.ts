@@ -57,6 +57,19 @@ export interface JavaScriptParserOptions extends ParserOptions {
     sourceFileCache?: Map<string, ts.SourceFile>
 }
 
+function getScriptKindFromFileName(fileName: string): ts.ScriptKind {
+    const ext = fileName.toLowerCase();
+    if (ext.endsWith('.tsx')) return ts.ScriptKind.TSX;
+    if (ext.endsWith('.jsx')) return ts.ScriptKind.JSX;
+    if (ext.endsWith('.ts')) return ts.ScriptKind.TS;
+    if (ext.endsWith('.js')) return ts.ScriptKind.JS;
+    if (ext.endsWith('.mjs')) return ts.ScriptKind.JS;
+    if (ext.endsWith('.cjs')) return ts.ScriptKind.JS;
+    if (ext.endsWith('.mts')) return ts.ScriptKind.TS;
+    if (ext.endsWith('.cts')) return ts.ScriptKind.TS;
+    return ts.ScriptKind.TS;
+}
+
 export class JavaScriptParser extends Parser {
 
     private readonly compilerOptions: ts.CompilerOptions;
@@ -138,7 +151,9 @@ export class JavaScriptParser extends Parser {
             }
 
             if (sourceText !== undefined) {
-                sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true);
+                // Determine script kind based on file extension
+                const scriptKind = getScriptKindFromFileName(fileName);
+                sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);
@@ -192,7 +207,7 @@ export class JavaScriptParser extends Parser {
 
             try {
                 yield produce(
-                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker, this.relativeTo || process.cwd())
+                    new JavaScriptParserVisitor(sourceFile, this.relativePath(input), typeChecker)
                         .visit(sourceFile) as SourceFile,
                     draft => {
                         if (this.styles) {
@@ -222,9 +237,8 @@ export class JavaScriptParserVisitor {
     constructor(
         private readonly sourceFile: ts.SourceFile,
         private readonly sourcePath: string,
-        typeChecker: ts.TypeChecker,
-        projectRoot?: string) {
-        this.typeMapping = new JavaScriptTypeMapping(typeChecker, projectRoot);
+        typeChecker: ts.TypeChecker) {
+        this.typeMapping = new JavaScriptTypeMapping(typeChecker);
     }
 
     visit = (node: ts.Node): any => {
