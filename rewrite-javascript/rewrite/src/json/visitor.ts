@@ -62,7 +62,7 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         });
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
         Promise<Json.RightPadded<T> | undefined> {
         return produceAsync<Json.RightPadded<T>>(right, async draft => {
             draft.element = await this.visitDefined(right.element, p);
@@ -70,7 +70,7 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         });
     }
 
-    protected async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
         return space;
     }
 

@@ -29,9 +29,9 @@ export class Print {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  getObject: (id: string) => any): void {
+                  getObject: (id: string, sourceFileType?: string) => any): void {
         connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
-            const tree: Tree = await getObject(request.treeId.toString());
+            const tree: Tree = await getObject(request.treeId.toString(), request.sourceFileType);
             const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
             if (isSourceFile(tree)) {
                 return await printer(tree).print(tree, out);

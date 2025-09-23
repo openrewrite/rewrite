@@ -89,7 +89,7 @@ public class RpcObjectData {
     @NonFinal
     String trace = Trace.traceSender();
 
-    public RpcObjectData withTrace(@Nullable String trace) {
+    public RpcObjectData withTrace() {
         RpcObjectData d = new RpcObjectData(state, valueType, value, ref);
         d.trace = null;
         return d;

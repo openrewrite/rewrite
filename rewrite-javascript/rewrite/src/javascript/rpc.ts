@@ -18,7 +18,7 @@ import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc"
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
-import {JavaReceiver, JavaSender} from "../java/rpc";
+import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
@@ -1106,11 +1106,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return this.javaReceiverDelegate.visitRightPadded(right, q)
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+    async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         return this.javaReceiverDelegate.visitLeftPadded(left, q);
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+    async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
         return this.javaReceiverDelegate.visitContainer(container, q);
     }
 
@@ -1139,17 +1139,4 @@ class JavaScriptReceiverDelegate extends JavaReceiver {
     }
 }
 
-const javaScriptCodec: RpcCodec<JS> = {
-    async rpcReceive(before: JS, q: RpcReceiveQueue): Promise<JS> {
-        return (await new JavaScriptReceiver().visit(before, q))! as JS;
-    },
-
-    async rpcSend(after: JS, q: RpcSendQueue): Promise<void> {
-        await new JavaScriptSender().visit(after, q);
-    }
-}
-
-// Register codec for all JavaScript AST node types
-Object.values(JS.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, javaScriptCodec);
-});
+registerJLanguageCodecs(JS.Kind.CompilationUnit, new JavaScriptReceiver(), new JavaScriptSender(), JS.Kind);

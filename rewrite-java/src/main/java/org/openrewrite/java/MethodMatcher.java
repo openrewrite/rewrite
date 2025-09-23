@@ -149,6 +149,8 @@ public class MethodMatcher {
 
                 if (ctx.simpleNamePattern().CONSTRUCTOR() != null) {
                     methodName = "<constructor>";
+                } else if (ctx.simpleNamePattern().JAVASCRIPT_DEFAULT_METHOD() != null) {
+                    methodName = "<default>";
                 } else if (isPlainIdentifier(ctx.simpleNamePattern())) {
                     StringBuilder builder = new StringBuilder();
                     for (ParseTree child : ctx.simpleNamePattern().children) {
@@ -188,8 +190,8 @@ public class MethodMatcher {
                     property,
                     signature,
                     "Tried to construct a method matcher with an invalid method pattern. " +
-                            "An example of a good method pattern is `java.util.List add(..)`. " +
-                            throwable.getMessage(),
+                    "An example of a good method pattern is `java.util.List add(..)`. " +
+                    throwable.getMessage(),
                     throwable
             );
         }

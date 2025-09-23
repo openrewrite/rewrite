@@ -40,7 +40,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 

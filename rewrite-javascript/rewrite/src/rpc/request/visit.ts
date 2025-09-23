@@ -25,6 +25,7 @@ export interface VisitResponse {
 
 export class Visit {
     constructor(private readonly visitor: string,
+                private readonly sourceFileType: string,
                 private readonly visitorOptions: Map<string, any> | undefined,
                 private readonly treeId: string,
                 private readonly p: string,
@@ -35,15 +36,15 @@ export class Visit {
                   localObjects: Map<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
-                  getObject: (id: string) => any,
-                  getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
+                  getObject: (id: string, sourceFileType?: string) => any,
+                  getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
-            const p = await getObject(request.p);
-            const before: Tree = await getObject(request.treeId);
+            const p = await getObject(request.p, undefined);
+            const before: Tree = await getObject(request.treeId, request.sourceFileType);
             localObjects.set(before.id.toString(), before);
 
             const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
-            const after = await visitor.visit(before, p, await getCursor(request.cursor));
+            const after = await visitor.visit(before, p, await getCursor(request.cursor, request.sourceFileType));
             if (!after) {
                 localObjects.delete(before.id.toString());
             } else if (after !== before) {

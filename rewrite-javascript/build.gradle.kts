@@ -53,15 +53,13 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-val datedSnapshotVersion by extra {
-    if (System.getenv("CI") != null) {
-        project.version.toString().replace(
-            "SNAPSHOT",
-            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        )
-    } else {
-        project.version.toString()
-    }
+val datedSnapshotVersion = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "SNAPSHOT",
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+    )
+} else {
+    project.version.toString()
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {

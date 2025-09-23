@@ -2,7 +2,8 @@ lexer grammar MethodSignatureLexer;
 
 // §3.11 Separators
 
-CONSTRUCTOR     : '<constructor>' | '<init>';
+CONSTRUCTOR                   : '<constructor>' | '<init>';
+JAVASCRIPT_DEFAULT_METHOD     : '<default>';
 
 LPAREN          : '(';
 RPAREN          : ')';

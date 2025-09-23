@@ -195,7 +195,7 @@ describe('JavaScript type mapping', () => {
         // TODO: These will be implemented in Phase 2/3
         test.skip('should map type annotations', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((_node, _type) => {
                 // Will mark type reference nodes when implemented
                 return null;
             });
@@ -305,7 +305,7 @@ describe('JavaScript type mapping', () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((_, type) => {
                 // Mark any node that has a lodash-related type
-                return Type.isClass(type) && type.fullyQualifiedName.includes('lodash') ?
+                return Type.isClass(type) && type.fullyQualifiedName.includes('LoDash') ?
                     type.fullyQualifiedName : null;
             });
 
@@ -323,11 +323,11 @@ describe('JavaScript type mapping', () => {
                                 const sum = _.reduce(doubled, (a, b) => a + b, 0);
                             `,
                             `
-                                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                                import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
 
                                 const numbers = [1, 2, 3, 4, 5];
-                                const doubled = /*~~(@types/lodash.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
-                                const sum = /*~~(@types/lodash.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
+                                const doubled = /*~~(_.LoDashStatic)~~>*/_.map(numbers, n => n * 2);
+                                const sum = /*~~(_.LoDashStatic)~~>*/_.reduce(doubled, (a, b) => a + b, 0);
                             `
                         ),
                         //language=json
@@ -341,6 +341,60 @@ describe('JavaScript type mapping', () => {
                                 },
                                 "devDependencies": {
                                   "@types/lodash": "^4.14.195"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
+
+        test('should map tsx types', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                // Mark any node that has a lodash-related type
+                if (Type.isClass(type) && type.fullyQualifiedName.includes('react-spinners')) {
+                    expect(type.supertype?.fullyQualifiedName).toBe('React.Component');
+                    return type.fullyQualifiedName;
+                } else {
+                    return null;
+                }
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=tsx
+                        tsx(
+                            `
+                                import {ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return <ClipLoader color="#36d7b7"/>;
+                                };
+                            `,
+                            `
+                                import {/*~~(react-spinners.ClipLoader)~~>*/ClipLoader} from 'react-spinners';
+
+                                const App = () => {
+                                    return </*~~(react-spinners.ClipLoader)~~>*/ClipLoader color="#36d7b7"/>;
+                                };
+                            `
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "react": "^16.8.0",
+                                  "react-spinners": "^0.5.0"
+                                },
+                                "devDependencies": {
+                                  "@types/react": "^16.8.0"
                                 }
                               }
                             `
@@ -412,16 +466,16 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map array types', async () => {
+        test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals
+                // Mark array literals - arrays are now treated as class types
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        // Arrays should now be mapped as lib.Array class type
+                        if (type.fullyQualifiedName === 'lib.Array') {
+                            return 'lib.Array';
+                        }
                     }
                     return null;
                 }
@@ -436,8 +490,8 @@ describe('JavaScript type mapping', () => {
                         let strings: Array<string> = ["a", "b"];
                     `,
                     `
-                        let numbers: number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        let strings: Array<string> = /*~~(Array<String>)~~>*/["a", "b"];
+                        let numbers: number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
+                        let strings: Array<string> = /*~~(lib.Array)~~>*/["a", "b"];
                     `
                 )
             );
@@ -454,8 +508,8 @@ describe('JavaScript type mapping', () => {
                         const elemTypeName = Type.isPrimitive(type.elemType)
                             ? type.elemType.keyword || 'unknown'
                             : Type.isClass(type.elemType)
-                            ? 'union'  // Tuples often have union element types
-                            : 'unknown';
+                                ? 'union'  // Tuples often have union element types
+                                : 'unknown';
                         return `Array<${elemTypeName}>`;
                     }
                     // Debug what we get for tuples
@@ -482,16 +536,16 @@ describe('JavaScript type mapping', () => {
             );
         });
 
-        test('should map readonly array types', async () => {
+        test('should map readonly array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals assigned to readonly arrays
+                // Mark array literals assigned to readonly arrays - arrays are now class types
                 if (node?.kind === J.Kind.NewArray) {
-                    if (Type.isArray(type)) {
-                        const elemTypeName = Type.isPrimitive(type.elemType)
-                            ? type.elemType.keyword || 'unknown'
-                            : 'unknown';
-                        return `Array<${elemTypeName}>`;
+                    if (Type.isClass(type)) {
+                        // Both readonly and regular arrays should be mapped as lib.Array
+                        if (type.fullyQualifiedName === 'lib.Array') {
+                            return 'lib.Array';
+                        }
                     }
                     return null;
                 }
@@ -507,9 +561,9 @@ describe('JavaScript type mapping', () => {
                         const frozenArray = Object.freeze([1, 2, 3]);
                     `,
                     `
-                        const readonlyNumbers: readonly number[] = /*~~(Array<double>)~~>*/[1, 2, 3];
-                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array<String>)~~>*/["a", "b"];
-                        const frozenArray = Object.freeze(/*~~(Array<double>)~~>*/[1, 2, 3]);
+                        const readonlyNumbers: readonly number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(lib.Array)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(lib.Array)~~>*/[1, 2, 3]);
                     `
                 )
             );
@@ -532,7 +586,7 @@ describe('JavaScript type mapping', () => {
                     const methodType = type as Type.Method;
                     if (methodType.name === 'add') {
                         const params = methodType.parameterNames.join(', ');
-                        const returnTypeName = Type.isPrimitive(methodType.returnType) 
+                        const returnTypeName = Type.isPrimitive(methodType.returnType)
                             ? methodType.returnType.keyword || 'unknown'
                             : 'unknown';
                         return `(${params}) => ${returnTypeName}`;
@@ -550,7 +604,8 @@ describe('JavaScript type mapping', () => {
                         }
                     `,
                     `
-                        /*~~((a, b) => double)~~>*/function add(a: number, b: number): number {
+                        /*~~((a, b) => double)~~>*/
+                        function add(a: number, b: number): number {
                             return a + b;
                         }
                     `
@@ -561,7 +616,7 @@ describe('JavaScript type mapping', () => {
         test.skip('should map arrow function types', async () => {
             // TODO: Arrow functions need special handling - methodType might not be attached to Lambda
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark arrow functions with their method type
                 if (node?.kind === J.Kind.Lambda) {
                     const lambda = node as J.Lambda;
@@ -594,7 +649,7 @@ describe('JavaScript type mapping', () => {
 
         test('should map method invocation types', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
+            spec.recipe = markTypes((node, _type) => {
                 // Mark method invocations with their method type
                 if (node?.kind === J.Kind.MethodInvocation) {
                     const invocation = node as J.MethodInvocation;
@@ -647,35 +702,6 @@ describe('JavaScript type mapping', () => {
                         function /*~~(<T>(T) => T)~~>*/identity<T>(value: T): T {
                             return value;
                         }
-                    `
-                )
-            );
-        });
-
-        test.skip('should map JSX element types', async () => {
-            // TODO: Implement in Phase 7
-            const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) => {
-                // Mark JSX elements with their component type
-                if (node?.kind === J.Kind.NewClass && type) {
-                    // JSX elements are typically mapped as NewClass in the J model
-                    return Type.isClass(type) ? type.fullyQualifiedName : null;
-                }
-                return null;
-            });
-
-            await spec.rewriteRun(
-                //language=tsx
-                tsx(
-                    `
-                        import React from 'react';
-
-                        const element = <div className="test">Hello</div>;
-                    `,
-                    `
-                        import React from 'react';
-
-                        const element = /*~~(JSX.IntrinsicElements.div)~~>*/<div className="test">Hello</div>;
                     `
                 )
             );

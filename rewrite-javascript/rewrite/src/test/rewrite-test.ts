@@ -212,7 +212,7 @@ export class RecipeSpec {
 }
 
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
-    protected override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
         const ret = super.visitSpace(space, p);
         expect(space.whitespace).toMatch(/^\s*$/);
         return ret;
