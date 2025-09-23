@@ -31,8 +31,15 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -97,7 +104,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                             statement = statement.withPrefix(statement.getPrefix().withWhitespace(statementComments.get(startIndex - 1).getSuffix()).withComments(statementComments.subList(startIndex, statementComments.size())));
                         }
                     } else {
-                        statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(Collections.emptyList()));
+                        statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(emptyList()));
                     }
                 }
                 comments = new LinkedList<>();
@@ -294,7 +301,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
             if (object instanceof J.MethodInvocation) {
                 J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
 
-                if (!methodInvocation.getSimpleName().equals("dependencies")) {
+                if (!"dependencies".equals(methodInvocation.getSimpleName())) {
                     return null;
                 }
 
@@ -316,7 +323,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                                 }
                             }
                             return Stream.empty();
-                        }).collect(Collectors.toList());
+                        }).collect(toList());
 
                 return new GradleDependencies(cursor, statements);
             }
