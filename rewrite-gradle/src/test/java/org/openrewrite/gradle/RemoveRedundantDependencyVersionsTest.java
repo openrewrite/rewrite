@@ -742,7 +742,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
           buildGradle(
             """
-            group = 'io.moderne'
+            group = 'org.openrewrite'
             
             buildscript {
                 ext {
@@ -835,7 +835,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
             }
             """,
             """
-            group = 'io.moderne'
+            group = 'org.openrewrite'
             
             buildscript {
                 ext {
