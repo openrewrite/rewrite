@@ -457,19 +457,23 @@ public class GroovyParserVisitor {
                 Space prefixNewClass = whitespace();
                 skip("(");
                 RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
-                List<JRightPadded<Expression>> list = new ArrayList<>();
-                for (org.codehaus.groovy.ast.expr.Expression expression : ((ListExpression) field.getInitialExpression()).getExpressions()) {
-                    list.add(new JRightPadded<>(visitor.visit(expression), whitespace(), Markers.EMPTY));
-                    skip(",");
-                }
+                ListExpression arguments = (ListExpression) field.getInitialExpression();
+                List<JRightPadded<Expression>> list = visitor.convertAll(arguments.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
+                    if (n == arguments.getExpression(arguments.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
+                        cursor++;
+                        return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
+                    }
+                    return Markers.EMPTY;
+                });
                 skip(")");
 
-
-                JContainer<Expression> args = JContainer.build(list);
-
-                // FIXME
-                MethodNode ctor = field.getOwner().getDeclaredConstructors().get(0);
-                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, args, null, typeMapping.methodType(ctor));
+                MethodNode ctor = null;
+                for (ConstructorNode constructor : field.getOwner().getDeclaredConstructors()) {
+                    if (constructor.getParameters().length == arguments.getExpressions().size()) {
+                        ctor = constructor;
+                    }
+                }
+                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, JContainer.build(list), null, typeMapping.methodType(ctor));
             }
 
             return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);

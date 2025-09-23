@@ -199,7 +199,7 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
-                  ONE(1, "A"),
+                  ONE(1, "A", ),
                   TWO(2, "B", ")"),
                   THREE(3, $/C/$, 1);
 
