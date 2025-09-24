@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import io.github.classgraph.ClassGraph;
+import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -29,12 +30,14 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -156,67 +159,7 @@ public interface JavaParser extends Parser {
      * Builds a Java parser with a language level equal to that of the JDK running this JVM process.
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
-        String[] versionParts = System.getProperty("java.version").split("[.-]");
-        int version = Integer.parseInt(versionParts[0]);
-        if (version == 1) {
-            version = 8;
-        }
-
-        if (version > 21) {
-            try {
-                return (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java25Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } catch (Throwable e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        if (version > 17) {
-            try {
-                return (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java21Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } catch (Throwable e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        if (version > 11) {
-            try {
-                return (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java17Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } catch (Throwable e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        if (version > 8) {
-            try {
-                return (JavaParser.Builder<? extends JavaParser, ?>) Class
-                        .forName("org.openrewrite.java.Java11Parser")
-                        .getDeclaredMethod("builder")
-                        .invoke(null);
-            } catch (Throwable e) {
-                //Fall through, look for a parser on an older version.
-            }
-        }
-
-        try {
-            return (JavaParser.Builder<? extends JavaParser, ?>) Class
-                    .forName("org.openrewrite.java.Java8Parser")
-                    .getDeclaredMethod("builder")
-                    .invoke(null);
-        } catch (Throwable e) {
-            //Fall through to an exception without making this the "cause".
-        }
-
-        throw new IllegalStateException("Unable to create a Java parser instance. " +
-                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, or `rewrite-java-25` must be on the classpath.");
+        return JdkParserBuilderCache.getBuilder();
     }
 
     @Override
@@ -428,22 +371,100 @@ public interface JavaParser extends Parser {
     }
 }
 
+@UtilityClass
 class RuntimeClasspathCache {
-    private RuntimeClasspathCache() {
-    }
-
     @Nullable
-    private static List<Path> runtimeClasspath = null;
+    private static volatile List<Path> runtimeClasspath = null;
 
     static List<Path> getRuntimeClasspath() {
-        if (runtimeClasspath == null) {
-            runtimeClasspath = new ClassGraph()
-                    .disableNestedJarScanning()
-                    .getClasspathURIs().stream()
-                    .filter(uri -> "file".equals(uri.getScheme()))
-                    .map(Paths::get)
-                    .collect(toList());
+        List<Path> paths = runtimeClasspath;
+        if (paths == null) {
+            synchronized (RuntimeClasspathCache.class) {
+                paths = runtimeClasspath;
+                if (paths == null) {
+                    runtimeClasspath = paths = new ClassGraph()
+                            .disableNestedJarScanning()
+                            .getClasspathURIs().stream()
+                            .filter(uri -> "file".equals(uri.getScheme()))
+                            .map(Paths::get)
+                            .collect(toList());
+                }
+            }
         }
-        return runtimeClasspath;
+        return paths;
+    }
+}
+
+@UtilityClass
+class JdkParserBuilderCache {
+    // Cached supplier for the parser builder - initialized on first access
+    private static volatile @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> cachedBuilderSupplier = null;
+
+    static JavaParser.Builder<? extends JavaParser, ?> getBuilder() {
+        Supplier<JavaParser.Builder<? extends JavaParser, ?>> supplier = cachedBuilderSupplier;
+        if (supplier != null) {
+            return supplier.get();
+        }
+
+        synchronized (JdkParserBuilderCache.class) {
+            // Double-check after acquiring lock
+            supplier = cachedBuilderSupplier;
+            if (supplier != null) {
+                return supplier.get();
+            }
+
+            // Determine Java version once
+            String[] versionParts = System.getProperty("java.version").split("[.-]");
+            int version = Integer.parseInt(versionParts[0]);
+            if (version == 1) {
+                version = 8;
+            }
+
+            // Try to find and cache appropriate parser
+            if (version > 21) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
+            }
+
+            if (version > 17 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java21Parser");
+            }
+
+            if (version > 11 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java17Parser");
+            }
+
+            if (version > 8 && supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java11Parser");
+            }
+
+            if (supplier == null) {
+                supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java8Parser");
+            }
+
+            if (supplier != null) {
+                cachedBuilderSupplier = supplier;
+                return supplier.get();
+            }
+
+            throw new IllegalStateException("Unable to create a Java parser instance. " +
+                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, `rewrite-java-21`, or `rewrite-java-25` must be on the classpath.");
+        }
+    }
+
+    private static @Nullable Supplier<JavaParser.Builder<? extends JavaParser, ?>> tryCreateBuilderSupplier(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            Method builderMethod = clazz.getDeclaredMethod("builder");
+            return () -> {
+                try {
+                    //noinspection rawtypes,unchecked
+                    return (JavaParser.Builder) builderMethod.invoke(null);
+                } catch (Throwable e) {
+                    throw new RuntimeException("Failed to invoke builder() on " + className, e);
+                }
+            };
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
+            return null; // This parser version isn't available
+        }
     }
 }
