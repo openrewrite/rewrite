@@ -17,6 +17,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -244,6 +245,29 @@ class RealWorldGroovyTest implements RewriteTest {
                               }
                           }
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6067")
+    @Test
+    void spockTestParsingIssue() {
+        // Test the specific Groovy parser issue with method names containing spaces
+        // and labels like "expect:" that was causing ArrayIndexOutOfBoundsException
+        rewriteRun(
+          spec -> spec.parser(GroovyParser.builder().classpath("spock-core")),
+          groovy(
+            """
+              import spock.lang.Specification
+
+              class GroovyTest extends Specification {
+
+                  def "formatting test"() {
+                      expect:
+                      1 == 2
                   }
               }
               """
