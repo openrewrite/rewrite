@@ -148,7 +148,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             return deserializePom(cache.get(serialize(gav.toString().getBytes(StandardCharsets.UTF_8))));
         } catch (RocksDBException e) {
             throw new MavenDownloadingException("Failed to deserialize POM from RocksDB cache", e,
-                    new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
+                    GroupArtifactVersion.of(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
         }
     }
 

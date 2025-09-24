@@ -85,7 +85,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
 
                         try {
                             String newVersion = new DependencyVersionSelector(metadataFailures, null, maybeGs.get())
-                                    .select(new GroupArtifact("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
+                                    .select(GroupArtifact.of("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
                             if (newVersion == null) {
                                 // The develocity plugin was first published as of 3.17
                                 return cu;

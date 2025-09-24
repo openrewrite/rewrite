@@ -3960,11 +3960,11 @@ class MavenParserTest implements RewriteTest {
                     .map(ResolvedGroupArtifactVersion::asGroupArtifactVersion)
                     .as("At one point this test failed with no version number found for jakarta.xml.bind-api because ResolvedPom was not considering classifiers as significant for dependency management")
                     .containsExactlyInAnyOrder(
-                      new GroupArtifactVersion("org.glassfish.jaxb", "jaxb-runtime", "2.3.9"),
-                      new GroupArtifactVersion("jakarta.xml.bind", "jakarta.xml.bind-api", "2.3.3"),
-                      new GroupArtifactVersion("org.glassfish.jaxb", "txw2", "2.3.9"),
-                      new GroupArtifactVersion("com.sun.istack", "istack-commons-runtime", "3.0.12"),
-                      new GroupArtifactVersion("com.sun.activation", "jakarta.activation", "1.2.2")
+                      GroupArtifactVersion.of("org.glassfish.jaxb", "jaxb-runtime", "2.3.9"),
+                      GroupArtifactVersion.of("jakarta.xml.bind", "jakarta.xml.bind-api", "2.3.3"),
+                      GroupArtifactVersion.of("org.glassfish.jaxb", "txw2", "2.3.9"),
+                      GroupArtifactVersion.of("com.sun.istack", "istack-commons-runtime", "3.0.12"),
+                      GroupArtifactVersion.of("com.sun.activation", "jakarta.activation", "1.2.2")
                     );
               }
             )

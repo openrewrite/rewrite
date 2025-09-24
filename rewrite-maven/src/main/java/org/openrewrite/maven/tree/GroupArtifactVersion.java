@@ -16,16 +16,22 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.Objects;
 
 @Value
-@With
 public class GroupArtifactVersion implements Serializable {
+    private static final Cache<String, GroupArtifactVersion> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
+
     @Nullable
     String groupId;
 
@@ -34,10 +40,21 @@ public class GroupArtifactVersion implements Serializable {
     @Nullable
     String version;
 
+    @InlineMe(replacement = "GroupArtifactVersion.of(groupId, artifactId, version)", imports = "org.openrewrite.maven.tree.GroupArtifactVersion")
     public GroupArtifactVersion(@Nullable String groupId, String artifactId, @Nullable String version) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
+    }
+
+    @JsonCreator
+    public static GroupArtifactVersion of(
+            @Nullable String groupId,
+            String artifactId,
+            @Nullable String version) {
+        String key = (groupId == null ? "" : groupId) + ":" + artifactId + (version == null ? "" : ":" + version);
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new GroupArtifactVersion(groupId, artifactId, version));
     }
 
     @Override
@@ -47,7 +64,7 @@ public class GroupArtifactVersion implements Serializable {
     }
 
     public GroupArtifact asGroupArtifact() {
-        return new GroupArtifact(groupId == null ? "" : groupId, artifactId);
+        return GroupArtifact.of(groupId, artifactId);
     }
 
     /**
@@ -55,13 +72,22 @@ public class GroupArtifactVersion implements Serializable {
      * Usable when repository of resolution or dated snapshot version are irrelevant.
      */
     public ResolvedGroupArtifactVersion asResolved() {
-        return new ResolvedGroupArtifactVersion(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
+        return ResolvedGroupArtifactVersion.of(null, groupId == null ? "" : groupId, artifactId, version == null ? "" : version, null);
+    }
+
+    public GroupArtifactVersion withGroupId(@Nullable String groupId) {
+        return Objects.equals(groupId, this.groupId) ? this : of(groupId, artifactId, version);
+    }
+
+    public GroupArtifactVersion withArtifactId(String artifactId) {
+        return Objects.equals(artifactId, this.artifactId) ? this : of(groupId, artifactId, version);
+    }
+
+    public GroupArtifactVersion withVersion(@Nullable String version) {
+        return Objects.equals(version, this.version) ? this : of(groupId, artifactId, version);
     }
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
-        if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
-            return this;
-        }
-        return new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version);
+        return GroupArtifactVersion.of(ga.getGroupId(), ga.getArtifactId(), version);
     }
 }

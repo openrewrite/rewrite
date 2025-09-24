@@ -244,7 +244,7 @@ public class ChangeParentPom extends Recipe {
 
                             // Retain managed versions from the old parent that are not managed in the new parent
                             MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
-                            ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
+                            ResolvedPom newParent = mpd.download(GroupArtifactVersion.of(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
                             for (ResolvedManagedDependency dep : dependenciesWithoutExplicitVersions) {
@@ -393,7 +393,7 @@ public class ChangeParentPom extends Recipe {
                             String artifactId = resolvedPom.getValue(it.getArtifactId());
                             return dep.getGroupId().equals(groupId) && dep.getArtifactId().equals(artifactId);
                         }))
-                .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
+                .map(dep -> GroupArtifactVersion.of(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(toCollection(LinkedHashSet::new));
 
         if (requestedWithoutExplicitVersion.isEmpty()) {
@@ -417,11 +417,11 @@ public class ChangeParentPom extends Recipe {
 
         // Remove from the list any that would still be managed under the new parent
         Set<GroupArtifact> newParentManagedGa = newParent.getDependencyManagement().stream()
-                .map(dep -> new GroupArtifact(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
+                .map(dep -> GroupArtifact.of(dep.getGav().getGroupId(), dep.getGav().getArtifactId()))
                 .collect(toSet());
 
         return depsWithoutExplicitVersion.stream()
-                .filter(it -> !newParentManagedGa.contains(new GroupArtifact(it.getGav().getGroupId(), it.getGav().getArtifactId())))
+                .filter(it -> !newParentManagedGa.contains(GroupArtifact.of(it.getGav().getGroupId(), it.getGav().getArtifactId())))
                 .collect(toList());
     }
 }

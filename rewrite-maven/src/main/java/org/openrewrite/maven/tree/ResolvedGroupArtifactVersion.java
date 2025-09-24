@@ -16,16 +16,22 @@
 
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.errorprone.annotations.InlineMe;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.Objects;
 
 @Value
-@With
 public class ResolvedGroupArtifactVersion implements Serializable {
+    private static final Cache<String, ResolvedGroupArtifactVersion> CACHE = Caffeine.newBuilder()
+            .maximumSize(10_000)
+            .build();
+
     @Nullable
     String repository;
 
@@ -40,23 +46,66 @@ public class ResolvedGroupArtifactVersion implements Serializable {
     @Nullable
     String datedSnapshotVersion;
 
+    @InlineMe(
+            replacement = "ResolvedGroupArtifactVersion.of(repository, groupId, artifactId, version, datedSnapshotVersion)",
+            imports = "org.openrewrite.maven.tree.ResolvedGroupArtifactVersion")
+    public ResolvedGroupArtifactVersion(@Nullable String repository, String groupId, String artifactId, String version, @Nullable String datedSnapshotVersion) {
+        this.repository = repository;
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.datedSnapshotVersion = datedSnapshotVersion;
+    }
+
+    @JsonCreator
+    public static ResolvedGroupArtifactVersion of(
+            @Nullable String repository,
+            String groupId,
+            String artifactId,
+            String version,
+            @Nullable String datedSnapshotVersion) {
+        String key = (repository == null ? "" : repository) + "::" + groupId + ":" + artifactId + ":" + version + ":" + (datedSnapshotVersion == null ? "" : datedSnapshotVersion);
+        //noinspection DataFlowIssue
+        return CACHE.get(key, s -> new ResolvedGroupArtifactVersion(repository, groupId, artifactId, version, datedSnapshotVersion));
+    }
+
     @Override
     public String toString() {
         return groupId + ":" + artifactId + ":" + (datedSnapshotVersion == null ? version : datedSnapshotVersion);
     }
 
     public GroupArtifact asGroupArtifact() {
-        return new GroupArtifact(groupId, artifactId);
+        return GroupArtifact.of(groupId, artifactId);
     }
 
     public GroupArtifactVersion asGroupArtifactVersion() {
-        return new GroupArtifactVersion(groupId, artifactId, version);
+        return GroupArtifactVersion.of(groupId, artifactId, version);
+    }
+
+    public ResolvedGroupArtifactVersion withRepository(@Nullable String repository) {
+        return Objects.equals(repository, this.repository) ? this : of(repository, groupId, artifactId, version, datedSnapshotVersion);
+    }
+
+    public ResolvedGroupArtifactVersion withGroupId(String groupId) {
+        return groupId.equals(this.groupId) ? this : of(repository, groupId, artifactId, version, datedSnapshotVersion);
+    }
+
+    public ResolvedGroupArtifactVersion withArtifactId(String artifactId) {
+        return artifactId.equals(this.artifactId) ? this : of(repository, groupId, artifactId, version, datedSnapshotVersion);
+    }
+
+    public ResolvedGroupArtifactVersion withVersion(String version) {
+        return version.equals(this.version) ? this : of(repository, groupId, artifactId, version, datedSnapshotVersion);
+    }
+
+    public ResolvedGroupArtifactVersion withDatedSnapshotVersion(@Nullable String datedSnapshotVersion) {
+        return Objects.equals(datedSnapshotVersion, this.datedSnapshotVersion) ? this : of(repository, groupId, artifactId, version, datedSnapshotVersion);
     }
 
     public ResolvedGroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
         if (Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
             return this;
         }
-        return new ResolvedGroupArtifactVersion(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);
+        return ResolvedGroupArtifactVersion.of(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);
     }
 }

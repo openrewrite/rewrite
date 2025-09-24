@@ -99,7 +99,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                 Xml.Document doc = super.visitDocument(document, ctx);
                 Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
                 ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
-                rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
+                rootGavToDependencies.computeIfAbsent(GroupArtifactVersion.of(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
                 return doc;
             }
         });
@@ -115,7 +115,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                 Collection<ResolvedDependency> manageableDependencies;
                 if (Boolean.TRUE.equals(addToRootPom)) {
                     ResolvedPom pom = getResolutionResult().getPom();
-                    GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
+                    GroupArtifactVersion gav = GroupArtifactVersion.of(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
                     manageableDependencies = rootGavToDependencies.get(gav);
                 } else {
                     manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
@@ -128,7 +128,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
                         String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
                                 rmd.getClassifier());
                         if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
-                            maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
+                            maxVersionByGroupArtifact.compute(GroupArtifact.of(rmd.getGroupId(), rmd.getArtifactId()),
                                     (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
                                             rmd : existing);
                         }

@@ -91,7 +91,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 } else {
                     try {
                         resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
+                                .select(GroupArtifact.of(groupId, artifactId), configuration, version, versionPattern, ctx);
                     } catch (MavenDownloadingException e) {
                         return (J) e.warn(tree);
                     }
@@ -106,7 +106,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 sourceFile = org.openrewrite.gradle.internal.AddDependencyVisitor.addDependency(
                         sourceFile,
                         gradleProject.getConfiguration(configuration),
-                        new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
+                        GroupArtifactVersion.of(groupId, artifactId, versionWithPattern),
                         classifier,
                         ctx
                 );

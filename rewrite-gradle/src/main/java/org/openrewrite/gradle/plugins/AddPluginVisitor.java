@@ -114,7 +114,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
 
             try {
-                version = new DependencyVersionSelector(null, maybeGp.orElse(null), maybeGs.orElse(null)).select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                version = new DependencyVersionSelector(null, maybeGp.orElse(null), maybeGs.orElse(null)).select(GroupArtifact.of(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
             } catch (MavenDownloadingException e) {
                 return e.warn(cu);
             }

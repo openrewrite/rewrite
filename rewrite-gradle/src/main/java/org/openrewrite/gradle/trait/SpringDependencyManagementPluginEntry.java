@@ -209,7 +209,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     String notation = (String) ((J.Literal) argument).getValue();
                     int versionIdx = notation == null ? -1 : notation.lastIndexOf(':');
                     if (versionIdx != -1) {
-                        dependencies.add(new GroupArtifactVersion(notation.substring(0, versionIdx), entry, notation.substring(versionIdx + 1)));
+                        dependencies.add(GroupArtifactVersion.of(notation.substring(0, versionIdx), entry, notation.substring(versionIdx + 1)));
                     }
                     return;
                 } else if (argument instanceof G.MapLiteral) {
@@ -296,7 +296,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             if (dependencyManagement.getArtifacts().stream().allMatch(artifact ->
                     depMatcher.matches(dependencyManagement.getGroup(), artifact))) {
                 for (String managedArtifact : dependencyManagement.getArtifacts()) {
-                    GroupArtifactVersion original = new GroupArtifactVersion(dependencyManagement.getGroup(), managedArtifact, dependencyManagement.getVersion());
+                    GroupArtifactVersion original = GroupArtifactVersion.of(dependencyManagement.getGroup(), managedArtifact, dependencyManagement.getVersion());
                     GroupArtifactVersion updated = original;
                     if (!StringUtils.isBlank(newGroup) && !newGroup.equals(updated.getGroupId())) {
                         updated = updated.withGroupId(newGroup);
@@ -308,7 +308,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                         String resolvedVersion;
                         try {
                             resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(GroupArtifact.of(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
@@ -434,7 +434,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                             String resolvedVersion;
                             try {
                                 resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                        .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                        .select(GroupArtifact.of(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                             } catch (MavenDownloadingException e) {
                                 return e.warn(m);
                             }
@@ -549,13 +549,13 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             String updatedVersion = version == null ? null : version.getValue();
             if (!StringUtils.isBlank(newVersion)) {
                 String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                        .select(new GroupArtifact(updatedGroupId, updatedArtifactId), configuration, newVersion, versionPattern, ctx);
+                        .select(GroupArtifact.of(updatedGroupId, updatedArtifactId), configuration, newVersion, versionPattern, ctx);
                 if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
                     updatedVersion = resolvedVersion;
                 }
             }
 
-            return new GroupArtifactVersion(updatedGroupId, updatedArtifactId, updatedVersion);
+            return GroupArtifactVersion.of(updatedGroupId, updatedArtifactId, updatedVersion);
         }
     }
 
@@ -653,7 +653,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             GavMapEntry<? extends Expression> version = entries.get(VERSION);
 
             if (group != null && (artifact != null || !StringUtils.isBlank(artifactName))) {
-                return new GroupArtifactVersion(
+                return GroupArtifactVersion.of(
                         group.getValue(),
                         !StringUtils.isBlank(artifactName) ? artifactName : requireNonNull(artifact).getValue(),
                         version == null ? null : version.getValue()

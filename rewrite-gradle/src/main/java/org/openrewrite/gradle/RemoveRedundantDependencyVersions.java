@@ -151,7 +151,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         J.Literal l = (J.Literal) m.getArguments().get(0);
                                         if (l.getType() == JavaType.Primitive.String) {
                                             Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                            gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+                                            gav = GroupArtifactVersion.of(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
                                         }
                                     } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                                         String groupId = null;
@@ -176,7 +176,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         }
 
                                         if (groupId != null && artifactId != null && version != null) {
-                                            gav = new GroupArtifactVersion(groupId, artifactId, version);
+                                            gav = GroupArtifactVersion.of(groupId, artifactId, version);
                                         }
                                     }
                                     if (gav != null) {
@@ -227,7 +227,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             requested.stream()
                                                     .sorted(VERSION_COMPARATOR.reversed())
                                                     .skip(1)
-                                                    .forEach(redundant -> toBeRemoved.add(requestedToDeclaration.get(new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), redundant))));
+                                                    .forEach(redundant -> toBeRemoved.add(requestedToDeclaration.get(GroupArtifactVersion.of(ga.getGroupId(), ga.getArtifactId(), redundant))));
                                         }
 
                                         // With the list of redundant declarations in-hand, remove them from the dependencies block
