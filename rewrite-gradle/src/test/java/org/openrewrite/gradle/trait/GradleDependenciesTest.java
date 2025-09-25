@@ -24,6 +24,8 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Trait;
 
+import java.util.Optional;
+
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
@@ -35,10 +37,16 @@ class GradleDependenciesTest implements RewriteTest {
           .recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return new GradleDependencies.Matcher().get(getCursor())
-                    .map(deps -> deps.removeDependency("javax.validation", "validation-api"))
-                    .map(Trait::getTree)
-                    .orElseGet(() -> (J.MethodInvocation) super.visitMethodInvocation(method, ctx));
+                  J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  Optional<GradleDependencies> meybeDependenciesBlock = new GradleDependencies.Matcher().get(mi, getCursor().getParent());
+
+                  if (meybeDependenciesBlock.isPresent()) {
+                      return meybeDependenciesBlock
+                        .map(deps -> deps.removeDependency("javax.validation", "validation-api"))
+                        .map(Trait::getTree)
+                        .orElse(null);
+                  }
+                  return mi;
               }
           }));
     }
@@ -142,12 +150,12 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   implementation 'javax.validation:validation-api:2.0.1.Final'
                   implementation 'javax.validation:validation-api:2.0.2.Final'
               }
-
+              
               repositories {
                   mavenCentral()
               }
@@ -156,7 +164,7 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               repositories {
                   mavenCentral()
               }
@@ -173,12 +181,12 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   // This comment should preserve the block
                   implementation 'javax.validation:validation-api:2.0.1.Final'
               }
-
+              
               repositories {
                   mavenCentral()
               }
@@ -187,11 +195,11 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   // This comment should preserve the block
               }
-
+              
               repositories {
                   mavenCentral()
               }
@@ -208,15 +216,15 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   implementation 'javax.validation:validation-api:2.0.1.Final'
-
+              
                   constraints {
                       implementation 'org.apache.commons:commons-lang3:3.17.0'
                   } // end of constraints comment
                   // after constraints comment
-
+              
                   implementation 'javax.validation:validation-api:2.0.2.Final'
               }
               """,
@@ -224,7 +232,7 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
               
                   constraints {
@@ -245,7 +253,7 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   implementation 'org.apache.commons:commons-lang3:3.17.0' // end of line comment
                   implementation /* inline block */ 'javax.validation:validation-api:2.0.2.Final'
@@ -262,7 +270,7 @@ class GradleDependenciesTest implements RewriteTest {
               plugins {
                   id 'java'
               }
-
+              
               dependencies {
                   implementation 'org.apache.commons:commons-lang3:3.17.0' // end of line comment
                   /*
@@ -291,7 +299,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'javax.validation:validation-api:2.0.1.Final'
-
+              
                   // Second kept statement
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
               }
@@ -305,7 +313,7 @@ class GradleDependenciesTest implements RewriteTest {
               }
               dependencies {
                   // First statement comment
-
+              
                   // Second kept statement
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
               }
@@ -328,10 +336,10 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Middle statement removed
                   implementation 'javax.validation:validation-api:2.0.1.Final'
-
+              
                   // Another kept statement
                   implementation 'org.apache.commons:commons-lang3:3.18.0'
               }
@@ -346,9 +354,9 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Middle statement removed
-
+              
                   // Another kept statement
                   implementation 'org.apache.commons:commons-lang3:3.18.0'
               }
@@ -371,7 +379,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment kept
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Second statement removed
                   implementation 'javax.validation:validation-api:2.0.1.Final'
               }
@@ -386,7 +394,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment kept
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Second statement removed
               }
               """
@@ -408,7 +416,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'javax.validation:validation-api:2.0.1.Final' // End of line comment
-
+              
                   // Second kept statement
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
               }
@@ -422,7 +430,7 @@ class GradleDependenciesTest implements RewriteTest {
               }
               dependencies {
                   // First statement comment
-
+              
                   // Second kept statement
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
               }
@@ -445,10 +453,10 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Middle statement removed
                   implementation 'javax.validation:validation-api:2.0.1.Final' // End of line comment
-
+              
                   // Another kept statement
                   implementation 'org.apache.commons:commons-lang3:3.18.0'
               }
@@ -463,9 +471,9 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Middle statement removed
-
+              
                   // Another kept statement
                   implementation 'org.apache.commons:commons-lang3:3.18.0'
               }
@@ -488,7 +496,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment kept
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Second statement removed
                   implementation 'javax.validation:validation-api:2.0.1.Final' // End of line comment
               }
@@ -503,7 +511,7 @@ class GradleDependenciesTest implements RewriteTest {
               dependencies {
                   // First statement comment kept
                   implementation 'org.apache.commons:commons-lang3:3.17.0'
-
+              
                   // Second statement removed
               }
               """
@@ -884,49 +892,6 @@ class GradleDependenciesTest implements RewriteTest {
                   /* 
                   Comment at new line
                    */
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void repro() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  // Nimbus JOSE JWT
-                  implementation('org.apache.commons:commons-lang3:3.17.0')
-                  implementation('javax.validation:validation-api:2.0.1.Final') // CVE-2024-29025
-              
-                  // Jakarta Servlet
-                  implementation('org.apache.commons:commons-lang3:3.17.0')
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  // Nimbus JOSE JWT
-                  implementation('org.apache.commons:commons-lang3:3.17.0')
-              
-                  // Jakarta Servlet
-                  implementation('org.apache.commons:commons-lang3:3.17.0')
               }
               """
           )

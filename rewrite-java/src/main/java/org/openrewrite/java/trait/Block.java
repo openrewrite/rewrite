@@ -41,45 +41,46 @@ public class Block implements Trait<J.Block> {
     @Getter
     private final Cursor cursor;
 
-    public @Nullable Block filterStatements(Predicate<Statement> predicate) {
+    public Block filterStatements(Predicate<Statement> predicate) {
         return mapStatements(statement -> predicate.test(statement) ? statement : null);
     }
 
-    public @Nullable Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
+    public Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
         J.Block block = getTree();
         List<Statement> statements = block.getStatements();
-        List<Statement> filteredStatements = new LinkedList<>();
+        List<Statement> newStatements = new LinkedList<>();
         LinkedList<Comment> comments = new LinkedList<>();
         String whitespace = null;
         boolean lastStatementWasKept = false;
         for (Statement statement : statements) {
-            if (statement instanceof J.Return) {
-                if (((J.Return) statement).getExpression() instanceof Statement) {
-                    statement = ((J.Return) statement).getExpression().withPrefix(statement.getPrefix());
-                } else {
-                    filteredStatements.add(statement);
-                }
+            if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement) {
+                statement = ((J.Return) statement).getExpression().withPrefix(statement.getPrefix());
             }
             Statement mappedStatement = mapper.apply(statement);
             if (mappedStatement != null) {
+                // We want to keep the element (it might have been changed though).
                 List<Comment> statementComments = mappedStatement.getComments();
                 if (!comments.isEmpty() && whitespace != null) {
-                    //A previous statement was removed, and we are joining its comment / whitespace into the current statement
+                    //A previous statement was removed, it had comments and we now need to add these comments to the current element.
                     Comment last = comments.removeLast();
-                    if (statement.getPrefix().getWhitespace().contains("\n")) {
-                        comments.addLast(last.withSuffix(statement.getPrefix().getWhitespace()));
+                    if (mappedStatement.getPrefix().getWhitespace().contains("\n")) {
+                        // We need to add the prefix of the current statement as the suffix of the last comment of the previous block.
+                        comments.addLast(last.withSuffix(mappedStatement.getPrefix().getWhitespace()));
                         comments.addAll(statementComments);
                     } else {
+                        // Add the prefix of the current statement as the suffix of the last comment which is on the same line. (multiple multiline comments could be present)
                         int j = 0;
                         while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
                             j++;
                         }
                         comments.add(last.withSuffix(statementComments.get(j).getSuffix()));
+                        // Now that we have suffixed the correct comment, we can add remaining comments of the current statement
                         if (j + 1 < statementComments.size()) {
                             comments.addAll(statementComments.subList(j + 1, statementComments.size()));
                         }
                     }
-                    statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(comments));
+                    //make sure that the previous removed element's whitespace get used and the newly calculated list of comments containing also the previous removed element's comments.
+                    statement = mappedStatement.withPrefix(mappedStatement.getPrefix().withWhitespace(whitespace).withComments(comments));
                 } else if (!lastStatementWasKept && !statement.getPrefix().getWhitespace().contains("\n") && whitespace != null) {
                     int startIndex = 0;
                     int j = 0;
@@ -99,7 +100,7 @@ public class Block implements Trait<J.Block> {
                 }
                 comments = new LinkedList<>();
                 whitespace = null;
-                filteredStatements.add(statement);
+                newStatements.add(statement);
                 lastStatementWasKept = true;
             } else {
                 List<Comment> statementComments = statement.getComments();
@@ -138,25 +139,22 @@ public class Block implements Trait<J.Block> {
             }
         }
 
-        filteredStatements = ListUtils.mapLast(filteredStatements, newLast -> {
+        newStatements = ListUtils.mapLast(newStatements, newLast -> {
             Statement currentLast = statements.get(statements.size() - 1);
-            if (currentLast instanceof J.Return) {
+            if (currentLast instanceof J.Return && !(newLast instanceof J.Return)) {
                 return ((J.Return) currentLast).withExpression(newLast.withPrefix(Space.EMPTY)).withPrefix(newLast.getPrefix());
             }
             return newLast;
         });
-        if (statements.equals(filteredStatements) && comments.isEmpty()) {
+        if (statements.equals(newStatements) && comments.isEmpty()) {
             return this;
         }
 
         if (!lastStatementWasKept) {
             block = block.withEnd(buildEnd(block.getEnd(), comments, whitespace));
         }
-        if (filteredStatements.isEmpty() && block.getEnd().getComments().isEmpty() && block.getComments().isEmpty()) {
-            return null;
-        }
-        block = block
-                .withStatements(filteredStatements);
+
+        block = block.withStatements(newStatements);
 
         return new Block(new Cursor(this.cursor.getParent(), block));
     }

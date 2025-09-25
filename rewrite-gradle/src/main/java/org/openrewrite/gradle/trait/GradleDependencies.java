@@ -66,6 +66,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                             return new Block.Matcher().get(lambda.getBody(), new Cursor(cursor, lambda))
                                     .map(block -> block.mapStatements(mapper))
                                     .map(Trait::getTree)
+                                    .filter(block -> !(block.getStatements().isEmpty() && block.getComments().isEmpty() && block.getEnd().getComments().isEmpty()))
                                     .map(lambda::withBody)
                                     .orElse(null);
                         }
@@ -74,7 +75,6 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                     return expression;
                 }
         );
-        // Return null to remove the dependencies block entirely if no arguments remain
         if (arguments.isEmpty()) {
             return null;
         }
