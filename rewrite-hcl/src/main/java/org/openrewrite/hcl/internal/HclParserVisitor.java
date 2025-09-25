@@ -650,10 +650,16 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space tuplePrefix = sourceBefore("[");
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ExpressionContext> values = ctx.expression();
-            for (int i = 0; i < values.size(); i++) {
-                HCLParser.ExpressionContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("]") : sourceBefore(",")));
+            if (values.isEmpty()) {
+                // For empty arrays, preserve the whitespace before the closing bracket using Hcl.Empty
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("]"), Markers.EMPTY)));
+            } else {
+                for (int i = 0; i < values.size(); i++) {
+                    HCLParser.ExpressionContext value = values.get(i);
+                    mappedValues.add(HclRightPadded.build((Expression) visit(value))
+                            .withAfter(i == values.size() - 1 ? sourceBefore("]") : sourceBefore(",")));
+                }
             }
 
             return new Hcl.Tuple(randomId(), Space.format(prefix), Markers.EMPTY, HclContainer
