@@ -13,14 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-export * from "./tree";
-export * from "./visitor";
-export * from "./assertions";
-export * from "./parser";
-export * from "./style";
-export * from "./markers";
-export * from "./preconditions";
-export * from "./templating";
+import {RewriteRpc} from "../rpc";
+import {Recipe} from "../recipe";
 
-import "./print";
-import "./rpc";
+export async function hasSourcePath(filePattern: string): Promise<Recipe> {
+    return RewriteRpc.get().prepareRecipe("org.openrewrite.FindSourceFiles", {filePattern})
+}
+
+export async function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<Recipe> {
+    return RewriteRpc.get().prepareRecipe("org.openrewrite.java.search.UsesMethod", {methodMatcher, matchOverrides})
+}
+
+export async function usesType(fullyQualifiedType: string): Promise<Recipe> {
+    return RewriteRpc.get().prepareRecipe("org.openrewrite.java.search.UsesType", {fullyQualifiedType})
+}
