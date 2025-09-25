@@ -20,9 +20,11 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.service.ImportService;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -91,10 +93,67 @@ public class ReplaceAnnotation extends Recipe {
             }
 
             maybeRemoveImport(TypeUtils.asFullyQualified(a.getType()));
+            // Collect and remove imports for types used in annotation arguments
+            Set<JavaType.FullyQualified> typesToRemove = new HashSet<>();
+            collectTypesFromArguments(a.getArguments(), typesToRemove);
+            for (JavaType.FullyQualified type : typesToRemove) {
+                maybeRemoveImport(type);
+            }
+
             JavaCoordinates replaceCoordinate = a.getCoordinates().replace();
             a = replacement.apply(getCursor(), replaceCoordinate);
             doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(a));
             return a;
+        }
+
+        private void collectTypesFromArguments(@Nullable List<Expression> arguments, Set<JavaType.FullyQualified> types) {
+            if (arguments == null) {
+                return;
+            }
+
+            for (Expression arg : arguments) {
+                collectTypesFromExpression(arg, types);
+            }
+        }
+
+        private void collectTypesFromExpression(Expression expr, Set<JavaType.FullyQualified> types) {
+            if (expr instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) expr;
+                // Check if this is a class literal (e.g., String.class)
+                if ("class".equals(fieldAccess.getSimpleName())) {
+                    Expression target = fieldAccess.getTarget();
+                    JavaType targetType = target.getType();
+                    if (targetType instanceof JavaType.FullyQualified) {
+                        types.add((JavaType.FullyQualified) targetType);
+                    }
+                }
+                // Recursively check the target for nested field accesses
+                collectTypesFromExpression(fieldAccess.getTarget(), types);
+            } else if (expr instanceof J.NewArray) {
+                // Handle array initializers like {String.class, List.class}
+                J.NewArray newArray = (J.NewArray) expr;
+                if (newArray.getInitializer() != null) {
+                    for (Expression element : newArray.getInitializer()) {
+                        collectTypesFromExpression(element, types);
+                    }
+                }
+            } else if (expr instanceof J.Assignment) {
+                // Handle named arguments like value = String.class
+                J.Assignment assignment = (J.Assignment) expr;
+                collectTypesFromExpression(assignment.getAssignment(), types);
+            } else if (expr instanceof J.Identifier) {
+                // Handle simple identifiers that might be class references
+                J.Identifier identifier = (J.Identifier) expr;
+                JavaType type = identifier.getType();
+                if (type instanceof JavaType.Class) {
+                    JavaType.Class classType = (JavaType.Class) type;
+                    // Check if this is a reference to a Class type (e.g., in "String.class")
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(classType);
+                    if (fq != null && !fq.getFullyQualifiedName().startsWith("java.lang.Class")) {
+                        types.add(fq);
+                    }
+                }
+            }
         }
     }
 }
