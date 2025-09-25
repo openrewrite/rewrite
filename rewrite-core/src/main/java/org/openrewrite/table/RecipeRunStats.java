@@ -144,7 +144,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
 
     private static class PhaseTimer {
         private static final long ONE_MICROSECOND = 1_000;
-        private static final long TWENTY_MINUTES = Duration.ofMinutes(20).toNanos();
+        private static final long TEN_MINUTES = Duration.ofMinutes(10).toNanos();
 
         final Histogram histogram;
 
@@ -156,7 +156,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         private long maxNs = 0;
 
         PhaseTimer() {
-            histogram = new Histogram(ONE_MICROSECOND, TWENTY_MINUTES, 1);
+            histogram = new Histogram(ONE_MICROSECOND, TEN_MINUTES, 1);
             histogram.setAutoResize(true);
         }
 
