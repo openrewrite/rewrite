@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -59,19 +60,20 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        Timer.builder("rewrite.recipe.scan")
-                .tag("name", recipe.getName())
-                .publishPercentiles(0.99)
-                .register(registry)
-                .recordCallable(scan);
+        newTimer("rewrite.recipe.scan", recipe.getName()).recordCallable(scan);
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
-        return Timer.builder("rewrite.recipe.edit")
-                .tag("name", recipe.getName())
+        return newTimer("rewrite.recipe.edit", recipe.getName()).recordCallable(edit);
+    }
+
+    private Timer newTimer(String name, String recipeName) {
+        return Timer.builder(name)
+                .tag("name", recipeName)
                 .publishPercentiles(0.99)
-                .register(registry)
-                .recordCallable(edit);
+                .distributionStatisticExpiry(Duration.ofDays(1))
+                .distributionStatisticBufferLength(1)
+                .register(registry);
     }
 
     public void flush(ExecutionContext ctx) {
