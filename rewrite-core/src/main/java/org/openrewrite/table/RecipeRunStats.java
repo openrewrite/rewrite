@@ -17,12 +17,10 @@ package org.openrewrite.table;
 
 import lombok.Getter;
 import lombok.Value;
-import org.HdrHistogram.Histogram;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,10 +68,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     sourceFileVisited.size(),
                     sourceFileChanged.size(),
                     timers.scan.getTotalNs(),
-                    timers.scan.getP99Ns(),
                     timers.scan.getMaxNs(),
                     timers.edit.getTotalNs(),
-                    timers.edit.getP99Ns(),
                     timers.edit.getMaxNs()
             );
             addRowToDataTable(ctx, row);
@@ -108,10 +104,6 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The total time spent across the scanning phase of this recipe.")
         Long scanTotalTimeNs;
 
-        @Column(displayName = "99th percentile scanning time (ns)",
-                description = "99 out of 100 scans completed in this amount of time.")
-        Double scanP99Ns;
-
         @Column(displayName = "Max scanning time (ns)",
                 description = "The max time scanning any one source file.")
         Long scanMaxNs;
@@ -119,10 +111,6 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         @Column(displayName = "Cumulative edit time (ns)",
                 description = "The total time spent across the editing phase of this recipe.")
         Long editTotalTimeNs;
-
-        @Column(displayName = "99th percentile edit time (ns)",
-                description = "99 out of 100 edits completed in this amount of time.")
-        Double editP99Ns;
 
         @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
@@ -142,23 +130,10 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         }
     }
 
+    @Getter
     private static class PhaseTimer {
-        private static final long ONE_MICROSECOND = 1_000;
-        private static final long TEN_MINUTES = Duration.ofMinutes(10).toNanos();
-
-        final Histogram histogram;
-
-        // Track actual values to avoid HdrHistogram quantization loss
-        @Getter
         private long totalNs = 0;
-
-        @Getter
         private long maxNs = 0;
-
-        PhaseTimer() {
-            histogram = new Histogram(ONE_MICROSECOND, TEN_MINUTES, 1);
-            histogram.setAutoResize(true);
-        }
 
         <T> T recordTimed(Callable<T> callable) throws Exception {
             long startNs = System.nanoTime();
@@ -171,13 +146,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         }
 
         private void record(long elapsedNs) {
-            histogram.recordValue(elapsedNs);
             totalNs += elapsedNs;
             maxNs = Math.max(maxNs, elapsedNs);
-        }
-
-        double getP99Ns() {
-            return histogram.getTotalCount() > 0 ? (double) histogram.getValueAtPercentile(99.0) : 0.0;
         }
     }
 }
