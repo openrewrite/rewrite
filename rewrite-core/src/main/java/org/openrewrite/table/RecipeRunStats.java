@@ -53,11 +53,11 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).scan.recordTimed(scan);
+        recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordScan(scan);
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
-        return recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).edit.recordTimed(edit);
+        return recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordEdit(edit);
     }
 
     public void flush(ExecutionContext ctx) {
@@ -132,6 +132,14 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     private static class RecipeTimers {
         final PhaseTimer scan = new PhaseTimer();
         final PhaseTimer edit = new PhaseTimer();
+
+        void recordScan(Callable<SourceFile> scanCallable) throws Exception {
+            scan.recordTimed(scanCallable);
+        }
+
+        @Nullable SourceFile recordEdit(Callable<SourceFile> editCallable) throws Exception {
+            return edit.recordTimed(editCallable);
+        }
     }
 
     private static class PhaseTimer {
