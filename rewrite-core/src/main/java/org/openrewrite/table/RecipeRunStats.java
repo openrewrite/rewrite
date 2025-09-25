@@ -125,7 +125,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
             scan.recordTimed(scanCallable);
         }
 
-        @Nullable SourceFile recordEdit(Callable<SourceFile> editCallable) throws Exception {
+        @Nullable
+        SourceFile recordEdit(Callable<SourceFile> editCallable) throws Exception {
             return edit.recordTimed(editCallable);
         }
     }
