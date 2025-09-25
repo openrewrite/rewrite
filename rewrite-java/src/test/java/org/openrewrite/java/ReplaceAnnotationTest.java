@@ -27,7 +27,7 @@ class ReplaceAnnotationTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void matchWithPrams() {
+    void matchWithParams() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
           java(
