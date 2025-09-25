@@ -1531,20 +1531,35 @@ public interface Hcl extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class TemplateInterpolation implements Hcl, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
         @With
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
-        Expression expression;
+        HclRightPadded<Expression> expression;
+
+        public Expression getExpression() {
+            return expression.getElement();
+        }
+
+        public TemplateInterpolation withExpression(Expression expression) {
+            return getPadding().withExpression(this.expression.withElement(expression));
+        }
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
@@ -1554,6 +1569,34 @@ public interface Hcl extends Tree {
         @Override
         public String toString() {
             return "TemplateInterpolation";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TemplateInterpolation t;
+
+            public HclRightPadded<Expression> getExpression() {
+                return t.expression;
+            }
+
+            public TemplateInterpolation withExpression(HclRightPadded<Expression> expression) {
+                return t.expression == expression ? t : new TemplateInterpolation(t.padding, t.id, t.prefix, t.markers, expression);
+            }
         }
     }
 
