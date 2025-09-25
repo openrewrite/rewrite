@@ -47,10 +47,13 @@ class HclQuotedTemplateTest implements RewriteTest {
     @Test
     void spaceInBraces() {
         rewriteRun(
-          hcl("""
-            foo {
-              default = "${ var.resource_group_name }"
-            }
-          """));
+          hcl(
+            """
+                foo {
+                  default = "${ var.resource_group_name }"
+                }
+              """
+          )
+        );
     }
 }

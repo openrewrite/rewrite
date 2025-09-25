@@ -336,8 +336,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             t = (Hcl.TemplateInterpolation) temp;
         }
-        t = t.getPadding().withExpression(visitRightPadded(t.getPadding().getExpression(), HclRightPadded.Location.TEMPLATE_INTERPOLATION, p));
-        return t;
+        return t.getPadding().withExpression(visitRightPadded(t.getPadding().getExpression(), HclRightPadded.Location.TEMPLATE_INTERPOLATION, p));
     }
 
     public Hcl visitTuple(Hcl.Tuple tuple, P p) {
