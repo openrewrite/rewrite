@@ -737,6 +737,77 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void supportSpringBootDependenciesPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id("org.springframework.boot") version "3.5.6"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot')
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+                  implementation("org.openrewrite:rewrite-core:8.62.0")
+                  implementation("javax.validation:validation-api:2.0.0.Final")
+                  implementation("org.openrewrite.recipe:rewrite-quarkus:2.25.1")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency("javax.validation:validation-api:2.0.1.Final")
+                      dependencySet('org.openrewrite:8.62.2') {
+                          entry 'rewrite-core'
+                      }
+                  }
+                  imports {
+                      mavenBom "org.openrewrite.recipe:rewrite-recipe-bom:3.14.1"
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id("org.springframework.boot") version "3.5.6"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot')
+                  implementation("org.apache.commons:commons-lang3")
+                  implementation("org.openrewrite:rewrite-core")
+                  implementation("javax.validation:validation-api")
+                  implementation("org.openrewrite.recipe:rewrite-quarkus")
+              }
+              
+              dependencyManagement {
+                  dependencies {
+                      dependency("javax.validation:validation-api:2.0.1.Final")
+                      dependencySet('org.openrewrite:8.62.2') {
+                          entry 'rewrite-core'
+                      }
+                  }
+                  imports {
+                      mavenBom "org.openrewrite.recipe:rewrite-recipe-bom:3.14.1"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void complexExample() {
         rewriteRun(
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
@@ -884,14 +955,14 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
             
                 // Misc
                 implementation('org.owasp.encoder:encoder:1.3.1')
-                implementation('org.codehaus.janino:janino:3.1.12')
+                implementation('org.codehaus.janino:janino')
                 implementation('commons-validator:commons-validator:1.9.0')
                 implementation('commons-beanutils:commons-beanutils:1.11.0') //CVE-2025-48734
-                implementation('org.apache.commons:commons-lang3:3.17.0')
-                implementation('io.micrometer:context-propagation:1.1.3')
+                implementation('org.apache.commons:commons-lang3')
+                implementation('io.micrometer:context-propagation')
             
                 // Lombok
-                implementation('org.projectlombok:lombok:1.18.38')
+                implementation('org.projectlombok:lombok')
                 compileOnly('org.projectlombok:lombok')
                 annotationProcessor('org.projectlombok:lombok')
             
@@ -901,7 +972,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 // Test dependencies
                 testImplementation('org.springframework.boot:spring-boot-starter-test')
                 testImplementation('org.wiremock:wiremock-standalone:3.13.0')
-                testImplementation('io.projectreactor:reactor-test:3.7.6')
+                testImplementation('io.projectreactor:reactor-test')
                 testImplementation('org.springframework.boot:spring-boot-starter-web')
             }
             """

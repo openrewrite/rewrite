@@ -31,19 +31,16 @@ import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 class GradleDependenciesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        String removeGroup = "javax.validation";
-        String oldArtifactId = "validation-api";
-        GradleDependencies.Matcher matcher = new GradleDependencies.Matcher();
         spec
           .beforeRecipe(withToolingApi())
           .recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = method;
-                  Optional<GradleDependencies> dependencies = matcher.get(getCursor());
+                  Optional<GradleDependencies> dependencies = new GradleDependencies.Matcher().get(getCursor());
                   if (dependencies.isPresent()) {
                       mi = dependencies.map(gradleDependencies -> {
-                          GradleDependencies filtered = gradleDependencies.withStatements(statement -> new GradleDependency.Matcher().artifactId(oldArtifactId).groupId(removeGroup).get(statement, getCursor()).isEmpty());
+                          GradleDependencies filtered = gradleDependencies.removeDependency("javax.validation", "validation-api");
                           if (filtered == null) {
                               return null;
                           }
@@ -230,6 +227,7 @@ class GradleDependenciesTest implements RewriteTest {
                   constraints {
                       implementation 'org.apache.commons:commons-lang3:3.17.0'
                   } // end of constraints comment
+                  // after constraints comment
 
                   implementation 'javax.validation:validation-api:2.0.2.Final'
               }
@@ -244,6 +242,7 @@ class GradleDependenciesTest implements RewriteTest {
                   constraints {
                       implementation 'org.apache.commons:commons-lang3:3.17.0'
                   } // end of constraints comment
+                  // after constraints comment
               }
               """
           )

@@ -23,9 +23,11 @@ import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleDependencyConstraint;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -88,7 +90,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove explicitly-specified dependencies and dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
+        return "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`, `enforcedPlatform` " +
+               "or the `io.spring.dependency-management` plugin. Also removes redundant " +
+               "direct dependencies and dependency constraints that are already satisfied by transitive dependencies.";
     }
 
     private static final List<String> DEPENDENCY_MANAGEMENT_METHODS = Arrays.asList(
@@ -119,6 +123,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     GradleProject gp;
                     final Map<String, List<ResolvedPom>> platforms = new HashMap<>();
                     final Map<String, List<ResolvedDependency>> directDependencies = new HashMap<>();
+                    final Map<GroupArtifact, String> springPluginManagedDependencies = new HashMap<>();
 
 
                     @Override
@@ -130,6 +135,50 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             }
 
                             gp = maybeGp.get();
+
+                            if (gp.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                                String springBootVersion = Optional.ofNullable(getSpringBootVersionFromConfiguration("testRuntimeClasspath")).orElseGet(() ->
+                                        gp.getNameToConfiguration().keySet().stream()
+                                                .map(this::getSpringBootVersionFromConfiguration)
+                                                .filter(Objects::nonNull)
+                                                .findFirst()
+                                                .orElse(null));
+                                if (springBootVersion != null) {
+                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                    try {
+                                        ResolvedPom platformPom = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootVersion), null, null, gp.getMavenRepositories())
+                                                .resolve(emptyList(), mpd, ctx);
+                                        platformPom.getDependencyManagement().stream()
+                                                .filter(managedVersion -> managedVersion.getVersion() != null)
+                                                .forEach(managedVersion -> springPluginManagedDependencies.put(managedVersion.getGav().asGroupArtifact(), managedVersion.getVersion()));
+                                    } catch (MavenDownloadingException ignored) {
+                                    }
+                                }
+
+                                new JavaIsoVisitor<ExecutionContext>() {
+                                    @Override
+                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                        new SpringDependencyManagementPluginEntry.Matcher().get(getCursor()).ifPresent(entry -> entry.getArtifacts().forEach(artifact -> {
+                                            if ("mavenBom".equals(method.getSimpleName())) {
+                                                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                                try {
+                                                    ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(entry.getGroup(), artifact, entry.getVersion()), null, null, gp.getMavenRepositories())
+                                                            .resolve(emptyList(), mpd, ctx);
+                                                    platformPom.getDependencyManagement().stream()
+                                                            .filter(managedVersion -> managedVersion.getVersion() != null)
+                                                            .forEach(managedVersion -> springPluginManagedDependencies.put(managedVersion.getGav().asGroupArtifact(), managedVersion.getVersion()));
+                                                } catch (MavenDownloadingException ignored) {
+                                                }
+                                            } else {
+                                                springPluginManagedDependencies.put(new GroupArtifact(entry.getGroup(), artifact), entry.getVersion());
+                                            }
+                                        }));
+                                        return m;
+                                    }
+                                }.visit(tree, ctx);
+                            }
+
                             new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
                                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -218,7 +267,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             }
                                         }.visit(m.getArguments().get(0), ctx, getCursor());
 
-                                        Set<J.MethodInvocation> toBeRemoved = new HashSet<>();
                                         for (Map.Entry<GroupArtifact, List<String>> gaToRequestedVersions : gaToRequested.entrySet()) {
                                             GroupArtifact ga = gaToRequestedVersions.getKey();
                                             List<String> requested = gaToRequestedVersions.getValue();
@@ -243,7 +291,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         }
                                         return m;
                                     } else {
-                                        if (!isDependencyManagmentMethod(m.getSimpleName()) ||
+                                        if (!isDependencyManagementMethod(m.getSimpleName()) ||
                                             m.getArguments().isEmpty() ||
                                             m.getArguments().get(0).getType() != JavaType.Primitive.String) {
                                             return m;
@@ -280,7 +328,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     return r;
                                 }
 
-                                private boolean isDependencyManagmentMethod(String methodName) {
+                                private boolean isDependencyManagementMethod(String methodName) {
                                     return DEPENDENCY_MANAGEMENT_METHODS.contains(methodName);
                                 }
 
@@ -376,7 +424,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                     J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                                     return new GradleDependencies.Matcher().get(getCursor())
-                                            .map(dependencies -> dependencies.withStatements(s -> !statementsToRemove.contains(s)))
+                                            .map(dependencies -> dependencies.filterStatements(s -> !statementsToRemove.contains(s)))
                                             .map(Trait::getTree)
                                             .orElse(m);
                                 }
@@ -401,6 +449,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         ResolvedDependency dep = gradleDependency.getResolvedDependency();
                         if (StringUtils.isBlank(dep.getVersion())) {
                             return m;
+                        }
+
+                        if (springPluginManagedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
+                            if (matchesComparator(springPluginManagedDependencies.get(dep.getGav().asGroupArtifact()), dep.getVersion())) {
+                                return maybeRemoveVersion(m);
+                            }
                         }
 
                         if (platforms.containsKey(m.getSimpleName())) {
@@ -460,6 +514,23 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             }));
                         }
                         return m;
+                    }
+
+                    private @Nullable String getSpringBootVersionFromConfiguration(String configuration) {
+                        GradleDependencyConfiguration testRuntimeConfiguration = gp.getConfiguration(configuration);
+                        if (testRuntimeConfiguration != null) {
+                            for (GradleDependencyConstraint constraint : testRuntimeConfiguration.getConstraints()) {
+                                if ("org.springframework.boot".equals(constraint.getGroupId()) && constraint.getStrictVersion() != null) {
+                                    return constraint.getStrictVersion();
+                                }
+                            }
+                            for (ResolvedDependency dependency : testRuntimeConfiguration.getDirectResolved()) {
+                                if (dependency.getRequested().getVersion() == null && "org.springframework.boot".equals(dependency.getGroupId())) {
+                                    return dependency.getVersion();
+                                }
+                            }
+                        }
+                        return null;
                     }
                 }
         );

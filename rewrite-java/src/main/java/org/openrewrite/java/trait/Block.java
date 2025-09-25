@@ -1,0 +1,269 @@
+/*
+ * Copyright 2024 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java.trait;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.VisitFunction2;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
+
+import static java.util.Collections.emptyList;
+
+@RequiredArgsConstructor
+public class Block implements Trait<J.Block> {
+    @Getter
+    private final Cursor cursor;
+
+    public @Nullable Block filterStatements(Predicate<Statement> predicate) {
+        return mapStatements(statement -> predicate.test(statement) ? statement : null);
+    }
+
+    public @Nullable Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
+        J.Block block = getTree();
+        List<Statement> statements = block.getStatements();
+        List<Statement> filteredStatements = new LinkedList<>();
+        LinkedList<Comment> comments = new LinkedList<>();
+        String whitespace = null;
+        boolean lastStatementWasKept = false;
+        for (Statement statement : statements) {
+            if (statement instanceof J.Return) {
+                if (((J.Return) statement).getExpression() instanceof Statement) {
+                    statement = ((J.Return) statement).getExpression().withPrefix(statement.getPrefix());
+                } else {
+                    filteredStatements.add(statement);
+                }
+            }
+            Statement mappedStatement = mapper.apply(statement);
+            if (mappedStatement != null) {
+                List<Comment> statementComments = mappedStatement.getComments();
+                if (!comments.isEmpty() && whitespace != null) {
+                    //A previous statement was removed, and we are joining its comment / whitespace into the current statement
+                    Comment last = comments.removeLast();
+                    if (statement.getPrefix().getWhitespace().contains("\n")) {
+                        comments.addLast(last.withSuffix(statement.getPrefix().getWhitespace()));
+                        comments.addAll(statementComments);
+                    } else {
+                        int j = 0;
+                        while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
+                            j++;
+                        }
+                        comments.add(last.withSuffix(statementComments.get(j).getSuffix()));
+                        if (j + 1 < statementComments.size()) {
+                            comments.addAll(statementComments.subList(j + 1, statementComments.size()));
+                        }
+                    }
+                    statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(comments));
+                } else if (!lastStatementWasKept && !statement.getPrefix().getWhitespace().contains("\n") && whitespace != null) {
+                    int startIndex = 0;
+                    int j = 0;
+                    while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
+                        j++;
+                    }
+                    if (j + 1 <= statementComments.size()) {
+                        startIndex = j + 1;
+                    }
+                    if (startIndex < statementComments.size()) {
+                        if (startIndex > 0) {
+                            statement = statement.withPrefix(statement.getPrefix().withWhitespace(statementComments.get(startIndex - 1).getSuffix()).withComments(statementComments.subList(startIndex, statementComments.size())));
+                        }
+                    } else {
+                        statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(emptyList()));
+                    }
+                }
+                comments = new LinkedList<>();
+                whitespace = null;
+                filteredStatements.add(statement);
+                lastStatementWasKept = true;
+            } else {
+                List<Comment> statementComments = statement.getComments();
+                if (!comments.isEmpty() && whitespace != null) {
+                    int startIndex = 0;
+                    int endIndex = findIndexOfLastCommentOnNewLine(statementComments) + 1;
+                    if (!statement.getPrefix().getWhitespace().contains("\n")) {
+                        int j = 0;
+                        while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
+                            j++;
+                        }
+                        Comment last = comments.removeLast();
+                        comments.add(last.withSuffix(statementComments.get(j).getSuffix()));
+                        if (j + 1 <= statementComments.size()) {
+                            startIndex = j + 1;
+                        }
+                    }
+                    if (startIndex < endIndex) {
+                        comments.addAll(statementComments.subList(startIndex, endIndex));
+                    }
+                } else {
+                    if (lastStatementWasKept) {
+                        comments.addAll(statementComments.subList(0, findIndexOfLastCommentOnNewLine(statementComments) + 1));
+                        whitespace = statement.getPrefix().getWhitespace();
+                    } else {
+                        int startIndex = findIndexOfFirstCommentOnNewLine(statementComments, statement.getPrefix());
+                        comments.addAll(statementComments.subList(startIndex, findIndexOfLastCommentOnNewLine(statementComments) + 1));
+                        if (startIndex == 0) {
+                            whitespace = statement.getPrefix().getWhitespace();
+                        } else {
+                            whitespace = statementComments.get(startIndex - 1).getSuffix();
+                        }
+                    }
+                }
+                lastStatementWasKept = false;
+            }
+        }
+
+        filteredStatements = ListUtils.mapLast(filteredStatements, newLast -> {
+            Statement currentLast = statements.get(statements.size() - 1);
+            if (currentLast instanceof J.Return) {
+                return ((J.Return) currentLast).withExpression(newLast.withPrefix(Space.EMPTY)).withPrefix(newLast.getPrefix());
+            }
+            return newLast;
+        });
+        if (statements.equals(filteredStatements) && comments.isEmpty()) {
+            return this;
+        }
+
+        if (!lastStatementWasKept) {
+            block = block.withEnd(buildEnd(block.getEnd(), comments, whitespace));
+        }
+        if (filteredStatements.isEmpty() && block.getEnd().getComments().isEmpty() && block.getComments().isEmpty()) {
+            return null;
+        }
+        block = block
+                .withStatements(filteredStatements);
+
+        return new Block(new Cursor(this.cursor.getParent(), block));
+    }
+
+    private Space buildEnd(Space end, List<Comment> comments, @Nullable String endWhitespace) {
+        List<Comment> newComments = new ArrayList<>();
+        boolean eolComments = endWhitespace == null || !endWhitespace.contains("\n");
+        String endBlockWhitespace = null;
+        if (!comments.isEmpty()) {
+            for (Comment comment : comments) {
+                if (comment instanceof TextComment) {
+                    if (comment.getSuffix().contains("\n")) {
+                        eolComments = false;
+                    }
+                    newComments.add(comment);
+                    if (endBlockWhitespace == null) {
+                        endBlockWhitespace = endWhitespace;
+                    }
+                }
+            }
+        }
+
+        List<Comment> existingEndComments = new ArrayList<>();
+        eolComments = !end.getWhitespace().contains("\n");
+        String whitespace = null;
+        if (!eolComments) {
+            whitespace = end.getWhitespace();
+        }
+        if (!end.getComments().isEmpty()) {
+            for (Comment comment : end.getComments()) {
+                if (comment instanceof TextComment) {
+                    if (!eolComments) {
+                        existingEndComments.add(comment);
+                    } else if (comment.getSuffix().contains("\n")) {
+                        eolComments = false;
+                    }
+                    if (whitespace == null) {
+                        whitespace = comment.getSuffix();
+                    }
+                }
+            }
+        }
+        if (!newComments.isEmpty()) {
+            newComments.set(newComments.size() - 1, newComments.get(newComments.size() - 1).withSuffix(whitespace == null ? "" : whitespace));
+        } else {
+            endBlockWhitespace = whitespace;
+        }
+
+        newComments.addAll(existingEndComments);
+
+        return end.withWhitespace(endBlockWhitespace == null ? end.getWhitespace() : endBlockWhitespace).withComments(newComments);
+    }
+
+    private static int findIndexOfFirstCommentOnNewLine(List<Comment> comments, Space prefix) {
+        if (prefix.getWhitespace().contains("\n")) {
+            return 0;
+        }
+        int index = 0;
+        while (index < comments.size()) {
+            Comment comment = comments.get(index);
+            index++;
+            if (comment.getSuffix().contains("\n")) {
+                break;
+            }
+        }
+        return index;
+    }
+
+    private static int findIndexOfLastCommentOnNewLine(List<Comment> comments) {
+        int index = comments.size() - 1;
+        while (index >= 0) {
+            Comment comment = comments.get(index);
+            if (comment.isMultiline()) {
+                if (comment.getSuffix().contains("\n")) {
+                    return index;
+                } else {
+                    index--;
+                }
+            } else {
+                return index;
+            }
+        }
+        return index;
+    }
+
+    public static class Matcher extends SimpleTraitMatcher<Block> {
+        @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<Block, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitBlock(J.Block block, P p) {
+                    Block trait = test(getCursor());
+                    return trait != null ?
+                            (J) visitor.visit(trait, p) :
+                            super.visitBlock(block, p);
+                }
+            };
+        }
+
+        @Override
+        protected @Nullable Block test(Cursor cursor) {
+            Object object = cursor.getValue();
+            if (object instanceof J.Block) {
+                return new Block(cursor);
+            }
+
+            return null;
+        }
+    }
+}

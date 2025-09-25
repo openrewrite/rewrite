@@ -26,21 +26,17 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.marker.ImplicitReturn;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.trait.Block;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
-
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
-
-import java.util.stream.Stream;
 
 @RequiredArgsConstructor
 public class GradleDependencies implements Trait<J.MethodInvocation> {
@@ -49,132 +45,31 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
     @Getter
     private final Cursor cursor;
 
-    private final List<Statement> statements;
+    public @Nullable GradleDependencies removeDependency(@Nullable String group, @Nullable String artifact) {
+        return filterStatements(statement -> !new GradleDependency.Matcher().artifactId(artifact).groupId(group).get(statement, getCursor()).isPresent());
+    }
 
-    public @Nullable GradleDependencies withStatements(Predicate<Statement> filter) {
+    public @Nullable GradleDependencies filterStatements(Predicate<Statement> predicate) {
+        return mapStatements(statement -> predicate.test(statement) ? statement : null);
+    }
+
+    public @Nullable GradleDependencies mapStatements(Function<Statement, @Nullable Statement> mapper) {
         GradleProject gradleProject = getGradleProject();
         if (gradleProject == null) {
             return this;
         }
 
-        LinkedList<Statement> filteredStatements = new LinkedList<>();
-        LinkedList<Comment> comments = new LinkedList<>();
-        String whitespace = null;
-        boolean lastStatementWasKept = false;
-        for (int i = 0; i < statements.size(); i++) {
-            Statement statement = statements.get(i);
-            if (statement instanceof J.Return && statement.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
-                if (((J.Return) statement).getExpression() instanceof Statement) {
-                    statement = ((J.Return) statement).getExpression().withPrefix(statement.getPrefix());
-                } else {
-                    filteredStatements.add(statement);
-                }
-            }
-            List<Comment> statementComments = statement.getComments();
-            if (filter.test(statement)) {
-                if (!comments.isEmpty() && whitespace != null) {
-                    //A previous statement was removed, and we are joining its comment / whitespace into the current statement
-                    Comment last = comments.removeLast();
-                    if (statement.getPrefix().getWhitespace().contains("\n")) {
-                        comments.addLast(last.withSuffix(statement.getPrefix().getWhitespace()));
-                        comments.addAll(statementComments);
-                    } else {
-                        int j = 0;
-                        while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
-                            j++;
-                        }
-                        comments.add(last.withSuffix(statementComments.get(j).getSuffix()));
-                        if (j + 1 < statementComments.size()) {
-                            comments.addAll(statementComments.subList(j + 1, statementComments.size()));
-                        }
-                    }
-                    statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(comments));
-                } else if (!lastStatementWasKept && !statement.getPrefix().getWhitespace().contains("\n") && whitespace != null) {
-                    int startIndex = 0;
-                    int j = 0;
-                    while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
-                        j++;
-                    }
-                    if (j + 1 <= statementComments.size()) {
-                        startIndex = j + 1;
-                    }
-                    if (startIndex < statementComments.size()) {
-                        if (startIndex > 0) {
-                            statement = statement.withPrefix(statement.getPrefix().withWhitespace(statementComments.get(startIndex - 1).getSuffix()).withComments(statementComments.subList(startIndex, statementComments.size())));
-                        }
-                    } else {
-                        statement = statement.withPrefix(statement.getPrefix().withWhitespace(whitespace).withComments(emptyList()));
-                    }
-                }
-                comments = new LinkedList<>();
-                whitespace = null;
-                filteredStatements.add(statement);
-                lastStatementWasKept = true;
-            } else {
-                if (!comments.isEmpty() && whitespace != null) {
-                    int startIndex = 0;
-                    int endIndex = findIndexOfLastCommentOnNewLine(statementComments) + 1;
-                    if (!statement.getPrefix().getWhitespace().contains("\n")) {
-                        int j = 0;
-                        while (j < statementComments.size() && !statementComments.get(j).getSuffix().contains("\n")) {
-                            j++;
-                        }
-                        Comment last = comments.removeLast();
-                        comments.add(last.withSuffix(statementComments.get(j).getSuffix()));
-                        if (j + 1 <= statementComments.size()) {
-                            startIndex = j + 1;
-                        }
-                    }
-                    if (startIndex < endIndex) {
-                        comments.addAll(statementComments.subList(startIndex, endIndex));
-                    }
-                } else {
-                    if (lastStatementWasKept) {
-                        comments.addAll(statementComments.subList(0, findIndexOfLastCommentOnNewLine(statementComments) + 1));
-                        whitespace = statement.getPrefix().getWhitespace();
-                    } else {
-                        int startIndex = findIndexOfFirstCommentOnNewLine(statementComments, statement.getPrefix());
-                        comments.addAll(statementComments.subList(startIndex, findIndexOfLastCommentOnNewLine(statementComments) + 1));
-                        if (startIndex == 0) {
-                            whitespace = statement.getPrefix().getWhitespace();
-                        } else {
-                            whitespace = statementComments.get(startIndex - 1).getSuffix();
-                        }
-                    }
-                }
-                lastStatementWasKept = false;
-            }
-        }
-
-        if (statements.size() == filteredStatements.size() && comments.isEmpty()) {
-            return this;
-        }
-
-        J.MethodInvocation dependenciesBlock = cursor.getValue();
-        LinkedList<Comment> endComments = comments;
-        String endWhitespace = whitespace;
-        boolean preserveEOLComments = !lastStatementWasKept;
-        List<Expression> arguments = ListUtils.mapFirst(dependenciesBlock.getArguments(), expression -> {
+        List<Expression> arguments = ListUtils.mapFirst(getTree().getArguments(), (Function<Expression, Expression>)  expression -> {
                     if (expression instanceof J.Lambda) {
                         J.Lambda lambda = (J.Lambda) expression;
                         if (lambda.getBody() instanceof J.Block) {
-                            J.Block body = (J.Block) lambda.getBody();
-                            Space end = body.getEnd();
-                            if (preserveEOLComments) {
-                                end = buildEnd(body.getEnd(), endComments, endWhitespace);
-                            }
-                            if (filteredStatements.isEmpty() && end.getComments().isEmpty()) {
-                                return null;
-                            }
-                            List<Statement> newStatements = ListUtils.mapLast(filteredStatements, newLast -> {
-                                Statement currentLast = statements.get(statements.size() - 1);
-                                if (currentLast instanceof J.Return) {
-                                    return ((J.Return) currentLast).withExpression(newLast.withPrefix(Space.EMPTY)).withPrefix(newLast.getPrefix());
-                                }
-                                return newLast;
-                            });
-                            return lambda.withBody(body.withStatements(newStatements).withEnd(end));
+                            return new Block.Matcher().get(lambda.getBody(), new Cursor(cursor, lambda))
+                                    .map(block -> block.mapStatements(mapper))
+                                    .map(Trait::getTree)
+                                    .map(lambda::withBody)
+                                    .orElse(null);
                         }
+                        return lambda;
                     }
                     return expression;
                 }
@@ -183,10 +78,9 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
         if (arguments.isEmpty()) {
             return null;
         }
-        dependenciesBlock = dependenciesBlock.withArguments(arguments);
-        Cursor newCursor = new Cursor(this.cursor.getParent(), dependenciesBlock);
+        Cursor newCursor = new Cursor(this.cursor.getParent(), getTree().withArguments(arguments));
 
-        return new GradleDependencies(newCursor, filteredStatements);
+        return new GradleDependencies(newCursor);
     }
 
     private @Nullable GradleProject getGradleProject() {
@@ -197,87 +91,6 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
 
         Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
         return maybeGp.orElse(null);
-    }
-
-    private Space buildEnd(Space end, LinkedList<Comment> comments, @Nullable String endWhitespace) {
-        List<Comment> newComments = new ArrayList<>();
-        boolean eolComments = endWhitespace == null || !endWhitespace.contains("\n");
-        String endBlockWhitespace = null;
-        if (!comments.isEmpty()) {
-            for (Comment comment : comments) {
-                if (comment instanceof TextComment) {
-                    if (comment.getSuffix().contains("\n")) {
-                        eolComments = false;
-                    }
-                    newComments.add(comment);
-                    if (endBlockWhitespace == null) {
-                        endBlockWhitespace = endWhitespace;
-                    }
-                }
-            }
-        }
-
-        List<Comment> existingEndComments = new ArrayList<>();
-        eolComments = !end.getWhitespace().contains("\n");
-        String whitespace = null;
-        if (!eolComments) {
-            whitespace = end.getWhitespace();
-        }
-        if (!end.getComments().isEmpty()) {
-            for (Comment comment : end.getComments()) {
-                if (comment instanceof TextComment) {
-                    if (!eolComments) {
-                        existingEndComments.add(comment);
-                    } else if (comment.getSuffix().contains("\n")) {
-                        eolComments = false;
-                    }
-                    if (whitespace == null) {
-                        whitespace = comment.getSuffix();
-                    }
-                }
-            }
-        }
-        if (!newComments.isEmpty()) {
-            newComments.set(newComments.size() - 1, newComments.get(newComments.size() - 1).withSuffix(whitespace == null ? "" : whitespace));
-        } else {
-            endBlockWhitespace = whitespace;
-        }
-
-        newComments.addAll(existingEndComments);
-
-        return end.withWhitespace(endBlockWhitespace == null ? end.getWhitespace() : endBlockWhitespace).withComments(newComments);
-    }
-
-    private static int findIndexOfFirstCommentOnNewLine(List<Comment> comments, Space prefix) {
-        if (prefix.getWhitespace().contains("\n")) {
-            return 0;
-        }
-        int index = 0;
-        while (index < comments.size()) {
-            Comment comment = comments.get(index);
-            index++;
-            if (comment.getSuffix().contains("\n")) {
-                break;
-            }
-        }
-        return index;
-    }
-
-    private static int findIndexOfLastCommentOnNewLine(List<Comment> comments) {
-        int index = comments.size() - 1;
-        while (index >= 0) {
-            Comment comment = comments.get(index);
-            if (comment.isMultiline()) {
-                if (comment.getSuffix().contains("\n")) {
-                    return index;
-                } else {
-                    index--;
-                }
-            } else {
-                return index;
-            }
-        }
-        return index;
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleDependencies> {
@@ -309,22 +122,7 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                List<Statement> statements = methodInvocation.getArguments().stream()
-                        .limit(1)
-                        .flatMap(arg -> {
-                            if (arg instanceof J.Lambda) {
-                                J.Lambda lambda = (J.Lambda) arg;
-                                J body = lambda.getBody();
-                                if (body instanceof J.Block) {
-                                    return ((J.Block) body).getStatements().stream();
-                                } else if (body instanceof Statement) {
-                                    return Stream.of((Statement) body);
-                                }
-                            }
-                            return Stream.empty();
-                        }).collect(toList());
-
-                return new GradleDependencies(cursor, statements);
+                return new GradleDependencies(cursor);
             }
 
             return null;
