@@ -15,27 +15,20 @@
  */
 package org.openrewrite.table;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import lombok.Getter;
 import lombok.Value;
+import org.HdrHistogram.Histogram;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
-import static java.util.Objects.requireNonNull;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
-    private final MeterRegistry registry = new SimpleMeterRegistry();
+    private final Map<String, PhaseTimer[]> recipeTimers = new ConcurrentHashMap<>();
     private final Set<Path> sourceFileVisited = new HashSet<>();
     private final Set<Path> sourceFileChanged = new HashSet<>();
 
@@ -60,58 +53,40 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        newTimer("rewrite.recipe.scan", recipe.getName()).recordCallable(scan);
+        getScanTimer(recipe.getName()).recordTimed(scan);
+    }
+
+    private PhaseTimer getScanTimer(String recipeName) {
+        return recipeTimers.computeIfAbsent(recipeName, k -> new PhaseTimer[]{new PhaseTimer(), new PhaseTimer()})[0];
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
-        return newTimer("rewrite.recipe.edit", recipe.getName()).recordCallable(edit);
+        return getEditTimer(recipe.getName()).recordTimed(edit);
     }
 
-    private Timer newTimer(String name, String recipeName) {
-        return Timer.builder(name)
-                .tag("name", recipeName)
-                .publishPercentiles(0.99)
-                .distributionStatisticExpiry(Duration.ofDays(1))
-                .distributionStatisticBufferLength(1)
-                .register(registry);
+    private PhaseTimer getEditTimer(String recipeName) {
+        return recipeTimers.computeIfAbsent(recipeName, k -> new PhaseTimer[]{new PhaseTimer(), new PhaseTimer()})[1];
     }
 
     public void flush(ExecutionContext ctx) {
-        for (Timer editor : registry.find("rewrite.recipe.edit").timers()) {
-            String recipeName = requireNonNull(editor.getId().getTag("name"));
-            Timer scanner = registry.find("rewrite.recipe.scan").tag("name", recipeName).timer();
+        for (Map.Entry<String, PhaseTimer[]> entry : recipeTimers.entrySet()) {
+            String recipeName = entry.getKey();
+            PhaseTimer[] timers = entry.getValue();
+            PhaseTimer scanTimer = timers[0];
+            PhaseTimer editTimer = timers[1];
+
             Row row = new Row(
                     recipeName,
                     sourceFileVisited.size(),
                     sourceFileChanged.size(),
-                    scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
-                    (long) editor.totalTime(TimeUnit.NANOSECONDS),
-                    editor.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                    (long) editor.max(TimeUnit.NANOSECONDS)
+                    scanTimer.getTotalNs(),
+                    scanTimer.getP99Ns(),
+                    scanTimer.getMaxNs(),
+                    editTimer.getTotalNs(),
+                    editTimer.getP99Ns(),
+                    editTimer.getMaxNs()
             );
             addRowToDataTable(ctx, row);
-        }
-
-        // find scanners that never finished their edit phase
-        for (Timer scanner : registry.find("rewrite.recipe.scan").timers()) {
-            String recipeName = requireNonNull(scanner.getId().getTag("name"));
-            if (registry.find("rewrite.recipe.edit").tag("name", recipeName).timer() == null) {
-                Row row = new Row(
-                        recipeName,
-                        Long.valueOf(scanner.count()).intValue(),
-                        sourceFileChanged.size(),
-                        (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                        scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                        (long) scanner.max(TimeUnit.NANOSECONDS),
-                        0L,
-                        0.0,
-                        0L
-                );
-
-                addRowToDataTable(ctx, row);
-            }
         }
     }
 
@@ -162,5 +137,44 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
         Long editMaxNs;
+    }
+
+    private static class PhaseTimer {
+        private static final long ONE_MICROSECOND = 1_000;
+        private static final long TWENTY_MINUTES = Duration.ofMinutes(20).toNanos();
+
+        final Histogram histogram;
+
+        // Track actual values to avoid HdrHistogram quantization loss
+        @Getter
+        private long totalNs = 0;
+
+        @Getter
+        private long maxNs = 0;
+
+        PhaseTimer() {
+            histogram = new Histogram(ONE_MICROSECOND, TWENTY_MINUTES, 1);
+            histogram.setAutoResize(true);
+        }
+
+        <T> T recordTimed(Callable<T> callable) throws Exception {
+            long startNs = System.nanoTime();
+            try {
+                return callable.call();
+            } finally {
+                long elapsedNs = System.nanoTime() - startNs;
+                record(elapsedNs);
+            }
+        }
+
+        private void record(long elapsedNs) {
+            histogram.recordValue(elapsedNs);
+            totalNs += elapsedNs;
+            maxNs = Math.max(maxNs, elapsedNs);
+        }
+
+        double getP99Ns() {
+            return histogram.getTotalCount() > 0 ? (double) histogram.getValueAtPercentile(99.0) : 0.0;
+        }
     }
 }
