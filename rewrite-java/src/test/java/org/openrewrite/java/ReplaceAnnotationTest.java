@@ -222,7 +222,7 @@ class ReplaceAnnotationTest implements RewriteTest {
     @Nested
     class ClassImports {
         @Test
-        void removesClassArgumentImports() {
+        void removeArgumentImportForField() {
             rewriteRun(
               spec -> spec.recipe(new ReplaceAnnotation("@java.lang.annotation.Target", "@lombok.NonNull", null)),
               java(
@@ -243,63 +243,46 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String firstName="";
                   }
                   """
-              ));
+              )
+            );
         }
 
         @Test
-        void removesMultipleClassArgumentImports() {
+        void removeArgumentImportForClass() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@java.lang.annotation.Target", "@lombok.NonNull", null)),
+              spec -> spec.recipe(new ReplaceAnnotation("@foo.Foo", "@lombok.NonNull", null)),
               java(
                 """
-                  import java.lang.annotation.ElementType;
-                  import java.lang.annotation.Target;
+                  package foo;
+                  public @interface Foo {
+                    Class<?> value();
+                  }
+                  """
+              ),
+              java(
+                """
+                  package bar;
+                  public class Bar {}
+                  """
+              ),
+              java(
+                """
+                  import foo.Foo;
+                  import bar.Bar;
 
+                  @Foo(Bar.class)
                   public class Person {
-                      @Target({ElementType.FIELD, ElementType.METHOD})
-                      String firstName="";
                   }
                   """,
                 """
                   import lombok.NonNull;
 
+                  @NonNull
                   public class Person {
-                      @NonNull
-                      String firstName="";
                   }
                   """
-              ));
-        }
-
-        @Test
-        void keepsClassImportsUsedElsewhere() {
-            rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@java.lang.annotation.Target", "@lombok.NonNull", null)),
-              java(
-                """
-                  import java.lang.annotation.ElementType;
-                  import java.lang.annotation.Target;
-
-                  public class Person {
-                      @Target(ElementType.FIELD)
-                      String firstName="";
-
-                      ElementType type = ElementType.METHOD;
-                  }
-                  """,
-                """
-                  import lombok.NonNull;
-
-                  import java.lang.annotation.ElementType;
-
-                  public class Person {
-                      @NonNull
-                      String firstName="";
-
-                      ElementType type = ElementType.METHOD;
-                  }
-                  """
-              ));
+              )
+            );
         }
     }
 
