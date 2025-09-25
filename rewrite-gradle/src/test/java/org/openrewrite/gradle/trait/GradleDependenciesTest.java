@@ -22,8 +22,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-
-import java.util.Optional;
+import org.openrewrite.trait.Trait;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -36,21 +35,10 @@ class GradleDependenciesTest implements RewriteTest {
           .recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation mi = method;
-                  Optional<GradleDependencies> dependencies = new GradleDependencies.Matcher().get(getCursor());
-                  if (dependencies.isPresent()) {
-                      mi = dependencies.map(gradleDependencies -> {
-                          GradleDependencies filtered = gradleDependencies.removeDependency("javax.validation", "validation-api");
-                          if (filtered == null) {
-                              return null;
-                          }
-                          return filtered.getTree();
-                      }).orElse(null);
-                  }
-                  if (mi == null) {
-                      return null;
-                  }
-                  return super.visitMethodInvocation(mi, ctx);
+                  return new GradleDependencies.Matcher().get(getCursor())
+                    .map(deps -> deps.removeDependency("javax.validation", "validation-api"))
+                    .map(Trait::getTree)
+                    .orElseGet(() -> (J.MethodInvocation) super.visitMethodInvocation(method, ctx));
               }
           }));
     }
