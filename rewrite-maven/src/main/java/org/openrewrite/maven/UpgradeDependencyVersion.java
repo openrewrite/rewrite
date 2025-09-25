@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -31,9 +32,12 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -79,7 +83,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     String versionPattern;
 
     @Option(displayName = "Override managed version",
-            description = "This flag can be set to explicitly override a managed dependency's version. The default for this flag is `false`.",
+            description = "This flag can be set to explicitly override a managed dependency's version. " +
+                          "If the dependency has its version managed by a Bill of Materials (BOM), enabling this flag will attempt to upgrade the BOM. " +
+                          "The default for this flag is `false`.",
             required = false)
     @Nullable
     Boolean overrideManagedVersion;
@@ -197,6 +203,32 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private final VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
             @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                // Check if we should attempt a BOM upgrade before processing individual dependencies
+                if (Boolean.TRUE.equals(overrideManagedVersion)) {
+                    MavenResolutionResult mrr = getResolutionResult();
+                    for (ResolvedDependency dep : mrr.findDependencies(groupId, artifactId, null)) {
+                        ResolvedManagedDependency managedDep = getResolutionResult().getPom().getManagedDependency(dep.getGroupId(), dep.getArtifactId(), dep.getType(), dep.getClassifier());
+                        // If the dependency's version is managed by a BOM, first attempt to upgrade the BOM to maintain its alignment
+                        if (managedDep != null && managedDep.getBomGav() != null) {
+                            try {
+                                String targetVersion = findNewerVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion(), ctx);
+                                if (targetVersion != null) {
+                                    Xml.Document result = attemptBomUpgrade(document, managedDep, targetVersion, ctx);
+                                    if (result != document) {
+                                        return result;
+                                    }
+                                }
+                            } catch (MavenDownloadingException e) {
+                                document = e.warn(document);
+                            }
+                        }
+                    }
+                }
+                return super.visitDocument(document, ctx);
+            }
+
+            @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 try {
@@ -278,6 +310,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
+
                             // if a managed dependency is expressed as a property, change the property value
                             // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null && isProperty(dm.getRequested().getVersion()) && dm.getRequestedBom() == null) {
@@ -314,8 +347,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 } else {
                     for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
                         if (dm.getBomGav() != null) {
-                            String group = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
-                            String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
+                            String group = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()))).orElse("");
+                            String artifactId = ofNullable(getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""))).orElse("");
                             if (!accumulator.projectArtifacts.contains(new GroupArtifact(group, artifactId))) {
                                 ResolvedGroupArtifactVersion bom = dm.getBomGav();
                                 if (Objects.equals(group, bom.getGroupId()) &&
@@ -372,6 +405,117 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     throws MavenDownloadingException {
                 return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
                         versionComparator, ctx);
+            }
+
+            private Xml.Document attemptBomUpgrade(Xml.Document document, ResolvedManagedDependency managedDep,
+                                                   String targetVersion, ExecutionContext ctx) throws MavenDownloadingException {
+                ResolvedGroupArtifactVersion bomGav = managedDep.getBomGav();
+                if (bomGav == null) {
+                    return document;
+                }
+
+                String newerBomVersion = findNewerBomVersionWithDependency(
+                        bomGav.getGroupId(),
+                        bomGav.getArtifactId(),
+                        bomGav.getVersion(),
+                        managedDep.getGroupId(),
+                        managedDep.getArtifactId(),
+                        targetVersion,
+                        ctx
+                );
+
+                if (newerBomVersion == null) {
+                    return document;
+                }
+
+                return (Xml.Document) new UpgradeDependencyVersion(bomGav.getGroupId(), bomGav.getArtifactId(), newerBomVersion, null, true, retainVersions)
+                        .getVisitor(accumulator)
+                        .visitNonNull(document, ctx, getCursor().getParentTreeCursor());
+            }
+
+            /**
+             * Finds a newer version of a BOM that manages a specific dependency at a target version.
+             */
+            private @Nullable String findNewerBomVersionWithDependency(
+                    String bomGroupId,
+                    String bomArtifactId,
+                    String currentBomVersion,
+                    String dependencyGroupId,
+                    String dependencyArtifactId,
+                    String targetDependencyVersion,
+                    ExecutionContext ctx) throws MavenDownloadingException {
+
+                List<String> bomVersions = getAvailableBomVersions(bomGroupId, bomArtifactId, currentBomVersion, ctx);
+
+                for (String bomVersion : bomVersions) {
+                    String managedVersion = getDependencyVersionFromBom(
+                            bomGroupId, bomArtifactId, bomVersion,
+                            dependencyGroupId, dependencyArtifactId, ctx
+                    );
+
+                    if (targetDependencyVersion.equals(managedVersion)) {
+                        return bomVersion;
+                    }
+                }
+
+                return null;
+            }
+
+            private List<String> getAvailableBomVersions(String groupId, String artifactId, String currentVersion, ExecutionContext ctx)
+                    throws MavenDownloadingException {
+                //noinspection SpellCheckingInspection
+                MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                MavenSettings settings = mctx.effectiveSettings(getResolutionResult());
+                MavenPomDownloader downloader = new MavenPomDownloader(
+                        emptyMap(), ctx, settings,
+                        ofNullable(settings)
+                                .map(MavenSettings::getActiveProfiles)
+                                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                                .orElse(null)
+                );
+
+                MavenMetadata metadata = downloader.downloadMetadata(
+                        new GroupArtifact(groupId, artifactId), null,
+                        getResolutionResult().getPom().getRepositories()
+                );
+
+                return metadata.getVersioning().getVersions().stream()
+                        .filter(version -> versionComparator.compare(null, currentVersion, version) < 0)
+                        .sorted(versionComparator)
+                        .collect(toList());
+            }
+
+            private @Nullable String getDependencyVersionFromBom(
+                    String bomGroupId,
+                    String bomArtifactId,
+                    String bomVersion,
+                    String dependencyGroupId,
+                    String dependencyArtifactId,
+                    ExecutionContext ctx) throws MavenDownloadingException {
+                //noinspection SpellCheckingInspection
+                MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                MavenSettings settings = mctx.effectiveSettings(getResolutionResult());
+                MavenPomDownloader downloader = new MavenPomDownloader(
+                        emptyMap(), mctx, settings,
+                        ofNullable(settings)
+                                .map(MavenSettings::getActiveProfiles)
+                                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                                .orElse(null)
+                );
+
+                Pom bom = downloader.download(
+                        new GroupArtifactVersion(bomGroupId, bomArtifactId, bomVersion),
+                        null, null, getResolutionResult().getPom().getRepositories()
+                );
+                ResolvedPom resolvedBom = bom.resolve(mctx.getActiveProfiles(), downloader, mctx);
+                for (ResolvedManagedDependency md : resolvedBom.getDependencyManagement()) {
+                    if (dependencyGroupId.equals(md.getGroupId()) &&
+                        dependencyArtifactId.equals(md.getArtifactId())) {
+                        return md.getVersion();
+                    }
+                }
+
+                return null;
             }
         };
     }
