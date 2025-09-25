@@ -19,14 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
 import java.util.Properties;
 
 import static org.openrewrite.java.Assertions.java;
@@ -40,12 +38,12 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
           name: org.openrewrite.java.GoogleJavaFormat
           """;
         spec.recipe(Environment.builder()
-                .load(new YamlResourceLoader(
-                        new ByteArrayInputStream(googleJavaFormatStyle.getBytes(StandardCharsets.UTF_8)),
-                        URI.create("rewrite.yml"),
-                        new Properties()))
-                .build()
-                .activateRecipes("org.openrewrite.java.format.AutoFormat"));
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(googleJavaFormatStyle.getBytes(StandardCharsets.UTF_8)),
+            URI.create("rewrite.yml"),
+            new Properties()))
+          .build()
+          .activateRecipes("org.openrewrite.java.format.AutoFormat"));
     }
 
     @DocumentExample
@@ -135,7 +133,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       if (true) {
                       }else {
                       }
-
+              
                       try {
                       }catch (Exception e) {
                       }finally {
@@ -149,7 +147,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       if (true) {
                       } else {
                       }
-
+              
                       try {
                       } catch (Exception e) {
                       } finally {
@@ -197,7 +195,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       call(1,2,3);
                       int[] array = {1,2,3};
                   }
-
+              
                   void call(int x,int y,int z) {
                   }
               }
@@ -208,7 +206,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       call(1, 2, 3);
                       int[] array = {1, 2, 3};
                   }
-
+              
                   void call(int x, int y, int z) {
                   }
               }
@@ -225,12 +223,12 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.function.Function;
-
+              
               class Test {
                   void method(List<String> items) {
                       for (String item:items) {
                       }
-
+              
                       Function<String, Integer> fn = s->s.length();
                   }
               }
@@ -238,12 +236,12 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.function.Function;
-
+              
               class Test {
                   void method(List<String> items) {
                       for (String item : items) {
                       }
-
+              
                       Function<String, Integer> fn = s -> s.length();
                   }
               }
@@ -259,7 +257,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-
+              
               class Test {
                   void method() {
                       Function<String, Integer> ref = String :: length;
@@ -270,7 +268,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-
+              
               class Test {
                   void method() {
                       Function<String, Integer> ref = String::length;
@@ -292,13 +290,13 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                   void method(){
                       if (true){
                       }
-
+              
                       for (int i = 0; i < 10; i++){
                       }
-
+              
                       while (true){
                       }
-
+              
                       try{
                       } catch (Exception e){
                       }
@@ -310,13 +308,13 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                   void method() {
                       if (true) {
                       }
-
+              
                       for (int i = 0; i < 10; i++) {
                       }
-
+              
                       while (true) {
                       }
-
+              
                       try {
                       } catch (Exception e) {
                       }
@@ -335,7 +333,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
               @interface MyAnnotation {
                   String[] value();
               }
-
+              
               class Test {
                   @MyAnnotation({"a", "b"})
                   void method() {
@@ -353,7 +351,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-
+              
               class Test<T extends Number&Serializable> {
                   void method() {
                       try {
@@ -364,7 +362,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
               """,
             """
               import java.io.Serializable;
-
+              
               class Test<T extends Number & Serializable> {
                   void method() {
                       try {
@@ -409,7 +407,7 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.function.Function;
-
+              
               class Test {
                   void method(int a, int b, int c) {
                       if (true) {
@@ -417,15 +415,15 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       } else {
                           System.out.println("false");
                       }
-
+              
                       for (int i = 0; i < 10; i++) {
                           System.out.println(i);
                       }
-
+              
                       while (true) {
                           break;
                       }
-
+              
                       try {
                           String s = "test";
                           int len = s.length();
@@ -434,21 +432,21 @@ class GoogleJavaFormatSpacesTest implements RewriteTest {
                       } finally {
                           System.out.println("done");
                       }
-
+              
                       int x = 5 + 3;
                       int y = 10 - 2;
                       int z = 2 * 4;
                       boolean flag = true && false;
                       int result = flag ? 1 : 0;
-
+              
                       List<String> items = List.of("a", "b", "c");
                       for (String item : items) {
                           System.out.println(item);
                       }
-
+              
                       Function<String, Integer> fn = s -> s.length();
                       Function<String, Integer> ref = String::length;
-
+              
                       String str = (String) new Object();
                   }
               }
