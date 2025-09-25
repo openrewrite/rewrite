@@ -28,7 +28,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
-    private final Map<String, PhaseTimer[]> recipeTimers = new ConcurrentHashMap<>();
+    private final Map<String, RecipeTimers> recipeTimers = new ConcurrentHashMap<>();
     private final Set<Path> sourceFileVisited = new HashSet<>();
     private final Set<Path> sourceFileChanged = new HashSet<>();
 
@@ -53,38 +53,28 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        getScanTimer(recipe.getName()).recordTimed(scan);
-    }
-
-    private PhaseTimer getScanTimer(String recipeName) {
-        return recipeTimers.computeIfAbsent(recipeName, k -> new PhaseTimer[]{new PhaseTimer(), new PhaseTimer()})[0];
+        recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).scan.recordTimed(scan);
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
-        return getEditTimer(recipe.getName()).recordTimed(edit);
-    }
-
-    private PhaseTimer getEditTimer(String recipeName) {
-        return recipeTimers.computeIfAbsent(recipeName, k -> new PhaseTimer[]{new PhaseTimer(), new PhaseTimer()})[1];
+        return recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).edit.recordTimed(edit);
     }
 
     public void flush(ExecutionContext ctx) {
-        for (Map.Entry<String, PhaseTimer[]> entry : recipeTimers.entrySet()) {
+        for (Map.Entry<String, RecipeTimers> entry : recipeTimers.entrySet()) {
             String recipeName = entry.getKey();
-            PhaseTimer[] timers = entry.getValue();
-            PhaseTimer scanTimer = timers[0];
-            PhaseTimer editTimer = timers[1];
+            RecipeTimers timers = entry.getValue();
 
             Row row = new Row(
                     recipeName,
                     sourceFileVisited.size(),
                     sourceFileChanged.size(),
-                    scanTimer.getTotalNs(),
-                    scanTimer.getP99Ns(),
-                    scanTimer.getMaxNs(),
-                    editTimer.getTotalNs(),
-                    editTimer.getP99Ns(),
-                    editTimer.getMaxNs()
+                    timers.scan.getTotalNs(),
+                    timers.scan.getP99Ns(),
+                    timers.scan.getMaxNs(),
+                    timers.edit.getTotalNs(),
+                    timers.edit.getP99Ns(),
+                    timers.edit.getMaxNs()
             );
             addRowToDataTable(ctx, row);
         }
@@ -137,6 +127,11 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
         Long editMaxNs;
+    }
+
+    private static class RecipeTimers {
+        final PhaseTimer scan = new PhaseTimer();
+        final PhaseTimer edit = new PhaseTimer();
     }
 
     private static class PhaseTimer {
