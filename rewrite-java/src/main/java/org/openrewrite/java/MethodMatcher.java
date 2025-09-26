@@ -708,13 +708,53 @@ public class MethodMatcher {
 
     @Override
     public String toString() {
-        // Generate pattern from argumentMatchers for toString()
-        String argPattern = generatePatternFromMatchers();
+        StringBuilder sb = new StringBuilder();
 
-        return targetType +
-                ' ' +
-                (methodName != null ? methodName : "*") +
-                '(' + argPattern + ')';
+        // Target type pattern
+        sb.append(targetType);
+        sb.append(' ');
+
+        // Method name - handle special cases
+        if (methodName != null) {
+            sb.append(methodName);
+        } else if (methodNameMatcher != null) {
+            // Use the actual pattern from the matcher
+            sb.append(methodNameMatcher.getPattern());
+        } else {
+            sb.append('*');
+        }
+
+        // Arguments pattern
+        sb.append('(');
+        if (argumentMatchers.isEmpty()) {
+            // No arguments
+        } else if (argumentMatchers.size() == 1 && argumentMatchers.get(0) instanceof VarArgsMatcher) {
+            sb.append("..");
+        } else {
+            for (int i = 0; i < argumentMatchers.size(); i++) {
+                if (i > 0) {
+                    sb.append(',');
+                    if (!(argumentMatchers.get(i) instanceof VarArgsMatcher)) {
+                        sb.append(' ');
+                    }
+                }
+
+                ArgumentMatcher matcher = argumentMatchers.get(i);
+                if (matcher instanceof VarArgsMatcher) {
+                    sb.append("..");
+                } else if (matcher instanceof ExactTypeMatcher) {
+                    sb.append(((ExactTypeMatcher) matcher).typeName);
+                } else if (matcher instanceof WildcardMatcher) {
+                    sb.append('*');
+                } else {
+                    // Fallback - shouldn't happen
+                    sb.append("?");
+                }
+            }
+        }
+        sb.append(')');
+
+        return sb.toString();
     }
 
     // ============ Simple AspectJ pattern matcher ============
@@ -745,22 +785,36 @@ public class MethodMatcher {
             }
         }
 
+        String getPattern() {
+            return pattern;
+        }
+
         boolean matches(String text) {
             if (isFullWildcard) {
                 return true;
             }
             if (isSimplePattern) {
-                return pattern.equals(text);
+                // For simple patterns, handle $ vs . equivalence for inner classes
+                if (pattern.equals(text)) {
+                    return true;
+                }
+                // Check if they're equal when normalized ($ replaced with .)
+                if (pattern.length() == text.length()) {
+                    return pattern.replace('$', '.').equals(text.replace('$', '.'));
+                }
+                return false;
             }
 
             // Optimize pattern *..*Something (any packages + class name pattern)
             if (pattern.length() > 3 && pattern.charAt(0) == '*' && pattern.charAt(1) == '.' && pattern.charAt(2) == '.') {
-                // Find the simple class name (part after last dot)
+                // Find the simple class name (part after last dot or dollar sign for inner classes)
                 int lastDot = text.lastIndexOf('.');
+                int lastDollar = text.lastIndexOf('$');
+                int lastSeparator = Math.max(lastDot, lastDollar);
 
-                if (lastDot >= 0) {
+                if (lastSeparator >= 0) {
                     // Match pattern after *.. against simple name only
-                    return matchesPattern(pattern, text, 3, lastDot + 1);
+                    return matchesPattern(pattern, text, 3, lastSeparator + 1);
                 } else {
                     // No package, match pattern after *.. against entire text
                     return matchesPattern(pattern, text, 3, 0);
@@ -775,9 +829,10 @@ public class MethodMatcher {
                     int suffixLength = pattern.length() - 1;
                     if (text.length() >= suffixLength &&
                         text.regionMatches(text.length() - suffixLength, pattern, 1, suffixLength)) {
-                        // Also verify no dots in the prefix part
+                        // Also verify no dots (or dollars for inner classes) in the prefix part
                         for (int i = 0; i < text.length() - suffixLength; i++) {
-                            if (text.charAt(i) == '.') {
+                            char c = text.charAt(i);
+                            if (c == '.' || c == '$') {
                                 return false;
                             }
                         }
@@ -792,14 +847,16 @@ public class MethodMatcher {
                     // Search for the middle part
                     for (int i = 0; i <= text.length() - middleLength; i++) {
                         if (text.regionMatches(i, pattern, middleStart, middleLength)) {
-                            // Found it - check no dots before or after
+                            // Found it - check no dots or dollars before or after
                             for (int j = 0; j < i; j++) {
-                                if (text.charAt(j) == '.') {
+                                char c = text.charAt(j);
+                                if (c == '.' || c == '$') {
                                     return false;
                                 }
                             }
                             for (int j = i + middleLength; j < text.length(); j++) {
-                                if (text.charAt(j) == '.') {
+                                char c = text.charAt(j);
+                                if (c == '.' || c == '$') {
                                     return false;
                                 }
                             }
@@ -813,9 +870,10 @@ public class MethodMatcher {
                 int prefixLength = pattern.length() - 1;
                 if (text.length() >= prefixLength &&
                     text.regionMatches(0, pattern, 0, prefixLength)) {
-                    // Also verify no dots in the suffix part
+                    // Also verify no dots or dollars in the suffix part
                     for (int i = prefixLength; i < text.length(); i++) {
-                        if (text.charAt(i) == '.') {
+                        char c = text.charAt(i);
+                        if (c == '.' || c == '$') {
                             return false;
                         }
                     }

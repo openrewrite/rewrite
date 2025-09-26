@@ -35,8 +35,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 
@@ -658,5 +657,122 @@ class MethodMatcherTest implements RewriteTest {
           emptyList(),
           null
         );
+    }
+
+    @Nested
+    class InnerClassMatching {
+
+        @Test
+        void matchesInnerClassWithDotPattern() {
+            // Pattern with . should match types with $
+            MethodMatcher matcher = new MethodMatcher("java.util.Map.Entry get*()");
+
+            // Should match binary name with $
+            assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
+            assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getValue")));
+
+            // Should also match source name with .
+            assertTrue(matcher.matches(newMethodType("java.util.Map.Entry", "getKey")));
+        }
+
+        @Test
+        void matchesInnerClassWithDollarPattern() {
+            // Pattern with $ should also work
+            MethodMatcher matcher = new MethodMatcher("java.util.Map$Entry get*()");
+
+            assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
+            assertTrue(matcher.matches(newMethodType("java.util.Map.Entry", "getKey")));
+        }
+
+        @Test
+        void matchesInnerClassWithWildcardPattern() {
+            // Wildcard patterns should work with inner classes
+            MethodMatcher matcher = new MethodMatcher("*..*Entry get*()");
+
+            assertTrue(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
+            assertTrue(matcher.matches(newMethodType("java.util.Map.Entry", "getValue")));
+            assertTrue(matcher.matches(newMethodType("com.example.Cache$Entry", "getKey")));
+        }
+
+        @Test
+        void matchesNestedInnerClasses() {
+            // Test deeply nested inner classes
+            MethodMatcher matcher = new MethodMatcher("com.example.Outer.Middle.Inner method()");
+
+            // Should match various representations
+            assertTrue(matcher.matches(newMethodType("com.example.Outer$Middle$Inner", "method")));
+            assertTrue(matcher.matches(newMethodType("com.example.Outer.Middle.Inner", "method")));
+
+            // Mixed representation
+            assertTrue(matcher.matches(newMethodType("com.example.Outer$Middle.Inner", "method")));
+        }
+
+        @Test
+        void innerClassWildcardSuffix() {
+            // Pattern like *Entry should only match simple class names without package separators
+            MethodMatcher matcher = new MethodMatcher("*Entry get*()");
+
+            // Should match simple class name
+            assertTrue(matcher.matches(newMethodType("SomeEntry", "getValue")));
+            assertTrue(matcher.matches(newMethodType("CacheEntry", "getKey")));
+
+            // Should NOT match if there's a package separator (. or $)
+            assertFalse(matcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
+            assertFalse(matcher.matches(newMethodType("com.example.Entry", "getKey")));
+
+            // Pattern with .. should match inner classes
+            MethodMatcher packageMatcher = new MethodMatcher("*..*Entry get*()");
+            assertTrue(packageMatcher.matches(newMethodType("java.util.Map$Entry", "getKey")));
+        }
+    }
+
+    @Nested
+    class ToStringBehavior {
+        @Test
+        void preservesMethodNameWildcards() {
+            // Test that toString() preserves method name patterns
+            MethodMatcher matcher = new MethodMatcher("java.util.Map$Entry get*()");
+            assertEquals("java.util.Map$Entry get*()", matcher.toString());
+
+            // Test with various method name patterns
+            assertEquals("java.io.PrintStream print*(..)",
+                new MethodMatcher("java.io.PrintStream print*(..)").toString());
+
+            assertEquals("*..*Service find*By*(..)",
+                new MethodMatcher("*..*Service find*By*(..)").toString());
+
+            assertEquals("com.example.* *get*()",
+                new MethodMatcher("com.example.* *get*()").toString());
+        }
+
+        @Test
+        void preservesExactMethodNames() {
+            // Test exact method names are preserved
+            assertEquals("java.lang.String substring(int)",
+                new MethodMatcher("java.lang.String substring(int)").toString());
+
+            assertEquals("java.util.List add(java.lang.Object)",
+                new MethodMatcher("java.util.List add(java.lang.Object)").toString());
+        }
+
+        @Test
+        void preservesConstructorPatterns() {
+            // Test special method patterns
+            assertEquals("com.example.Foo <constructor>()",
+                new MethodMatcher("com.example.Foo <constructor>()").toString());
+
+            assertEquals("com.example.Bar <constructor>(java.lang.String)",
+                new MethodMatcher("com.example.Bar <init>(java.lang.String)").toString());
+        }
+
+        @Test
+        void preservesWildcardArguments() {
+            // Test wildcard arguments
+            assertEquals("java.util.Map put(*, *)",
+                new MethodMatcher("java.util.Map put(*, *)").toString());
+
+            assertEquals("java.io.PrintStream println(..)",
+                new MethodMatcher("java.io.PrintStream println(..)").toString());
+        }
     }
 }
