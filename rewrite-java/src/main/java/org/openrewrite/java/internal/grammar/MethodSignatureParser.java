@@ -36,18 +36,18 @@ public class MethodSignatureParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, JAVASCRIPT_DEFAULT_METHOD=2, LPAREN=3, RPAREN=4, LBRACK=5, 
-		RBRACK=6, COMMA=7, DOT=8, BANG=9, WILDCARD=10, AND=11, OR=12, ELLIPSIS=13, 
+		CONSTRUCTOR=1, JAVASCRIPT_DEFAULT_METHOD=2, LPAREN=3, RPAREN=4, LBRACK=5,
+		RBRACK=6, COMMA=7, DOT=8, BANG=9, WILDCARD=10, AND=11, OR=12, ELLIPSIS=13,
 		DOTDOT=14, POUND=15, SPACE=16, Identifier=17;
 	public static final int
-		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
-		RULE_formalsTail = 3, RULE_formalsPatternAfterDotDot = 4, RULE_targetTypePattern = 5, 
-		RULE_formalTypePattern = 6, RULE_classNameOrInterface = 7, RULE_arrayDimensions = 8, 
+		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2,
+		RULE_formalsTail = 3, RULE_formalsPatternAfterDotDot = 4, RULE_targetTypePattern = 5,
+		RULE_formalTypePattern = 6, RULE_classNameOrInterface = 7, RULE_arrayDimensions = 8,
 		RULE_simpleNamePattern = 9, RULE_simpleNamePart = 10;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"methodPattern", "formalParametersPattern", "formalsPattern", "formalsTail", 
-			"formalsPatternAfterDotDot", "targetTypePattern", "formalTypePattern", 
+			"methodPattern", "formalParametersPattern", "formalsPattern", "formalsTail",
+			"formalsPatternAfterDotDot", "targetTypePattern", "formalTypePattern",
 			"classNameOrInterface", "arrayDimensions", "simpleNamePattern", "simpleNamePart"
 		};
 	}
@@ -55,15 +55,15 @@ public class MethodSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'<default>'", null, null, "'['", "']'", null, null, "'!'", 
+			null, null, "'<default>'", null, null, "'['", "']'", null, null, "'!'",
 			"'*'", "'&&'", "'||'", "'...'", "'..'", "'#'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "JAVASCRIPT_DEFAULT_METHOD", "LPAREN", "RPAREN", 
-			"LBRACK", "RBRACK", "COMMA", "DOT", "BANG", "WILDCARD", "AND", "OR", 
+			null, "CONSTRUCTOR", "JAVASCRIPT_DEFAULT_METHOD", "LPAREN", "RPAREN",
+			"LBRACK", "RBRACK", "COMMA", "DOT", "BANG", "WILDCARD", "AND", "OR",
 			"ELLIPSIS", "DOTDOT", "POUND", "SPACE", "Identifier"
 		};
 	}
@@ -167,7 +167,7 @@ public class MethodSignatureParser extends Parser {
 			switch (_input.LA(1)) {
 			case SPACE:
 				{
-				setState(24); 
+				setState(24);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -177,7 +177,7 @@ public class MethodSignatureParser extends Parser {
 					match(SPACE);
 					}
 					}
-					setState(26); 
+					setState(26);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==SPACE );
@@ -850,7 +850,7 @@ public class MethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(96); 
+				setState(96);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				do {
@@ -860,7 +860,7 @@ public class MethodSignatureParser extends Parser {
 					simpleNamePart();
 					}
 					}
-					setState(98); 
+					setState(98);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				} while ( _la==WILDCARD || _la==Identifier );
