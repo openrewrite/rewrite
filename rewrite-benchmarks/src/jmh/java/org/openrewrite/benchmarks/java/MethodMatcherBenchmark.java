@@ -24,11 +24,11 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 
 @Fork(1)
@@ -269,9 +269,9 @@ public class MethodMatcherBenchmark {
             null,
             null,
             parameterTypeList,
-            Collections.emptyList(),
-            Collections.emptyList(),
-            Collections.emptyList(),
+            emptyList(),
+            emptyList(),
+            emptyList(),
             null
         );
     }

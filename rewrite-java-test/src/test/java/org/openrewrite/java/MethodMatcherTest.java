@@ -28,11 +28,11 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -653,9 +653,9 @@ class MethodMatcherTest implements RewriteTest {
           null,
           null,
           parameterTypeList,
-          Collections.emptyList(),
-          Collections.emptyList(),
-          Collections.emptyList(),
+          emptyList(),
+          emptyList(),
+          emptyList(),
           null
         );
     }

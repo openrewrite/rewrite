@@ -32,16 +32,16 @@ import java.util.function.Consumer;
 
 /**
  * Benchmark for MethodSignatureParser and MethodMatcher.
- *
+ * <p>
  * Tests both:
  * 1. Parser performance after reducing adaptivePredict() calls
  * 2. Full MethodMatcher construction overhead (parsing + pattern compilation)
- *
+ * <p>
  * Use the 'mode' parameter to switch between:
  * - "parser": Tests only the ANTLR parser
  * - "methodMatcher": Tests full MethodMatcher construction
  */
-@Fork(value = 1)
+@Fork(1)
 @Measurement(iterations = 3, time = 2)
 @Warmup(iterations = 3, time = 2)
 @BenchmarkMode(Mode.Throughput)
@@ -65,9 +65,7 @@ public class MethodSignatureParserBenchmark {
             };
         } else if ("methodMatcher".equals(mode)) {
             // Full MethodMatcher construction
-            this.patternProcessor = pattern -> {
-                bh.consume(new MethodMatcher(pattern));
-            };
+            this.patternProcessor = pattern -> bh.consume(new MethodMatcher(pattern));
         } else {
             throw new IllegalArgumentException("Unknown mode: " + mode);
         }
@@ -197,13 +195,13 @@ public class MethodSignatureParserBenchmark {
 
     /**
      * Run this benchmark from the command line or IDE.
-     *
+     * <p>
      * To run from command line:
      * ./gradlew :rewrite-benchmarks:jmh -Pjmh.includes=MethodSignatureParserBenchmark
-     *
+     * <p>
      * To run specific benchmarks:
      * ./gradlew :rewrite-benchmarks:jmh -Pjmh.includes=MethodSignatureParserBenchmark.simplePatterns
-     *
+     * <p>
      * To compare parser vs MethodMatcher:
      * Results will show both modes for each benchmark method
      */
