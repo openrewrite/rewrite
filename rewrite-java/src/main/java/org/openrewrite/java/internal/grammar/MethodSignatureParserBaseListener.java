@@ -68,25 +68,13 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterWildcard(MethodSignatureParser.WildcardContext ctx) { }
+	@Override public void enterFormalsTail(MethodSignatureParser.FormalsTailContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitWildcard(MethodSignatureParser.WildcardContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDotDot(MethodSignatureParser.DotDotContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDotDot(MethodSignatureParser.DotDotContext ctx) { }
+	@Override public void exitFormalsTail(MethodSignatureParser.FormalsTailContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -99,18 +87,6 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -152,6 +128,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -159,6 +147,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

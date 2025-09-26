@@ -53,25 +53,15 @@ public interface MethodSignatureParserListener extends ParseTreeListener {
 	 */
 	void exitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
 	/**
-	 * Enter a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * Enter a parse tree produced by {@link MethodSignatureParser#formalsTail}.
 	 * @param ctx the parse tree
 	 */
-	void enterWildcard(MethodSignatureParser.WildcardContext ctx);
+	void enterFormalsTail(MethodSignatureParser.FormalsTailContext ctx);
 	/**
-	 * Exit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * Exit a parse tree produced by {@link MethodSignatureParser#formalsTail}.
 	 * @param ctx the parse tree
 	 */
-	void exitWildcard(MethodSignatureParser.WildcardContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link MethodSignatureParser#dotDot}.
-	 * @param ctx the parse tree
-	 */
-	void enterDotDot(MethodSignatureParser.DotDotContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link MethodSignatureParser#dotDot}.
-	 * @param ctx the parse tree
-	 */
-	void exitDotDot(MethodSignatureParser.DotDotContext ctx);
+	void exitFormalsTail(MethodSignatureParser.FormalsTailContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link MethodSignatureParser#formalsPatternAfterDotDot}.
 	 * @param ctx the parse tree
@@ -82,16 +72,6 @@ public interface MethodSignatureParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link MethodSignatureParser#optionalParensTypePattern}.
-	 * @param ctx the parse tree
-	 */
-	void enterOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link MethodSignatureParser#optionalParensTypePattern}.
-	 * @param ctx the parse tree
-	 */
-	void exitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link MethodSignatureParser#targetTypePattern}.
 	 * @param ctx the parse tree
@@ -123,6 +103,16 @@ public interface MethodSignatureParserListener extends ParseTreeListener {
 	 */
 	void exitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link MethodSignatureParser#arrayDimensions}.
+	 * @param ctx the parse tree
+	 */
+	void enterArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MethodSignatureParser#arrayDimensions}.
+	 * @param ctx the parse tree
+	 */
+	void exitArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link MethodSignatureParser#simpleNamePattern}.
 	 * @param ctx the parse tree
 	 */
@@ -132,4 +122,14 @@ public interface MethodSignatureParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link MethodSignatureParser#simpleNamePart}.
+	 * @param ctx the parse tree
+	 */
+	void enterSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MethodSignatureParser#simpleNamePart}.
+	 * @param ctx the parse tree
+	 */
+	void exitSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx);
 }

@@ -44,29 +44,17 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * Visit a parse tree produced by {@link MethodSignatureParser#formalsTail}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitWildcard(MethodSignatureParser.WildcardContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#dotDot}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDotDot(MethodSignatureParser.DotDotContext ctx);
+	T visitFormalsTail(MethodSignatureParser.FormalsTailContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#formalsPatternAfterDotDot}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#optionalParensTypePattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#targetTypePattern}.
 	 * @param ctx the parse tree
@@ -86,9 +74,21 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#arrayDimensions}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#simpleNamePattern}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#simpleNamePart}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx);
 }

@@ -3,7 +3,7 @@ parser grammar MethodSignatureParser;
 options { tokenVocab=MethodSignatureLexer; }
 
 methodPattern
-    :    targetTypePattern (SPACE* | DOT | POUND) simpleNamePattern formalParametersPattern
+    :    targetTypePattern (SPACE+ | POUND) simpleNamePattern SPACE* formalParametersPattern
     ;
 
 formalParametersPattern
@@ -11,51 +11,43 @@ formalParametersPattern
     ;
 
 formalsPattern
-    :    dotDot (COMMA SPACE* formalsPatternAfterDotDot)* 
-    |    wildcard (COMMA SPACE* formalsPattern)*
-    |    optionalParensTypePattern (COMMA SPACE* formalsPattern)*
-    |    formalTypePattern ELLIPSIS
+    :    DOTDOT formalsPatternAfterDotDot?
+    |    formalTypePattern (ELLIPSIS | formalsTail?)
     ;
 
-wildcard
-    :   WILDCARD
-    ;
-
-dotDot
-    :   DOTDOT
+formalsTail
+    :    COMMA formalsPattern
     ;
 
 formalsPatternAfterDotDot
-    :    optionalParensTypePattern (COMMA SPACE* formalsPatternAfterDotDot)* 
-    |    formalTypePattern ELLIPSIS
-    ;
-
-optionalParensTypePattern
-    :    LPAREN formalTypePattern RPAREN
-    |    formalTypePattern
+    :    COMMA formalTypePattern (ELLIPSIS | formalsPatternAfterDotDot?)
     ;
 
 targetTypePattern
     :   classNameOrInterface
-    |    BANG targetTypePattern
-    |    targetTypePattern AND targetTypePattern 
-    |    targetTypePattern OR targetTypePattern
+    |    BANG classNameOrInterface
     ;
 
 formalTypePattern
     :    classNameOrInterface
-    |    BANG formalTypePattern
-    |    formalTypePattern AND formalTypePattern 
-    |    formalTypePattern OR formalTypePattern
+    |    BANG classNameOrInterface
     ;
 
 classNameOrInterface
-    :    (Identifier | WILDCARD | DOT | DOTDOT)+ (LBRACK RBRACK)*
+    :    (Identifier | WILDCARD) (DOT | DOTDOT | Identifier | WILDCARD)* arrayDimensions?
+    ;
+
+arrayDimensions
+    :    LBRACK RBRACK arrayDimensions?
     ;
 
 simpleNamePattern
-    :    Identifier (WILDCARD Identifier)* WILDCARD?
-    |    WILDCARD (Identifier WILDCARD)* Identifier?
+    :    simpleNamePart+
     |    JAVASCRIPT_DEFAULT_METHOD
     |    CONSTRUCTOR
+    ;
+
+simpleNamePart
+    :    Identifier
+    |    WILDCARD
     ;

@@ -606,6 +606,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
+        // Special case: a single * matches any type
+        if ("*".equals(name)) {
+            return ".*";
+        }
+
         int length = name.length();
         StringBuilder sb = new StringBuilder(length);
         char prev = 0;
