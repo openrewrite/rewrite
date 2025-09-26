@@ -49,9 +49,9 @@ class HclQuotedTemplateTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
-                foo {
-                  default = "${ var.resource_group_name }"
-                }
+              foo {
+                default = "${ var.resource_group_name }"
+              }
               """
           )
         );
