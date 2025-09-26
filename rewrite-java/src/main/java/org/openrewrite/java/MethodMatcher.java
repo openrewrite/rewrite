@@ -432,6 +432,22 @@ public class MethodMatcher {
         if (!matchesMethodName(type.getName())) {
             return false;
         }
+
+        // Early argument count check to avoid expensive type matching
+        int actualArgCount = type.getParameterTypes().size();
+        if (varArgsPosition == -1) {
+            // No varargs - exact count match required
+            if (actualArgCount != argumentMatchers.size()) {
+                return false;
+            }
+        } else {
+            // With varargs - need at least (matchers - 1) arguments
+            // because varargs can match 0 or more arguments
+            if (actualArgCount < argumentMatchers.size() - 1) {
+                return false;
+            }
+        }
+
         if (!matchesTargetType(type.getDeclaringType())) {
             return false;
         }
@@ -538,6 +554,21 @@ public class MethodMatcher {
     private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {
         if (!matchesMethodName(method.getSimpleName())) {
             return false;
+        }
+
+        // Early argument count check to avoid expensive select matching
+        int actualArgCount = method.getArguments().size();
+        if (varArgsPosition == -1) {
+            // No varargs - exact count match required
+            if (actualArgCount != argumentMatchers.size()) {
+                return false;
+            }
+        } else {
+            // With varargs - need at least (matchers - 1) arguments
+            // because varargs can match 0 or more arguments
+            if (actualArgCount < argumentMatchers.size() - 1) {
+                return false;
+            }
         }
 
         // When checking receiver with unknown types, we still need to match the name pattern
