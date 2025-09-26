@@ -213,7 +213,7 @@ public class MethodMatcherBenchmark {
     @State(Scope.Benchmark)
     public static class SubpackagePattern {
         MethodMatcher subpackagePattern = new MethodMatcher("com.example..* save(..)");
-        MethodMatcher deepSubpackagePattern = new MethodMatcher("org.springframework.** *(..)");
+        MethodMatcher deepSubpackagePattern = new MethodMatcher("org.springframework..* *(..)");
 
         JavaType.Method[] methods = new JavaType.Method[] {
             newMethodType("com.example.UserService", "save", "com.example.User"),

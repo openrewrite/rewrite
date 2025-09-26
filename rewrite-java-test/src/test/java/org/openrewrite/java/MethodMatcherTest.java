@@ -119,9 +119,9 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matchesMethodNameWithDotSeparator() {
         assertTrue(nameRegex("A.foo()").matcher("foo").matches());
-//        assertTrue(nameRegex("*..*Service find*(..)").matcher("foo").matches());
-//        assertTrue(nameRegex("A.B.*()").matcher("foo").matches());
-//        assertTrue(nameRegex("A.fo*()").matcher("foo").matches());
+        assertTrue(nameRegex("*..*Service find*(..)").matcher("foo").matches());
+        assertTrue(nameRegex("A.B.*()").matcher("foo").matches());
+        assertTrue(nameRegex("A.fo*()").matcher("foo").matches());
     }
 
     @Test
@@ -154,8 +154,8 @@ class MethodMatcherTest implements RewriteTest {
 
     @Test
     void matchesArgumentsWithWildcards() {
-        assertTrue(argRegex("A foo(java.util.*)").matcher("java.util.Map").matches());
         assertTrue(argRegex("A foo(java..*)").matcher("java.util.Map").matches());
+        assertTrue(argRegex("A foo(java.util.*)").matcher("java.util.Map").matches());
         assertTrue(argRegex("A foo(*.util.*)").matcher("java.util.Map").matches());
         assertTrue(argRegex("A foo(*..*)").matcher("java.util.Map").matches());
     }
@@ -607,6 +607,13 @@ class MethodMatcherTest implements RewriteTest {
 
         assertTrue(new MethodMatcher("com.example.Service *find*By*(..)").matches(
           newMethodType("com.example.Service", "findUserByEmail", "java.lang.String")
+        ));
+    }
+
+    @Test
+    void wildcardPackagePatterns() {
+        assertTrue(new MethodMatcher("com.example..* *(..)").matches(
+          newMethodType("com.example.my.deeply.nested.Service", "findUserById", "long")
         ));
     }
 
