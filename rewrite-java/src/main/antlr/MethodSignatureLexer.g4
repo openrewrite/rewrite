@@ -5,11 +5,11 @@ lexer grammar MethodSignatureLexer;
 CONSTRUCTOR                   : '<constructor>' | '<init>';
 JAVASCRIPT_DEFAULT_METHOD     : '<default>';
 
-LPAREN          : '(';
-RPAREN          : ')';
+LPAREN          : WHITESPACE* '(' WHITESPACE*;
+RPAREN          : WHITESPACE* ')' WHITESPACE*;
 LBRACK          : '[';
 RBRACK          : ']';
-COMMA           : ',';
+COMMA           : WHITESPACE* ',' WHITESPACE*;
 
 // The widening of DOT to include '/' allows matching of package separators
 // in JavaScript and TypeScript import paths, e.g. @types/lodash..* map(..)
@@ -18,16 +18,23 @@ DOT             : '.' | '/';
 // §3.12 Operators
 
 BANG            : '!';
-WILDCARD        : '*';
+
+WILDCARD        : '*' ;
 
 AND             : '&&';
 OR              : '||';
 
 ELLIPSIS        : '...';
-
 DOTDOT          : '..';
 POUND           : '#';
-SPACE           : ' ';
+
+// Whitespace - not skipped, we handle it explicitly
+SPACE           : WHITESPACE+;
+
+fragment
+WHITESPACE
+    :   [ \t\r\n]
+    ;
 
 Identifier
     :   JavaLetter JavaLetterOrDigit*

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,7 +28,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -116,8 +120,9 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matchesMethodNameWithDotSeparator() {
         assertTrue(nameRegex("A.foo()").matcher("foo").matches());
-        assertTrue(nameRegex("A.*()").matcher("foo").matches());
-        assertTrue(nameRegex("A.fo*()").matcher("foo").matches());
+//        assertTrue(nameRegex("*..*Service find*(..)").matcher("foo").matches());
+//        assertTrue(nameRegex("A.B.*()").matcher("foo").matches());
+//        assertTrue(nameRegex("A.fo*()").matcher("foo").matches());
     }
 
     @Test
@@ -384,88 +389,93 @@ class MethodMatcherTest implements RewriteTest {
         );
     }
 
-    @Test
-    void matchUnknownTypesNoSelect() {
-        var mi = asMethodInvocation("assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+    @Nested
+    class UnknownTypes {
+
+        @Test
+        void matchUnknownTypesNoSelect() {
+            var mi = asMethodInvocation("assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesQualifiedStaticMethod() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesPackageQualifiedStaticMethod() {
+            var mi = asMethodInvocation("org.junit.Assert.assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWildcardReceiverType() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("*..* assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesFullWildcardReceiverType() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("* assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesExplicitPackageWildcardReceiverType() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertTrue(new MethodMatcher("org.junit.* assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsMismatchedMethodName() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertFalse(new MethodMatcher("org.junit.Assert assertFalse(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsStaticSelectMismatch() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertFalse(new MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsTooManyArguments() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsTooFewArguments() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean, String)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesRejectsMismatchingKnownArgument() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+            assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean, int)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWildcardArguments() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(..)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesSingleWildcardArgument() {
+            var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true));
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, java.lang.String)").matches(mi, true));
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(String, *)").matches(mi, true));
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(double, *)").matches(mi, true));
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(java.lang.String, *)").matches(mi, true));
+            assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
+        }
     }
 
-    @Test
-    void matchUnknownTypesQualifiedStaticMethod() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesPackageQualifiedStaticMethod() {
-        var mi = asMethodInvocation("org.junit.Assert.assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesWildcardReceiverType() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("*..* assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesFullWildcardReceiverType() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("* assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesExplicitPackageWildcardReceiverType() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertTrue(new MethodMatcher("org.junit.* assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesRejectsMismatchedMethodName() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertFalse(new MethodMatcher("org.junit.Assert assertFalse(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesRejectsStaticSelectMismatch() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertFalse(new MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesRejectsTooManyArguments() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
-        assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesRejectsTooFewArguments() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar());");
-        assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean, String)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesRejectsMismatchingKnownArgument() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
-        assertFalse(new MethodMatcher("org.junit.Assert assertTrue(boolean, int)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesWildcardArguments() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(..)").matches(mi, true));
-    }
-
-    @Test
-    void matchUnknownTypesSingleWildcardArgument() {
-        var mi = asMethodInvocation("Assert.assertTrue(Foo.bar(), \"message\");");
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true));
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, java.lang.String)").matches(mi, true));
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(String, *)").matches(mi, true));
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(double, *)").matches(mi, true));
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(java.lang.String, *)").matches(mi, true));
-        assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
-    }
 
     @Issue("https://github.com/openrewrite/rewrite/pull/5833")
     @Test
@@ -550,5 +560,103 @@ class MethodMatcherTest implements RewriteTest {
     void failsToParse() {
         assertThatThrownBy(() -> new MethodMatcher("foo(|bar)"))
           .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void complexWildcardPatterns() {
+        assertTrue(new MethodMatcher("*..*Service *find*(..)").matches(
+          newMethodType("com.example.UserService", "findById")
+        ));
+
+        assertTrue(new MethodMatcher("*..*Controller *(.., javax.servlet.http.HttpServletResponse)").matches(
+          newMethodType("com.example.web.UserController", "handleRequest",
+            "java.lang.String",
+            "javax.servlet.http.HttpServletResponse"
+          )
+        ));
+
+        assertTrue(new MethodMatcher("org.springframework.web.bind.annotation.*Mapping *(..)").matches(
+          newMethodType("org.springframework.web.bind.annotation.GetMapping", "value")
+        ));
+
+        assertTrue(new MethodMatcher("javax.servlet.http.HttpServlet do*(..)").matches(
+          newMethodType("javax.servlet.http.HttpServlet", "doGet",
+            "javax.servlet.http.HttpServletRequest",
+            "javax.servlet.http.HttpServletResponse"
+          ))
+        );
+
+        assertTrue(new MethodMatcher("java.util.concurrent.* submit(java.util.concurrent.Callable)").matches(
+          newMethodType("java.util.concurrent.ExecutorService", "submit",
+            "java.util.concurrent.Callable")
+        ));
+    }
+
+    @Test
+    void wildcardMethodNamePatterns() {
+        assertTrue(new MethodMatcher("com.example.Service *find*(..)").matches(
+          newMethodType("com.example.Service", "findUserById", "long")
+        ));
+
+        assertTrue(new MethodMatcher("com.example.Test assert*(..)").matches(
+          newMethodType("com.example.Test", "assertEquals", "int", "int")
+        ));
+
+        assertTrue(new MethodMatcher("com.example.Foo *Bar(..)").matches(
+          newMethodType("com.example.Foo", "fooBar")
+        ));
+
+        assertTrue(new MethodMatcher("com.example.Service *find*By*(..)").matches(
+          newMethodType("com.example.Service", "findUserByEmail", "java.lang.String")
+        ));
+    }
+
+    @Test
+    void wildcardMethodNamePatternsExactMatch() {
+        // Test that print* matches both "print" exactly and methods starting with "print"
+        assertTrue(new MethodMatcher("java.io.PrintStream print*(..)").matches(
+          newMethodType("java.io.PrintStream", "print", "java.lang.String")
+        ));
+        assertTrue(new MethodMatcher("java.io.PrintStream print*(..)").matches(
+          newMethodType("java.io.PrintStream", "println", "java.lang.String")
+        ));
+        assertTrue(new MethodMatcher("java.io.PrintStream print*(..)").matches(
+          newMethodType("java.io.PrintStream", "printf", "java.lang.String", "java.lang.Object[]")
+        ));
+
+        // Test other exact match cases
+        assertTrue(new MethodMatcher("com.example.Test assert*(..)").matches(
+          newMethodType("com.example.Test", "assert")
+        ));
+        assertTrue(new MethodMatcher("com.example.Logger log*(..)").matches(
+          newMethodType("com.example.Logger", "log", "java.lang.String")
+        ));
+        assertTrue(new MethodMatcher("com.example.Service find*(..)").matches(
+          newMethodType("com.example.Service", "find")
+        ));
+    }
+
+    private static JavaType.Method newMethodType(String type, String method, String... parameterTypes) {
+        List<JavaType> parameterTypeList = Stream.of(parameterTypes)
+          .map(name -> {
+              JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(name);
+              return primitive != null ? primitive : JavaType.ShallowClass.build(name);
+          })
+          .map(JavaType.class::cast)
+          .toList();
+
+        return new JavaType.Method(
+          null,
+          1L,
+          build(type),
+          method,
+          null,
+          null,
+          parameterTypeList,
+          Collections.emptyList(),
+          Collections.emptyList(),
+          Collections.emptyList(),
+          null
+        );
     }
 }

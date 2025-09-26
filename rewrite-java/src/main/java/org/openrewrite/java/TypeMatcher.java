@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
@@ -85,8 +87,8 @@ public class TypeMatcher implements Reference.Matcher {
 
     public boolean matchesPackage(String packageName) {
         return targetTypePattern.matcher(packageName).matches() ||
-               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
+                targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
+                        "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -99,15 +101,29 @@ public class TypeMatcher implements Reference.Matcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+                this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null &&
-               context.AND() == null &&
-               context.OR() == null &&
-               context.classNameOrInterface().DOTDOT().isEmpty() &&
-               context.classNameOrInterface().WILDCARD().isEmpty();
+                !hasWildcards(context.classNameOrInterface());
+    }
+
+    private static boolean hasWildcards(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
+        // Check if any of the tokens are wildcards or dots (but not array dimensions)
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            ParseTree child = ctx.getChild(i);
+            if (child instanceof TerminalNode) {
+                TerminalNode node = (TerminalNode) child;
+                int tokenType = node.getSymbol().getType();
+                if (tokenType == MethodSignatureLexer.WILDCARD ||
+                    tokenType == MethodSignatureLexer.DOT ||
+                    tokenType == MethodSignatureLexer.DOTDOT) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

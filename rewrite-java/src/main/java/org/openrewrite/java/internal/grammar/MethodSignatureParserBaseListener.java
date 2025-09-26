@@ -1,19 +1,4 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -68,25 +53,13 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterWildcard(MethodSignatureParser.WildcardContext ctx) { }
+	@Override public void enterFormalsTail(MethodSignatureParser.FormalsTailContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void exitWildcard(MethodSignatureParser.WildcardContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDotDot(MethodSignatureParser.DotDotContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDotDot(MethodSignatureParser.DotDotContext ctx) { }
+	@Override public void exitFormalsTail(MethodSignatureParser.FormalsTailContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -99,18 +72,6 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -152,6 +113,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -159,6 +132,18 @@ public class MethodSignatureParserBaseListener implements MethodSignatureParserL
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

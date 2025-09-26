@@ -1,19 +1,4 @@
-/*
- * Copyright 2025 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -44,29 +29,17 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx);
 	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#wildcard}.
+	 * Visit a parse tree produced by {@link MethodSignatureParser#formalsTail}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	T visitWildcard(MethodSignatureParser.WildcardContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#dotDot}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDotDot(MethodSignatureParser.DotDotContext ctx);
+	T visitFormalsTail(MethodSignatureParser.FormalsTailContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#formalsPatternAfterDotDot}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitFormalsPatternAfterDotDot(MethodSignatureParser.FormalsPatternAfterDotDotContext ctx);
-	/**
-	 * Visit a parse tree produced by {@link MethodSignatureParser#optionalParensTypePattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitOptionalParensTypePattern(MethodSignatureParser.OptionalParensTypePatternContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#targetTypePattern}.
 	 * @param ctx the parse tree
@@ -86,9 +59,21 @@ public interface MethodSignatureParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#arrayDimensions}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitArrayDimensions(MethodSignatureParser.ArrayDimensionsContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link MethodSignatureParser#simpleNamePattern}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitSimpleNamePattern(MethodSignatureParser.SimpleNamePatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link MethodSignatureParser#simpleNamePart}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitSimpleNamePart(MethodSignatureParser.SimpleNamePartContext ctx);
 }
