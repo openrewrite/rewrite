@@ -356,13 +356,13 @@ public class MethodMatcher {
     }
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
-        return getTargetTypeMatcher().matches(fullyQualifiedTypeName);
+        return getTargetTypeMatcher().matchesType(fullyQualifiedTypeName);
     }
 
     boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
-        // For unknown types, allow if pattern contains wildcards
+        // For unknown types, allow if pattern matches any type
         if (type == null || type instanceof JavaType.Unknown) {
-            return targetType.contains("*") || targetType.contains("..");
+            return targetType.equals("*") || targetType.equals("*..*");
         }
         return TypeUtils.isOfTypeWithName(
                 type,
@@ -376,7 +376,7 @@ public class MethodMatcher {
         if (this.methodName != null) {
             return this.methodName.equals(name);
         }
-        return methodNameMatcher != null && methodNameMatcher.matches(name);
+        return methodNameMatcher != null && methodNameMatcher.matchesMethod(name);
     }
 
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
@@ -387,9 +387,7 @@ public class MethodMatcher {
     private boolean matchesParameterTypesWithMatchers(List<JavaType> types) {
         if (varArgsPosition == -1) {
             // No varargs - exact match required
-            if (types.size() != argumentMatchers.size()) {
-                return false;
-            }
+            // Size check is already done in the caller for performance
             for (int i = 0; i < types.size(); i++) {
                 if (!argumentMatchers.get(i).matches(types.get(i))) {
                     return false;
@@ -473,8 +471,7 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // * is a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = "*".equals(targetType) || matchesTargetType(enclosing.getType());
-        if (!matchesTargetType) {
+        if (!("*".equals(targetType) || matchesTargetType(enclosing.getType()))) {
             return false;
         }
 
@@ -639,7 +636,7 @@ public class MethodMatcher {
         } else {
             AspectJMatcher matcher = getTargetTypeMatcher();
             // Try matching just the simple name
-            if (matcher.matches(simpleName)) {
+            if (matcher.matchesType(simpleName)) {
                 return true;
             }
             // Also try matching with stripped package wildcards
@@ -688,14 +685,14 @@ public class MethodMatcher {
     public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
         if (methodName != null && !methodName.equals(fieldAccess.getName().getSimpleName())) {
             return false;
-        } else if (methodNameMatcher != null && !methodNameMatcher.matches(fieldAccess.getName().getSimpleName())) {
+        } else if (methodNameMatcher != null && !methodNameMatcher.matchesMethod(fieldAccess.getName().getSimpleName())) {
             return false;
         }
 
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             String simpleName = ((J.Identifier) target).getSimpleName();
-            return getTargetTypeMatcher().matches(simpleName);
+            return getTargetTypeMatcher().matchesType(simpleName);
         } else if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType);
         }
@@ -820,7 +817,11 @@ public class MethodMatcher {
             return pattern;
         }
 
-        boolean matches(String text) {
+        /**
+         * Match a type name (fully qualified class name).
+         * Handles package separators (.), inner class separators ($), and package wildcards (..).
+         */
+        boolean matchesType(String text) {
             if (isFullWildcard) {
                 return true;
             }
@@ -897,23 +898,118 @@ public class MethodMatcher {
                     return false;
                 }
             } else if (pattern.charAt(pattern.length() - 1) == '*' && !containsDotDot) {
-                // Pattern like Prefix* - just check if text starts with Prefix
-                int prefixLength = pattern.length() - 1;
-                if (text.length() >= prefixLength &&
-                    text.regionMatches(0, pattern, 0, prefixLength)) {
-                    // Also verify no dots or dollars in the suffix part
-                    for (int i = prefixLength; i < text.length(); i++) {
-                        char c = text.charAt(i);
-                        if (c == '.' || c == '$') {
-                            return false;
+                // Pattern like Prefix* - but only if there's exactly one wildcard
+                // Check if this is the only '*' in the pattern
+                if (pattern.indexOf('*') == pattern.length() - 1) {
+                    // Pattern like Prefix* - just check if text starts with Prefix
+                    int prefixLength = pattern.length() - 1;
+                    if (text.length() >= prefixLength &&
+                        text.regionMatches(0, pattern, 0, prefixLength)) {
+                        // Also verify no dots or dollars in the suffix part
+                        for (int i = prefixLength; i < text.length(); i++) {
+                            char c = text.charAt(i);
+                            if (c == '.' || c == '$') {
+                                return false;
+                            }
                         }
+                        return true;
                     }
-                    return true;
+                    return false;
                 }
-                return false;
+                // Multiple wildcards - fall through to general matching
             }
 
             return matchesPattern(pattern, text, 0, 0);
+        }
+
+        /**
+         * Match a method name (simple name only, no package/class qualifiers).
+         * Only supports * wildcards for glob matching. Does not handle . or $ or ..
+         * since method names cannot contain these characters.
+         */
+        boolean matchesMethod(String methodName) {
+            if (isFullWildcard) {
+                return true;
+            }
+            if (isSimplePattern) {
+                return pattern.equals(methodName);
+            }
+
+            // Method names are simpler - only need to handle * wildcards
+            // No need to check for dots or dollars since method names can't contain them
+            return matchesMethodPattern(pattern, methodName, 0, 0);
+        }
+
+        private boolean matchesMethodPattern(String pattern, String text, int pIdx, int tIdx) {
+            // Match character by character for method names
+            while (pIdx < pattern.length()) {
+                if (tIdx >= text.length()) {
+                    // If remaining pattern is all wildcards, it's still a match
+                    while (pIdx < pattern.length()) {
+                        if (pattern.charAt(pIdx) != '*') {
+                            return false;
+                        }
+                        pIdx++;
+                    }
+                    return true;
+                }
+
+                char p = pattern.charAt(pIdx);
+
+                if (p == '*') {
+                    // * matches any characters
+                    pIdx++;
+                    if (pIdx >= pattern.length()) {
+                        // * at end matches rest of text
+                        return true;
+                    }
+
+                    // Look ahead for the next literal segment
+                    int segmentStart = pIdx;
+                    int segmentEnd = segmentStart;
+                    while (segmentEnd < pattern.length() && pattern.charAt(segmentEnd) != '*') {
+                        segmentEnd++;
+                    }
+
+                    if (segmentStart < segmentEnd) {
+                        // We have a literal segment to find
+                        int segmentLength = segmentEnd - segmentStart;
+
+                        // Try to find this segment in the remaining text
+                        while (tIdx <= text.length() - segmentLength) {
+                            if (text.regionMatches(tIdx, pattern, segmentStart, segmentLength)) {
+                                // Found the segment, continue matching after it
+                                if (matchesMethodPattern(pattern, text, segmentEnd, tIdx + segmentLength)) {
+                                    return true;
+                                }
+                            }
+                            tIdx++;
+                        }
+                        return false;
+                    }
+
+                    // No literal segment - try matching rest at each position
+                    if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
+                        return true;
+                    }
+                    while (tIdx < text.length()) {
+                        tIdx++;
+                        if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } else {
+                    // Literal character must match
+                    if (pattern.charAt(pIdx) != text.charAt(tIdx)) {
+                        return false;
+                    }
+                    pIdx++;
+                    tIdx++;
+                }
+            }
+
+            return tIdx == text.length();
         }
 
         private boolean matchesPattern(String pattern, String text, int pIdx, int tIdx) {
@@ -1102,7 +1198,7 @@ public class MethodMatcher {
                 }
             }
 
-            return getMatcher().matches(typeStr);
+            return getMatcher().matchesType(typeStr);
         }
 
         @Override

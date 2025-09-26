@@ -635,6 +635,36 @@ class MethodMatcherTest implements RewriteTest {
         ));
     }
 
+    @Test
+    void multipleWildcardsInMethodName() {
+        // Test the specific case from the request: get*Record* should match getRecords
+        assertTrue(new MethodMatcher("org.springframework.kafka.test.utils.KafkaTestUtils get*Record*(.., long)").matches(
+          newMethodType("org.springframework.kafka.test.utils.KafkaTestUtils", "getRecords",
+            "org.apache.kafka.clients.consumer.Consumer", "long")
+        ));
+
+        // Test patterns with multiple wildcards where there's text between wildcards in both pattern and method name
+        // Pattern: get*Records* should match getRecordsById (wildcards match "", "ById")
+        assertTrue(new MethodMatcher("com.example.Test get*Records*(..)").matches(
+          newMethodType("com.example.Test", "getRecordsById")
+        ));
+
+        // Pattern: find*By*Name should match findUserByName (wildcards match "User", "")
+        assertTrue(new MethodMatcher("com.example.Service find*By*Name(..)").matches(
+          newMethodType("com.example.Service", "findUserByName", "java.lang.String")
+        ));
+
+        // Pattern: get*And* should match getUserAndAccount (wildcards match "User", "Account")
+        assertTrue(new MethodMatcher("com.example.Repository get*And*(..)").matches(
+          newMethodType("com.example.Repository", "getUserAndAccount", "long", "long")
+        ));
+
+        // Test with wildcards at the start
+        assertTrue(new MethodMatcher("com.example.Test *find*(..)").matches(
+          newMethodType("com.example.Test", "prefixfindSuffix")
+        ));
+    }
+
     private static JavaType.Method newMethodType(String type, String method, String... parameterTypes) {
         List<JavaType> parameterTypeList = Stream.of(parameterTypes)
           .map(name -> {
