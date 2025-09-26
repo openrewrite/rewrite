@@ -260,7 +260,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeFromEjbTypeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.jboss.pnc", "constants", null)),
           pomXml(
             """
               <project>
@@ -270,9 +270,9 @@ class ExcludeDependencyTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <dependency>
-                    <groupId>com.psc.jobs</groupId>
-                    <artifactId>jobs-configuration</artifactId>
-                    <version>2.33.0</version>
+                    <groupId>org.jboss.da</groupId>
+                    <artifactId>common</artifactId>
+                    <version>2.6.9</version>
                     <type>ejb</type>
                   </dependency>
                 </dependencies>
@@ -286,14 +286,14 @@ class ExcludeDependencyTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <dependency>
-                    <groupId>com.psc.jobs</groupId>
-                    <artifactId>jobs-configuration</artifactId>
-                    <version>2.33.0</version>
+                    <groupId>org.jboss.da</groupId>
+                    <artifactId>common</artifactId>
+                    <version>2.6.9</version>
                     <type>ejb</type>
                     <exclusions>
                       <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
+                        <groupId>org.jboss.pnc</groupId>
+                        <artifactId>constants</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>
@@ -308,7 +308,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeFromManagedEjbTypeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.jboss.pnc", "constants", null)),
           pomXml(
             """
               <project>
@@ -319,17 +319,17 @@ class ExcludeDependencyTest implements RewriteTest {
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>com.psc.jobs</groupId>
-                      <artifactId>jobs-configuration</artifactId>
-                      <version>2.33.0</version>
+                      <groupId>org.jboss.da</groupId>
+                      <artifactId>common</artifactId>
+                      <version>2.6.9</version>
                       <type>ejb</type>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
                 <dependencies>
                   <dependency>
-                    <groupId>com.psc.jobs</groupId>
-                    <artifactId>jobs-configuration</artifactId>
+                    <groupId>org.jboss.da</groupId>
+                    <artifactId>common</artifactId>
                     <type>ejb</type>
                   </dependency>
                 </dependencies>
@@ -344,22 +344,22 @@ class ExcludeDependencyTest implements RewriteTest {
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>com.psc.jobs</groupId>
-                      <artifactId>jobs-configuration</artifactId>
-                      <version>2.33.0</version>
+                      <groupId>org.jboss.da</groupId>
+                      <artifactId>common</artifactId>
+                      <version>2.6.9</version>
                       <type>ejb</type>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
                 <dependencies>
                   <dependency>
-                    <groupId>com.psc.jobs</groupId>
-                    <artifactId>jobs-configuration</artifactId>
+                    <groupId>org.jboss.da</groupId>
+                    <artifactId>common</artifactId>
                     <type>ejb</type>
                     <exclusions>
                       <exclusion>
-                        <groupId>commons-logging</groupId>
-                        <artifactId>commons-logging</artifactId>
+                        <groupId>org.jboss.pnc</groupId>
+                        <artifactId>constants</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>
