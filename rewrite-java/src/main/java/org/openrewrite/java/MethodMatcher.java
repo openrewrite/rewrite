@@ -837,10 +837,10 @@ public class MethodMatcher {
             }
 
             // Optimize pattern *..*Something (any packages + class name pattern)
-            if (pattern.length() > 3 && pattern.charAt(0) == '*' && pattern.charAt(1) == '.' && pattern.charAt(2) == '.') {
+            if (pattern.length() > 3 && pattern.startsWith("*..")) {
                 // Find the simple class name (part after last dot or dollar sign for inner classes)
                 int lastDot = text.lastIndexOf('.');
-                int lastDollar = text.lastIndexOf('$');
+                int lastDollar = text.indexOf('$', lastDot + 1);
                 int lastSeparator = Math.max(lastDot, lastDollar);
 
                 if (lastSeparator >= 0) {
