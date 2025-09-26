@@ -262,7 +262,12 @@ public class MethodMatcher {
     @Deprecated
     public Pattern getTargetTypePattern() {
         // For backward compatibility, convert to Pattern
-        return Pattern.compile(StringUtils.aspectjNameToPattern(targetTypeMatcher.getPattern()));
+        String pattern = targetTypeMatcher.getPattern();
+        // Reconstruct ..*  suffix for PackagePrefix patterns
+        if (targetTypeMatcher.patternType == AspectJMatcher.PatternType.PackagePrefix) {
+            pattern = pattern + "..*";
+        }
+        return Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
     }
 
     @Deprecated
@@ -793,33 +798,39 @@ public class MethodMatcher {
      * - Literal matching for everything else
      */
     static class AspectJMatcher {
+        enum PatternType {
+            FullWildcard,    // "*" or "*..*" - matches anything
+            Exact,           // "com.foo.Bar" - no wildcards, exact match
+            PackagePrefix,   // "com.foo" (represents "com.foo..*") - package prefix
+            Wildcard         // Other patterns with * or .. requiring full matching
+        }
+
         private final String pattern;
-        private final boolean isFullWildcard;   // Just "*"
-        private final boolean containsDotDot;
-        private final boolean isSimplePattern;  // No wildcards
+        private final PatternType patternType;
         private final int arrayDimensions;      // Number of [] in the type
         private final boolean isVarargs;        // Has ... (ELLIPSIS)
 
         AspectJMatcher(String pattern) {
-            this(pattern, 0, false);
-        }
-
-        AspectJMatcher(String pattern, int arrayDimensions) {
-            this(pattern, arrayDimensions, false);
+            this(pattern, 0, false, null);
         }
 
         AspectJMatcher(String pattern, int arrayDimensions, boolean isVarargs) {
+            this(pattern, arrayDimensions, isVarargs, null);
+        }
+
+        AspectJMatcher(String pattern, int arrayDimensions, boolean isVarargs, @Nullable PatternType explicitType) {
             this.pattern = pattern;
             this.arrayDimensions = arrayDimensions;
             this.isVarargs = isVarargs;
-            if ("*".equals(pattern) || "*..*".equals(pattern)) {
-                this.isFullWildcard = true;
-                this.containsDotDot = false;
-                this.isSimplePattern = false;
+
+            if (explicitType != null) {
+                this.patternType = explicitType;
+            } else if ("*".equals(pattern) || "*..*".equals(pattern)) {
+                this.patternType = PatternType.FullWildcard;
+            } else if (!pattern.contains("*") && !pattern.contains("..")) {
+                this.patternType = PatternType.Exact;
             } else {
-                this.isFullWildcard = false;
-                this.containsDotDot = pattern.contains("..");
-                this.isSimplePattern = !pattern.contains("*") && !containsDotDot;
+                this.patternType = PatternType.Wildcard;
             }
         }
 
@@ -832,11 +843,11 @@ public class MethodMatcher {
         }
 
         boolean matchesAnyType() {
-            return isFullWildcard;
+            return patternType == PatternType.FullWildcard;
         }
 
         boolean isSimplePattern() {
-            return isSimplePattern;
+            return patternType == PatternType.Exact;
         }
 
         String getPattern() {
@@ -848,8 +859,32 @@ public class MethodMatcher {
          * This is the primary matching method that avoids allocations.
          */
         boolean matches(@Nullable JavaType type) {
+            return matchesWithArrayDepth(type, arrayDimensions);
+        }
+
+        private boolean matchesWithArrayDepth(@Nullable JavaType type, int expectedArrayDepth) {
             if (type == null) {
                 return false;
+            }
+
+            // Unwrap array dimensions to match the expected depth
+            while (expectedArrayDepth > 0 && type instanceof JavaType.Array) {
+                type = ((JavaType.Array) type).getElemType();
+                expectedArrayDepth--;
+            }
+
+            // If we expected arrays but didn't get them, or got too many, fail
+            if (expectedArrayDepth > 0) {
+                return false;
+            }
+
+            // For varargs patterns, the type should be an array
+            if (isVarargs) {
+                if (type instanceof JavaType.Array) {
+                    type = ((JavaType.Array) type).getElemType();
+                } else {
+                    return false;
+                }
             }
 
             if (type instanceof JavaType.Primitive) {
@@ -861,15 +896,6 @@ public class MethodMatcher {
                     return matchesType(primitive.getClassName());
                 }
 
-                return false;
-            }
-
-            if (type instanceof JavaType.Array) {
-                if (arrayDimensions > 0 || isVarargs) {
-                    JavaType elemType = ((JavaType.Array) type).getElemType();
-                    AspectJMatcher baseMatcher = new AspectJMatcher(pattern);
-                    return baseMatcher.matches(elemType);
-                }
                 return false;
             }
 
@@ -886,104 +912,28 @@ public class MethodMatcher {
          * Handles package separators (.), inner class separators ($), and package wildcards (..).
          */
         boolean matchesType(String text) {
-            if (isFullWildcard) {
-                return true;
-            }
-            if (isSimplePattern) {
-                // For simple patterns, handle $ vs . equivalence for inner classes
-                if (pattern.equals(text)) {
+            switch (patternType) {
+                case FullWildcard:
                     return true;
-                }
-                // Check if they're equal when normalized ($ replaced with .)
-                if (pattern.length() == text.length()) {
-                    return pattern.replace('$', '.').equals(text.replace('$', '.'));
-                }
-                return false;
-            }
-
-            // Optimize pattern *..*Something (any packages + class name pattern)
-            if (pattern.length() > 3 && pattern.startsWith("*..")) {
-                // Find the simple class name (part after last dot or dollar sign for inner classes)
-                int lastDot = text.lastIndexOf('.');
-                int lastDollar = text.indexOf('$', lastDot + 1);
-                int lastSeparator = Math.max(lastDot, lastDollar);
-
-                if (lastSeparator >= 0) {
-                    // Match pattern after *.. against simple name only
-                    return matchesPattern(pattern, text, 3, lastSeparator + 1);
-                } else {
-                    // No package, match pattern after *.. against entire text
-                    return matchesPattern(pattern, text, 3, 0);
-                }
-            }
-
-            // Optimize common patterns like *Suffix or Prefix*
-            if (pattern.charAt(0) == '*' && !containsDotDot) {
-                int nextStar = pattern.indexOf('*', 1);
-                if (nextStar == -1) {
-                    // Pattern like *Suffix - just check if text ends with Suffix
-                    int suffixLength = pattern.length() - 1;
-                    if (text.length() >= suffixLength &&
-                            text.regionMatches(text.length() - suffixLength, pattern, 1, suffixLength)) {
-                        // Also verify no dots (or dollars for inner classes) in the prefix part
-                        for (int i = 0; i < text.length() - suffixLength; i++) {
-                            char c = text.charAt(i);
-                            if (c == '.' || c == '$') {
-                                return false;
-                            }
-                        }
+                case Exact:
+                    // For exact patterns, handle $ vs . equivalence for inner classes
+                    if (pattern.equals(text)) {
                         return true;
                     }
-                    return false;
-                } else if (nextStar == pattern.length() - 1) {
-                    // Pattern like *Middle* - check if text contains Middle
-                    int middleStart = 1;
-                    int middleLength = nextStar - 1;
-
-                    // Search for the middle part
-                    for (int i = 0; i <= text.length() - middleLength; i++) {
-                        if (text.regionMatches(i, pattern, middleStart, middleLength)) {
-                            // Found it - check no dots or dollars before or after
-                            for (int j = 0; j < i; j++) {
-                                char c = text.charAt(j);
-                                if (c == '.' || c == '$') {
-                                    return false;
-                                }
-                            }
-                            for (int j = i + middleLength; j < text.length(); j++) {
-                                char c = text.charAt(j);
-                                if (c == '.' || c == '$') {
-                                    return false;
-                                }
-                            }
-                            return true;
-                        }
+                    // Check if they're equal when normalized ($ replaced with .)
+                    if (pattern.length() == text.length()) {
+                        return pattern.replace('$', '.').equals(text.replace('$', '.'));
                     }
                     return false;
-                }
-            } else if (pattern.charAt(pattern.length() - 1) == '*' && !containsDotDot) {
-                // Pattern like Prefix* - but only if there's exactly one wildcard
-                // Check if this is the only '*' in the pattern
-                if (pattern.indexOf('*') == pattern.length() - 1) {
-                    // Pattern like Prefix* - just check if text starts with Prefix
-                    int prefixLength = pattern.length() - 1;
-                    if (text.length() >= prefixLength &&
-                            text.regionMatches(0, pattern, 0, prefixLength)) {
-                        // Also verify no dots or dollars in the suffix part
-                        for (int i = prefixLength; i < text.length(); i++) {
-                            char c = text.charAt(i);
-                            if (c == '.' || c == '$') {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                    return false;
-                }
-                // Multiple wildcards - fall through to general matching
+                case PackagePrefix:
+                    // Fast path for patterns like "com.foo" (representing "com.foo..*")
+                    // Check if text starts with prefix and next char is a package separator (.)
+                    // Note: $ is not a package separator, only . is valid here
+                    int prefixLen = pattern.length();
+                    return text.length() > prefixLen && text.startsWith(pattern) && text.charAt(prefixLen) == '.';
+                default:
+                    return matchesPattern(pattern, text, 0, 0);
             }
-
-            return matchesPattern(pattern, text, 0, 0);
         }
 
         /**
@@ -992,11 +942,10 @@ public class MethodMatcher {
          * since method names cannot contain these characters.
          */
         boolean matchesMethod(String methodName) {
-            if (isFullWildcard) {
-                return true;
-            }
-            if (isSimplePattern) {
+            if (patternType == PatternType.Exact) {
                 return pattern.equals(methodName);
+            } else if (patternType == PatternType.FullWildcard) {
+                return true;
             }
 
             // Method names are simpler - only need to handle * wildcards
@@ -1006,10 +955,11 @@ public class MethodMatcher {
 
         private boolean matchesMethodPattern(String pattern, String text, int pIdx, int tIdx) {
             // Match character by character for method names
-            while (pIdx < pattern.length()) {
-                if (tIdx >= text.length()) {
+            int pLength = pattern.length(), tLength = text.length();
+            while (pIdx < pLength) {
+                if (tIdx >= tLength) {
                     // If remaining pattern is all wildcards, it's still a match
-                    while (pIdx < pattern.length()) {
+                    while (pIdx < pLength) {
                         if (pattern.charAt(pIdx) != '*') {
                             return false;
                         }
@@ -1023,40 +973,16 @@ public class MethodMatcher {
                 if (p == '*') {
                     // * matches any characters
                     pIdx++;
-                    if (pIdx >= pattern.length()) {
+                    if (pIdx >= pLength) {
                         // * at end matches rest of text
                         return true;
                     }
 
-                    // Look ahead for the next literal segment
-                    int segmentStart = pIdx;
-                    int segmentEnd = segmentStart;
-                    while (segmentEnd < pattern.length() && pattern.charAt(segmentEnd) != '*') {
-                        segmentEnd++;
-                    }
-
-                    if (segmentStart < segmentEnd) {
-                        // We have a literal segment to find
-                        int segmentLength = segmentEnd - segmentStart;
-
-                        // Try to find this segment in the remaining text
-                        while (tIdx <= text.length() - segmentLength) {
-                            if (text.regionMatches(tIdx, pattern, segmentStart, segmentLength)) {
-                                // Found the segment, continue matching after it
-                                if (matchesMethodPattern(pattern, text, segmentEnd, tIdx + segmentLength)) {
-                                    return true;
-                                }
-                            }
-                            tIdx++;
-                        }
-                        return false;
-                    }
-
-                    // No literal segment - try matching rest at each position
+                    // Try matching rest at each position
                     if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
                         return true;
                     }
-                    while (tIdx < text.length()) {
+                    while (tIdx < tLength) {
                         tIdx++;
                         if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
                             return true;
@@ -1073,7 +999,7 @@ public class MethodMatcher {
                 }
             }
 
-            return tIdx == text.length();
+            return tIdx == tLength;
         }
 
         private boolean matchesPattern(String pattern, String text, int pIdx, int tIdx) {
@@ -1081,11 +1007,12 @@ public class MethodMatcher {
             int pLength = pattern.length();
             int tLength = text.length();
             while (pIdx < pLength) {
+                char p = pattern.charAt(pIdx);
+
                 // Check if we've run out of text
                 if (tIdx >= tLength) {
                     // If remaining pattern is all wildcards, it's still a match
                     while (pIdx < pLength) {
-                        char p = pattern.charAt(pIdx);
                         if (p == '*') {
                             pIdx++;
                         } else if (p == '.' && pIdx + 1 < pLength && pattern.charAt(pIdx + 1) == '.') {
@@ -1096,8 +1023,6 @@ public class MethodMatcher {
                     }
                     return true;
                 }
-
-                char p = pattern.charAt(pIdx);
 
                 if (p == '*') {
                     // * matches any characters except '.'
@@ -1111,37 +1036,6 @@ public class MethodMatcher {
                         return true;
                     }
 
-                    // Look ahead for the next literal segment
-                    int segmentStart = pIdx;
-                    int segmentEnd = segmentStart;
-                    while (segmentEnd < pLength && pattern.charAt(segmentEnd) != '*' &&
-                            !(pattern.charAt(segmentEnd) == '.' && segmentEnd + 1 < pLength &&
-                                    pattern.charAt(segmentEnd + 1) == '.')) {
-                        segmentEnd++;
-                    }
-
-                    if (segmentStart < segmentEnd) {
-                        // We have a literal segment to find
-                        int segmentLength = segmentEnd - segmentStart;
-
-                        // Try to find this segment in the remaining text
-                        while (tIdx <= tLength - segmentLength) {
-                            if (text.charAt(tIdx) == '.') {
-                                return false;  // * can't match dots
-                            }
-
-                            if (text.regionMatches(tIdx, pattern, segmentStart, segmentLength)) {
-                                // Found the segment, continue matching after it
-                                if (matchesPattern(pattern, text, segmentEnd, tIdx + segmentLength)) {
-                                    return true;
-                                }
-                            }
-                            tIdx++;
-                        }
-                        return false;
-                    }
-
-                    // Fall back to original algorithm for edge cases
                     // Try to match rest of pattern at each position
                     if (matchesPattern(pattern, text, pIdx, tIdx)) {
                         return true;
@@ -1218,8 +1112,13 @@ public class MethodMatcher {
 
         String getPatternString() {
             String pattern = matcher.getPattern();
-
             StringBuilder adjustedPattern = new StringBuilder(pattern);
+
+            // Reconstruct ..*  suffix for PackagePrefix patterns
+            if (matcher.patternType == AspectJMatcher.PatternType.PackagePrefix) {
+                adjustedPattern.append("..*");
+            }
+
             for (int i = 0; i < matcher.getArrayDimensions(); i++) {
                 adjustedPattern.append("[]");
             }
@@ -1292,7 +1191,10 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
         if (classNameCtx == null) {
             return new MethodMatcher.AspectJMatcher("*");
         }
+        return buildAspectJMatcher(classNameCtx);
+    }
 
+    static MethodMatcher.AspectJMatcher buildAspectJMatcher(MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx) {
         int arrayDimensions = 0;
         MethodSignatureParser.ArrayDimensionsContext arrayCtx = classNameCtx.arrayDimensions();
         if (arrayCtx != null) {
@@ -1300,11 +1202,51 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
         }
 
         StringBuilder patternBuilder = new StringBuilder();
-        for (ParseTree child : classNameCtx.children) {
-            if (!(child instanceof MethodSignatureParser.ArrayDimensionsContext)) {
+        MethodMatcher.AspectJMatcher.PatternType patternType = null;
+        ParseTree prevChild = null;
+
+        for (int i = 0; i < classNameCtx.getChildCount(); i++) {
+            ParseTree child = classNameCtx.getChild(i);
+            if (child instanceof MethodSignatureParser.ArrayDimensionsContext) {
+                // Array dimensions are handled separately, skip them in pattern building
+                continue;
+            }
+
+            boolean isWildcard = child instanceof TerminalNode &&
+                    ((TerminalNode) child).getSymbol().getType() == MethodSignatureLexer.WILDCARD;
+
+            // Check if current child is WILDCARD and previous was DOTDOT
+            boolean isDotDotWildcard = isWildcard &&
+                    prevChild instanceof TerminalNode &&
+                    ((TerminalNode) prevChild).getSymbol().getType() == MethodSignatureLexer.DOTDOT;
+
+            // Check if this is the last non-array child (array dimensions come after)
+            boolean isLastNonArrayChild = true;
+            for (int j = i + 1; j < classNameCtx.getChildCount(); j++) {
+                if (!(classNameCtx.getChild(j) instanceof MethodSignatureParser.ArrayDimensionsContext)) {
+                    isLastNonArrayChild = false;
+                    break;
+                }
+            }
+
+            if (isDotDotWildcard && isLastNonArrayChild) {
+                // This is ..*  at the end (before array dimensions) - remove the DOTDOT we already appended
+                patternBuilder.setLength(patternBuilder.length() - 2);
+                String pattern = patternBuilder.toString();
+                if (pattern.isEmpty() || "*".equals(pattern)) {
+                    pattern = "*";
+                } else {
+                    patternType = MethodMatcher.AspectJMatcher.PatternType.PackagePrefix;
+                }
+                patternBuilder.setLength(0);
+                patternBuilder.append(pattern);
+                break;
+            } else {
                 patternBuilder.append(child.getText());
             }
+            prevChild = child;
         }
+
         String pattern = patternBuilder.toString();
 
         if (!pattern.contains(".")) {
@@ -1317,15 +1259,16 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
             }
         }
 
-        return new MethodMatcher.AspectJMatcher(pattern, arrayDimensions);
+        return new MethodMatcher.AspectJMatcher(pattern, arrayDimensions, false, patternType);
     }
 
-    private int countArrayDimensions(MethodSignatureParser.@Nullable ArrayDimensionsContext ctx) {
-        if (ctx == null) {
-            return 0;
+    private static int countArrayDimensions(MethodSignatureParser.@Nullable ArrayDimensionsContext ctx) {
+        int count = 0;
+        while (ctx != null) {
+            count++;
+            ctx = ctx.arrayDimensions();
         }
-        // Each [] is one dimension, recursively count
-        return 1 + countArrayDimensions(ctx.arrayDimensions());
+        return count;
     }
 }
 
@@ -1366,39 +1309,7 @@ class FormalTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
         if (classNameCtx == null) {
             return new MethodMatcher.AspectJMatcher("*", 0, false);
         }
-
-        int arrayDimensions = 0;
-        MethodSignatureParser.ArrayDimensionsContext arrayCtx = classNameCtx.arrayDimensions();
-        if (arrayCtx != null) {
-            arrayDimensions = countArrayDimensions(arrayCtx);
-        }
-
-        StringBuilder patternBuilder = new StringBuilder();
-        for (ParseTree child : classNameCtx.children) {
-            if (!(child instanceof MethodSignatureParser.ArrayDimensionsContext)) {
-                patternBuilder.append(child.getText());
-            }
-        }
-        String pattern = patternBuilder.toString();
-
-        if (!pattern.contains(".")) {
-            if (Character.isLowerCase(pattern.charAt(0)) && JavaType.Primitive.fromKeyword(pattern) != null) {
-                // It's a primitive, keep as-is
-            } else {
-                if (TypeUtils.findQualifiedJavaLangTypeName(pattern) != null) {
-                    pattern = "java.lang." + pattern;
-                }
-            }
-        }
-
-        return new MethodMatcher.AspectJMatcher(pattern, arrayDimensions, false);
-    }
-
-    private int countArrayDimensions(MethodSignatureParser.@Nullable ArrayDimensionsContext ctx) {
-        if (ctx == null) {
-            return 0;
-        }
-        return 1 + countArrayDimensions(ctx.arrayDimensions());
+        return TargetTypeMatcherVisitor.buildAspectJMatcher(classNameCtx);
     }
 }
 

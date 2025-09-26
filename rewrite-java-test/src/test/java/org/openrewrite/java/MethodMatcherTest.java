@@ -370,6 +370,38 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void packagePrefixWithArrayDimensions() {
+        JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
+        assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*[])").matches(
+                new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
+                        null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void packagePrefixWithVarargs() {
+        JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
+        assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*...)").matches(
+                new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
+                        null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void varargsMatchesArrayType() {
+        // Varargs parameters (String...) are represented as Array types (String[]) in JavaType
+        JavaType.Array stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
+
+        // Pattern with varargs should match Array type
+        assertTrue(new MethodMatcher("com.example.Foo bar(String...)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern with explicit array should also match
+        assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
     void siteExample() {
         rewriteRun(
           java(
@@ -811,5 +843,105 @@ class MethodMatcherTest implements RewriteTest {
             assertEquals("java.io.PrintStream println(..)",
                 new MethodMatcher("java.io.PrintStream println(..)").toString());
         }
+    }
+
+    @Test
+    void varargsMethodInvocationWithMultipleArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("com.example.Util format(String, Object...)", false)),
+          java(
+            """
+            package com.example;
+
+            class Util {
+                static String format(String template, Object... args) {
+                    return String.format(template, args);
+                }
+            }
+
+            class Test {
+                void test() {
+                    String result1 = Util.format("Hello %s %d", "world", 42);
+                    String result2 = Util.format("No args");
+                    String result3 = Util.format("Single: %s", "arg");
+                }
+            }
+            """,
+            """
+            package com.example;
+
+            class Util {
+                static String format(String template, Object... args) {
+                    return String.format(template, args);
+                }
+            }
+
+            class Test {
+                void test() {
+                    String result1 = /*~~>*/Util.format("Hello %s %d", "world", 42);
+                    String result2 = /*~~>*/Util.format("No args");
+                    String result3 = /*~~>*/Util.format("Single: %s", "arg");
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void multiDimensionalArrayMatching() {
+        // Test 1D array
+        JavaType.Array stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
+        assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+
+        // Test 2D array
+        JavaType.Array stringArray2D = new JavaType.Array(null, stringArray, null);
+        assertTrue(new MethodMatcher("com.example.Foo bar(String[][])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
+
+        // Test 3D array
+        JavaType.Array stringArray3D = new JavaType.Array(null, stringArray2D, null);
+        assertTrue(new MethodMatcher("com.example.Foo bar(String[][][])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray3D), emptyList(), emptyList(), emptyList(), null)));
+
+        // Test mismatch: pattern expects 1D but got 2D
+        assertFalse(new MethodMatcher("com.example.Foo bar(String[])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
+
+        // Test mismatch: pattern expects 2D but got 1D
+        assertFalse(new MethodMatcher("com.example.Foo bar(String[][])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void varargsWithArrayElementType() {
+        // Varargs with array element type: int[]...
+        // In JavaType, this is represented as Array(Array(int))
+        JavaType.Array intArray = new JavaType.Array(null, JavaType.Primitive.Int, null);
+        JavaType.Array intArrayArray = new JavaType.Array(null, intArray, null);
+
+        // Pattern int[]... should match Array(Array(int))
+        assertTrue(new MethodMatcher("com.example.Foo bar(int[]...)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern int[][] should also match the same type (varargs is just sugar for array)
+        assertTrue(new MethodMatcher("com.example.Foo bar(int[][])").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
+
+        // Test with parameters before varargs: foo(int, int[]...)
+        JavaType.Array stringArrayArray = new JavaType.Array(null,
+                new JavaType.Array(null, JavaType.Primitive.String, null), null);
+        assertTrue(new MethodMatcher("com.example.Foo bar(int, String[]...)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(JavaType.Primitive.Int, stringArrayArray),
+                        emptyList(), emptyList(), emptyList(), null)));
     }
 }
