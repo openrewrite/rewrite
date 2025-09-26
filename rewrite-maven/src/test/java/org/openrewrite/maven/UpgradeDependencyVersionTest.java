@@ -2239,4 +2239,91 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+
+	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
+	@Test
+	void upgradeVersionForEjbTypeDependency() {
+		rewriteRun(
+		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+			null, null)),
+		  pomXml(
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencies>
+					  <dependency>
+						  <groupId>org.codeartisans.asadmin</groupId>
+						  <artifactId>ejb-example</artifactId>
+						  <version>0.11</version>
+						  <type>ejb</type>
+					  </dependency>
+				  </dependencies>
+			  </project>
+			  """,
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencies>
+					  <dependency>
+						  <groupId>org.codeartisans.asadmin</groupId>
+						  <artifactId>ejb-example</artifactId>
+						  <version>0.12</version>
+						  <type>ejb</type>
+					  </dependency>
+				  </dependencies>
+			  </project>
+			  """
+		  )
+		);
+	}
+
+	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
+	@Test
+	void upgradeVersionForEjbTypeManagedDependency() {
+		rewriteRun(
+		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+			null, null)),
+		  pomXml(
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencyManagement>
+					  <dependencies>
+						  <dependency>
+							  <groupId>org.codeartisans.asadmin</groupId>
+							  <artifactId>ejb-example</artifactId>
+							  <version>0.11</version>
+							  <type>ejb</type>
+						  </dependency>
+					  </dependencies>
+				  </dependencyManagement>
+			  </project>
+			  """,
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencyManagement>
+					  <dependencies>
+						  <dependency>
+							  <groupId>org.codeartisans.asadmin</groupId>
+							  <artifactId>ejb-example</artifactId>
+							  <version>0.12</version>
+							  <type>ejb</type>
+						  </dependency>
+					  </dependencies>
+				  </dependencyManagement>
+			  </project>
+			  """
+		  )
+		);
+	}
 }
