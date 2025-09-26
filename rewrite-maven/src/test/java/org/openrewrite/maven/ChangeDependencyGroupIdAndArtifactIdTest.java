@@ -1865,11 +1865,11 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     void changeDependencyGroupIdAndArtifactIdForEjbType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "com.psc.jobs",
-            "jobs-configuration",
-            "com.enterprise.jobs",
-            "jobs-config",
-            null,
+            "org.codeartisans.asadmin",
+            "ejb-example",
+            "org.jboss.da",
+            "common",
+            "2.6.9",
             null
           )),
           pomXml(
@@ -1881,9 +1881,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>com.psc.jobs</groupId>
-                          <artifactId>jobs-configuration</artifactId>
-                          <version>2.33.0</version>
+                          <groupId>org.codeartisans.asadmin</groupId>
+                          <artifactId>ejb-example</artifactId>
+                          <version>0.12</version>
                           <type>ejb</type>
                       </dependency>
                   </dependencies>
@@ -1897,9 +1897,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>com.enterprise.jobs</groupId>
-                          <artifactId>jobs-config</artifactId>
-                          <version>2.33.0</version>
+                          <groupId>org.jboss.da</groupId>
+                          <artifactId>common</artifactId>
+                          <version>2.6.9</version>
                           <type>ejb</type>
                       </dependency>
                   </dependencies>
@@ -1914,8 +1914,8 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     void changeManagedDependencyGroupIdAndArtifactIdForEjbType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "com.psc.jobs",
-            "jobs-configuration",
+            "org.codeartisans.asadmin",
+            "ejb-example",
             "com.enterprise.jobs",
             "jobs-config",
             null,
@@ -1931,9 +1931,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
-                              <groupId>com.psc.jobs</groupId>
-                              <artifactId>jobs-configuration</artifactId>
-                              <version>2.33.0</version>
+                              <groupId>org.codeartisans.asadmin</groupId>
+                              <artifactId>ejb-example</artifactId>
+                              <version>0.12</version>
                               <type>ejb</type>
                           </dependency>
                       </dependencies>
@@ -1951,7 +1951,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>com.enterprise.jobs</groupId>
                               <artifactId>jobs-config</artifactId>
-                              <version>2.33.0</version>
+                              <version>0.12</version>
                               <type>ejb</type>
                           </dependency>
                       </dependencies>
