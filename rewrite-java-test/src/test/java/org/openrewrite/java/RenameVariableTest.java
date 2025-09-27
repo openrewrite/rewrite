@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
@@ -1450,5 +1448,168 @@ class RenameVariableTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/582")
+    @Nested
+    class RenameVariableCombinedWithChangeTypeHasUnexpectedBehavior implements RewriteTest {
+
+        @Test
+        void replacingTheNameOfTheVariableSucceeds() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "arrayDeque"));
+                      return super.visitVariableDeclarations(multiVariable, executionContext);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> arrayDeque = new Stack<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeSucceedsWhenCalledFromCU() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+                  @Override
+                  public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(cu, ctx, getCursor().getParent());
+                      return super.visitCompilationUnit((J.CompilationUnit) tree, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeFailsWhenCalledFromCD() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+                  @Override
+                  public J visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(cd, ctx, getCursor().getParent());
+                      return super.visitClassDeclaration((J.ClassDeclaration) tree, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void replacingTheNameAsAnEffectOfChangeTypeFailsWhenCalledFromVD() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+
+                  @Override
+                  public J visitVariableDeclarations(J.VariableDeclarations mv, ExecutionContext ctx) {
+                      Tree tree = new ChangeType("java.util.Stack", "java.util.ArrayDeque", false)
+                        .getVisitor().visit(mv, ctx, getCursor().getParent());
+                      return super.visitVariableDeclarations((J.VariableDeclarations) tree, ctx);
+                  }
+              })),
+              //language=java
+              java(
+                """
+                  import java.util.Stack;
+    
+                  class Test {
+                      void test() {
+                          Stack<Integer> stack = new Stack<>();
+                          stack.add(1);
+                          stack.add(2);
+                      }
+                  }
+                  """,
+                """
+                  import java.util.ArrayDeque;
+    
+                  class Test {
+                      void test() {
+                          ArrayDeque<Integer> arrayDeque = new ArrayDeque<>();
+                          arrayDeque.add(1);
+                          arrayDeque.add(2);
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }
