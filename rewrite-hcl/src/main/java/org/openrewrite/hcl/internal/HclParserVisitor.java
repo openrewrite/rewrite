@@ -638,10 +638,10 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitTemplateInterpolation(HCLParser.TemplateInterpolationContext ctx) {
         skip(ctx.TEMPLATE_INTERPOLATION_START());
-        Hcl.TemplateInterpolation templateInterpolation = convert(ctx, (c, prefix) -> new Hcl.TemplateInterpolation(randomId(), Space.format(prefix), Markers.EMPTY,
-                (Expression) visit(ctx.expression())));
-        skip(ctx.RBRACE());
-        return templateInterpolation;
+        Expression expression = (Expression) visit(ctx.expression());
+        Space beforeClosingBrace = sourceBefore("}");
+        return convert(ctx, (c, prefix) -> new Hcl.TemplateInterpolation(randomId(), Space.format(prefix), Markers.EMPTY,
+                new HclRightPadded<>(expression, beforeClosingBrace, Markers.EMPTY)));
     }
 
     @Override
