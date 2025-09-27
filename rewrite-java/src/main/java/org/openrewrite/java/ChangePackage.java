@@ -259,10 +259,13 @@ public class ChangePackage extends Recipe {
                     String path = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
                     String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
                     assert changingFrom != null;
-                    sf = ((SourceFile) sf).withSourcePath(Paths.get(path.replaceFirst(
-                            changingFrom.replace('.', '/'),
-                            changingTo.replace('.', '/')
-                    )));
+                    final int dirIdx = path.indexOf('/');
+                    final String newPath = path.substring(0, dirIdx) + path.substring(dirIdx)
+                            .replaceFirst(
+                                changingFrom.replace('.', '/'),
+                                changingTo.replace('.', '/')
+                            );
+                    sf = ((SourceFile) sf).withSourcePath(Paths.get(newPath));
 
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
