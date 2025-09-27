@@ -29,7 +29,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -41,20 +40,6 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 
 @SuppressWarnings("ConstantConditions")
 class MethodMatcherTest implements RewriteTest {
-    @SuppressWarnings("deprecation")
-    private Pattern typeRegex(String signature) {
-        return new MethodMatcher(signature).getTargetTypePattern();
-    }
-
-    @SuppressWarnings("deprecation")
-    private Pattern nameRegex(String signature) {
-        return new MethodMatcher(signature).getMethodNamePattern();
-    }
-
-    @SuppressWarnings("deprecation")
-    private Pattern argRegex(String signature) {
-        return new MethodMatcher(signature).getArgumentPattern();
-    }
 
     @Test
     void invalidMethodMatcher() {
@@ -65,177 +50,6 @@ class MethodMatcherTest implements RewriteTest {
         assertThat(validate.failures().getFirst().getException()).isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void npmPackageNaming() {
-        assertThat(MethodMatcher.validate("@types/lodash..* map(..)").isValid()).isTrue();
-        assertTrue(typeRegex("@types/lodash..* map(..)").matcher("@types/lodash.LodashStatic").matches());
-    }
-
-    @Test
-    void anyTypeMatchesNullTargetType() {
-        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(null));
-        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(JavaType.Unknown.getInstance()));
-    }
-
-    @SuppressWarnings("rawtypes")
-    @Test
-    void matchesSuperclassTypeOfInterfaces() {
-        rewriteRun(
-          java(
-            "class Test { java.util.List l; }",
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    JavaType.FullyQualified listType = multiVariable.getTypeAsFullyQualified();
-                    assertTrue(new MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType));
-                    assertFalse(new MethodMatcher("java.util.Collection size()").matchesTargetType(listType));
-                    // ensuring subtypes do not match parents, regardless of matchOverrides
-                    assertFalse(new MethodMatcher("java.util.List size()", true).matchesTargetType(build("java.util.Collection")));
-                    assertFalse(new MethodMatcher("java.util.List size()").matchesTargetType(build("java.util.Collection")));
-                    return multiVariable;
-                }
-            }.visit(cu, 0))
-          )
-        );
-    }
-
-    @Test
-    void matchesSuperclassTypeOfClasses() {
-        assertTrue(new MethodMatcher("Object equals(Object)", true).matchesTargetType(build("java.lang.String")));
-        assertFalse(new MethodMatcher("Object equals(Object)").matchesTargetType(build("java.lang.String")));
-        // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(new MethodMatcher("String equals(String)", true).matchesTargetType(build("java.lang.Object")));
-        assertFalse(new MethodMatcher("String equals(String)").matchesTargetType(build("java.lang.Object")));
-    }
-
-    @Test
-    void matchesMethodTargetType() {
-        assertTrue(typeRegex("*..MyClass foo()").matcher("com.bar.MyClass").matches());
-        assertTrue(typeRegex("MyClass foo()").matcher("MyClass").matches());
-        assertTrue(typeRegex("com.bar.MyClass foo()").matcher("com.bar.MyClass").matches());
-        assertTrue(typeRegex("com.*.MyClass foo()").matcher("com.bar.MyClass").matches());
-    }
-
-    @Test
-    void matchesMethodNameWithDotSeparator() {
-        assertTrue(nameRegex("A.foo()").matcher("foo").matches());
-        assertTrue(nameRegex("*..*Service find*(..)").matcher("foo").matches());
-        assertTrue(nameRegex("A.B.*()").matcher("foo").matches());
-        assertTrue(nameRegex("A.fo*()").matcher("foo").matches());
-    }
-
-    @Test
-    void matchesMethodNameWithPoundSeparator() {
-        assertTrue(nameRegex("A#foo()").matcher("foo").matches());
-        assertTrue(nameRegex("A#*()").matcher("foo").matches());
-        assertTrue(nameRegex("A#fo*()").matcher("foo").matches());
-        assertTrue(nameRegex("A#*oo()").matcher("foo").matches());
-    }
-
-    @Test
-    void matchesMethodName() {
-        assertTrue(nameRegex("A foo()").matcher("foo").matches());
-        assertTrue(nameRegex("A *()").matcher("foo").matches());
-        assertTrue(nameRegex("A fo*()").matcher("foo").matches());
-        assertTrue(nameRegex("A *oo()").matcher("foo").matches());
-    }
-
-    @Test
-    void matchesArguments() {
-        assertTrue(argRegex("A foo()").matcher("").matches());
-        assertTrue(argRegex("A foo(int)").matcher("int").matches());
-        assertTrue(argRegex("A foo(java.util.Map)").matcher("java.util.Map").matches());
-    }
-
-    @Test
-    void matchesUnqualifiedJavaLangArguments() {
-        assertTrue(argRegex("A foo(String)").matcher("java.lang.String").matches());
-    }
-
-    @Test
-    void matchesArgumentsWithWildcards() {
-        assertTrue(argRegex("A foo(java..*)").matcher("java.util.Map").matches());
-        assertTrue(argRegex("A foo(java.util.*)").matcher("java.util.Map").matches());
-        assertTrue(argRegex("A foo(*.util.*)").matcher("java.util.Map").matches());
-        assertTrue(argRegex("A foo(*..*)").matcher("java.util.Map").matches());
-    }
-
-    @Test
-    void matchesExactlyOneWithWildcard() {
-        assertTrue(argRegex("A foo(*)").matcher("int").matches());
-        assertTrue(argRegex("A foo(*)").matcher("java.lang.String").matches());
-        assertTrue(argRegex("A foo(*, int)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(*,int)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(*, int)").matcher("double,int").matches());
-        assertTrue(argRegex("A foo(*, int)").matcher("java.lang.String,int").matches());
-        assertTrue(argRegex("A foo(*, String)").matcher("java.lang.String,java.lang.String").matches());
-        assertTrue(argRegex("A foo(int, *)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(int, *)").matcher("int,double").matches());
-        assertTrue(argRegex("A foo(int,*)").matcher("int,double").matches());
-        assertTrue(argRegex("A foo(*, *)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(*,*)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(int, *, double)").matcher("int,int,double").matches());
-        assertTrue(argRegex("A foo(int, *, double)").matcher("int,double,double").matches());
-        assertTrue(argRegex("A foo(int,*,double)").matcher("int,double,double").matches());
-
-        assertFalse(argRegex("A foo(*)").matcher("").matches());
-        assertFalse(argRegex("A foo(*)").matcher("int,int").matches());
-        assertFalse(argRegex("A foo(*, int)").matcher("int").matches());
-        assertFalse(argRegex("A foo(*, int)").matcher("int,double").matches());
-        assertFalse(argRegex("A foo(int, *)").matcher("int").matches());
-        assertFalse(argRegex("A foo(int, *)").matcher("double,int").matches());
-        assertFalse(argRegex("A foo(*, *)").matcher("").matches());
-        assertFalse(argRegex("A foo(*, *)").matcher("int").matches());
-        assertFalse(argRegex("A foo(int, *, double)").matcher("int,double").matches());
-        assertFalse(argRegex("A foo(int, *, double)").matcher("double,int,double").matches());
-    }
-
-    @Test
-    void matchesArgumentsWithDotDot() {
-        assertTrue(argRegex("A foo(.., int)").matcher("int").matches());
-        assertTrue(argRegex("A foo(.., int)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(.., int)").matcher("double,int").matches());
-        assertFalse(argRegex("A foo(.., int)").matcher("int,double").matches());
-
-        assertTrue(argRegex("A foo(int, ..)").matcher("int").matches());
-        assertTrue(argRegex("A foo(int, ..)").matcher("int,int").matches());
-        assertTrue(argRegex("A foo(int, ..)").matcher("int,double").matches());
-        assertFalse(argRegex("A foo(int, ..)").matcher("double,int").matches());
-
-        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double").matches());
-        assertTrue(argRegex("A foo(int, .., double)").matcher("int,int,double").matches());
-        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double,double").matches());
-        assertFalse(argRegex("A foo(int, .., double)").matcher("double,int,double").matches());
-
-        assertTrue(argRegex("A foo(..)").matcher("").matches());
-        assertTrue(argRegex("A foo(..)").matcher("int").matches());
-        assertTrue(argRegex("A foo(..)").matcher("int,int").matches());
-
-        assertTrue(argRegex("A foo(.., int)").matcher("double,double,int").matches());
-        assertTrue(argRegex("A foo(int, .., double)").matcher("int,double,java.lang.String,int,double").matches());
-    }
-
-    @Test
-    void matchesMethodSymbolsWithVarargs() {
-        assertTrue(argRegex("A foo(String, Object...)").matcher("java.lang.String,java.lang.Object[]").matches());
-    }
-
-    @Test
-    void dotDotMatchesArrayArgs() {
-        assertTrue(argRegex("A foo(..)").matcher("java.lang.String,java.lang.Object[]").matches());
-    }
-
-    @Test
-    void matchesArrayArguments() {
-        assertTrue(argRegex("A foo(String[])").matcher("java.lang.String[]").matches());
-    }
-
-    @Test
-    void matchesPrimitiveArgument() {
-        assertTrue(argRegex("A foo(int)").matcher("int").matches());
-        assertTrue(argRegex("A foo(int[])").matcher("int[]").matches());
-        assertFalse(argRegex("A foo(int[])").matcher("int").matches());
-    }
 
     @ParameterizedTest
     @ValueSource(strings = {"a.A <constructor>()", "a.A <init>()", "a.A *()"})
@@ -359,7 +173,8 @@ class MethodMatcherTest implements RewriteTest {
     @SuppressWarnings("SpellCheckingInspection")
     @Test
     void matchesWildcardedMethodNameStartingWithJavaKeyword() {
-        assertTrue(nameRegex("A assert*()").matcher("assertThat").matches());
+        assertTrue(new MethodMatcher("A assert*()").matches(
+          newMethodType("A", "assertThat")));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/629")
@@ -504,6 +319,40 @@ class MethodMatcherTest implements RewriteTest {
             assertTrue(new MethodMatcher("org.junit.Assert assertTrue(double, *)").matches(mi, true));
             assertTrue(new MethodMatcher("org.junit.Assert assertTrue(java.lang.String, *)").matches(mi, true));
             assertTrue(new MethodMatcher("org.junit.Assert assertTrue(*, *)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWithWildcardInClassName() {
+            var mi = asMethodInvocation("MyHelper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.*Helper doSomething(boolean)").matches(mi, true));
+            assertFalse(new MethodMatcher("com.foo.*Service doSomething(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWithPackageWildcardAndClassName() {
+            var mi = asMethodInvocation("MyHelper.doSomething(true);");
+            assertTrue(new MethodMatcher("com..MyHelper doSomething(boolean)").matches(mi, true));
+            assertFalse(new MethodMatcher("com..OtherHelper doSomething(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWithClassNameWildcard() {
+            var mi = asMethodInvocation("MyHelper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.* doSomething(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesExactClassNameMatch() {
+            var mi = asMethodInvocation("MyHelper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.MyHelper doSomething(boolean)").matches(mi, true));
+            assertFalse(new MethodMatcher("com.foo.OtherHelper doSomething(boolean)").matches(mi, true));
+        }
+
+        @Test
+        void matchUnknownTypesWithMultipleWildcardsInClassName() {
+            var mi = asMethodInvocation("MyTestHelper.doSomething(true);");
+            assertTrue(new MethodMatcher("com.foo.My*Helper doSomething(boolean)").matches(mi, true));
+            assertFalse(new MethodMatcher("com.foo.Your*Helper doSomething(boolean)").matches(mi, true));
         }
     }
 
@@ -943,5 +792,170 @@ class MethodMatcherTest implements RewriteTest {
                 new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
                         null, null, List.of(JavaType.Primitive.Int, stringArrayArray),
                         emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void wildcardPatternsSkipChecks() throws Exception {
+        // Test that patterns with wildcards for type and method name work correctly
+        // This verifies that the check-skipping optimization doesn't break functionality
+
+        // Pattern: * *(..) - matches any method on any type
+        assertTrue(new MethodMatcher("* *(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: * foo(..) - matches foo method on any type
+        assertTrue(new MethodMatcher("* foo(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        assertFalse(new MethodMatcher("* foo(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: com.example.Foo *(..) - matches any method on com.example.Foo
+        assertTrue(new MethodMatcher("com.example.Foo *(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        assertFalse(new MethodMatcher("com.example.Foo *(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Bar"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: *..* *(..) - equivalent to * *(..), should skip both type and method checks
+        assertTrue(new MethodMatcher("*..* *(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: *..* foo(..) - equivalent to * foo(..), should skip type check
+        assertTrue(new MethodMatcher("*..* foo(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        assertFalse(new MethodMatcher("*..* foo(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: com.example.Foo foo(..) - should skip argument checks
+        assertTrue(new MethodMatcher("com.example.Foo foo(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+                        null, null, List.of(JavaType.Primitive.Int, JavaType.Primitive.String),
+                        emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: * *(..) - should skip all checks (method name, target type, arguments)
+        assertTrue(new MethodMatcher("* *(..)").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+                        null, null, List.of(JavaType.Primitive.Int),
+                        emptyList(), emptyList(), emptyList(), null)));
+
+        // Pattern: com.example.Foo foo() - should check arg count (expects zero args)
+        assertTrue(new MethodMatcher("com.example.Foo foo()").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+                        null, null, emptyList(),
+                        emptyList(), emptyList(), emptyList(), null)));
+
+        assertFalse(new MethodMatcher("com.example.Foo foo()").matches(
+                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+                        null, null, List.of(JavaType.Primitive.Int),
+                        emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void matcherWithNoArgsDoesNotMatchMethodWithArgs() {
+        assertFalse(new MethodMatcher("java.lang.Object finalize()").matches(
+                new JavaType.Method(null, 1L, build("my.Foo"), "finalize",
+                        null, null, List.of(build("java.lang.Object")),
+                        emptyList(), emptyList(), emptyList(), null)));
+    }
+
+    @Test
+    void varargsMatcherValidatesVarargsArgumentTypes() {
+        MethodMatcher matcher = new MethodMatcher("org.springframework.core.env.Environment acceptsProfiles(java.lang.String...)");
+
+        JavaType.Method correctMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.core.env.Environment"),
+                "acceptsProfiles",
+                null, null,
+                List.of(new JavaType.Array(null, build("java.lang.String"), null)),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertTrue(matcher.matches(correctMethod), "Should match method with String varargs");
+
+        JavaType.Method zeroArgsMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.core.env.Environment"),
+                "acceptsProfiles",
+                null, null,
+                emptyList(),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertTrue(matcher.matches(zeroArgsMethod), "Should match method with zero varargs (varargs can be empty)");
+
+        JavaType.Method multipleArgsMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.core.env.Environment"),
+                "acceptsProfiles",
+                null, null,
+                List.of(build("java.lang.String"), build("java.lang.String"), build("java.lang.String")),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertTrue(matcher.matches(multipleArgsMethod), "Should match method with multiple String arguments");
+
+        JavaType.Method wrongTypeMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.core.env.Environment"),
+                "acceptsProfiles",
+                null, null,
+                List.of(JavaType.Primitive.Int),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertFalse(matcher.matches(wrongTypeMethod), "Should NOT match method when varargs argument is wrong type (int instead of String)");
+
+        JavaType.Method mixedArgsMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.core.env.Environment"),
+                "acceptsProfiles",
+                null, null,
+                List.of(build("java.lang.String"), JavaType.Primitive.Int),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertFalse(matcher.matches(mixedArgsMethod), "Should NOT match method when second varargs argument is wrong type");
+    }
+
+    @Test
+    void wildcardVarargsWithTrailingParameter() {
+        // Pattern: get*Record*(.., long) means "any method starting with 'get' containing 'Record', any number of args, followed by long"
+        MethodMatcher matcher = new MethodMatcher("org.springframework.kafka.test.utils.KafkaTestUtils get*Record*(.., long)");
+
+        JavaType.Method correctMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+                "getRecords",
+                null, null,
+                List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Long),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertTrue(matcher.matches(correctMethod), "Should match getRecords(Consumer, long)");
+
+        JavaType.Method wrongLastParamMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+                "getRecords",
+                null, null,
+                List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Int),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertFalse(matcher.matches(wrongLastParamMethod), "Should NOT match getRecords(Consumer, int) - last param must be long");
+
+        JavaType.Method noArgsMethod = new JavaType.Method(
+                null, 1L,
+                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+                "getRecords",
+                null, null,
+                List.of(JavaType.Primitive.Long),
+                emptyList(), emptyList(), emptyList(), null
+        );
+        assertTrue(matcher.matches(noArgsMethod), "Should match getRecords(long) - wildcard varargs can match zero args");
     }
 }

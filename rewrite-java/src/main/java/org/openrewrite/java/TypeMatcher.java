@@ -30,24 +30,16 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.Reference;
 
-import java.util.regex.Pattern;
-
-import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
-
 @Getter
 public class TypeMatcher implements Reference.Matcher {
 
     @SuppressWarnings("NotNullFieldNotInitialized")
-    @Getter
-    private Pattern targetTypePattern;
-
-    @Nullable
-    private String targetType;
+    private TypeNameMatcher typeNameMatcher;
 
     private final String signature;
 
     /**
-     * Whether to match on subclasses of {@link #targetTypePattern}.
+     * Whether to match on subclasses.
      */
     @Getter
     private final boolean matchInherited;
@@ -61,7 +53,9 @@ public class TypeMatcher implements Reference.Matcher {
         this.matchInherited = matchInherited;
 
         if (StringUtils.isBlank(fieldType)) {
-            targetTypePattern = Pattern.compile(".*");
+            // Blank means wildcard - use PatternTypeNameMatcher with FullWildcard type
+            AspectJMatcher aspectJMatcher = new AspectJMatcher("*", AspectJMatcher.PatternType.FullWildcard);
+            typeNameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
         } else {
             MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                     CharStreams.fromString(fieldType + "#dummy()"))));
@@ -72,9 +66,12 @@ public class TypeMatcher implements Reference.Matcher {
                 public @Nullable Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
                     String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
                     if (isPlainIdentifier(ctx)) {
-                        targetType = pattern;
+                        typeNameMatcher = new ExactTypeNameMatcher(pattern);
+                    } else {
+                        // All patterns (including "*" and "*..*") use PatternTypeNameMatcher
+                        AspectJMatcher aspectJMatcher = new AspectJMatcher(pattern, null);
+                        typeNameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
                     }
-                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                     return null;
                 }
             }.visitTargetTypePattern(parser.targetTypePattern());
@@ -86,9 +83,9 @@ public class TypeMatcher implements Reference.Matcher {
     }
 
     public boolean matchesPackage(String packageName) {
-        return targetTypePattern.matcher(packageName).matches() ||
-                targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                        "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
+        return typeNameMatcher.matches(packageName) ||
+                typeNameMatcher.matches(packageName.replaceAll("\\.\\*$",
+                        "." + signature.substring(signature.lastIndexOf('.') + 1)));
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -100,8 +97,7 @@ public class TypeMatcher implements Reference.Matcher {
     }
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
-        return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-                this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+        return typeNameMatcher.matches(fullyQualifiedTypeName);
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
@@ -110,7 +106,6 @@ public class TypeMatcher implements Reference.Matcher {
     }
 
     private static boolean hasWildcards(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
-        // Check if any of the tokens are wildcards or dots (but not array dimensions)
         for (int i = 0; i < ctx.getChildCount(); i++) {
             ParseTree child = ctx.getChild(i);
             if (child instanceof TerminalNode) {
@@ -134,5 +129,30 @@ public class TypeMatcher implements Reference.Matcher {
     @Override
     public Reference.Renamer createRenamer(String newName) {
         return reference -> newName;
+    }
+}
+
+class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
+    @Override
+    public String visitClassNameOrInterface(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
+        StringBuilder classNameBuilder = new StringBuilder();
+        for (ParseTree c : ctx.children) {
+            classNameBuilder.append(c.getText());
+        }
+        String className = classNameBuilder.toString();
+
+        if (!className.contains(".")) {
+            int arrInit = className.lastIndexOf('[');
+            String beforeArr = arrInit == -1 ? className : className.substring(0, arrInit);
+            if (Character.isLowerCase(beforeArr.charAt(0)) && JavaType.Primitive.fromKeyword(beforeArr) != null) {
+                return className;
+            } else {
+                if (TypeUtils.findQualifiedJavaLangTypeName(beforeArr) != null) {
+                    return "java.lang." + className;
+                }
+            }
+        }
+
+        return className;
     }
 }
