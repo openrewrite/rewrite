@@ -156,7 +156,11 @@ public class Block implements Trait<J.Block> {
                     J.Return currentReturn = (J.Return) currentLast;
                     Space statementPrefix = currentReturn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ? Space.EMPTY : Space.SINGLE_SPACE;
                     J.Return mappedReturn = returnMapper.apply(currentReturn, newLast.withPrefix(statementPrefix));
-                    if ((mappedReturn.getExpression() instanceof Statement && mapper.apply((Statement) mappedReturn.getExpression()) == null) || mapper.apply(mappedReturn) == null) {
+                    if (mappedReturn.getExpression() instanceof Statement) {
+                        if (mapper.apply((Statement) mappedReturn.getExpression()) == null) {
+                            throw new IllegalArgumentException("The return statement replacement result should not be one that gets filtered out to avoid cyclic changes that result in the entire block being cleared. Did you return something from the old return that still return null when the mapper would be applied?");
+                        }
+                    } else if (mapper.apply(mappedReturn) == null) {
                         throw new IllegalArgumentException("The return statement replacement result should not be one that gets filtered out to avoid cyclic changes that result in the entire block being cleared. Did you return something from the old return that still return null when the mapper would be applied?");
                     }
                     return mappedReturn
