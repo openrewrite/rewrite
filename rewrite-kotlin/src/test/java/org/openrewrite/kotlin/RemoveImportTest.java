@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -23,6 +24,7 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -75,7 +77,7 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeStarFoldPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")),
           kotlin(
             """
               import java.io.*
@@ -219,6 +221,108 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepWhenParentMembersAreUsed() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("org.example.Child.Companion.one")),
+          kotlin(
+            """
+              package org.example
+              interface Shared {
+                  fun one() = "one"
+              }
+              open class Parent {
+                  companion object : Shared
+              }
+              class Child : Parent() {
+                  companion object : Shared {
+                      fun two() = "two"
+                  }
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.Child.Companion.one
+              import org.example.Child.Companion.two
+              
+              class A {
+                  fun test() {
+                      one()
+                      two()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepWhenUsingTopLevelFunctions() {
+        rewriteRun(
+          spec -> spec.recipe(removeTypeImportRecipe("org.example.one")),
+          kotlin(
+            """
+              package org.example
+              
+              fun one() = "one"
+              fun two() = "two"
+              """
+          ),
+          kotlin(
+            """
+              package org.example2
+              
+              import org.example.one
+              import org.example.two
+              
+              class Aassss {
+                  fun test() {
+                      one()
+                      two()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("We cannot use Java sources as dependencies in Kotlin sources yet")
+    @Test
+    void keepStarFoldWhenUsingStaticChildAndParentMembersFromJavaClasses() {
+        rewriteRun(
+          // This kind of setup is only possible with a Java <> Kotlin mix, as you cannot use star imports for companion object members
+          java(
+            """
+              package org.example;
+              public class Parent {
+                  public static void a() {}
+                  public static void b() {}
+              }
+              public class Child extends Parent {
+                   public static void x() {}
+                   public static void y() {}
+              }
+              """
+          ),
+          kotlin(
+            """
+              import org.example.Child.*
+              import org.example.Child.a
+              
+              class A {
+                  fun test() {
+                      a()
+                      b()
+                      x()
+                      y()
+                  }
+              }
               """
           )
         );
