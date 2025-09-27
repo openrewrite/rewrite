@@ -23,6 +23,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
@@ -31,6 +32,7 @@ import org.openrewrite.trait.VisitFunction2;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -42,10 +44,18 @@ public class Block implements Trait<J.Block> {
     private final Cursor cursor;
 
     public Block filterStatements(Predicate<Statement> predicate) {
-        return mapStatements(statement -> predicate.test(statement) ? statement : null);
+        return filterStatements(predicate, (J.Return::withExpression));
     }
 
     public Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
+        return mapStatements(mapper, (J.Return::withExpression));
+    }
+
+    public Block filterStatements(Predicate<Statement> predicate, BiFunction<J.Return, Expression, J.Return> returnMapper) {
+        return mapStatements(statement -> predicate.test(statement) ? statement : null, returnMapper);
+    }
+
+    public Block mapStatements(Function<Statement, @Nullable Statement> mapper, BiFunction<J.Return, Expression, J.Return> returnMapper) {
         J.Block block = getTree();
         List<Statement> statements = block.getStatements();
         List<Statement> newStatements = new LinkedList<>();
@@ -139,10 +149,19 @@ public class Block implements Trait<J.Block> {
             }
         }
 
-        newStatements = ListUtils.mapLast(newStatements, newLast -> {
+        newStatements = ListUtils.mapLast(newStatements, (Function<Statement, Statement>) newLast -> {
             Statement currentLast = statements.get(statements.size() - 1);
             if (currentLast instanceof J.Return && !(newLast instanceof J.Return)) {
-                return ((J.Return) currentLast).withExpression(newLast.withPrefix(Space.EMPTY)).withPrefix(newLast.getPrefix());
+                if (newLast instanceof Expression) {
+                    J.Return currentReturn = (J.Return) currentLast;
+                    Space statementPrefix = currentReturn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ? Space.EMPTY : Space.SINGLE_SPACE;
+                    J.Return mappedReturn = returnMapper.apply(currentReturn, newLast.withPrefix(statementPrefix));
+                    if ((mappedReturn.getExpression() instanceof Statement && mapper.apply((Statement) mappedReturn.getExpression()) == null) || mapper.apply(mappedReturn) == null) {
+                        throw new IllegalArgumentException("The return statement replacement result should not be one that gets filtered out to avoid cyclic changes that result in the entire block being cleared. Did you return something from the old return that still return null when the mapper would be applied?");
+                    }
+                    return mappedReturn
+                            .withPrefix(newLast.getPrefix());
+                }
             }
             return newLast;
         });
@@ -161,14 +180,10 @@ public class Block implements Trait<J.Block> {
 
     private Space buildEnd(Space end, List<Comment> comments, @Nullable String endWhitespace) {
         List<Comment> newComments = new ArrayList<>();
-        boolean eolComments = endWhitespace == null || !endWhitespace.contains("\n");
         String endBlockWhitespace = null;
         if (!comments.isEmpty()) {
             for (Comment comment : comments) {
                 if (comment instanceof TextComment) {
-                    if (comment.getSuffix().contains("\n")) {
-                        eolComments = false;
-                    }
                     newComments.add(comment);
                     if (endBlockWhitespace == null) {
                         endBlockWhitespace = endWhitespace;
@@ -178,7 +193,7 @@ public class Block implements Trait<J.Block> {
         }
 
         List<Comment> existingEndComments = new ArrayList<>();
-        eolComments = !end.getWhitespace().contains("\n");
+        boolean eolComments = !end.getWhitespace().contains("\n");
         String whitespace = null;
         if (!eolComments) {
             whitespace = end.getWhitespace();
