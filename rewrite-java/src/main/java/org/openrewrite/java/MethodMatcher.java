@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -181,11 +182,8 @@ public class MethodMatcher {
                         methodNameMatcher = new ExactMethodNameMatcher(methodNamePattern);
                     } else {
                         // Pattern match (including "*" wildcard) - we already know it has wildcards from isPattern flag
-                        AspectJMatcher.PatternType patternType = "*".equals(methodNamePattern) ?
-                                AspectJMatcher.PatternType.FullWildcard :
-                                AspectJMatcher.PatternType.Wildcard;
-                        methodNameMatcher = new PatternMethodNameMatcher(
-                                new AspectJMatcher(methodNamePattern, patternType));
+                        boolean isFullWildcard = "*".equals(methodNamePattern);
+                        methodNameMatcher = new PatternMethodNameMatcher(methodNamePattern, isFullWildcard);
                     }
                 }
 
@@ -201,7 +199,7 @@ public class MethodMatcher {
                     visitor.visitFormalParametersPattern(ctx.formalParametersPattern());
                     // Capture the ArgumentMatchers and varargs position
                     argumentMatchers = visitor.getMatchers();
-                    varArgsPosition = visitor.getVarArgsPosition();
+                    varArgsPosition = visitor.getVarArgsPos();
                 }
                 return null;
             }
@@ -247,17 +245,8 @@ public class MethodMatcher {
         this(methodPattern(method), false);
     }
 
-
-    private AspectJMatcher getTargetTypeMatcher() {
-        if (typeMatcher instanceof StandardTypeMatcher) {
-            return ((StandardTypeMatcher) typeMatcher).getDelegate();
-        }
-        throw new UnsupportedOperationException("getTargetTypeMatcher() only supported for StandardTypeMatcher with PatternTypeNameMatcher");
-    }
-
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
-        // Delegate to the TypeNameMatcher which handles all the matching logic
-        return typeMatcher.matches(fullyQualifiedTypeName);
+        return typeMatcher.matchesQualifiedName(fullyQualifiedTypeName);
     }
 
     boolean matchesTargetType(JavaType type) {
@@ -378,13 +367,7 @@ public class MethodMatcher {
     }
 
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
-        if (enclosing.getType() == null) {
-            return false;
-        }
-
-        // aspectJUtils does not support matching classes separated by packages.
-        // * is a fully wild card match for a method. `* foo()`
-        if (!matchesTargetType(enclosing.getType())) {
+        if (enclosing.getType() == null || !matchesTargetType(enclosing.getType())) {
             return false;
         }
 
@@ -559,7 +542,7 @@ public class MethodMatcher {
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             String simpleName = ((J.Identifier) target).getSimpleName();
-            return getTargetTypeMatcher().matchesType(simpleName);
+            return typeMatcher.matchesSimpleName(simpleName);
         } else if (target instanceof J.FieldAccess) {
             StringBuilder builder = new StringBuilder();
             while (target instanceof J.FieldAccess) {
@@ -570,7 +553,7 @@ public class MethodMatcher {
             if (target instanceof J.Identifier) {
                 builder.insert(0, ((J.Identifier) target).getSimpleName());
             }
-            return typeMatcher.matches(builder.toString());
+            return typeMatcher.matchesQualifiedName(builder.toString());
         }
         return false;
     }
@@ -606,39 +589,24 @@ public class MethodMatcher {
             }
         }
 
-        return typePattern(method.getDeclaringType()) + " " +
-                method.getName() + "(" + parameters + ")";
+        return typePattern(method.getDeclaringType()) + " " + method.getName() + "(" + parameters + ")";
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        // Target type pattern
-        sb.append(typeMatcher.toString());
-        sb.append(' ');
-
-        // Method name - handle special cases
-        // Use the actual pattern from the matcher
-        sb.append(methodNameMatcher);
+        sb.append(typeMatcher).append(' ').append(methodNameMatcher);
 
         // Arguments pattern
         sb.append('(');
-        if (argumentMatchers.isEmpty()) {
-            // No arguments
-        } else if (argumentMatchers.size() == 1 && argumentMatchers.get(0) instanceof VarArgsMatcher) {
-            sb.append("..");
-        } else {
+        if (!argumentMatchers.isEmpty()) {
             for (int i = 0; i < argumentMatchers.size(); i++) {
                 if (i > 0) {
-                    sb.append(',');
-                    if (!(argumentMatchers.get(i) instanceof VarArgsMatcher)) {
-                        sb.append(' ');
-                    }
+                    sb.append(", ");
                 }
 
-                ArgumentMatcher matcher = argumentMatchers.get(i);
-                sb.append(matcher);
+                sb.append(argumentMatchers.get(i));
             }
         }
         sb.append(')');
@@ -656,7 +624,7 @@ public class MethodMatcher {
     // IMPORTANT: Don't add more subtypes so we can benefit from bimorphic optimizations
     interface TypeMatcher {
         boolean matches(JavaType type);
-        boolean matches(String qualifiedName);
+        boolean matchesQualifiedName(String qualifiedName);
 
         /**
          * Match against a simple name (used when type information is unknown).
@@ -714,27 +682,20 @@ public class MethodMatcher {
             }
         }
 
-        return type;
+        return type instanceof JavaType.Unknown ? null : type;
     }
 
+    @RequiredArgsConstructor
     static class StandardTypeMatcher implements TypeMatcher {
         private final TypeNameMatcher nameMatcher;
         private final int arrayDimensions;
         private final boolean isVarargs;
 
-        StandardTypeMatcher(TypeNameMatcher nameMatcher, int arrayDimensions, boolean isVarargs) {
-            this.nameMatcher = nameMatcher;
-            this.arrayDimensions = arrayDimensions;
-            this.isVarargs = isVarargs;
-        }
-
         @Override
         public boolean matches(JavaType type) {
             type = unwrapArrays(type, arrayDimensions, isVarargs);
-            if (type == null || type instanceof JavaType.Unknown) {
-                // For null/Unknown types, only match if we have a full wildcard pattern
-                return nameMatcher instanceof PatternTypeNameMatcher &&
-                        ((PatternTypeNameMatcher) nameMatcher).isFullWildcard();
+            if (type == null) {
+                return false;
             }
 
             String typeName = extractTypeName(type);
@@ -742,58 +703,13 @@ public class MethodMatcher {
         }
 
         @Override
-        public boolean matches(String qualifiedName) {
+        public boolean matchesQualifiedName(String qualifiedName) {
             return nameMatcher.matches(qualifiedName);
         }
 
         @Override
         public boolean matchesSimpleName(String simpleName) {
-            if (nameMatcher instanceof ExactTypeNameMatcher) {
-                // Exact match
-                String pattern = nameMatcher.getPattern();
-                return pattern.equals(simpleName) || pattern.endsWith('.' + simpleName);
-            } else {
-                String pattern = nameMatcher.getPattern();
-                // Also try matching with stripped package wildcards
-                // For patterns like com.*.Bar or com..Bar, we want to match just "Bar"
-                int lastDot = pattern.lastIndexOf('.');
-                if (lastDot > 0 && lastDot < pattern.length() - 1) {
-                    int lastPartStart = lastDot + 1;
-                    int lastPartLength = pattern.length() - lastPartStart;
-
-                    // Check if last part is just "*"
-                    if (lastPartLength == 1 && pattern.charAt(lastPartStart) == '*') {
-                        return true;
-                    }
-
-                    // Check if last part contains wildcards
-                    boolean hasWildcard = false;
-                    for (int i = lastPartStart; i < pattern.length(); i++) {
-                        if (pattern.charAt(i) == '*') {
-                            hasWildcard = true;
-                            break;
-                        }
-                    }
-
-                    if (!hasWildcard) {
-                        // Simple exact match
-                        return simpleName.length() == lastPartLength &&
-                                pattern.regionMatches(lastPartStart, simpleName, 0, lastPartLength);
-                    } else {
-                        // Has wildcards - use pattern matching on the substring
-                        // This is not in hot path (only for unknown types) so substring is acceptable here
-                        return simpleName.matches(pattern.substring(lastPartStart).replace("*", ".*"));
-                    }
-                }
-            }
-            return false;
-        }
-
-        AspectJMatcher getDelegate() {
-            if (nameMatcher instanceof PatternTypeNameMatcher) {
-                return ((PatternTypeNameMatcher) nameMatcher).getDelegate();
-            }
-            throw new UnsupportedOperationException("getDelegate() only supported for PatternTypeNameMatcher");
+            return nameMatcher.matchesSimpleName(simpleName);
         }
 
         @Override
@@ -811,7 +727,7 @@ public class MethodMatcher {
         }
 
         @Override
-        public boolean matches(String qualifiedName) {
+        public boolean matchesQualifiedName(String qualifiedName) {
             return true;
         }
 
@@ -831,12 +747,9 @@ public class MethodMatcher {
         boolean matches(String methodName);
     }
 
+    @RequiredArgsConstructor
     static class ExactMethodNameMatcher implements MethodNameMatcher {
         private final String methodName;
-
-        ExactMethodNameMatcher(String methodName) {
-            this.methodName = methodName;
-        }
 
         @Override
         public boolean matches(String name) {
@@ -849,43 +762,72 @@ public class MethodMatcher {
         }
     }
 
+    @RequiredArgsConstructor
     static class PatternMethodNameMatcher implements MethodNameMatcher {
-        private final AspectJMatcher delegate;
-
-        PatternMethodNameMatcher(AspectJMatcher delegate) {
-            this.delegate = delegate;
-        }
+        private final String pattern;
+        private final boolean isFullWildcard;
 
         @Override
         public boolean matches(String methodName) {
-            return delegate.matchesMethod(methodName);
+            if (pattern.equals(methodName)) {
+                return true;
+            } else if (isFullWildcard) {
+                return true;
+            }
+
+            return matchesMethodPattern(pattern, methodName);
+        }
+
+        private boolean matchesMethodPattern(String pattern, String text) {
+            int pIdx = 0, tIdx = 0;
+            int pLength = pattern.length(), tLength = text.length();
+            int starIdx = -1, matchIdx = -1;
+
+            while (tIdx < tLength) {
+                if (pIdx < pLength && pattern.charAt(pIdx) == '*') {
+                    // Found a wildcard - remember position and skip it
+                    starIdx = pIdx;
+                    matchIdx = tIdx;
+                    pIdx++;
+                } else if (pIdx < pLength && pattern.charAt(pIdx) == text.charAt(tIdx)) {
+                    // Characters match - advance both
+                    pIdx++;
+                    tIdx++;
+                } else if (starIdx != -1) {
+                    // No match, but we have a previous wildcard - backtrack
+                    pIdx = starIdx + 1;
+                    matchIdx++;
+                    tIdx = matchIdx;
+                } else {
+                    // No match and no wildcard to backtrack to
+                    return false;
+                }
+            }
+
+            // Consume any trailing wildcards in pattern
+            while (pIdx < pLength && pattern.charAt(pIdx) == '*') {
+                pIdx++;
+            }
+
+            return pIdx == pLength;
         }
 
         @Override
         public String toString() {
-            return delegate.getPattern();
+            return pattern;
         }
     }
 
     interface ArgumentMatcher {
         boolean matches(JavaType type);
         boolean matchesUnknown(@Nullable JavaType type);
-        int getArrayDimensions();
-        boolean isVarargs();
-
-        @Override
-        String toString();
     }
 
     // exact or pattern case
+    @RequiredArgsConstructor
     static class StandardArgumentMatcher implements ArgumentMatcher {
         final TypeNameMatcher nameMatcher;
-        private final int arrayDimensions;
-
-        StandardArgumentMatcher(TypeNameMatcher nameMatcher, int arrayDimensions) {
-            this.nameMatcher = nameMatcher;
-            this.arrayDimensions = arrayDimensions;
-        }
+        final int arrayDimensions;
 
         @Override
         public boolean matches(JavaType type) {
@@ -903,16 +845,6 @@ public class MethodMatcher {
                 return true;
             }
             return matches(type);
-        }
-
-        @Override
-        public int getArrayDimensions() {
-            return arrayDimensions;
-        }
-
-        @Override
-        public boolean isVarargs() {
-            return false;
         }
 
         @Override
@@ -936,28 +868,15 @@ public class MethodMatcher {
         }
 
         @Override
-        public int getArrayDimensions() {
-            return 0;
-        }
-
-        @Override
-        public boolean isVarargs() {
-            return false;
-        }
-
-        @Override
         public String toString() {
             return "*";
         }
     }
 
     // `type...` case
+    @RequiredArgsConstructor
     static class VarArgsMatcher implements ArgumentMatcher {
         private final StandardArgumentMatcher elementMatcher;
-
-        VarArgsMatcher(StandardArgumentMatcher elementMatcher) {
-            this.elementMatcher = elementMatcher;
-        }
 
         @Override
         public boolean matches(JavaType type) {
@@ -986,16 +905,6 @@ public class MethodMatcher {
         }
 
         @Override
-        public int getArrayDimensions() {
-            return elementMatcher.getArrayDimensions();
-        }
-
-        @Override
-        public boolean isVarargs() {
-            return true;
-        }
-
-        @Override
         public String toString() {
             return elementMatcher + "...";
         }
@@ -1018,16 +927,6 @@ public class MethodMatcher {
         }
 
         @Override
-        public int getArrayDimensions() {
-            return 0;
-        }
-
-        @Override
-        public boolean isVarargs() {
-            return true;
-        }
-
-        @Override
         public String toString() {
             return "..";
         }
@@ -1036,20 +935,13 @@ public class MethodMatcher {
 
 /**
  * Simple data class to carry pattern metadata during parsing.
- * Separates pattern string from array/varargs metadata.
+ * Contains the type name matcher along with array/varargs metadata.
  */
+@RequiredArgsConstructor
 class TypePatternInfo {
-    final String pattern;
+    final TypeNameMatcher nameMatcher;
     final int arrayDimensions;
     final boolean isVarargs;
-    final AspectJMatcher.@Nullable PatternType patternType;
-
-    TypePatternInfo(String pattern, int arrayDimensions, boolean isVarargs, AspectJMatcher.@Nullable PatternType patternType) {
-        this.pattern = pattern;
-        this.arrayDimensions = arrayDimensions;
-        this.isVarargs = isVarargs;
-        this.patternType = patternType;
-    }
 }
 
 /**
@@ -1062,7 +954,6 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
     public MethodMatcher.TypeMatcher visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
         MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx = ctx.classNameOrInterface();
         if (classNameCtx == null) {
-            // Wildcard type - matches everything
             return MethodMatcher.WildcardTypeMatcher.INSTANCE;
         }
         return buildTypeMatcher(classNameCtx);
@@ -1070,7 +961,8 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
 
     static TypePatternInfo buildTypePatternInfo(MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx) {
         StringBuilder patternBuilder = new StringBuilder();
-        AspectJMatcher.PatternType patternType = null;
+        boolean usePackagePrefix = false;
+        boolean useFullWildcard = false;
         ParseTree prevChild = null;
         boolean hasWildcards = false;
 
@@ -1099,9 +991,9 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
                 String pattern = patternBuilder.toString();
                 if (pattern.isEmpty() || "*".equals(pattern)) {
                     pattern = "*";
-                    patternType = AspectJMatcher.PatternType.FullWildcard;
+                    useFullWildcard = true;
                 } else {
-                    patternType = AspectJMatcher.PatternType.PackagePrefix;
+                    usePackagePrefix = true;
                 }
                 patternBuilder.setLength(0);
                 patternBuilder.append(pattern);
@@ -1118,6 +1010,7 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
         String pattern = patternBuilder.toString();
 
         if (!pattern.contains(".")) {
+            //noinspection StatementWithEmptyBody
             if (Character.isLowerCase(pattern.charAt(0)) && JavaType.Primitive.fromKeyword(pattern) != null) {
                 // It's a primitive, keep as-is
             } else {
@@ -1127,39 +1020,34 @@ class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMa
             }
         }
 
-        // If patternType wasn't set (i.e., not a PackagePrefix), determine it now
-        if (patternType == null) {
-            if ("*".equals(pattern) || "*..*".equals(pattern)) {
-                patternType = AspectJMatcher.PatternType.FullWildcard;
-            } else if (hasWildcards) {
-                patternType = AspectJMatcher.PatternType.Wildcard;
-            } else {
-                patternType = AspectJMatcher.PatternType.Exact;
-            }
+        // Create the appropriate matcher based on flags and pattern
+        TypeNameMatcher nameMatcher;
+        if (usePackagePrefix) {
+            nameMatcher = PatternTypeNameMatcher.packagePrefix(pattern);
+        } else if (useFullWildcard) {
+            nameMatcher = PatternTypeNameMatcher.fullWildcard(pattern);
+        } else if ("*".equals(pattern) || "*..*".equals(pattern)) {
+            nameMatcher = PatternTypeNameMatcher.fullWildcard(pattern);
+        } else if (hasWildcards) {
+            nameMatcher = PatternTypeNameMatcher.wildcard(pattern);
+        } else {
+            nameMatcher = new ExactTypeNameMatcher(pattern);
         }
 
-        return new TypePatternInfo(pattern, arrayDimensions, false, patternType);
+        return new TypePatternInfo(nameMatcher, arrayDimensions, false);
     }
 
     static MethodMatcher.TypeMatcher buildTypeMatcher(MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx) {
         TypePatternInfo info = buildTypePatternInfo(classNameCtx);
 
         // Check for full wildcard pattern with no arrays - return WildcardTypeMatcher
-        if (info.patternType == AspectJMatcher.PatternType.FullWildcard && info.arrayDimensions == 0 && !info.isVarargs) {
+        if (info.nameMatcher instanceof PatternTypeNameMatcher &&
+            ((PatternTypeNameMatcher) info.nameMatcher).isFullWildcard() &&
+            info.arrayDimensions == 0 && !info.isVarargs) {
             return MethodMatcher.WildcardTypeMatcher.INSTANCE;
         }
 
-        // Create matcher based on pattern type (already computed during parsing)
-        TypeNameMatcher nameMatcher;
-        if (info.patternType == AspectJMatcher.PatternType.Exact) {
-            // Exact pattern - no wildcards
-            nameMatcher = new ExactTypeNameMatcher(info.pattern);
-        } else {
-            // Pattern with wildcards - use AspectJMatcher
-            AspectJMatcher aspectJMatcher = new AspectJMatcher(info.pattern, info.patternType);
-            nameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
-        }
-        return new MethodMatcher.StandardTypeMatcher(nameMatcher, info.arrayDimensions, info.isVarargs);
+        return new MethodMatcher.StandardTypeMatcher(info.nameMatcher, info.arrayDimensions, info.isVarargs);
     }
 
     private static int countArrayDimensions(MethodSignatureParser.@Nullable ArrayDimensionsContext ctx) {
@@ -1182,7 +1070,8 @@ class FormalTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<TypePatt
     public TypePatternInfo visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
         MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx = ctx.classNameOrInterface();
         if (classNameCtx == null) {
-            return new TypePatternInfo("*", 0, false, AspectJMatcher.PatternType.FullWildcard);
+            TypeNameMatcher nameMatcher = PatternTypeNameMatcher.fullWildcard("*");
+            return new TypePatternInfo(nameMatcher, 0, false);
         }
         return TargetTypeMatcherVisitor.buildTypePatternInfo(classNameCtx);
     }
@@ -1193,18 +1082,14 @@ class FormalTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<TypePatt
  * This is used during MethodMatcher construction to set up efficient matching.
  */
 class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<Void> {
+    @Getter
     private final List<MethodMatcher.ArgumentMatcher> matchers = new ArrayList<>();
+
+    @Getter
     private int varArgsPos = -1;
+
     private final FormalTypeMatcherVisitor typeMatcherVisitor = new FormalTypeMatcherVisitor();
     private boolean nextTypeIsVarargs = false;
-
-    public List<MethodMatcher.ArgumentMatcher> getMatchers() {
-        return matchers;
-    }
-
-    public int getVarArgsPosition() {
-        return varArgsPos;
-    }
 
     @Override
     public Void visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
@@ -1215,22 +1100,11 @@ class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<Void> {
 
             // Update info if this is a varargs parameter
             if (nextTypeIsVarargs) {
-                info = new TypePatternInfo(info.pattern, info.arrayDimensions, true, info.patternType);
-            }
-
-            // Create matcher based on pattern type (already computed during parsing)
-            TypeNameMatcher nameMatcher;
-            if (info.patternType == AspectJMatcher.PatternType.Exact) {
-                // Exact pattern - no wildcards
-                nameMatcher = new ExactTypeNameMatcher(info.pattern);
-            } else {
-                // Pattern with wildcards - use AspectJMatcher
-                AspectJMatcher aspectJMatcher = new AspectJMatcher(info.pattern, info.patternType);
-                nameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
+                info = new TypePatternInfo(info.nameMatcher, info.arrayDimensions, true);
             }
 
             MethodMatcher.StandardArgumentMatcher baseMatcher = new MethodMatcher.StandardArgumentMatcher(
-                nameMatcher,
+                info.nameMatcher,
                 info.arrayDimensions
             );
 

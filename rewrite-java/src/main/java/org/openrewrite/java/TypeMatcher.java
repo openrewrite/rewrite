@@ -54,8 +54,7 @@ public class TypeMatcher implements Reference.Matcher {
 
         if (StringUtils.isBlank(fieldType)) {
             // Blank means wildcard - use PatternTypeNameMatcher with FullWildcard type
-            AspectJMatcher aspectJMatcher = new AspectJMatcher("*", AspectJMatcher.PatternType.FullWildcard);
-            typeNameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
+            typeNameMatcher = PatternTypeNameMatcher.fullWildcard("*");
         } else {
             MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                     CharStreams.fromString(fieldType + "#dummy()"))));
@@ -69,8 +68,7 @@ public class TypeMatcher implements Reference.Matcher {
                         typeNameMatcher = new ExactTypeNameMatcher(pattern);
                     } else {
                         // All patterns (including "*" and "*..*") use PatternTypeNameMatcher
-                        AspectJMatcher aspectJMatcher = new AspectJMatcher(pattern, null);
-                        typeNameMatcher = new PatternTypeNameMatcher(aspectJMatcher);
+                        typeNameMatcher = PatternTypeNameMatcher.fromPattern(pattern);
                     }
                     return null;
                 }

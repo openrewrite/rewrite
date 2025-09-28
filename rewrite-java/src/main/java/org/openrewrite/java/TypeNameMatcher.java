@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.TypeUtils;
@@ -22,23 +23,20 @@ import org.openrewrite.java.tree.TypeUtils;
 @Incubating(since = "8.63.0")
 public interface TypeNameMatcher {
     boolean matches(String typeName);
-    String getPattern();
+    boolean matchesSimpleName(String simpleName);
 
     static TypeNameMatcher fromPattern(String pattern) {
         if (pattern.contains("*") || pattern.contains("..")) {
-            return new PatternTypeNameMatcher(new AspectJMatcher(pattern, null));
+            return PatternTypeNameMatcher.fromPattern(pattern);
         } else {
             return new ExactTypeNameMatcher(pattern);
         }
     }
 }
 
+@RequiredArgsConstructor
 class ExactTypeNameMatcher implements TypeNameMatcher {
     private final String pattern;
-
-    ExactTypeNameMatcher(String pattern) {
-        this.pattern = pattern;
-    }
 
     @Override
     public boolean matches(String typeName) {
@@ -46,8 +44,8 @@ class ExactTypeNameMatcher implements TypeNameMatcher {
     }
 
     @Override
-    public String getPattern() {
-        return pattern;
+    public boolean matchesSimpleName(String simpleName) {
+        return pattern.equals(simpleName) || pattern.endsWith('.' + simpleName);
     }
 
     @Override
@@ -57,38 +55,7 @@ class ExactTypeNameMatcher implements TypeNameMatcher {
 }
 
 class PatternTypeNameMatcher implements TypeNameMatcher {
-    private final AspectJMatcher delegate;
-
-    PatternTypeNameMatcher(AspectJMatcher delegate) {
-        this.delegate = delegate;
-    }
-
-    @Override
-    public boolean matches(String typeName) {
-        return delegate.matchesType(typeName);
-    }
-
-    @Override
-    public String getPattern() {
-        return delegate.getPattern();
-    }
-
-    boolean isFullWildcard() {
-        return delegate.getPatternType() == AspectJMatcher.PatternType.FullWildcard;
-    }
-
-    AspectJMatcher getDelegate() {
-        return delegate;
-    }
-
-    @Override
-    public String toString() {
-        return getPattern();
-    }
-}
-
-class AspectJMatcher {
-    enum PatternType {
+    private enum PatternType {
         FullWildcard,
         Exact,
         PackagePrefix,
@@ -98,7 +65,7 @@ class AspectJMatcher {
     private final String pattern;
     private final PatternType patternType;
 
-    AspectJMatcher(String pattern, @Nullable PatternType explicitType) {
+    private PatternTypeNameMatcher(String pattern, @Nullable PatternType explicitType) {
         this.pattern = pattern;
 
         if (explicitType != null) {
@@ -112,15 +79,28 @@ class AspectJMatcher {
         }
     }
 
-    String getPattern() {
-        return pattern;
+    static PatternTypeNameMatcher fromPattern(String pattern) {
+        return new PatternTypeNameMatcher(pattern, null);
     }
 
-    PatternType getPatternType() {
-        return patternType;
+    static PatternTypeNameMatcher fullWildcard(String pattern) {
+        return new PatternTypeNameMatcher(pattern, PatternType.FullWildcard);
     }
 
-    boolean matchesType(String text) {
+    static PatternTypeNameMatcher packagePrefix(String pattern) {
+        return new PatternTypeNameMatcher(pattern, PatternType.PackagePrefix);
+    }
+
+    static PatternTypeNameMatcher wildcard(String pattern) {
+        return new PatternTypeNameMatcher(pattern, PatternType.Wildcard);
+    }
+
+    boolean isFullWildcard() {
+        return patternType == PatternType.FullWildcard;
+    }
+
+    @Override
+    public boolean matches(String text) {
         switch (patternType) {
             case FullWildcard:
                 return true;
@@ -134,57 +114,38 @@ class AspectJMatcher {
         }
     }
 
-    boolean matchesMethod(String methodName) {
-        if (patternType == PatternType.Exact) {
-            return pattern.equals(methodName);
-        } else if (patternType == PatternType.FullWildcard) {
-            return true;
-        }
+    @Override
+    public boolean matchesSimpleName(String simpleName) {
+        // For patterns like com.*.Bar or com..Bar, we want to match just "Bar"
+        int lastDot = pattern.lastIndexOf('.');
+        if (lastDot > 0 && lastDot < pattern.length() - 1) {
+            int lastPartStart = lastDot + 1;
+            int lastPartLength = pattern.length() - lastPartStart;
 
-        return matchesMethodPattern(pattern, methodName, 0, 0);
-    }
-
-    private boolean matchesMethodPattern(String pattern, String text, int pIdx, int tIdx) {
-        int pLength = pattern.length(), tLength = text.length();
-        while (pIdx < pLength) {
-            if (tIdx >= tLength) {
-                while (pIdx < pLength) {
-                    if (pattern.charAt(pIdx) != '*') {
-                        return false;
-                    }
-                    pIdx++;
-                }
+            // Check if last part is just "*"
+            if (lastPartLength == 1 && pattern.charAt(lastPartStart) == '*') {
                 return true;
             }
 
-            char p = pattern.charAt(pIdx);
+            // Check if last part contains wildcards
+            boolean hasWildcard = false;
+            for (int i = lastPartStart; i < pattern.length(); i++) {
+                if (pattern.charAt(i) == '*') {
+                    hasWildcard = true;
+                    break;
+                }
+            }
 
-            if (p == '*') {
-                pIdx++;
-                if (pIdx >= pLength) {
-                    return true;
-                }
-
-                if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
-                    return true;
-                }
-                while (tIdx < tLength) {
-                    tIdx++;
-                    if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
-                        return true;
-                    }
-                }
-                return false;
+            if (!hasWildcard) {
+                // Simple exact match
+                return simpleName.length() == lastPartLength &&
+                        pattern.regionMatches(lastPartStart, simpleName, 0, lastPartLength);
             } else {
-                if (pattern.charAt(pIdx) != text.charAt(tIdx)) {
-                    return false;
-                }
-                pIdx++;
-                tIdx++;
+                // Has wildcards - use pattern matching on the substring
+                return simpleName.matches(pattern.substring(lastPartStart).replace("*", ".*"));
             }
         }
-
-        return tIdx == tLength;
+        return false;
     }
 
     private boolean matchesPattern(String pattern, String text, int pIdx, int tIdx) {
@@ -269,6 +230,6 @@ class AspectJMatcher {
 
     @Override
     public String toString() {
-        return getPattern();
+        return pattern;
     }
 }

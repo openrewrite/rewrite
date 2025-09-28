@@ -489,6 +489,9 @@ class MethodMatcherTest implements RewriteTest {
         assertTrue(new MethodMatcher("com.example.Service *find*By*(..)").matches(
           newMethodType("com.example.Service", "findUserByEmail", "java.lang.String")
         ));
+        assertTrue(new MethodMatcher("com.example.Service *find*By*(..)").matches(
+          newMethodType("com.example.Service", "refindByUser", "java.lang.String")
+        ));
     }
 
     @Test
