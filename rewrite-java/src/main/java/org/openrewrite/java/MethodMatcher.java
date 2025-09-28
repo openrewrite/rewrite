@@ -769,47 +769,52 @@ public class MethodMatcher {
 
         @Override
         public boolean matches(String methodName) {
-            if (pattern.equals(methodName)) {
-                return true;
-            } else if (isFullWildcard) {
-                return true;
-            }
-
-            return matchesMethodPattern(pattern, methodName);
+            return isFullWildcard || matchesMethodPattern(pattern, methodName, 0, 0);
         }
 
-        private boolean matchesMethodPattern(String pattern, String text) {
-            int pIdx = 0, tIdx = 0;
-            int pLength = pattern.length(), tLength = text.length();
-            int starIdx = -1, matchIdx = -1;
+        private boolean matchesMethodPattern(String pattern, String text, int pIdx, int tIdx) {
+            int pLength = pattern.length();
+            int tLength = text.length();
 
-            while (tIdx < tLength) {
-                if (pIdx < pLength && pattern.charAt(pIdx) == '*') {
-                    // Found a wildcard - remember position and skip it
-                    starIdx = pIdx;
-                    matchIdx = tIdx;
-                    pIdx++;
-                } else if (pIdx < pLength && pattern.charAt(pIdx) == text.charAt(tIdx)) {
-                    // Characters match - advance both
-                    pIdx++;
-                    tIdx++;
-                } else if (starIdx != -1) {
-                    // No match, but we have a previous wildcard - backtrack
-                    pIdx = starIdx + 1;
-                    matchIdx++;
-                    tIdx = matchIdx;
-                } else {
-                    // No match and no wildcard to backtrack to
+            while (pIdx < pLength) {
+                if (tIdx >= tLength) {
+                    // Consume any remaining wildcards in pattern
+                    while (pIdx < pLength && pattern.charAt(pIdx) == '*') {
+                        pIdx++;
+                    }
+                    return pIdx >= pLength;
+                }
+
+                char p = pattern.charAt(pIdx++);
+
+                if (p == '*') {
+                    // Wildcard at end matches rest of text
+                    if (pIdx >= pLength) {
+                        return true;
+                    }
+
+                    // Try matching with zero-length wildcard match first (greedy)
+                    if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
+                        return true;
+                    }
+                    // Then try consuming characters from text
+                    while (tIdx < tLength) {
+                        tIdx++;
+                        if (matchesMethodPattern(pattern, text, pIdx, tIdx)) {
+                            return true;
+                        }
+                    }
                     return false;
+                } else {
+                    // Literal character must match
+                    if (text.charAt(tIdx) != p) {
+                        return false;
+                    }
+                    tIdx++;
                 }
             }
 
-            // Consume any trailing wildcards in pattern
-            while (pIdx < pLength && pattern.charAt(pIdx) == '*') {
-                pIdx++;
-            }
-
-            return pIdx == pLength;
+            return tIdx >= tLength;
         }
 
         @Override
