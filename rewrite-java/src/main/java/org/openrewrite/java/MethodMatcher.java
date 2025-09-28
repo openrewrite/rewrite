@@ -181,9 +181,9 @@ public class MethodMatcher {
                         methodNameMatcher = new ExactMethodNameMatcher(methodNamePattern);
                     } else {
                         // Pattern match (including "*" wildcard) - we already know it has wildcards from isPattern flag
-                        AspectJMatcher.PatternType patternType = "*".equals(methodNamePattern)
-                                ? AspectJMatcher.PatternType.FullWildcard
-                                : AspectJMatcher.PatternType.Wildcard;
+                        AspectJMatcher.PatternType patternType = "*".equals(methodNamePattern) ?
+                                AspectJMatcher.PatternType.FullWildcard :
+                                AspectJMatcher.PatternType.Wildcard;
                         methodNameMatcher = new PatternMethodNameMatcher(
                                 new AspectJMatcher(methodNamePattern, patternType));
                     }
