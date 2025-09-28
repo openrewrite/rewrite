@@ -139,7 +139,47 @@ export class JavaScriptTypeMapping {
         return undefined;
     }
 
+    /**
+     * Helper to create a Type.Method object from common parameters
+     */
+    private createMethodType(
+        signature: ts.Signature,
+        node: ts.Node,
+        declaringType: Type.FullyQualified,
+        name: string,
+        declaredFormalTypeNames: string[] = []
+    ): Type.Method {
+        const returnType = signature.getReturnType();
+        const parameters = signature.getParameters();
+        const parameterTypes: Type[] = [];
+        const parameterNames: string[] = [];
+
+        for (const param of parameters) {
+            parameterNames.push(param.getName());
+            const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
+            parameterTypes.push(this.getType(paramType));
+        }
+
+        // Create the Type.Method object
+        return Object.assign(new NonDraftableType(), {
+            kind: Type.Kind.Method,
+            declaringType: declaringType,
+            name: name,
+            returnType: this.getType(returnType),
+            parameterNames: parameterNames,
+            parameterTypes: parameterTypes,
+            thrownExceptions: [], // JavaScript doesn't have checked exceptions
+            annotations: [],
+            defaultValue: undefined,
+            declaredFormalTypeNames: declaredFormalTypeNames,
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        }) as Type.Method;
+    }
+
     methodType(node: ts.Node): Type.Method | undefined {
+
         let signature: ts.Signature | undefined;
         let methodName: string;
         let declaringType: Type.FullyQualified;
@@ -153,7 +193,68 @@ export class JavaScriptTypeMapping {
                 return undefined;
             }
 
-            const symbol = this.checker.getSymbolAtLocation(node.expression);
+            let symbol = this.checker.getSymbolAtLocation(node.expression);
+
+
+            if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
+                // For property access expressions where we couldn't get a symbol,
+                // try to get the symbol from the signature's declaration
+                const declaration = signature?.getDeclaration();
+                if (declaration) {
+                    symbol = this.checker.getSymbolAtLocation(declaration);
+                }
+
+                // If still no symbol but we have a signature, we can proceed with limited info
+                if (!symbol && signature) {
+                    // For cases like util.isArray where the module is 'any' type
+                    // We'll construct a basic method type from the signature
+                    methodName = node.expression.name.getText();
+
+                    // When there's no symbol but we have a signature, we need to work harder
+                    // to find the declaring type. This happens with CommonJS require() calls
+                    // where the module is typed as 'any' but methods still have signatures
+
+                    // Try to trace back through the AST to find the require() call
+                    let inferredDeclaringType: Type.FullyQualified | undefined;
+                    const objExpr = node.expression.expression;
+
+                    if (ts.isIdentifier(objExpr)) {
+                        // Look for the variable declaration that assigns the require() result
+                        const objSymbol = this.checker.getSymbolAtLocation(objExpr);
+
+                        if (objSymbol && objSymbol.valueDeclaration) {
+                            const valueDecl = objSymbol.valueDeclaration;
+                            if (ts.isVariableDeclaration(valueDecl) && valueDecl.initializer) {
+                                // Check if it's a require() call
+                                if (ts.isCallExpression(valueDecl.initializer)) {
+                                    const callExpr = valueDecl.initializer;
+                                    if (ts.isIdentifier(callExpr.expression) &&
+                                        callExpr.expression.getText() === 'require' &&
+                                        callExpr.arguments.length > 0) {
+                                        // Extract the module name from require('module-name')
+                                        const moduleArg = callExpr.arguments[0];
+                                        if (ts.isStringLiteral(moduleArg)) {
+                                            const moduleName = moduleArg.text;
+
+                                            inferredDeclaringType = {
+                                                kind: Type.Kind.Class,
+                                                fullyQualifiedName: moduleName
+                                            } as Type.FullyQualified;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Use the inferred type or fall back to unknown
+                    declaringType = inferredDeclaringType || Type.unknownType as Type.FullyQualified;
+
+                    // Create the method type using the helper
+                    return this.createMethodType(signature, node, declaringType, methodName);
+                }
+            }
+
             if (!symbol) {
                 return undefined;
             }
@@ -383,34 +484,8 @@ export class JavaScriptTypeMapping {
             return undefined;
         }
 
-        // Common logic for all method types
-        const returnType = signature.getReturnType();
-        const parameters = signature.getParameters();
-        const parameterTypes: Type[] = [];
-        const parameterNames: string[] = [];
-
-        for (const param of parameters) {
-            parameterNames.push(param.getName());
-            const paramType = this.checker.getTypeOfSymbolAtLocation(param, node);
-            parameterTypes.push(this.getType(paramType));
-        }
-
-        // Create the Type.Method object
-        return Object.assign(new NonDraftableType(), {
-            kind: Type.Kind.Method,
-            declaringType: declaringType,
-            name: methodName,
-            returnType: this.getType(returnType),
-            parameterNames: parameterNames,
-            parameterTypes: parameterTypes,
-            thrownExceptions: [], // JavaScript doesn't have checked exceptions
-            annotations: [],
-            defaultValue: undefined,
-            declaredFormalTypeNames: declaredFormalTypeNames,
-            toJSON: function () {
-                return Type.signature(this);
-            }
-        }) as Type.Method;
+        // Create the method type using the helper
+        return this.createMethodType(signature, node, declaringType, methodName, declaredFormalTypeNames);
     }
 
 

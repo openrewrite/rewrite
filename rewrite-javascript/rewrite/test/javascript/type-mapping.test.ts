@@ -20,6 +20,7 @@ import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
     describe('primitive types', () => {
@@ -347,6 +348,86 @@ describe('JavaScript type mapping', () => {
                         )
                     )
                 );
+            }, {unsafeCleanup: true});
+        });
+
+        test('deprecated node methods with CommonJS', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                const util = require('util');
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                const util = require('util');
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('deprecated node methods with ES6 imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import * as util from 'util';
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                import * as util from 'util';
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
             }, {unsafeCleanup: true});
         });
 

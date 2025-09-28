@@ -16,6 +16,7 @@
 import {Marker, MarkersKind, SearchResult} from "./markers";
 import {Cursor, isSourceFile, SourceFile, Tree} from "./tree";
 import {TreeVisitor} from "./visitor";
+import {trimIndent} from "./util";
 
 type CommentWrapper = (input: string) => string;
 
@@ -134,7 +135,8 @@ export class TreePrinters {
                 const p = out || new PrintOutputCapture();
                 await printer().visit(tree, p);
                 return p.out;
-            }})
+            }
+        })
     }
 
     /**
@@ -147,8 +149,8 @@ export class TreePrinters {
         const sourceFileKind = typeof target === 'string' ?
             target :
             (isSourceFile(target) ?
-                target as SourceFile :
-                target.firstEnclosing(isSourceFile)
+                    target as SourceFile :
+                    target.firstEnclosing(isSourceFile)
             )!.kind
 
         if (!this._registry.has(sourceFileKind)) {
@@ -159,6 +161,10 @@ export class TreePrinters {
 
     static print(sourceFile: SourceFile): Promise<string> {
         return this.printer(sourceFile).print(sourceFile);
+    }
+
+    static async printTrimmed(sourceFile: SourceFile): Promise<string> {
+        return trimIndent(await this.print(sourceFile));
     }
 }
 
