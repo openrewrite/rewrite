@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.TypeUtils;
 
+@Incubating(since = "8.63.0")
 public interface TypeNameMatcher {
     boolean matches(String typeName);
     String getPattern();
