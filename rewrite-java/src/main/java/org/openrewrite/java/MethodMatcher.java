@@ -334,18 +334,8 @@ public class MethodMatcher {
         }
 
         // Early argument count check to avoid expensive type matching
-        int actualArgCount = type.getParameterTypes().size();
-        if (varArgsPosition == -1) {
-            // No varargs - exact count match required
-            if (actualArgCount != argumentMatchers.size()) {
-                return false;
-            }
-        } else {
-            // With varargs - need at least (matchers - 1) arguments
-            // because varargs can match 0 or more arguments
-            if (actualArgCount < argumentMatchers.size() - 1) {
-                return false;
-            }
+        if (!matchesParameterCount(type.getParameterTypes().size())) {
+            return false;
         }
 
         if (!matchesTargetType(type.getDeclaringType())) {
@@ -353,6 +343,11 @@ public class MethodMatcher {
         }
 
         return matchesParameterTypes(type.getParameterTypes());
+    }
+
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean matchesParameterCount(int actualArgCount) {
+        return varArgsPosition == -1 ? actualArgCount == argumentMatchers.size() : actualArgCount >= argumentMatchers.size() - 1;
     }
 
     public boolean matches(@Nullable MethodCall methodCall) {
@@ -448,17 +443,8 @@ public class MethodMatcher {
 
         // Early argument count check to avoid expensive select matching
         int actualArgCount = method.getArguments().size();
-        if (varArgsPosition == -1) {
-            // No varargs - exact count match required
-            if (actualArgCount != argumentMatchers.size()) {
-                return false;
-            }
-        } else {
-            // With varargs - need at least (matchers - 1) arguments
-            // because varargs can match 0 or more arguments
-            if (actualArgCount < argumentMatchers.size() - 1) {
-                return false;
-            }
+        if (!matchesParameterCount(actualArgCount)) {
+            return false;
         }
 
         // When checking receiver with unknown types, we still need to match the name pattern
