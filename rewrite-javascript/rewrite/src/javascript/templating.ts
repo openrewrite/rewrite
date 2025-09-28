@@ -92,7 +92,8 @@ export class Pattern {
 export class MatchResult implements Pick<Map<string, J>, "get"> {
     constructor(
         private readonly bindings: Map<string, J> = new Map()
-    ) {}
+    ) {
+    }
 
     get(capture: Capture | string): J | undefined {
         const name = typeof capture === "string" ? capture : capture.name;
@@ -577,7 +578,7 @@ class TemplateApplier {
      * @returns A Promise resolving to the modified AST
      */
     async apply(): Promise<J | undefined> {
-        const {tree, loc, mode} = this.coordinates;
+        const {loc} = this.coordinates;
 
         // Apply the template based on the location and mode
         switch (loc || 'EXPRESSION_PREFIX') {
@@ -771,7 +772,7 @@ class RewriteRuleImpl implements RewriteRule {
  *     after: template`${"left"} === ${"right"}`
  * }));
  */
-export function rewrite<T extends J>(
+export function rewrite(
     builderFn: () => RewriteConfig
 ): RewriteRule {
     const config = builderFn();
