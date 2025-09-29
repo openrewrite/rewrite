@@ -237,6 +237,10 @@ export namespace Type {
         return type?.kind === Type.Kind.Class;
     }
 
+    export function isMethod(type?: Type): type is Type.Method {
+        return type?.kind === Type.Kind.Method;
+    }
+
     export function isArray(type?: Type): type is Type.Array {
         return type?.kind === Type.Kind.Array;
     }
