@@ -15,8 +15,6 @@
  */
 package org.openrewrite.benchmarks.java;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
@@ -24,8 +22,6 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
-import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -49,26 +45,11 @@ import java.util.function.Consumer;
 @State(Scope.Benchmark)
 public class MethodSignatureParserBenchmark {
 
-    @Param({"parser", "methodMatcher"})
-    private String mode;
-
     private Consumer<String> patternProcessor;
 
     @Setup(Level.Trial)
     public void setup(Blackhole bh) {
-        if ("parser".equals(mode)) {
-            // Only parse with ANTLR
-            this.patternProcessor = pattern -> {
-                MethodSignatureLexer lexer = new MethodSignatureLexer(CharStreams.fromString(pattern));
-                MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(lexer));
-                bh.consume(parser.methodPattern());
-            };
-        } else if ("methodMatcher".equals(mode)) {
-            // Full MethodMatcher construction
-            this.patternProcessor = pattern -> bh.consume(new MethodMatcher(pattern));
-        } else {
-            throw new IllegalArgumentException("Unknown mode: " + mode);
-        }
+        this.patternProcessor = pattern -> bh.consume(new MethodMatcher(pattern));
     }
 
     /**

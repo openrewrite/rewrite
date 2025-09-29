@@ -17,17 +17,9 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.antlr.v4.runtime.ANTLRErrorListener;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.TerminalNode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.java.internal.ThrowingErrorListener;
-import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
-import org.openrewrite.java.internal.grammar.MethodSignatureParser;
-import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
@@ -139,71 +131,13 @@ public class MethodMatcher {
     }
 
     private void parsePattern(String methodPattern) {
-        ANTLRErrorListener errorListener = new ThrowingErrorListener(methodPattern);
-        MethodSignatureLexer lexer = new MethodSignatureLexer(CharStreams.fromString(methodPattern));
-        lexer.removeErrorListeners();
-        lexer.addErrorListener(errorListener);
-        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(lexer));
-        parser.removeErrorListeners();
-        parser.addErrorListener(errorListener);
+        Parser parser = new Parser(methodPattern);
+        parser.parse();
 
-        new MethodSignatureParserBaseVisitor<Void>() {
-
-            @SuppressWarnings("ConstantValue")
-            @Override
-            public @Nullable Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
-                MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
-                typeMatcher = new TargetTypeMatcherVisitor().visitTargetTypePattern(targetTypePatternContext);
-                boolean isPattern = false;
-
-                // Build method name pattern
-                String methodNamePattern;
-                if (ctx.simpleNamePattern().CONSTRUCTOR() != null) {
-                    methodNamePattern = "<constructor>";
-                    methodNameMatcher = new ExactMethodNameMatcher(methodNamePattern);
-                } else if (ctx.simpleNamePattern().JAVASCRIPT_DEFAULT_METHOD() != null) {
-                    methodNamePattern = "<default>";
-                    methodNameMatcher = new ExactMethodNameMatcher(methodNamePattern);
-                } else {
-                    StringBuilder builder = new StringBuilder();
-                    for (MethodSignatureParser.SimpleNamePartContext child : ctx.simpleNamePattern().simpleNamePart()) {
-                        if (child.WILDCARD() != null) {
-                            isPattern = true;
-                        }
-                        builder.append(child.getText());
-                    }
-                    methodNamePattern = builder.toString();
-                }
-
-                // Create appropriate MethodNameMatcher (if not already set for constructor/default)
-                if (methodNameMatcher == null) {
-                    if (!isPattern) {
-                        // Exact match
-                        methodNameMatcher = new ExactMethodNameMatcher(methodNamePattern);
-                    } else {
-                        // Pattern match (including "*" wildcard) - we already know it has wildcards from isPattern flag
-                        boolean isFullWildcard = "*".equals(methodNamePattern);
-                        methodNameMatcher = new PatternMethodNameMatcher(methodNamePattern, isFullWildcard);
-                    }
-                }
-
-                if (ctx.formalParametersPattern().formalsPattern() == null) {
-                    argumentMatchers = new ArrayList<>();  // Empty list for no arguments
-                } else if (matchAllArguments(ctx.formalParametersPattern().formalsPattern())) {
-                    // For (..), use a single WildcardVarArgsMatcher
-                    argumentMatchers = new ArrayList<>();
-                    argumentMatchers.add(WildcardVarArgsMatcher.INSTANCE);
-                    varArgsPosition = 0;
-                } else {
-                    FormalParameterVisitor visitor = new FormalParameterVisitor();
-                    visitor.visitFormalParametersPattern(ctx.formalParametersPattern());
-                    // Capture the ArgumentMatchers and varargs position
-                    argumentMatchers = visitor.getMatchers();
-                    varArgsPosition = visitor.getVarArgsPos();
-                }
-                return null;
-            }
-        }.visit(parser.methodPattern());
+        this.typeMatcher = parser.typeMatcher;
+        this.methodNameMatcher = parser.methodNameMatcher;
+        this.argumentMatchers = parser.argumentMatchers;
+        this.varArgsPosition = parser.varArgsPosition;
     }
 
     public static Validated<String> validate(@Nullable String signature) {
@@ -225,9 +159,6 @@ public class MethodMatcher {
         }
     }
 
-    private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
-        return context.DOTDOT() != null && context.formalsPatternAfterDotDot() == null;
-    }
 
     public MethodMatcher(J.MethodDeclaration method, boolean matchOverrides) {
         this(methodPattern(method), matchOverrides);
@@ -734,6 +665,22 @@ public class MethodMatcher {
     }
 
     @RequiredArgsConstructor
+    static class ConstructorMethodNameMatcher implements MethodNameMatcher {
+        private final String originalName;
+
+        @Override
+        public boolean matches(String name) {
+            return "<constructor>".equals(name);
+        }
+
+        @Override
+        public String toString() {
+            // Normalize <init> to <constructor> in toString
+            return "<init>".equals(originalName) ? "<constructor>" : originalName;
+        }
+    }
+
+    @RequiredArgsConstructor
     static class PatternMethodNameMatcher implements MethodNameMatcher {
         private final String pattern;
         private final boolean isFullWildcard;
@@ -907,214 +854,195 @@ public class MethodMatcher {
             return "..";
         }
     }
-}
 
-/**
- * Simple data class to carry pattern metadata during parsing.
- * Contains the type name matcher along with array/varargs metadata.
- */
-@RequiredArgsConstructor
-class TypePatternInfo {
-    final TypeNameMatcher nameMatcher;
-    final int arrayDimensions;
-    final boolean isVarargs;
-}
+    @RequiredArgsConstructor
+    static class Parser {
+        private final String pattern;
+        private MethodMatcher.TypeMatcher typeMatcher;
+        private MethodMatcher.MethodNameMatcher methodNameMatcher;
+        private List<MethodMatcher.ArgumentMatcher> argumentMatchers;
+        private int varArgsPosition = -1;
 
-/**
- * Visitor for building AspectJMatcher with metadata from target type patterns.
- * Extracts information like array dimensions directly from the parse tree.
- */
-class TargetTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<MethodMatcher.TypeMatcher> {
-
-    @Override
-    public MethodMatcher.TypeMatcher visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
-        MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx = ctx.classNameOrInterface();
-        if (classNameCtx == null) {
-            return MethodMatcher.WildcardTypeMatcher.INSTANCE;
-        }
-        return buildTypeMatcher(classNameCtx);
-    }
-
-    static TypePatternInfo buildTypePatternInfo(MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx) {
-        StringBuilder patternBuilder = new StringBuilder();
-        boolean usePackagePrefix = false;
-        boolean useFullWildcard = false;
-        ParseTree prevChild = null;
-        boolean hasWildcards = false;
-
-        int childCount = classNameCtx.getChildCount();
-        int arrayDimensions = 0;
-        int lastNonArrayIndex = childCount - 1;
-
-        ParseTree lastChild = childCount > 0 ? classNameCtx.getChild(lastNonArrayIndex) : null;
-        if (lastChild instanceof MethodSignatureParser.ArrayDimensionsContext) {
-            arrayDimensions = countArrayDimensions((MethodSignatureParser.ArrayDimensionsContext) lastChild);
-            lastNonArrayIndex--;
-        }
-
-        for (int i = 0; i <= lastNonArrayIndex; i++) {
-            ParseTree child = classNameCtx.getChild(i);
-
-            boolean isWildcard = child instanceof TerminalNode &&
-                    ((TerminalNode) child).getSymbol().getType() == MethodSignatureLexer.WILDCARD;
-
-            boolean isDotDotWildcard = isWildcard &&
-                    prevChild instanceof TerminalNode &&
-                    ((TerminalNode) prevChild).getSymbol().getType() == MethodSignatureLexer.DOTDOT;
-
-            if (isDotDotWildcard && i == lastNonArrayIndex) {
-                if (patternBuilder.length() == 3 && patternBuilder.charAt(0) == '*') {
-                    useFullWildcard = true;
-                    patternBuilder.append(child.getText());
-                } else {
-                    patternBuilder.setLength(patternBuilder.length() - 2);
-                    usePackagePrefix = true;
-                }
-            } else {
-                String childText = child.getText();
-                patternBuilder.append(childText);
-                hasWildcards |= isWildcard;
+        void parse() {
+            int openParen = pattern.indexOf('(');
+            if (openParen == -1) {
+                throw new IllegalArgumentException("Invalid method pattern - missing '(': " + pattern);
             }
-            prevChild = child;
+
+            int closeParen = pattern.lastIndexOf(')');
+            if (closeParen == -1 || closeParen <= openParen) {
+                throw new IllegalArgumentException("Invalid method pattern - missing or misplaced ')': " + pattern);
+            }
+
+            // Find the separator between type and method (# or last space before '(')
+            int separator = pattern.lastIndexOf('#', openParen);
+            if (separator == -1) {
+                separator = pattern.lastIndexOf(' ', openParen);
+                if (separator == -1) {
+                    throw new IllegalArgumentException("Invalid method pattern - missing type/method separator: " + pattern);
+                }
+            }
+
+            // Parse type pattern
+            String typePattern = pattern.substring(0, separator).trim();
+            if (typePattern.isEmpty()) {
+                throw new IllegalArgumentException("Invalid method pattern - empty type pattern: " + pattern);
+            }
+            typeMatcher = parseTypeMatcher(typePattern);
+
+            // Parse method name pattern
+            String methodName = pattern.substring(separator + 1, openParen).trim();
+            if (methodName.isEmpty()) {
+                throw new IllegalArgumentException("Invalid method pattern - empty method name: " + pattern);
+            }
+            methodNameMatcher = parseMethodNameMatcher(methodName);
+
+            // Parse arguments
+            String argsString = pattern.substring(openParen + 1, closeParen).trim();
+            parseArguments(argsString);
         }
 
-        String pattern = patternBuilder.toString();
+        private MethodMatcher.TypeMatcher parseTypeMatcher(String typePattern) {
+            ParsedType parsed = parseType(typePattern);
 
-        // Create the appropriate matcher based on flags and pattern
-        TypeNameMatcher nameMatcher;
-        if (usePackagePrefix) {
-            nameMatcher = PatternTypeNameMatcher.packagePrefix(pattern);
-        } else if (useFullWildcard || "*".equals(pattern)) {
-            nameMatcher = PatternTypeNameMatcher.fullWildcard(pattern);
-        } else if (hasWildcards) {
-            nameMatcher = PatternTypeNameMatcher.wildcard(pattern);
-        } else {
-            if (!pattern.contains(".")) {
-                //noinspection StatementWithEmptyBody
-                if (Character.isLowerCase(pattern.charAt(0)) && JavaType.Primitive.fromKeyword(pattern) != null) {
+            // Check for full wildcard pattern
+            if ("*".equals(parsed.baseType) && parsed.arrayDimensions == 0) {
+                return MethodMatcher.WildcardTypeMatcher.INSTANCE;
+            }
+
+            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.baseType);
+
+            // Check if the name matcher is a full wildcard pattern with no arrays
+            if (nameMatcher instanceof PatternTypeNameMatcher &&
+                    ((PatternTypeNameMatcher) nameMatcher).isFullWildcard() &&
+                    parsed.arrayDimensions == 0) {
+                return MethodMatcher.WildcardTypeMatcher.INSTANCE;
+            }
+
+            return new MethodMatcher.StandardTypeMatcher(nameMatcher, parsed.arrayDimensions, false);
+        }
+
+        private ParsedType parseType(String typePattern) {
+            // Handle array types by counting [] suffixes
+            int arrayDimensions = 0;
+            int pos = typePattern.length();
+            while (pos >= 2 && typePattern.charAt(pos - 2) == '[' && typePattern.charAt(pos - 1) == ']') {
+                arrayDimensions++;
+                pos -= 2;
+            }
+            String baseType = arrayDimensions > 0 ? typePattern.substring(0, pos).trim() : typePattern;
+
+            // Special handling for simple type names
+            if (!baseType.contains(".") && !baseType.contains("*")) {
+                // Check if it's a primitive
+                if (Character.isLowerCase(baseType.charAt(0)) && JavaType.Primitive.fromKeyword(baseType) != null) {
                     // It's a primitive, keep as-is
                 } else {
-                    if (TypeUtils.findQualifiedJavaLangTypeName(pattern) != null) {
-                        pattern = "java.lang." + pattern;
+                    // Check if it's a java.lang type
+                    if (TypeUtils.findQualifiedJavaLangTypeName(baseType) != null) {
+                        baseType = "java.lang." + baseType;
                     }
                 }
             }
-            nameMatcher = new ExactTypeNameMatcher(pattern);
+
+            return new ParsedType(baseType, arrayDimensions);
         }
 
-
-        return new TypePatternInfo(nameMatcher, arrayDimensions, false);
-    }
-
-    static MethodMatcher.TypeMatcher buildTypeMatcher(MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx) {
-        TypePatternInfo info = buildTypePatternInfo(classNameCtx);
-
-        // Check for full wildcard pattern with no arrays - return WildcardTypeMatcher
-        if (info.nameMatcher instanceof PatternTypeNameMatcher &&
-                ((PatternTypeNameMatcher) info.nameMatcher).isFullWildcard() &&
-                info.arrayDimensions == 0 && !info.isVarargs) {
-            return MethodMatcher.WildcardTypeMatcher.INSTANCE;
-        }
-
-        return new MethodMatcher.StandardTypeMatcher(info.nameMatcher, info.arrayDimensions, info.isVarargs);
-    }
-
-    private static int countArrayDimensions(MethodSignatureParser.@Nullable ArrayDimensionsContext ctx) {
-        int count = 0;
-        while (ctx != null) {
-            count++;
-            ctx = ctx.arrayDimensions();
-        }
-        return count;
-    }
-}
-
-/**
- * Visitor for building AspectJMatcher with metadata from formal type patterns.
- * Extracts array dimensions and varargs information directly from the parse tree.
- */
-class FormalTypeMatcherVisitor extends MethodSignatureParserBaseVisitor<TypePatternInfo> {
-
-    @Override
-    public TypePatternInfo visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
-        MethodSignatureParser.ClassNameOrInterfaceContext classNameCtx = ctx.classNameOrInterface();
-        if (classNameCtx == null) {
-            TypeNameMatcher nameMatcher = PatternTypeNameMatcher.fullWildcard("*");
-            return new TypePatternInfo(nameMatcher, 0, false);
-        }
-        return TargetTypeMatcherVisitor.buildTypePatternInfo(classNameCtx);
-    }
-}
-
-/**
- * Visitor for building ArgumentMatchers from the formal parameters pattern.
- * This is used during MethodMatcher construction to set up efficient matching.
- */
-class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<Void> {
-    @Getter
-    private final List<MethodMatcher.ArgumentMatcher> matchers = new ArrayList<>();
-
-    @Getter
-    private int varArgsPos = -1;
-
-    private final FormalTypeMatcherVisitor typeMatcherVisitor = new FormalTypeMatcherVisitor();
-    private boolean nextTypeIsVarargs = false;
-
-    @Override
-    public Void visitFormalTypePattern(MethodSignatureParser.FormalTypePatternContext ctx) {
-        if (ctx.classNameOrInterface() != null && isWildcardOnly(ctx.classNameOrInterface())) {
-            matchers.add(MethodMatcher.WildcardMatcher.INSTANCE);
-        } else {
-            TypePatternInfo info = typeMatcherVisitor.visitFormalTypePattern(ctx);
-
-            // Update info if this is a varargs parameter
-            if (nextTypeIsVarargs) {
-                info = new TypePatternInfo(info.nameMatcher, info.arrayDimensions, true);
+        private MethodMatcher.MethodNameMatcher parseMethodNameMatcher(String methodName) {
+            // Handle special cases
+            if ("<constructor>".equals(methodName) || "<init>".equals(methodName)) {
+                return new MethodMatcher.ConstructorMethodNameMatcher(methodName);
+            }
+            if ("<default>".equals(methodName)) {
+                return new MethodMatcher.ExactMethodNameMatcher("<default>");
             }
 
-            MethodMatcher.StandardArgumentMatcher baseMatcher = new MethodMatcher.StandardArgumentMatcher(
-                    info.nameMatcher,
-                    info.arrayDimensions
-            );
+            // Check if it contains wildcards
+            if (methodName.contains("*")) {
+                boolean isFullWildcard = "*".equals(methodName);
+                return new MethodMatcher.PatternMethodNameMatcher(methodName, isFullWildcard);
+            }
 
-            if (info.isVarargs) {
-                matchers.add(new MethodMatcher.VarArgsMatcher(baseMatcher));
+            return new MethodMatcher.ExactMethodNameMatcher(methodName);
+        }
+
+        private void parseArguments(String argsString) {
+            argumentMatchers = new ArrayList<>();
+            varArgsPosition = -1;
+
+            // Handle empty arguments
+            if (argsString.isEmpty()) {
+                return;
+            }
+
+            // Handle (..) - matches any arguments
+            if ("..".equals(argsString)) {
+                argumentMatchers.add(MethodMatcher.WildcardVarArgsMatcher.INSTANCE);
+                varArgsPosition = 0;
+                return;
+            }
+
+            // Parse comma-separated arguments
+            int start = 0;
+            int commaPos;
+
+            while ((commaPos = argsString.indexOf(',', start)) != -1) {
+                processArgument(argsString.substring(start, commaPos).trim());
+                start = commaPos + 1;
+            }
+
+            // Process the last argument
+            processArgument(argsString.substring(start).trim());
+        }
+
+        private void processArgument(String arg) {
+            if (arg.isEmpty()) {
+                return; // Skip empty arguments (e.g., trailing comma)
+            }
+
+            if ("..".equals(arg)) {
+                // Wildcard varargs (..) - matches zero or more arguments of any type
+                if (varArgsPosition == -1) {
+                    varArgsPosition = argumentMatchers.size();
+                }
+                argumentMatchers.add(MethodMatcher.WildcardVarArgsMatcher.INSTANCE);
+            } else if ("*".equals(arg)) {
+                // Single wildcard argument - matches exactly one argument of any type
+                argumentMatchers.add(MethodMatcher.WildcardMatcher.INSTANCE);
+            } else if (arg.endsWith("...")) {
+                // Java varargs notation (e.g., String...) - matches zero or more of specific type
+                String baseType = arg.substring(0, arg.length() - 3).trim();
+                if (varArgsPosition == -1) {
+                    varArgsPosition = argumentMatchers.size();
+                }
+                MethodMatcher.ArgumentMatcher baseMatcher = parseArgumentMatcher(baseType);
+                if (baseMatcher instanceof MethodMatcher.StandardArgumentMatcher) {
+                    argumentMatchers.add(new MethodMatcher.VarArgsMatcher((MethodMatcher.StandardArgumentMatcher) baseMatcher));
+                } else {
+                    // This shouldn't happen with valid patterns, but handle it gracefully
+                    argumentMatchers.add(baseMatcher);
+                }
             } else {
-                matchers.add(baseMatcher);
-            }
-        }
-        nextTypeIsVarargs = false;
-        return super.visitFormalTypePattern(ctx);
-    }
-
-    @Override
-    public Void visitFormalsPattern(MethodSignatureParser.FormalsPatternContext ctx) {
-        if (ctx.DOTDOT() != null) {
-            if (varArgsPos == -1) {
-                varArgsPos = matchers.size();
-                matchers.add(MethodMatcher.WildcardVarArgsMatcher.INSTANCE);
+                // Regular type argument
+                argumentMatchers.add(parseArgumentMatcher(arg));
             }
         }
 
-        if (ctx.ELLIPSIS() != null) {
-            nextTypeIsVarargs = true;
-            if (varArgsPos == -1) {
-                varArgsPos = matchers.size();
+        private MethodMatcher.ArgumentMatcher parseArgumentMatcher(String typePattern) {
+            if ("*".equals(typePattern)) {
+                return MethodMatcher.WildcardMatcher.INSTANCE;
             }
+
+            ParsedType parsed = parseType(typePattern);
+            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.baseType);
+            return new MethodMatcher.StandardArgumentMatcher(nameMatcher, parsed.arrayDimensions);
         }
 
-        return super.visitFormalsPattern(ctx);
-    }
 
-    private static boolean isWildcardOnly(MethodSignatureParser.ClassNameOrInterfaceContext ctx) {
-        // Check if it's exactly one child and it's a wildcard token
-        if (ctx.getChildCount() == 1) {
-            ParseTree child = ctx.getChild(0);
-            if (child instanceof TerminalNode) {
-                TerminalNode node = (TerminalNode) child;
-                return node.getSymbol().getType() == MethodSignatureLexer.WILDCARD;
-            }
+        @Value
+        private static class ParsedType {
+            String baseType;
+            int arrayDimensions;
         }
-        return false;
     }
 }

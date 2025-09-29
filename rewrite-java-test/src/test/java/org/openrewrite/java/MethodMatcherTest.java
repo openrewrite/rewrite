@@ -46,7 +46,7 @@ class MethodMatcherTest implements RewriteTest {
         Validated<String> validate = MethodMatcher.validate("com.google.common.collect.*");
         assertThat(validate.isValid()).isFalse();
         assertThat(validate.failures()).isNotEmpty();
-        assertThat(validate.failures().getFirst().getMessage()).contains("mismatched input");
+        assertThat(validate.failures().getFirst().getMessage()).contains("invalid method pattern");
         assertThat(validate.failures().getFirst().getException()).isInstanceOf(IllegalArgumentException.class);
     }
 
