@@ -1867,9 +1867,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "org.codeartisans.asadmin",
             "ejb-example",
-            "org.jboss.da",
-            "common",
-            "2.6.9",
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
             null
           )),
           pomXml(
@@ -1897,9 +1897,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>org.jboss.da</groupId>
-                          <artifactId>common</artifactId>
-                          <version>2.6.9</version>
+                          <groupId>it.vige</groupId>
+                          <artifactId>school-ejb</artifactId>
+                          <version>1.1.1</version>
                           <type>ejb</type>
                       </dependency>
                   </dependencies>
@@ -1916,9 +1916,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "org.codeartisans.asadmin",
             "ejb-example",
-            "com.enterprise.jobs",
-            "jobs-config",
-            null,
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
             null
           )),
           pomXml(
@@ -1949,9 +1949,9 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
-                              <groupId>com.enterprise.jobs</groupId>
-                              <artifactId>jobs-config</artifactId>
-                              <version>0.12</version>
+                              <groupId>it.vige</groupId>
+                              <artifactId>school-ejb</artifactId>
+                              <version>1.1.1</version>
                               <type>ejb</type>
                           </dependency>
                       </dependencies>

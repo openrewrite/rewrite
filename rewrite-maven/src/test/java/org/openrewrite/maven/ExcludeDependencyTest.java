@@ -260,7 +260,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeFromEjbTypeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("org.jboss.pnc", "constants", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
           pomXml(
             """
               <project>
@@ -270,9 +270,9 @@ class ExcludeDependencyTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <dependency>
-                    <groupId>org.jboss.da</groupId>
-                    <artifactId>common</artifactId>
-                    <version>2.6.9</version>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
                     <type>ejb</type>
                   </dependency>
                 </dependencies>
@@ -286,14 +286,14 @@ class ExcludeDependencyTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <dependency>
-                    <groupId>org.jboss.da</groupId>
-                    <artifactId>common</artifactId>
-                    <version>2.6.9</version>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
                     <type>ejb</type>
                     <exclusions>
                       <exclusion>
-                        <groupId>org.jboss.pnc</groupId>
-                        <artifactId>constants</artifactId>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>
@@ -308,7 +308,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeFromManagedEjbTypeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("org.jboss.pnc", "constants", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
           pomXml(
             """
               <project>
@@ -319,17 +319,17 @@ class ExcludeDependencyTest implements RewriteTest {
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>org.jboss.da</groupId>
-                      <artifactId>common</artifactId>
-                      <version>2.6.9</version>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
                       <type>ejb</type>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
                 <dependencies>
                   <dependency>
-                    <groupId>org.jboss.da</groupId>
-                    <artifactId>common</artifactId>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
                     <type>ejb</type>
                   </dependency>
                 </dependencies>
@@ -344,22 +344,22 @@ class ExcludeDependencyTest implements RewriteTest {
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>org.jboss.da</groupId>
-                      <artifactId>common</artifactId>
-                      <version>2.6.9</version>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
                       <type>ejb</type>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
                 <dependencies>
                   <dependency>
-                    <groupId>org.jboss.da</groupId>
-                    <artifactId>common</artifactId>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
                     <type>ejb</type>
                     <exclusions>
                       <exclusion>
-                        <groupId>org.jboss.pnc</groupId>
-                        <artifactId>constants</artifactId>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>
