@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.*;
@@ -591,11 +590,10 @@ public class MethodMatcher {
     static class StandardTypeMatcher implements TypeMatcher {
         private final TypeNameMatcher nameMatcher;
         private final int arrayDimensions;
-        private final boolean isVarargs;
 
         @Override
         public boolean matches(JavaType type) {
-            type = unwrapArrays(type, arrayDimensions, isVarargs);
+            type = unwrapArrays(type, arrayDimensions, false);
             if (type == null) {
                 return false;
             }
@@ -742,7 +740,6 @@ public class MethodMatcher {
 
     interface ArgumentMatcher {
         boolean matches(JavaType type);
-
         boolean matchesUnknown(@Nullable JavaType type);
     }
 
@@ -862,6 +859,7 @@ public class MethodMatcher {
         private MethodMatcher.MethodNameMatcher methodNameMatcher;
         private List<MethodMatcher.ArgumentMatcher> argumentMatchers;
         private int varArgsPosition = -1;
+        private boolean hasWildcardVarArgs = false;  // Track if we've seen .. wildcard
 
         void parse() {
             int openParen = pattern.indexOf('(');
@@ -903,49 +901,27 @@ public class MethodMatcher {
         }
 
         private MethodMatcher.TypeMatcher parseTypeMatcher(String typePattern) {
-            ParsedType parsed = parseType(typePattern);
+            org.openrewrite.java.TypeMatcher.ParsedType parsed = parseType(typePattern);
 
             // Check for full wildcard pattern
-            if ("*".equals(parsed.baseType) && parsed.arrayDimensions == 0) {
+            if ("*".equals(parsed.getBaseType()) && parsed.getArrayDimensions() == 0) {
                 return MethodMatcher.WildcardTypeMatcher.INSTANCE;
             }
 
-            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.baseType);
+            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.getBaseType());
 
             // Check if the name matcher is a full wildcard pattern with no arrays
             if (nameMatcher instanceof PatternTypeNameMatcher &&
                     ((PatternTypeNameMatcher) nameMatcher).isFullWildcard() &&
-                    parsed.arrayDimensions == 0) {
+                    parsed.getArrayDimensions() == 0) {
                 return MethodMatcher.WildcardTypeMatcher.INSTANCE;
             }
 
-            return new MethodMatcher.StandardTypeMatcher(nameMatcher, parsed.arrayDimensions, false);
+            return new MethodMatcher.StandardTypeMatcher(nameMatcher, parsed.getArrayDimensions());
         }
 
-        private ParsedType parseType(String typePattern) {
-            // Handle array types by counting [] suffixes
-            int arrayDimensions = 0;
-            int pos = typePattern.length();
-            while (pos >= 2 && typePattern.charAt(pos - 2) == '[' && typePattern.charAt(pos - 1) == ']') {
-                arrayDimensions++;
-                pos -= 2;
-            }
-            String baseType = arrayDimensions > 0 ? typePattern.substring(0, pos).trim() : typePattern;
-
-            // Special handling for simple type names
-            if (!baseType.contains(".") && !baseType.contains("*")) {
-                // Check if it's a primitive
-                if (Character.isLowerCase(baseType.charAt(0)) && JavaType.Primitive.fromKeyword(baseType) != null) {
-                    // It's a primitive, keep as-is
-                } else {
-                    // Check if it's a java.lang type
-                    if (TypeUtils.findQualifiedJavaLangTypeName(baseType) != null) {
-                        baseType = "java.lang." + baseType;
-                    }
-                }
-            }
-
-            return new ParsedType(baseType, arrayDimensions);
+        private org.openrewrite.java.TypeMatcher.ParsedType parseType(String typePattern) {
+            return org.openrewrite.java.TypeMatcher.parseTypePattern(typePattern);
         }
 
         private MethodMatcher.MethodNameMatcher parseMethodNameMatcher(String methodName) {
@@ -1002,6 +978,10 @@ public class MethodMatcher {
 
             if ("..".equals(arg)) {
                 // Wildcard varargs (..) - matches zero or more arguments of any type
+                if (hasWildcardVarArgs) {
+                    throw new IllegalArgumentException("Invalid method pattern - only one wildcard varargs (..) is allowed: " + pattern);
+                }
+                hasWildcardVarArgs = true;
                 if (varArgsPosition == -1) {
                     varArgsPosition = argumentMatchers.size();
                 }
@@ -1012,6 +992,7 @@ public class MethodMatcher {
             } else if (arg.endsWith("...")) {
                 // Java varargs notation (e.g., String...) - matches zero or more of specific type
                 String baseType = arg.substring(0, arg.length() - 3).trim();
+                // Java varargs ... can coexist with wildcard .., but we still need to track position
                 if (varArgsPosition == -1) {
                     varArgsPosition = argumentMatchers.size();
                 }
@@ -1033,16 +1014,11 @@ public class MethodMatcher {
                 return MethodMatcher.WildcardMatcher.INSTANCE;
             }
 
-            ParsedType parsed = parseType(typePattern);
-            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.baseType);
-            return new MethodMatcher.StandardArgumentMatcher(nameMatcher, parsed.arrayDimensions);
+            org.openrewrite.java.TypeMatcher.ParsedType parsed = parseType(typePattern);
+            TypeNameMatcher nameMatcher = TypeNameMatcher.fromPattern(parsed.getBaseType());
+            return new MethodMatcher.StandardArgumentMatcher(nameMatcher, parsed.getArrayDimensions());
         }
 
 
-        @Value
-        private static class ParsedType {
-            String baseType;
-            int arrayDimensions;
-        }
     }
 }

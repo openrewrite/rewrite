@@ -50,7 +50,6 @@ class MethodMatcherTest implements RewriteTest {
         assertThat(validate.failures().getFirst().getException()).isInstanceOf(IllegalArgumentException.class);
     }
 
-
     @ParameterizedTest
     @ValueSource(strings = {"a.A <constructor>()", "a.A <init>()", "a.A *()"})
     void matchesConstructorUsage(String methodPattern) {
@@ -188,16 +187,16 @@ class MethodMatcherTest implements RewriteTest {
     void packagePrefixWithArrayDimensions() {
         JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
         assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*[])").matches(
-                new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
-                        null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
+            null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
     void packagePrefixWithVarargs() {
         JavaType arrayType = new JavaType.Array(null, build("javax.ws.rs.core.Response"), null);
         assertTrue(new MethodMatcher("javax.ws.rs..* process(javax.ws.rs..*...)").matches(
-                new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
-                        null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("javax.ws.rs.core.ResponseBuilder"), "process",
+            null, null, List.of(arrayType), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -207,13 +206,13 @@ class MethodMatcherTest implements RewriteTest {
 
         // Pattern with varargs should match Array type
         assertTrue(new MethodMatcher("com.example.Foo bar(String...)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern with explicit array should also match
         assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -443,6 +442,38 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void rejectsMultipleWildcardVarargs() {
+        // Multiple .. wildcard varargs should be rejected
+        assertThatThrownBy(() -> new MethodMatcher("com.example.Test foo(.., ..)"))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("only one wildcard varargs (..) is allowed");
+
+        // But mixing .. and ... should be allowed (different concepts)
+        assertDoesNotThrow(() -> new MethodMatcher("com.example.Test foo(.., String...)"));
+        assertDoesNotThrow(() -> new MethodMatcher("com.example.Test foo(int, .., String...)"));
+
+        // Java varargs ... must be last, but can have multiple regular args or .. before it
+        assertDoesNotThrow(() -> new MethodMatcher("com.example.Test foo(String, int, Object...)"));
+    }
+
+    @Test
+    void allowsMixedWildcardAndVarargs() {
+        // Test that patterns with both .. and ... are allowed (not rejected)
+        // Note: The actual matching logic for mixed patterns is complex and would need more work
+        assertDoesNotThrow(() -> {
+            MethodMatcher matcher = new MethodMatcher("com.example.Test foo(.., String...)");
+            // At minimum, the pattern should be parseable without throwing
+            assertNotNull(matcher);
+        });
+
+        // Pattern with arguments before and after ..
+        assertDoesNotThrow(() -> {
+            MethodMatcher matcher = new MethodMatcher("com.example.Test foo(int, .., String...)");
+            assertNotNull(matcher);
+        });
+    }
+
+    @Test
     void complexWildcardPatterns() {
         assertTrue(new MethodMatcher("*..*Service *find*(..)").matches(
           newMethodType("com.example.UserService", "findById")
@@ -657,44 +688,126 @@ class MethodMatcherTest implements RewriteTest {
 
             // Test with various method name patterns
             assertEquals("java.io.PrintStream print*(..)",
-                new MethodMatcher("java.io.PrintStream print*(..)").toString());
+              new MethodMatcher("java.io.PrintStream print*(..)").toString());
 
             assertEquals("*..*Service find*By*(..)",
-                new MethodMatcher("*..*Service find*By*(..)").toString());
+              new MethodMatcher("*..*Service find*By*(..)").toString());
 
             assertEquals("com.example.* *get*()",
-                new MethodMatcher("com.example.* *get*()").toString());
+              new MethodMatcher("com.example.* *get*()").toString());
         }
 
         @Test
         void preservesExactMethodNames() {
             // Test exact method names are preserved
             assertEquals("java.lang.String substring(int)",
-                new MethodMatcher("java.lang.String substring(int)").toString());
+              new MethodMatcher("java.lang.String substring(int)").toString());
 
             assertEquals("java.util.List add(java.lang.Object)",
-                new MethodMatcher("java.util.List add(java.lang.Object)").toString());
+              new MethodMatcher("java.util.List add(java.lang.Object)").toString());
         }
 
         @Test
         void preservesConstructorPatterns() {
             // Test special method patterns
             assertEquals("com.example.Foo <constructor>()",
-                new MethodMatcher("com.example.Foo <constructor>()").toString());
+              new MethodMatcher("com.example.Foo <constructor>()").toString());
 
             assertEquals("com.example.Bar <constructor>(java.lang.String)",
-                new MethodMatcher("com.example.Bar <init>(java.lang.String)").toString());
+              new MethodMatcher("com.example.Bar <init>(java.lang.String)").toString());
         }
 
         @Test
         void preservesWildcardArguments() {
             // Test wildcard arguments
             assertEquals("java.util.Map put(*, *)",
-                new MethodMatcher("java.util.Map put(*, *)").toString());
+              new MethodMatcher("java.util.Map put(*, *)").toString());
 
             assertEquals("java.io.PrintStream println(..)",
-                new MethodMatcher("java.io.PrintStream println(..)").toString());
+              new MethodMatcher("java.io.PrintStream println(..)").toString());
         }
+    }
+
+    @Test
+    void mixedWildcardAndVarargsWithFindMethods() {
+        // Test that patterns with both .. and ... work correctly with FindMethods
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("com.example.Logger log(.., Object...)", false)),
+          java(
+            """
+              package com.example;
+              
+              class Logger {
+                  // Method that takes any number of args followed by Object varargs
+                  void log(String level, String message, Object... params) {
+                      // logging implementation
+                  }
+              
+                  void log(Object... params) {
+                      // simpler logging
+                  }
+              
+                  void log(int code, String level, String message, Object... params) {
+                      // with error code
+                  }
+              }
+              
+              class Test {
+                  void test() {
+                      Logger logger = new Logger();
+              
+                      // Should match - level, message, then varargs
+                      logger.log("INFO", "Hello", "world", 123);
+              
+                      // Should match - just varargs
+                      logger.log("simple", "message");
+              
+                      // Should match - int, level, message, then varargs
+                      logger.log(500, "ERROR", "Server error", new Exception());
+              
+                      // Should match - with no varargs params
+                      logger.log("DEBUG", "No params");
+                  }
+              }
+              """,
+            """
+              package com.example;
+              
+              class Logger {
+                  // Method that takes any number of args followed by Object varargs
+                  void log(String level, String message, Object... params) {
+                      // logging implementation
+                  }
+              
+                  void log(Object... params) {
+                      // simpler logging
+                  }
+              
+                  void log(int code, String level, String message, Object... params) {
+                      // with error code
+                  }
+              }
+              
+              class Test {
+                  void test() {
+                      Logger logger = new Logger();
+              
+                      // Should match - level, message, then varargs
+                      /*~~>*/logger.log("INFO", "Hello", "world", 123);
+              
+                      // Should match - just varargs
+                      /*~~>*/logger.log("simple", "message");
+              
+                      // Should match - int, level, message, then varargs
+                      /*~~>*/logger.log(500, "ERROR", "Server error", new Exception());
+              
+                      // Should match - with no varargs params
+                      /*~~>*/logger.log("DEBUG", "No params");
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -703,39 +816,39 @@ class MethodMatcherTest implements RewriteTest {
           spec -> spec.recipe(new FindMethods("com.example.Util format(String, Object...)", false)),
           java(
             """
-            package com.example;
-
-            class Util {
-                static String format(String template, Object... args) {
-                    return String.format(template, args);
-                }
-            }
-
-            class Test {
-                void test() {
-                    String result1 = Util.format("Hello %s %d", "world", 42);
-                    String result2 = Util.format("No args");
-                    String result3 = Util.format("Single: %s", "arg");
-                }
-            }
-            """,
+              package com.example;
+              
+              class Util {
+                  static String format(String template, Object... args) {
+                      return String.format(template, args);
+                  }
+              }
+              
+              class Test {
+                  void test() {
+                      String result1 = Util.format("Hello %s %d", "world", 42);
+                      String result2 = Util.format("No args");
+                      String result3 = Util.format("Single: %s", "arg");
+                  }
+              }
+              """,
             """
-            package com.example;
-
-            class Util {
-                static String format(String template, Object... args) {
-                    return String.format(template, args);
-                }
-            }
-
-            class Test {
-                void test() {
-                    String result1 = /*~~>*/Util.format("Hello %s %d", "world", 42);
-                    String result2 = /*~~>*/Util.format("No args");
-                    String result3 = /*~~>*/Util.format("Single: %s", "arg");
-                }
-            }
-            """
+              package com.example;
+              
+              class Util {
+                  static String format(String template, Object... args) {
+                      return String.format(template, args);
+                  }
+              }
+              
+              class Test {
+                  void test() {
+                      String result1 = /*~~>*/Util.format("Hello %s %d", "world", 42);
+                      String result2 = /*~~>*/Util.format("No args");
+                      String result3 = /*~~>*/Util.format("Single: %s", "arg");
+                  }
+              }
+              """
           )
         );
     }
@@ -745,30 +858,30 @@ class MethodMatcherTest implements RewriteTest {
         // Test 1D array
         JavaType.Array stringArray = new JavaType.Array(null, JavaType.Primitive.String, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Test 2D array
         JavaType.Array stringArray2D = new JavaType.Array(null, stringArray, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[][])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
 
         // Test 3D array
         JavaType.Array stringArray3D = new JavaType.Array(null, stringArray2D, null);
         assertTrue(new MethodMatcher("com.example.Foo bar(String[][][])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray3D), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray3D), emptyList(), emptyList(), emptyList(), null)));
 
         // Test mismatch: pattern expects 1D but got 2D
         assertFalse(new MethodMatcher("com.example.Foo bar(String[])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray2D), emptyList(), emptyList(), emptyList(), null)));
 
         // Test mismatch: pattern expects 2D but got 1D
         assertFalse(new MethodMatcher("com.example.Foo bar(String[][])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(stringArray), emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -780,21 +893,21 @@ class MethodMatcherTest implements RewriteTest {
 
         // Pattern int[]... should match Array(Array(int))
         assertTrue(new MethodMatcher("com.example.Foo bar(int[]...)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern int[][] should also match the same type (varargs is just sugar for array)
         assertTrue(new MethodMatcher("com.example.Foo bar(int[][])").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(intArrayArray), emptyList(), emptyList(), emptyList(), null)));
 
         // Test with parameters before varargs: foo(int, int[]...)
         JavaType.Array stringArrayArray = new JavaType.Array(null,
-                new JavaType.Array(null, JavaType.Primitive.String, null), null);
+          new JavaType.Array(null, JavaType.Primitive.String, null), null);
         assertTrue(new MethodMatcher("com.example.Foo bar(int, String[]...)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(JavaType.Primitive.Int, stringArrayArray),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(JavaType.Primitive.Int, stringArrayArray),
+            emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -804,71 +917,71 @@ class MethodMatcherTest implements RewriteTest {
 
         // Pattern: * *(..) - matches any method on any type
         assertTrue(new MethodMatcher("* *(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: * foo(..) - matches foo method on any type
         assertTrue(new MethodMatcher("* foo(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         assertFalse(new MethodMatcher("* foo(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: com.example.Foo *(..) - matches any method on com.example.Foo
         assertTrue(new MethodMatcher("com.example.Foo *(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         assertFalse(new MethodMatcher("com.example.Foo *(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Bar"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Bar"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: *..* *(..) - equivalent to * *(..), should skip both type and method checks
         assertTrue(new MethodMatcher("*..* *(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: *..* foo(..) - equivalent to * foo(..), should skip type check
         assertTrue(new MethodMatcher("*..* foo(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         assertFalse(new MethodMatcher("*..* foo(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, emptyList(), emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: com.example.Foo foo(..) - should skip argument checks
         assertTrue(new MethodMatcher("com.example.Foo foo(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
-                        null, null, List.of(JavaType.Primitive.Int, JavaType.Primitive.String),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+            null, null, List.of(JavaType.Primitive.Int, JavaType.Primitive.String),
+            emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: * *(..) - should skip all checks (method name, target type, arguments)
         assertTrue(new MethodMatcher("* *(..)").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
-                        null, null, List.of(JavaType.Primitive.Int),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "bar",
+            null, null, List.of(JavaType.Primitive.Int),
+            emptyList(), emptyList(), emptyList(), null)));
 
         // Pattern: com.example.Foo foo() - should check arg count (expects zero args)
         assertTrue(new MethodMatcher("com.example.Foo foo()").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
-                        null, null, emptyList(),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+            null, null, emptyList(),
+            emptyList(), emptyList(), emptyList(), null)));
 
         assertFalse(new MethodMatcher("com.example.Foo foo()").matches(
-                new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
-                        null, null, List.of(JavaType.Primitive.Int),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("com.example.Foo"), "foo",
+            null, null, List.of(JavaType.Primitive.Int),
+            emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
     void matcherWithNoArgsDoesNotMatchMethodWithArgs() {
         assertFalse(new MethodMatcher("java.lang.Object finalize()").matches(
-                new JavaType.Method(null, 1L, build("my.Foo"), "finalize",
-                        null, null, List.of(build("java.lang.Object")),
-                        emptyList(), emptyList(), emptyList(), null)));
+          new JavaType.Method(null, 1L, build("my.Foo"), "finalize",
+            null, null, List.of(build("java.lang.Object")),
+            emptyList(), emptyList(), emptyList(), null)));
     }
 
     @Test
@@ -876,52 +989,52 @@ class MethodMatcherTest implements RewriteTest {
         MethodMatcher matcher = new MethodMatcher("org.springframework.core.env.Environment acceptsProfiles(java.lang.String...)");
 
         JavaType.Method correctMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.core.env.Environment"),
-                "acceptsProfiles",
-                null, null,
-                List.of(new JavaType.Array(null, build("java.lang.String"), null)),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.core.env.Environment"),
+          "acceptsProfiles",
+          null, null,
+          List.of(new JavaType.Array(null, build("java.lang.String"), null)),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertTrue(matcher.matches(correctMethod), "Should match method with String varargs");
 
         JavaType.Method zeroArgsMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.core.env.Environment"),
-                "acceptsProfiles",
-                null, null,
-                emptyList(),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.core.env.Environment"),
+          "acceptsProfiles",
+          null, null,
+          emptyList(),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertTrue(matcher.matches(zeroArgsMethod), "Should match method with zero varargs (varargs can be empty)");
 
         JavaType.Method multipleArgsMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.core.env.Environment"),
-                "acceptsProfiles",
-                null, null,
-                List.of(build("java.lang.String"), build("java.lang.String"), build("java.lang.String")),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.core.env.Environment"),
+          "acceptsProfiles",
+          null, null,
+          List.of(build("java.lang.String"), build("java.lang.String"), build("java.lang.String")),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertTrue(matcher.matches(multipleArgsMethod), "Should match method with multiple String arguments");
 
         JavaType.Method wrongTypeMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.core.env.Environment"),
-                "acceptsProfiles",
-                null, null,
-                List.of(JavaType.Primitive.Int),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.core.env.Environment"),
+          "acceptsProfiles",
+          null, null,
+          List.of(JavaType.Primitive.Int),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertFalse(matcher.matches(wrongTypeMethod), "Should NOT match method when varargs argument is wrong type (int instead of String)");
 
         JavaType.Method mixedArgsMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.core.env.Environment"),
-                "acceptsProfiles",
-                null, null,
-                List.of(build("java.lang.String"), JavaType.Primitive.Int),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.core.env.Environment"),
+          "acceptsProfiles",
+          null, null,
+          List.of(build("java.lang.String"), JavaType.Primitive.Int),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertFalse(matcher.matches(mixedArgsMethod), "Should NOT match method when second varargs argument is wrong type");
     }
@@ -932,32 +1045,32 @@ class MethodMatcherTest implements RewriteTest {
         MethodMatcher matcher = new MethodMatcher("org.springframework.kafka.test.utils.KafkaTestUtils get*Record*(.., long)");
 
         JavaType.Method correctMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
-                "getRecords",
-                null, null,
-                List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Long),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+          "getRecords",
+          null, null,
+          List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Long),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertTrue(matcher.matches(correctMethod), "Should match getRecords(Consumer, long)");
 
         JavaType.Method wrongLastParamMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
-                "getRecords",
-                null, null,
-                List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Int),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+          "getRecords",
+          null, null,
+          List.of(build("org.apache.kafka.clients.consumer.Consumer"), JavaType.Primitive.Int),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertFalse(matcher.matches(wrongLastParamMethod), "Should NOT match getRecords(Consumer, int) - last param must be long");
 
         JavaType.Method noArgsMethod = new JavaType.Method(
-                null, 1L,
-                build("org.springframework.kafka.test.utils.KafkaTestUtils"),
-                "getRecords",
-                null, null,
-                List.of(JavaType.Primitive.Long),
-                emptyList(), emptyList(), emptyList(), null
+          null, 1L,
+          build("org.springframework.kafka.test.utils.KafkaTestUtils"),
+          "getRecords",
+          null, null,
+          List.of(JavaType.Primitive.Long),
+          emptyList(), emptyList(), emptyList(), null
         );
         assertTrue(matcher.matches(noArgsMethod), "Should match getRecords(long) - wildcard varargs can match zero args");
     }

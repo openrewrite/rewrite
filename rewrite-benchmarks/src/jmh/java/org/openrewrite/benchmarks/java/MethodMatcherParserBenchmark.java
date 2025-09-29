@@ -27,15 +27,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Benchmark for MethodSignatureParser and MethodMatcher.
+ * Benchmark for MethodMatcher pattern parsing performance.
  * <p>
- * Tests both:
- * 1. Parser performance after reducing adaptivePredict() calls
- * 2. Full MethodMatcher construction overhead (parsing + pattern compilation)
- * <p>
- * Use the 'mode' parameter to switch between:
- * - "parser": Tests only the ANTLR parser
- * - "methodMatcher": Tests full MethodMatcher construction
+ * Tests the performance of MethodMatcher construction with various pattern complexities,
+ * including simple patterns, wildcards, varargs, and complex real-world patterns.
  */
 @Fork(1)
 @Measurement(iterations = 3, time = 2)
@@ -43,7 +38,7 @@ import java.util.function.Consumer;
 @BenchmarkMode(Mode.Throughput)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-public class MethodSignatureParserBenchmark {
+public class MethodMatcherParserBenchmark {
 
     private Consumer<String> patternProcessor;
 
@@ -188,7 +183,7 @@ public class MethodSignatureParserBenchmark {
      */
     public static void main(String[] args) throws RunnerException {
         Options opt = new OptionsBuilder()
-                .include(MethodSignatureParserBenchmark.class.getSimpleName())
+                .include(MethodMatcherParserBenchmark.class.getSimpleName())
                 .build();
 
         new Runner(opt).run();
