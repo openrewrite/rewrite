@@ -24,6 +24,7 @@ import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TypecastParenPadStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.Style;
 
 import java.util.Optional;
 
@@ -55,9 +56,8 @@ public class TypecastParenPad extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
-                typecastParenPadStyle = Optional.ofNullable(Style.from(TypecastParenPadStyle.class, cu)).orElse(Checkstyle.typecastParenPadStyle());
-
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                typecastParenPadStyle = Style.from(TypecastParenPadStyle.class, cu, Checkstyle::typecastParenPadStyle);
                 spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
             }
             return super.visit(tree, ctx);

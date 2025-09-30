@@ -21,6 +21,7 @@ import org.openrewrite.groovy.style.OmitParenthesesStyle;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.style.Style;
 
 import java.util.Optional;
 
@@ -47,7 +48,7 @@ public class OmitParenthesesFormat extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                OmitParenthesesStyle style = Optional.ofNullable(Style.from(OmitParenthesesStyle.class, cu)).orElse(OmitParenthesesStyle.DEFAULT);
+                OmitParenthesesStyle style = Style.from(OmitParenthesesStyle.class, cu, () -> OmitParenthesesStyle.DEFAULT);
                 if (style.getLastArgumentLambda()) {
                     doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
                 }

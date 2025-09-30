@@ -21,6 +21,7 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.ImportLayoutStyle;
 import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.style.Style;
 
 import java.util.HashSet;
 import java.util.List;
@@ -32,9 +33,7 @@ public class ImportReorderingVisitor<P> extends KotlinIsoVisitor<P> {
     public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, P p) {
         List<JRightPadded<J.Import>> importList = cu.getPadding().getImports();
 
-        ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
-                .orElse(IntelliJ.importLayout());
-
+        ImportLayoutStyle layoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
         List<JRightPadded<J.Import>> ordered = layoutStyle.orderImports(importList, new HashSet<>());
 
         if (referentialIdentical(importList, ordered)) {
