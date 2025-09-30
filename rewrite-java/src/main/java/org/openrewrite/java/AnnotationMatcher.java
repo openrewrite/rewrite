@@ -15,10 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.antlr.v4.runtime.ANTLRErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.ThrowingErrorListener;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -28,7 +29,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * This matcher will find all annotations matching the annotation pattern
@@ -53,13 +53,18 @@ import java.util.regex.Pattern;
  */
 public class AnnotationMatcher {
     private final AnnotationSignatureParser.AnnotationContext match;
-    private final Pattern matcher;
+    private final TypeNameMatcher matcher;
     private final boolean matchMetaAnnotations;
 
     public AnnotationMatcher(String signature, @Nullable Boolean matchesMetaAnnotations) {
-        this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
-                .annotation();
-        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(match.annotationName().getText()));
+        ANTLRErrorListener errorListener = new ThrowingErrorListener(signature);
+        AnnotationSignatureLexer lexer = new AnnotationSignatureLexer(CharStreams.fromString(signature));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        AnnotationSignatureParser parser = new AnnotationSignatureParser(new CommonTokenStream(lexer));
+        parser.addErrorListener(errorListener);
+        this.match = parser.annotation();
+        this.matcher = TypeNameMatcher.fromPattern(match.annotationName().getText());
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
     }
 
@@ -91,7 +96,7 @@ public class AnnotationMatcher {
     private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
                                                       @Nullable Set<String> seenAnnotations) {
         if (fqn != null) {
-            if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {
+            if (matcher.matches(fqn.getFullyQualifiedName())) {
                 return true;
             } else if (matchMetaAnnotations) {
                 for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {

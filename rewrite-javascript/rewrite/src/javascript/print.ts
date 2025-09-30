@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {Generator, DelegatedYield, FunctionDeclaration, NonNullAssertion, Optional, Spread} from "./markers";
+import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional, Spread} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -81,7 +81,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         return statement;
     }
 
-    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | J | undefined> {
+    override async visitStatementExpression(statementExpression: JS.StatementExpression, p: PrintOutputCapture): Promise<J | undefined> {
         await this.visitSpace(statementExpression.prefix, p);
         await this.visitMarkers(statementExpression.markers, p);
         await this.visit(statementExpression.statement, p);
@@ -1773,7 +1773,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async afterSyntaxMarkers(markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
+            p.append(p.markerPrinter.afterSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 
@@ -1783,18 +1783,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async beforeSyntaxExt(prefix: J.Space, markers: Markers, p: PrintOutputCapture) {
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforePrefix(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
 
         await this.visitSpace(prefix, p);
         await this.visitMarkers(markers, p);
 
         for (const marker of markers.markers) {
-            p.out.concat(
-                p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER)
-            );
+            p.append(p.markerPrinter.beforeSyntax(marker, new Cursor(marker, this.cursor), this.JAVA_SCRIPT_MARKER_WRAPPER));
         }
     }
 
@@ -1827,7 +1823,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         }
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
         if (isTree(right.element)) {
             await this.visit(right.element, p);
         }

@@ -68,4 +68,16 @@ class HclCollectionValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyArrayWithNewLine() {
+        rewriteRun(
+          hcl(
+            """
+              default = [
+              ]
+              """
+          )
+        );
+    }
 }

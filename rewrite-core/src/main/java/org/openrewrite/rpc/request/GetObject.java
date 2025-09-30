@@ -35,8 +35,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @Value
 public class GetObject implements RpcRequest {
     String id;
-    @Nullable
-    String lastKnownId;
+    @Nullable String sourceFileType;
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
@@ -67,22 +66,12 @@ public class GetObject implements RpcRequest {
 
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
+                Object before = remoteObjects.get(id);
 
-                // Determine what the remote has cached
-                Object before = null;
-                if (request.getLastKnownId() != null) {
-                    before = remoteObjects.get(request.getLastKnownId());
-                    if (before == null) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.remove(request.getLastKnownId());
-                    }
-                }
-
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs);
-                Object beforeFinal = before;
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType());
                 forkJoin.submit(() -> {
                     try {
-                        sendQueue.send(after, beforeFinal, null);
+                        sendQueue.send(after, before, null);
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state

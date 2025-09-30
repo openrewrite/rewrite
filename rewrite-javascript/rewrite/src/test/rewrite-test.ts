@@ -22,7 +22,7 @@ import {SourceFile} from "../tree";
 import dedent from "dedent";
 import {Result, scheduleRun} from "../run";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {mapAsync} from "../util";
+import {mapAsync, trimIndent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 import {JavaScriptVisitor} from "../javascript";
@@ -61,8 +61,20 @@ export class RecipeSpec {
         this.dataTableAssertions[name] = allRows;
     }
 
-    async rewriteRun(...sourceSpecs: SourceSpec<any>[]): Promise<void> {
-        const specsByKind = sourceSpecs.reduce((groups, spec) => {
+    async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
+        // Flatten generators into a list of sourceSpecs
+        const flattenedSpecs: SourceSpec<any>[] = [];
+        for (const specOrGenerator of sourceSpecs) {
+            if (specOrGenerator && typeof (specOrGenerator as any).next === 'function') {
+                for (const spec of specOrGenerator as Generator<SourceSpec<any>, void, unknown>) {
+                    flattenedSpecs.push(spec);
+                }
+            } else {
+                flattenedSpecs.push(specOrGenerator as SourceSpec<any>);
+            }
+        }
+
+        const specsByKind = flattenedSpecs.reduce((groups, spec) => {
             const kind = spec.kind;
             if (!groups[kind]) {
                 groups[kind] = [];
@@ -146,6 +158,9 @@ export class RecipeSpec {
     }
 
     private async expectAfter(spec: SourceSpec<any>, after?: SourceFile) {
+        if (!after) {
+            throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
+        }
         expect(after).toBeDefined();
         await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
         const actualAfter = await TreePrinters.print(after!);
@@ -179,7 +194,11 @@ export class RecipeSpec {
             const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;
             if (b !== undefined) {
                 if (b instanceof Promise) {
-                    return [spec, await b];
+                    const mapped = await b;
+                    if (mapped === undefined) {
+                        throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
+                    }
+                    return [spec, mapped];
                 }
                 return [spec, b as SourceFile];
             }
@@ -196,7 +215,7 @@ export class RecipeSpec {
 }
 
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
-    protected override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
+    public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
         const ret = super.visitSpace(space, p);
         expect(space.whitespace).toMatch(/^\s*$/);
         return ret;
@@ -208,7 +227,7 @@ class NoopRecipe extends Recipe {
     displayName = "Do nothing";
     description = "Default no-op test, does nothing.";
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return noopVisitor();
     }
 }
@@ -241,7 +260,7 @@ export class AdHocRecipe extends Recipe {
         super();
     }
 
-    get editor(): TreeVisitor<any, any> {
+    async editor(): Promise<TreeVisitor<any, any>> {
         return this.visitor;
     }
 }
@@ -249,4 +268,3 @@ export class AdHocRecipe extends Recipe {
 export function fromVisitor(visitor: TreeVisitor<any, any>): Recipe {
     return new AdHocRecipe(visitor);
 }
-

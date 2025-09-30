@@ -601,7 +601,7 @@ public class ChangeType extends Recipe {
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.ShallowClass.build(newFullyQualifiedTypeName);
-            this.originalConstructor = new MethodMatcher(oldFullyQualifiedTypeName + "<constructor>(..)");
+            this.originalConstructor = new MethodMatcher(oldFullyQualifiedTypeName + " <constructor>(..)");
         }
 
         @Override

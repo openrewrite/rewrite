@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
+import {mapAsync} from "../util";
+import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
+import {SourceFile} from "../tree";
 import {isJson, Json} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 
 export class JsonVisitor<P> extends TreeVisitor<Json, P> {
-    isAcceptable(sourceFile: SourceFile): boolean {
+    async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJson(sourceFile);
     }
 
@@ -60,7 +62,7 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         });
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: P):
         Promise<Json.RightPadded<T> | undefined> {
         return produceAsync<Json.RightPadded<T>>(right, async draft => {
             draft.element = await this.visitDefined(right.element, p);
@@ -68,7 +70,7 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         });
     }
 
-    protected async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, p: P): Promise<Json.Space> {
         return space;
     }
 

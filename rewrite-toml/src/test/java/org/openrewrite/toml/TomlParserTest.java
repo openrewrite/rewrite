@@ -16,6 +16,7 @@
 package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.tree.Toml;
 
@@ -396,6 +397,46 @@ class TomlParserTest implements RewriteTest {
               """
               str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
               #
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5988")
+    @Test
+    void arrayWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Single element with trailing comma
+              tsfresh = [
+                  "featuretools-tsfresh-primitives >= 1.0.0",
+              ]
+              
+              # Multiple elements with trailing comma
+              dependencies = [
+                  "package1",
+                  "package2",
+                  "package3",
+              ]
+              
+              # Inline array with trailing comma  
+              inline = ["value1", "value2",]
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineTableWithTrailingComma() {
+        rewriteRun(
+          toml(
+            """
+              # Inline table with trailing comma
+              point = { x = 1, y = 2, }
+              
+              # Another inline table with trailing comma
+              person = { name = "John", age = 30, }
               """
           )
         );

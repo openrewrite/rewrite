@@ -66,7 +66,7 @@ export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: Exe
         for (const b of before) {
             await recurseRecipeList(recipe, b, async (recipe, b2) => {
                 if (recipe instanceof ScanningRecipe) {
-                    return recipe.scanner(recipe.accumulator(cursor, ctx)).visit(b2, ctx, cursor)
+                    return (await recipe.scanner(recipe.accumulator(cursor, ctx))).visit(b2, ctx, cursor)
                 }
             });
         }
@@ -82,14 +82,14 @@ export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: Exe
     const changeset: Result[] = [];
 
     for (const b of before) {
-        const editedB = await recurseRecipeList(recipe, b, (recipe, b2) => recipe.editor.visit(b2, ctx));
+        const editedB = await recurseRecipeList(recipe, b, async (recipe, b2) => (await recipe.editor()).visit(b2, ctx));
         if (editedB !== b) {
             changeset.push(new Result(b, editedB));
         }
     }
 
     for (const g of generated) {
-        const editedG = await recurseRecipeList(recipe, g, (recipe, g2) => recipe.editor.visit(g2, ctx));
+        const editedG = await recurseRecipeList(recipe, g, async (recipe, g2) => (await recipe.editor()).visit(g2, ctx));
         if (editedG) {
             changeset.push(new Result(undefined, editedG));
         }

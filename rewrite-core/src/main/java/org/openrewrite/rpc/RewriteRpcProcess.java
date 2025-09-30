@@ -51,6 +51,9 @@ public class RewriteRpcProcess extends Thread {
     @Setter
     private boolean trace;
 
+    @Setter
+    private @Nullable Path workingDirectory;
+
     @Nullable
     private Process process;
 
@@ -70,11 +73,19 @@ public class RewriteRpcProcess extends Thread {
         return environment;
     }
 
+    public RewriteRpcProcess trace() {
+        this.trace = true;
+        return this;
+    }
+
     @Override
     public void run() {
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.environment().putAll(environment);
+            if (workingDirectory != null) {
+                pb.directory(workingDirectory.toFile());
+            }
             process = pb.start();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

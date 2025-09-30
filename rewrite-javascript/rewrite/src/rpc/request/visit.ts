@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
+import {ExecutionContext} from "../../execution";
 
 export interface VisitResponse {
     modified: boolean
@@ -24,6 +25,7 @@ export interface VisitResponse {
 
 export class Visit {
     constructor(private readonly visitor: string,
+                private readonly sourceFileType: string,
                 private readonly visitorOptions: Map<string, any> | undefined,
                 private readonly treeId: string,
                 private readonly p: string,
@@ -34,15 +36,15 @@ export class Visit {
                   localObjects: Map<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
-                  getObject: (id: string) => any,
-                  getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
+                  getObject: (id: string, sourceFileType?: string) => any,
+                  getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
-            const p = await getObject(request.p);
-            const before: Tree = await getObject(request.treeId);
+            const p = await getObject(request.p, undefined);
+            const before: Tree = await getObject(request.treeId, request.sourceFileType);
             localObjects.set(before.id.toString(), before);
 
-            const visitor = Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
-            const after = await visitor.visit(before, p, await getCursor(request.cursor));
+            const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
+            const after = await visitor.visit(before, p, await getCursor(request.cursor, request.sourceFileType));
             if (!after) {
                 localObjects.delete(before.id.toString());
             } else if (after !== before) {
@@ -53,10 +55,10 @@ export class Visit {
         });
     }
 
-    private static instantiateVisitor(request: Visit,
+    private static async instantiateVisitor(request: Visit,
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
-                                      p: any): TreeVisitor<any, any> {
+                                      p: any): Promise<TreeVisitor<any, any>> {
         const visitorName = request.visitor;
         if (visitorName.startsWith("scan:")) {
             const recipeKey = visitorName.substring("scan:".length);
@@ -70,14 +72,20 @@ export class Visit {
                 recipeCursors.set(recipe, cursor);
             }
             const acc = recipe.accumulator(cursor, p);
-            return recipe.scanner(acc);
+            return new class extends TreeVisitor<any, ExecutionContext> {
+                protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                    await (await recipe.scanner(acc)).visit(tree, ctx);
+                    this.stopAfterPreVisit();
+                    return tree;
+                }
+            }
         } else if (visitorName.startsWith("edit:")) {
             const recipeKey = visitorName.substring("edit:".length);
             const recipe = preparedRecipes.get(recipeKey) as Recipe;
             if (!recipe) {
                 throw new Error(`No editing recipe found for key: ${recipeKey}`);
             }
-            return recipe.editor;
+            return await recipe.editor();
         } else {
             return Reflect.construct(
                 // "as any" bypasses strict type checking

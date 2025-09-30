@@ -53,7 +53,6 @@ public class DataTable<Row> {
         this.description = description;
 
         // Only null when transferring DataTables over RPC.
-        //noinspection ConstantValue
         if (recipe != null) {
             recipe.addDataTable(this);
         }

@@ -86,99 +86,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void doNotOverrideImplicitProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
-            true, null)),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                          <version>4.2.9</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
     void forceUpgradeNonSemverVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2022.0.2", null,
@@ -2266,4 +2173,157 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeBomInsteadOfOverridingDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-core", "2.15.0", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.14.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.15.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+
+	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
+	@Test
+	void upgradeVersionForEjbTypeDependency() {
+		rewriteRun(
+		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+			null, null)),
+		  pomXml(
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencies>
+					  <dependency>
+						  <groupId>org.codeartisans.asadmin</groupId>
+						  <artifactId>ejb-example</artifactId>
+						  <version>0.11</version>
+						  <type>ejb</type>
+					  </dependency>
+				  </dependencies>
+			  </project>
+			  """,
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencies>
+					  <dependency>
+						  <groupId>org.codeartisans.asadmin</groupId>
+						  <artifactId>ejb-example</artifactId>
+						  <version>0.12</version>
+						  <type>ejb</type>
+					  </dependency>
+				  </dependencies>
+			  </project>
+			  """
+		  )
+		);
+	}
+
+	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
+	@Test
+	void upgradeVersionForEjbTypeManagedDependency() {
+		rewriteRun(
+		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+			null, null)),
+		  pomXml(
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencyManagement>
+					  <dependencies>
+						  <dependency>
+							  <groupId>org.codeartisans.asadmin</groupId>
+							  <artifactId>ejb-example</artifactId>
+							  <version>0.11</version>
+							  <type>ejb</type>
+						  </dependency>
+					  </dependencies>
+				  </dependencyManagement>
+			  </project>
+			  """,
+			"""
+			  <project>
+				  <groupId>com.mycompany.app</groupId>
+				  <artifactId>my-app</artifactId>
+				  <version>1</version>
+				  <dependencyManagement>
+					  <dependencies>
+						  <dependency>
+							  <groupId>org.codeartisans.asadmin</groupId>
+							  <artifactId>ejb-example</artifactId>
+							  <version>0.12</version>
+							  <type>ejb</type>
+						  </dependency>
+					  </dependencies>
+				  </dependencyManagement>
+			  </project>
+			  """
+		  )
+		);
+	}
 }

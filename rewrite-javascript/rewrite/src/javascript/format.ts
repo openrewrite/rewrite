@@ -159,7 +159,7 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         }) as J.ClassDeclaration;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         const ret = await super.visitContainer(container, p) as J.Container<T>;
         return produce(ret, draft => {
             if (draft.elements.length > 1) {
@@ -524,7 +524,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
     public async visitStatement(statement: Statement, p: P): Promise<Statement> {
         const j = await super.visitStatement(statement, p) as Statement;
         // TODO is it needed?
-        // const parent = this.cursor.parent?.value;
+        // const parent = this.cursor.parentTree()?.value;
         // if (parent?.kind === J.Kind.Block && j.kind !== J.Kind.EnumValueSet) {
         //     if (!j.prefix.whitespace.includes("\n")) {
         //         return produce(j, draft => {
@@ -537,7 +537,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
         const v = await super.visitVariableDeclarations(multiVariable, p) as J.VariableDeclarations;
-        const parent = this.cursor.parent?.value;
+        const parent = this.cursor.parentTree()?.value;
         if (parent?.kind === J.Kind.Block) {
             return produce(v, draft => {
                 draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
@@ -939,8 +939,8 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
 
     override async visitStatement(statement: Statement, p: P): Promise<Statement> {
         const ret = await super.visitStatement(statement, p) as Statement;
-        const parent = this.cursor.parent?.value;
-        const grandparent = this.cursor.parent?.parent?.value;
+        const parent = this.cursor.parentTree()?.value;
+        const grandparent = this.cursor.parentTree()?.parent?.value;
 
         return produce(ret, draft => {
             if (grandparent?.kind === J.Kind.ClassDeclaration && parent?.kind === J.Kind.Block) {
@@ -1088,7 +1088,7 @@ export class TabsAndIndentsVisitor<P> extends JavaScriptVisitor<P> {
         });
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         const ret = await super.visitLeftPadded(left, p);
         if (ret == undefined) {
             return ret;

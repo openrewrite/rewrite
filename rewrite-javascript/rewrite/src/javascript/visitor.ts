@@ -15,15 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {mapAsync, SourceFile, ValidImmerRecipeReturnType} from "../";
-import {Expression, J, JavaType, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
+import {mapAsync} from "../util";
+import {SourceFile} from "../tree";
+import {ValidImmerRecipeReturnType} from "../visitor";
+import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS, JSX} from "./tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
-    override isAcceptable(sourceFile: SourceFile): boolean {
+    override async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJavaScript(sourceFile);
     }
 
@@ -38,12 +40,12 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected override async visitType(javaType: JavaType | undefined, p: P): Promise<JavaType | undefined> {
+    protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
         return javaType;
     }
 
@@ -252,7 +254,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
             draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
             draft.arguments = await this.visitContainer(functionCall.arguments, p);
-            draft.functionType = await this.visitType(functionCall.functionType, p) as JavaType.Method | undefined;
+            draft.methodType = await this.visitType(functionCall.methodType, p) as Type.Method | undefined;
         });
     }
 
@@ -783,7 +785,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.name = await this.visitDefined<ComputedPropertyName>(computedPropMethod.name, p);
             draft.parameters = await this.visitContainer(computedPropMethod.parameters, p);
             draft.body = computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p);
-            draft.methodType = computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as JavaType.Method);
+            draft.methodType = computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as Type.Method);
         });
     }
 
@@ -840,7 +842,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.propertyName = bindingElement.propertyName && await this.visitRightPadded(bindingElement.propertyName, p);
             draft.name = await this.visitDefined<TypedTree>(bindingElement.name, p);
             draft.initializer = bindingElement.initializer && await this.visitLeftPadded(bindingElement.initializer, p);
-            draft.variableType = bindingElement.variableType && (await this.visitType(bindingElement.variableType, p) as JavaType.Variable);
+            draft.variableType = bindingElement.variableType && (await this.visitType(bindingElement.variableType, p) as Type.Variable);
         });
     }
 

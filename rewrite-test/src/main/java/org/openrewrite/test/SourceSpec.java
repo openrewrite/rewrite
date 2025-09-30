@@ -26,6 +26,7 @@ import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.internal.ThrowingUnaryOperator;
+import org.openrewrite.tree.ParseError;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -91,8 +92,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return markers.getMarkers();
     }
 
-    @Nullable
-    Path getSourcePath() {
+    public @Nullable Path getSourcePath() {
         return sourcePath == null ? null : dir.resolve(sourcePath);
     }
 
@@ -146,6 +146,15 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     public SourceSpec<T> mapBeforeRecipe(ThrowingUnaryOperator<T> beforeRecipe) {
         this.beforeRecipe = beforeRecipe;
         return this;
+    }
+
+    public SourceSpec<T> beforeRecipeParseError(ThrowingConsumer<ParseError> beforeRecipe) {
+        return mapBeforeRecipe(t -> {
+            if (t instanceof ParseError) {
+                beforeRecipe.accept((ParseError) t);
+            }
+            return t;
+        });
     }
 
     public SourceSpec<T> beforeRecipe(ThrowingConsumer<T> beforeRecipe) {

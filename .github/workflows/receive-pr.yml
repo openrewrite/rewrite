@@ -16,4 +16,8 @@ jobs:
   upload-patch:
     uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main
     with:
+      java_version: |
+        25
+        21
       recipe: 'org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset'
+

@@ -15,10 +15,11 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
-import {ReferenceMap} from "../reference";
+import {ReferenceMap} from "../../reference";
 
 export class GetObject {
-    constructor(private readonly id: string, private readonly lastKnownId?: string) {
+    constructor(private readonly id: string,
+                private readonly sourceFileType?: string) {
     }
 
     static handle(
@@ -49,18 +50,9 @@ export class GetObject {
             let allData = pendingData.get(objId);
             if (!allData) {
                 const after = localObjects.get(objId);
-                
-                // Determine what the remote has cached
-                let before = undefined;
-                if (request.lastKnownId) {
-                    before = remoteObjects.get(request.lastKnownId);
-                    if (before === undefined) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.delete(request.lastKnownId);
-                    }
-                }
+                const before = remoteObjects.get(objId);
 
-                allData = await new RpcSendQueue(localRefs, trace).generate(after, before);
+                allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
                 pendingData.set(objId, allData);
 
                 remoteObjects.set(objId, after);
@@ -75,4 +67,5 @@ export class GetObject {
 
             return batch;
         });
-    }}
+    }
+}

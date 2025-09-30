@@ -38,7 +38,7 @@ public class Trace {
     public static void traceReceiver(RpcObjectData message) {
         PrintStream logFile = TRACE_RECEIVER;
         if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
+            logFile.println(message.withTrace());
             logFile.println("  " + message.getTrace());
             logFile.println("  " + trace("Receiver"));
             logFile.flush();

@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -35,6 +37,9 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JRightPadded<T> {
+    private static JavaSender RPC_SENDER = new JavaSender();
+    private static JavaReceiver RPC_RECEIVER = new JavaReceiver();
+
     T element;
     Space after;
     Markers markers;
@@ -88,8 +93,7 @@ public class JRightPadded<T> {
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
         WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
-        ANY(Space.Location.ANY)
-        ;
+        ANY(Space.Location.ANY);
 
         private final Space.Location afterLocation;
 

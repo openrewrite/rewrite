@@ -17,15 +17,12 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
 
@@ -34,14 +31,17 @@ public class RpcSendQueue {
     private final List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
     private final IdentityHashMap<Object, Integer> refs;
+    private final @Nullable String sourceFileType;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs) {
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs,
+                        @Nullable String sourceFileType) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
         this.refs = refs;
+        this.sourceFileType = sourceFileType;
     }
 
     public void put(RpcObjectData rpcObjectData) {
@@ -62,14 +62,6 @@ public class RpcSendQueue {
         batch.clear();
     }
 
-    public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
-        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
-            Markers markers = Reference.getValue(markersRef);
-            getAndSend(requireNonNull(markers), Markers::getId);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
-        });
-    }
-
     public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }
@@ -81,14 +73,29 @@ public class RpcSendQueue {
         send(after, before, onChange == null || after == null ? null : () -> onChange.accept(after));
     }
 
+    public <T, U> void getAndSendListAsRef(@Nullable T parent,
+                                           Function<T, @Nullable List<U>> values,
+                                           Function<? super U, ?> id,
+                                           @Nullable Consumer<U> onChange) {
+        getAndSendList(parent, values, id, onChange, true);
+    }
+
     public <T, U> void getAndSendList(@Nullable T parent,
                                       Function<T, @Nullable List<U>> values,
-                                      Function<U, ?> id,
+                                      Function<? super U, ?> id,
                                       @Nullable Consumer<U> onChange) {
-        List<U> after = values.apply(parent);
+        getAndSendList(parent, values, id, onChange, false);
+    }
+
+    private <T, U> void getAndSendList(@Nullable T parent,
+                                       Function<T, @Nullable List<U>> values,
+                                       Function<? super U, ?> id,
+                                       @Nullable Consumer<U> onChange,
+                                       boolean asRef) {
+        List<U> after = parent == null ? null : values.apply(parent);
         //noinspection unchecked
         List<U> before = this.before == null ? null : values.apply((T) this.before);
-        sendList(after, before, id, onChange);
+        sendList(after, before, id, onChange, asRef);
     }
 
     public <T> void send(@Nullable T after, @Nullable T before, @Nullable Runnable onChange) {
@@ -102,17 +109,17 @@ public class RpcSendQueue {
         } else if (afterVal == null) {
             put(new RpcObjectData(DELETE, null, null, null));
         } else {
-            //noinspection unchecked
-            RpcCodec<Object> afterCodec = after instanceof RpcCodec ? (RpcCodec<Object>) after : null;
-            put(new RpcObjectData(CHANGE, null, onChange == null && afterCodec == null ? afterVal : null, null));
+            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null));
             doChange(after, before, onChange, afterCodec);
         }
     }
 
-    public <T> void sendList(@Nullable List<T> after,
-                             @Nullable List<T> before,
-                             Function<T, ?> id,
-                             @Nullable Consumer<T> onChange) {
+    <T> void sendList(@Nullable List<T> after,
+                      @Nullable List<T> before,
+                      Function<? super T, ?> id,
+                      @Nullable Consumer<T> onChange,
+                      boolean asRef) {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
@@ -122,22 +129,21 @@ public class RpcSendQueue {
                 Integer beforePos = beforeIdx.get(id.apply(anAfter));
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == null) {
-                    add(anAfter, onChangeRun);
+                    add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
                         put(new RpcObjectData(NO_CHANGE, null, null, null));
                     } else {
-                        put(new RpcObjectData(CHANGE, null, null, null));
-                        //noinspection unchecked
-                        doChange(anAfter, aBefore, onChangeRun, anAfter instanceof RpcCodec ? ((RpcCodec<Object>) anAfter) : null);
+                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null));
+                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
                     }
                 }
             }
         });
     }
 
-    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<T, ?> id) {
+    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
         Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
         if (before != null) {
             for (int i = 0; i < before.size(); i++) {
@@ -153,8 +159,8 @@ public class RpcSendQueue {
         return beforeIdx;
     }
 
-    private void add(@Nullable Object after, @Nullable Runnable onChange) {
-        Object afterVal = Reference.getValue(after);
+    private void add(Object after, @Nullable Runnable onChange) {
+        Object afterVal = requireNonNull(Reference.getValue(after));
         Integer ref = null;
         if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
@@ -165,8 +171,7 @@ public class RpcSendQueue {
             ref = refs.size() + 1;
             refs.put(afterVal, ref);
         }
-        //noinspection unchecked
-        RpcCodec<Object> afterCodec = afterVal instanceof RpcCodec ? (RpcCodec<Object>) afterVal : null;
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
         put(new RpcObjectData(ADD, getValueType(afterVal),
                 onChange == null && afterCodec == null ? afterVal : null, ref));
         doChange(afterVal, null, onChange, afterCodec);

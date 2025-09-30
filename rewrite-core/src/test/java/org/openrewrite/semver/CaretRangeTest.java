@@ -80,17 +80,6 @@ class CaretRangeTest {
         assertThat(caretRange.isValid("1.0", "0.3.0")).isFalse();
     }
 
-    @Test
-    void updateNothing() {
-        CaretRange caretRange = CaretRange
-            .build("^0.0.3", null)
-            .getValue();
-
-        assertThat(caretRange).isNotNull();
-        assertThat(caretRange.isValid("1.0", "0.0.3")).isFalse();
-        assertThat(caretRange.isValid("1.0", "0.0.4")).isFalse();
-    }
-
     /**
      * ^1.x := >=1.0.0 <2.0.0
      */
@@ -116,5 +105,22 @@ class CaretRangeTest {
         assertThat(caretRange.isValid("1.0", "0.0.0")).isTrue();
         assertThat(caretRange.isValid("1.0", "0.0.1")).isTrue();
         assertThat(caretRange.isValid("1.0", "0.1.0")).isFalse();
+    }
+
+    @Test
+    void compare() {
+        CaretRange caretRange = CaretRange.build("^1.0", null).getValue();
+
+        assertThat(caretRange).isNotNull();
+        assertThat(caretRange.compare(null, "0.9", "^1.0")).isNegative();
+        assertThat(caretRange.compare(null, "^1.0", "0.9")).isPositive();
+        assertThat(caretRange.compare(null, "1.0", "^1.0")).isZero();
+        assertThat(caretRange.compare(null, "^1.0", "1.0")).isZero();
+        assertThat(caretRange.compare(null, "1.999", "^1.0")).isZero();
+        assertThat(caretRange.compare(null, "^1.0", "1.999")).isZero();
+        assertThat(caretRange.compare(null, "^1.0", "^1.0")).isZero();
+        assertThat(caretRange.compare(null, "^1.0.1", "^1.0")).isPositive();
+        assertThat(caretRange.compare(null, "2.0", "^1.0")).isPositive();
+        assertThat(caretRange.compare(null, "^1.0", "2.0")).isNegative();
     }
 }

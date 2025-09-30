@@ -15,11 +15,8 @@
  */
 package org.openrewrite.rpc;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Function;
@@ -30,23 +27,16 @@ import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
     private static final ObjenesisStd objenesis = new ObjenesisStd();
-    private static final LoadingCache<String, Object> instanceCache = Caffeine.newBuilder()
-            .maximumSize(1_000)
-            .build((String key) -> {
-                try {
-                    Class<?> clazz = Class.forName(key);
-                    return objenesis.newInstance(clazz);
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
-            });
 
     private final Deque<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
     private final Supplier<List<RpcObjectData>> pull;
+    private final @Nullable String sourceFileType;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
+                           @Nullable String sourceFileType) {
         this.refs = refs;
+        this.sourceFileType = sourceFileType;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
@@ -74,13 +64,8 @@ public class RpcReceiveQueue {
     @SuppressWarnings({"DataFlowIssue", "unchecked"})
     public <T, U> T receiveAndGet(@Nullable T before, Function<U, @Nullable T> mapping) {
         T after = receive(before, null);
+        //noinspection ConstantValue
         return after != null && after != before ? mapping.apply((U) after) : after;
-    }
-
-    public Markers receiveMarkers(Markers markers) {
-        return requireNonNull(receive(markers, m -> m
-                .withId(receiveAndGet(m.getId(), UUID::fromString))
-                .withMarkers(requireNonNull(receiveList(m.getMarkers(), null)))));
     }
 
     /**
@@ -91,7 +76,6 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     public <T> T receive(@Nullable T before) {
-        //noinspection DataFlowIssue
         return receive(before, null);
     }
 
@@ -107,7 +91,7 @@ public class RpcReceiveQueue {
      * @return The received value.
      */
     @SuppressWarnings("DataFlowIssue")
-    public <T> @Nullable T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
+    public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
         Trace.traceReceiver(message);
         Integer ref = null;
@@ -131,6 +115,12 @@ public class RpcReceiveQueue {
                     before = message.getValueType() == null ?
                             message.getValue() :
                             newObj(message.getValueType());
+                    if (ref != null) {
+                        // For an object like JavaType that we will mutate in place rather than using
+                        // immutable updates because of its cyclic nature, the before instance will ultimately
+                        // be the same as the after instance below.
+                        refs.put(ref, before);
+                    }
                 }
                 // Intentional fall-through...
             case CHANGE:
@@ -138,11 +128,11 @@ public class RpcReceiveQueue {
 
                 // TODO handle enums here
 
+                RpcCodec<T> rpcCodec;
                 if (onChange != null) {
                     after = onChange.apply(before);
-                } else if (before instanceof RpcCodec) {
-                    //noinspection unchecked
-                    after = (T) ((RpcCodec<Object>) before).rpcReceive(before, this);
+                } else if (before != null && (rpcCodec = RpcCodec.forInstance(before, sourceFileType)) != null) {
+                    after = rpcCodec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
                 } else {
@@ -157,7 +147,8 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> @Nullable List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
+    @SuppressWarnings("DataFlowIssue")
+    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
@@ -173,7 +164,6 @@ public class RpcReceiveQueue {
                 List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
-                    //noinspection DataFlowIssue
                     after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
                 }
                 return after;
@@ -183,8 +173,13 @@ public class RpcReceiveQueue {
     }
 
     private <T> T newObj(String type) {
-        //noinspection unchecked
-        return (T) requireNonNull(instanceCache.get(type));
+        try {
+            Class<?> clazz = Class.forName(type);
+            //noinspection unchecked
+            return (T) objenesis.newInstance(clazz);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

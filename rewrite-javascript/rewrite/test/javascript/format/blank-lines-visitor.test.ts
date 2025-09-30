@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport,ES6UnusedImports
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -14,10 +16,10 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {BlankLinesStyle, IntelliJ, JavaScriptParser, typescript} from "../../../src/javascript";
-import {AutoformatVisitor, BlankLinesVisitor} from "../../../src/javascript/format";
+import {BlankLinesStyle, IntelliJ, typescript} from "../../../src/javascript";
+import {BlankLinesVisitor} from "../../../src/javascript/format";
 import {Draft, produce} from "immer";
-import {MarkersKind, NamedStyles, randomId, Style} from "../../../src";
+import {Style} from "../../../src";
 
 type StyleCustomizer<T extends Style> = (draft: Draft<T>) => void;
 
@@ -117,7 +119,8 @@ describe('BlankLinesVisitor', () => {
         return spec.rewriteRun(
             // @formatter:off
             //language=typescript
-            typescript(`const x=["1",2,3];let y = 2;const z = 3;`,
+            typescript(
+                `const x=["1",2,3];let y = 2;const z = 3;`,
                 `
                     const x=["1",2,3];
                     let y = 2;
