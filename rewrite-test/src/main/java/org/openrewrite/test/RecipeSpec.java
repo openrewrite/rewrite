@@ -211,8 +211,7 @@ public class RecipeSpec {
         return afterRecipe(run -> {
             for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
                 if (dataTableListEntry.getKey().getType().equals(rowType)) {
-                    //noinspection unchecked
-                    List<E> rows = (List<E>) dataTableListEntry.getValue();
+                    List<E> rows = run.getDataTableRows(dataTableListEntry.getKey().getName());
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -226,6 +225,7 @@ public class RecipeSpec {
                         .map(it -> it.getType().getName().replace("$", "."))
                         .collect(joining(","));
             }
+            //noinspection ResultOfMethodCallIgnored
             fail(message);
         });
     }

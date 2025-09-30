@@ -20,8 +20,8 @@ import lombok.Value;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.table.TypeUses;
@@ -31,7 +31,6 @@ import org.openrewrite.trait.Trait;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toSet;
 
@@ -64,7 +63,7 @@ public class FindTypes extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern fullyQualifiedType = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedTypeName));
+        TypeNameMatcher fullyQualifiedType = TypeNameMatcher.fromPattern(fullyQualifiedTypeName);
 
         return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -98,7 +97,7 @@ public class FindTypes extends Recipe {
     }
 
     private static Set<NameTree> find(boolean checkAssignability, J j, String fullyQualifiedClassName) {
-        Pattern fullyQualifiedType = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedClassName));
+        TypeNameMatcher fullyQualifiedType = TypeNameMatcher.fromPattern(fullyQualifiedClassName);
 
         JavaIsoVisitor<Set<NameTree>> findVisitor = new JavaIsoVisitor<Set<NameTree>>() {
             @Override
@@ -140,12 +139,16 @@ public class FindTypes extends Recipe {
         return ts;
     }
 
-    private static boolean typeMatches(boolean checkAssignability, Pattern pattern,
+    private static boolean typeMatches(boolean checkAssignability, TypeNameMatcher matcher,
                                        JavaType.@Nullable FullyQualified test) {
-        return test != null && (checkAssignability ?
-                test.isAssignableFrom(pattern) :
-                pattern.matcher(test.getFullyQualifiedName()).matches()
-        );
+        if (test == null) {
+            return false;
+        }
+        if (checkAssignability) {
+            return test.isAssignableFrom(matcher);
+        } else {
+            return matcher.matches(test.getFullyQualifiedName());
+        }
     }
 
     @Value
@@ -160,9 +163,9 @@ public class FindTypes extends Recipe {
     }
 
     private class JavaSourceFileVisitor extends JavaVisitor<ExecutionContext> {
-        private final Pattern fullyQualifiedType;
+        private final TypeNameMatcher fullyQualifiedType;
 
-        public JavaSourceFileVisitor(Pattern fullyQualifiedType) {
+        public JavaSourceFileVisitor(TypeNameMatcher fullyQualifiedType) {
             this.fullyQualifiedType = fullyQualifiedType;
         }
 

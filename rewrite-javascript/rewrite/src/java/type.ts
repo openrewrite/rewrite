@@ -237,12 +237,26 @@ export namespace Type {
         return type?.kind === Type.Kind.Class;
     }
 
+    export function isMethod(type?: Type): type is Type.Method {
+        return type?.kind === Type.Kind.Method;
+    }
+
     export function isArray(type?: Type): type is Type.Array {
         return type?.kind === Type.Kind.Array;
     }
 
     export function isParameterized(type?: Type): type is Type.Parameterized {
         return type?.kind === Type.Kind.Parameterized;
+    }
+
+    export function isFullyQualified(type?: Type): type is Type.FullyQualified {
+        return type != null && (
+            type.kind === Type.Kind.Class ||
+            type.kind === Type.Kind.Annotation ||
+            type.kind === Type.Kind.Parameterized ||
+            type.kind === Type.Kind.Array ||
+            type.kind === Type.Kind.ShallowClass
+        );
     }
 
     export interface FullyQualified extends Type {

@@ -20,6 +20,7 @@ import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
+import FullyQualified = Type.FullyQualified;
 
 describe('JavaScript type mapping', () => {
     describe('primitive types', () => {
@@ -293,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(lib.HTMLElement (235 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (235 members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
@@ -347,6 +348,104 @@ describe('JavaScript type mapping', () => {
                         )
                     )
                 );
+            }, {unsafeCleanup: true});
+        });
+
+        test('deprecated node methods with CommonJS', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                const util = require('util');
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                const util = require('util');
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('Promise not PromiseConstructor', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isClass(type) ? type.fullyQualifiedName : null;
+            });
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `Promise.resolve("data")`,
+                    //@formatter:off
+                    `/*~~(Promise)~~>*/Promise.resolve("data")`
+                    //@formatter:on
+                )
+            )
+        })
+
+        test('deprecated node methods with ES6 imports', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isMethod(type) && type.name === 'isArray' ? FullyQualified.getFullyQualifiedName(type.declaringType) : null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import * as util from 'util';
+
+                                util.isArray([])
+                            `,
+                            //@formatter:off
+                            `
+                                import * as util from 'util';
+
+                                /*~~(util)~~>*/util.isArray([])
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
             }, {unsafeCleanup: true});
         });
 
@@ -469,12 +568,10 @@ describe('JavaScript type mapping', () => {
         test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals - arrays are now treated as class types
                 if (node?.kind === J.Kind.NewArray) {
                     if (Type.isClass(type)) {
-                        // Arrays should now be mapped as lib.Array class type
-                        if (type.fullyQualifiedName === 'lib.Array') {
-                            return 'lib.Array';
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
                         }
                     }
                     return null;
@@ -490,8 +587,8 @@ describe('JavaScript type mapping', () => {
                         let strings: Array<string> = ["a", "b"];
                     `,
                     `
-                        let numbers: number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
-                        let strings: Array<string> = /*~~(lib.Array)~~>*/["a", "b"];
+                        let numbers: number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        let strings: Array<string> = /*~~(Array)~~>*/["a", "b"];
                     `
                 )
             );
@@ -542,9 +639,9 @@ describe('JavaScript type mapping', () => {
                 // Mark array literals assigned to readonly arrays - arrays are now class types
                 if (node?.kind === J.Kind.NewArray) {
                     if (Type.isClass(type)) {
-                        // Both readonly and regular arrays should be mapped as lib.Array
-                        if (type.fullyQualifiedName === 'lib.Array') {
-                            return 'lib.Array';
+                        // Both readonly and regular arrays should be mapped as Array
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
                         }
                     }
                     return null;
@@ -561,9 +658,9 @@ describe('JavaScript type mapping', () => {
                         const frozenArray = Object.freeze([1, 2, 3]);
                     `,
                     `
-                        const readonlyNumbers: readonly number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
-                        const readonlyStrings: ReadonlyArray<string> = /*~~(lib.Array)~~>*/["a", "b"];
-                        const frozenArray = Object.freeze(/*~~(lib.Array)~~>*/[1, 2, 3]);
+                        const readonlyNumbers: readonly number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(Array)~~>*/[1, 2, 3]);
                     `
                 )
             );

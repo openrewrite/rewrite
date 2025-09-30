@@ -111,8 +111,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
-                                methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
-                                ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
+                                    methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
+                                    ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
                                 doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
                             }
                         }
@@ -151,13 +151,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (value instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) value;
                 return m.getName() != ident;
-            } else if(value instanceof J.NewClass) {
+            } else if (value instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) value;
+                return m.getName() != ident;
+            } else if (value instanceof J.NewClass) {
                 J.NewClass m = (J.NewClass) value;
                 return m.getClazz() != ident;
-            } else if(value instanceof J.NewArray) {
+            } else if (value instanceof J.NewArray) {
                 J.NewArray a = (J.NewArray) value;
                 return a.getTypeExpression() != ident;
-            } else if(value instanceof J.VariableDeclarations) {
+            } else if (value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
             } else return !(value instanceof J.ParameterizedType);
@@ -239,15 +242,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
                     is instanceof JavaSourceFile ||
-                    is instanceof J.ClassDeclaration ||
-                    is instanceof J.MethodDeclaration ||
-                    is instanceof J.Block ||
-                    is instanceof J.ForLoop ||
-                    is instanceof J.ForEachLoop ||
-                    is instanceof J.Case ||
-                    is instanceof J.Try ||
-                    is instanceof J.Try.Catch ||
-                    is instanceof J.Lambda);
+                            is instanceof J.ClassDeclaration ||
+                            is instanceof J.MethodDeclaration ||
+                            is instanceof J.Block ||
+                            is instanceof J.ForLoop ||
+                            is instanceof J.ForEachLoop ||
+                            is instanceof J.Case ||
+                            is instanceof J.Try ||
+                            is instanceof J.Try.Catch ||
+                            is instanceof J.Lambda);
         }
     }
 

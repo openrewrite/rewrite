@@ -105,7 +105,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
         await q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(functionCall, m => asRef(m.functionType), type => this.visitType(type, q));
+        await q.getAndSend(functionCall, m => asRef(m.methodType), type => this.visitType(type, q));
         return functionCall;
     }
 
@@ -643,7 +643,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.function = await q.receive(functionCall.function, select => this.visitRightPadded(select, q));
         draft.typeParameters = await q.receive(functionCall.typeParameters, typeParams => this.visitContainer(typeParams, q));
         draft.arguments = await q.receive(functionCall.arguments, args => this.visitContainer(args, q));
-        draft.functionType = await q.receive(functionCall.functionType, type => this.visitType(type, q) as unknown as Type.Method);
+        draft.methodType = await q.receive(functionCall.methodType, type => this.visitType(type, q) as unknown as Type.Method);
 
         return finishDraft(draft);
     }

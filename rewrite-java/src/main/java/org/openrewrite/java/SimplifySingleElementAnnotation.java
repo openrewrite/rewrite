@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -50,6 +51,7 @@ public class SimplifySingleElementAnnotation extends Recipe {
     }
 
     @Value
+    @EqualsAndHashCode(callSuper = false)
     private static class SimplifySingleElementAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Nullable
         J scope;
