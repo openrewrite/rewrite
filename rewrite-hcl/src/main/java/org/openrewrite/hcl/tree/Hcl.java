@@ -26,6 +26,7 @@ import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
@@ -1556,6 +1557,7 @@ public interface Hcl extends Tree {
         HclRightPadded<Expression> paddedExpression;
 
         @JsonCreator
+        @ToBeRemoved(after = "2026-04-01", reason = "Temporary constructor to aid deserialization of older models")
         TemplateInterpolation(UUID id,
                               Space prefix,
                               Markers markers,
