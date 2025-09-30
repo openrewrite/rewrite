@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.google.errorprone.annotations.InlineMe;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.Style;
@@ -74,6 +75,7 @@ public interface SourceFile extends Tree {
      * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile)} instead.
      */
     @Deprecated
+    @InlineMe(replacement = "Style.from(styleClass, this)", imports = "org.openrewrite.style.Style")
     default <S extends Style> @Nullable S getStyle(Class<S> styleClass) {
         return Style.from(styleClass, this);
     }
@@ -82,6 +84,7 @@ public interface SourceFile extends Tree {
      * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile, Supplier)} instead.
      */
     @Deprecated
+    @InlineMe(replacement = "Style.from(styleClass, this, () -> defaultStyle)", imports = "org.openrewrite.style.Style")
     default <S extends Style> S getStyle(Class<S> styleClass, S defaultStyle) {
         return Style.from(styleClass, this, () -> defaultStyle);
     }

@@ -18,6 +18,7 @@ package org.openrewrite.xml.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,18 +38,14 @@ public class NormalizeLineBreaks extends Recipe {
     }
 
     @Override
-    public LineBreaksFromCompilationUnitStyle getVisitor() {
+    public XmlIsoVisitor<ExecutionContext> getVisitor() {
         return new LineBreaksFromCompilationUnitStyle();
     }
 
     private static class LineBreaksFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            GeneralFormatStyle generalFormatStyle = document.getStyle(GeneralFormatStyle.class);
-            if (generalFormatStyle == null) {
-                generalFormatStyle = autodetectGeneralFormatStyle(document);
-            }
-
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, document, () -> autodetectGeneralFormatStyle(document));
             doAfterVisit(new NormalizeLineBreaksVisitor<>(generalFormatStyle));
             return document;
         }

@@ -24,6 +24,7 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.Style;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -39,8 +40,7 @@ public class ShiftFormat {
 
     public static <J2 extends J> J2 indent(J j, Cursor cursor, int shift) {
         JavaSourceFile cu = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
-        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle tabsAndIndents = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
 
         //noinspection unchecked
         return (J2) Objects.requireNonNull(new JavaIsoVisitor<Integer>() {
