@@ -1571,11 +1571,11 @@ public interface Hcl extends Tree {
             }
         }
 
-        public Expression getPaddedExpression() {
+        public Expression getExpression() {
             return paddedExpression.getElement();
         }
 
-        public TemplateInterpolation withPaddedExpression(Expression expression) {
+        public TemplateInterpolation withExpression(Expression expression) {
             return getPadding().withExpression(this.paddedExpression.withElement(expression));
         }
 
