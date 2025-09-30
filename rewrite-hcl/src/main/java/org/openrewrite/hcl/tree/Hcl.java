@@ -17,7 +17,6 @@ package org.openrewrite.hcl.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -37,6 +36,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("unused")
 public interface Hcl extends Tree {
@@ -1553,30 +1553,30 @@ public interface Hcl extends Tree {
         @Getter
         Markers markers;
 
-        HclRightPadded<Expression> expression;
+        HclRightPadded<Expression> paddedExpression;
 
         @JsonCreator
-        TemplateInterpolation(@JsonProperty("id") UUID id,
-                              @JsonProperty("prefix") Space prefix,
-                              @JsonProperty("markers") Markers markers,
-                              @JsonProperty("expression") Object expression) {
+        TemplateInterpolation(UUID id,
+                              Space prefix,
+                              Markers markers,
+                              @Nullable Expression expression,
+                              @Nullable HclRightPadded<Expression> paddedExpression) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
-            if (expression instanceof Expression) {
-                this.expression = HclRightPadded.withElement(null, (Expression) expression);
+            if (expression != null) {
+                this.paddedExpression = HclRightPadded.withElement(null, expression);
             } else {
-                //noinspection unchecked
-                this.expression = (HclRightPadded<Expression>) expression;
+                this.paddedExpression = requireNonNull(paddedExpression);
             }
         }
 
-        public Expression getExpression() {
-            return expression.getElement();
+        public Expression getPaddedExpression() {
+            return paddedExpression.getElement();
         }
 
-        public TemplateInterpolation withExpression(Expression expression) {
-            return getPadding().withExpression(this.expression.withElement(expression));
+        public TemplateInterpolation withPaddedExpression(Expression expression) {
+            return getPadding().withExpression(this.paddedExpression.withElement(expression));
         }
 
         @Override
@@ -1609,11 +1609,11 @@ public interface Hcl extends Tree {
             private final TemplateInterpolation t;
 
             public HclRightPadded<Expression> getExpression() {
-                return t.expression;
+                return t.paddedExpression;
             }
 
             public TemplateInterpolation withExpression(HclRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new TemplateInterpolation(t.padding, t.id, t.prefix, t.markers, expression);
+                return t.paddedExpression == expression ? t : new TemplateInterpolation(t.padding, t.id, t.prefix, t.markers, expression);
             }
         }
     }
