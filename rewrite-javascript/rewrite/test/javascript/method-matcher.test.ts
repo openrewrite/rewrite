@@ -32,31 +32,6 @@ describe('MethodMatcher', () => {
         return new MethodMatcherRecipe();
     }
 
-    describe('Pattern: lib.* *(..)', () => {
-        test('should match any type in lib package, any method, any args', async () => {
-            const spec = new RecipeSpec();
-            spec.recipe = markMatchedMethods('lib.* *(..)');
-
-            //language=typescript
-            await spec.rewriteRun(
-                typescript(
-                    `
-                        const arr = [];
-                        arr.map(x => x);
-                        arr.filter(x => x);
-                    `,
-                    //@formatter:off
-                `
-                    const arr = [];
-                    /*~~>*/arr.map(x => x);
-                    /*~~>*/arr.filter(x => x);
-                `
-                //@formatter:on
-                )
-            );
-        });
-    });
-
     describe('Pattern: *.Array *(..)', () => {
         test('should match any method of Array regardless of package', async () => {
             const spec = new RecipeSpec();
@@ -237,7 +212,7 @@ describe('MethodMatcher', () => {
     describe('Pattern: console *(..)', () => {
         test('should match any console method', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markMatchedMethods('lib.Console *(..)');
+            spec.recipe = markMatchedMethods('Console *(..)');
 
             //language=typescript
             await spec.rewriteRun(
@@ -264,7 +239,7 @@ describe('MethodMatcher', () => {
     describe('Pattern: Math max(number, number)', () => {
         test('should match Math.max with two number arguments', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markMatchedMethods('lib.Math max(lib.Array)');
+            spec.recipe = markMatchedMethods('Math max(Array)');
 
             //language=typescript
             await spec.rewriteRun(
@@ -289,7 +264,7 @@ describe('MethodMatcher', () => {
     describe('Pattern with empty arguments', () => {
         test('should match methods with no arguments', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markMatchedMethods('DateConstructor now()');
+            spec.recipe = markMatchedMethods('Date now()');
 
             //language=typescript
             await spec.rewriteRun(

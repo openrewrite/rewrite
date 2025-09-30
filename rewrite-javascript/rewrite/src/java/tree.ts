@@ -24,7 +24,23 @@ export interface J extends Tree {
     readonly prefix: J.Space;
 }
 
+export namespace J {
+    export function isMethodCall(e?: Expression): e is MethodCall {
+        return e?.kind === J.Kind.NewClass ||
+            e?.kind === J.Kind.MethodInvocation ||
+            e?.kind === J.Kind.MemberReference;
+    }
+
+    export function hasType<T extends J>(tree: T): tree is T & { type: Type } {
+        return tree && 'type' in tree && tree.type != null;
+    }
+}
+
 export interface Expression extends J {
+}
+
+export interface MethodCall extends Expression {
+    readonly methodType?: Type.Method;
 }
 
 export interface TypedTree extends J {
@@ -458,13 +474,12 @@ export namespace J {
         readonly codePoint: string;
     }
 
-    export interface MemberReference extends J, Expression {
+    export interface MemberReference extends J, MethodCall {
         readonly kind: typeof Kind.MemberReference;
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly reference: LeftPadded<Identifier>;
         readonly type?: Type;
-        readonly methodType?: Type.Method;
         readonly variableType?: Type.Variable;
     }
 
@@ -483,13 +498,12 @@ export namespace J {
         readonly methodType?: Type.Method;
     }
 
-    export interface MethodInvocation extends J, TypedTree, Expression {
+    export interface MethodInvocation extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.MethodInvocation;
         readonly select?: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly name: Identifier;
         readonly arguments: Container<Expression>;
-        readonly methodType?: Type.Method;
     }
 
     export interface Modifier extends J {
@@ -536,7 +550,7 @@ export namespace J {
         readonly type?: Type;
     }
 
-    export interface NewClass extends J, TypedTree, Expression {
+    export interface NewClass extends J, TypedTree, MethodCall {
         readonly kind: typeof Kind.NewClass;
         readonly enclosing?: RightPadded<Expression>;
         readonly new: Space;
@@ -812,12 +826,6 @@ export interface TextComment extends Comment {
 
 export interface DocComment extends Comment {
     // TODO implement me!
-}
-
-const javaKindValues = new Set(Object.values(J.Kind));
-
-export function isJava(tree: any): tree is J {
-    return javaKindValues.has(tree["kind"]);
 }
 
 export function isLiteral(tree: any): tree is J.Literal {

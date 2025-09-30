@@ -254,7 +254,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             draft.function = await this.visitOptionalRightPadded(functionCall.function, p);
             draft.typeParameters = await this.visitOptionalContainer(functionCall.typeParameters, p);
             draft.arguments = await this.visitContainer(functionCall.arguments, p);
-            draft.functionType = await this.visitType(functionCall.functionType, p) as Type.Method | undefined;
+            draft.methodType = await this.visitType(functionCall.methodType, p) as Type.Method | undefined;
         });
     }
 
