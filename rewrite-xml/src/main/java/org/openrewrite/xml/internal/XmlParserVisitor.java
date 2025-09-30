@@ -50,7 +50,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    /**
+     * Track position within the file by character
+     */
     private int cursor = 0;
+    /**
+     * Track parsing position within the file by Unicode code point
+     */
     private int codePointCursor = 0;
 
     public XmlParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
@@ -114,8 +120,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         } else if (ctx.chardata() != null) {
             Xml.CharData charData = convert(ctx.chardata(), (chardata, prefix) ->
                     charData(chardata.getText(), false, prefix));
-            codePointCursor++; // otherwise an off-by-one on cursor positioning for close tags?
-            cursor = source.offsetByCodePoints(cursor, 1);
+            // Avoid off-by-one on cursor positioning error for closing tags
+            advanceCursor(codePointCursor + 1);
             return charData;
         } else if (ctx.reference() != null) {
             if (ctx.reference().EntityRef() != null) {
@@ -455,6 +461,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return source.substring(oldCursor, cursor);
     }
 
+
+    /**
+     *  Advance both the cursor and the code point cursor
+     */
+    @SuppressWarnings("UnusedReturnValue")
     private int advanceCursor(int newCodePointIndex) {
         for (; codePointCursor < newCodePointIndex; codePointCursor++) {
             cursor = source.offsetByCodePoints(cursor, 1);
