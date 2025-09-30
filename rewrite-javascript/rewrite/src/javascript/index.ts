@@ -21,6 +21,7 @@ export * from "./style";
 export * from "./markers";
 export * from "./preconditions";
 export * from "./templating";
+export * from "./method-matcher";
 
 import "./print";
 import "./rpc";
