@@ -391,6 +391,22 @@ describe('JavaScript type mapping', () => {
             }, {unsafeCleanup: true});
         });
 
+        test('Promise not PromiseConstructor', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((_, type) => {
+                return Type.isClass(type) ? type.fullyQualifiedName : null;
+            });
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `Promise.resolve("data")`,
+                    //@formatter:off
+                    `/*~~(lib.Promise)~~>*/Promise.resolve("data")`
+                    //@formatter:on
+                )
+            )
+        })
+
         test('deprecated node methods with ES6 imports', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((_, type) => {

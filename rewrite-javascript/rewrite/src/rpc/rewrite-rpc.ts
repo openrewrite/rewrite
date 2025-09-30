@@ -92,10 +92,7 @@ export class RewriteRpc {
         this._global = value;
     }
 
-    static get(): RewriteRpc {
-        if (!this._global) {
-            throw new Error("RewriteRpc not initialized");
-        }
+    static get(): RewriteRpc | undefined {
         return this._global;
     }
 

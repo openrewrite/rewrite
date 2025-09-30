@@ -1898,7 +1898,7 @@ export class JavaScriptParserVisitor {
                 function: select,
                 typeParameters: typeArguments,
                 arguments: this.mapCommaSeparatedList(node.getChildren(this.sourceFile).slice(-3)),
-                functionType: this.mapMethodType(node)
+                methodType: this.mapMethodType(node)
             }
         }
     }

@@ -15,15 +15,26 @@
  */
 import {RewriteRpc} from "../rpc";
 import {Recipe} from "../recipe";
+import {UsesMethod, UsesType} from "./search";
+import {ExecutionContext} from "../execution";
+import {TreeVisitor} from "../visitor";
+import {IsSourceFile} from "../search";
 
-export async function hasSourcePath(filePattern: string): Promise<Recipe> {
-    return RewriteRpc.get().prepareRecipe("org.openrewrite.FindSourceFiles", {filePattern})
+export async function hasSourcePath(filePattern: string): Promise<TreeVisitor<any, ExecutionContext>> {
+    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.FindSourceFiles", {
+        filePattern
+    }))?.editor() || new IsSourceFile(filePattern);
 }
 
-export async function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<Recipe> {
-    return RewriteRpc.get().prepareRecipe("org.openrewrite.java.search.UsesMethod", {methodMatcher, matchOverrides})
+export async function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<TreeVisitor<any, ExecutionContext>> {
+    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.java.search.UsesMethod", {
+        methodMatcher,
+        matchOverrides
+    }))?.editor() || new UsesMethod(methodMatcher)
 }
 
-export async function usesType(fullyQualifiedType: string): Promise<Recipe> {
-    return RewriteRpc.get().prepareRecipe("org.openrewrite.java.search.UsesType", {fullyQualifiedType})
+export async function usesType(fullyQualifiedType: string): Promise<TreeVisitor<any, ExecutionContext>> {
+    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.java.search.UsesType", {
+        fullyQualifiedType
+    }))?.editor() || new UsesType(fullyQualifiedType);
 }

@@ -249,6 +249,16 @@ export namespace Type {
         return type?.kind === Type.Kind.Parameterized;
     }
 
+    export function isFullyQualified(type?: Type): type is Type.FullyQualified {
+        return type != null && (
+            type.kind === Type.Kind.Class ||
+            type.kind === Type.Kind.Annotation ||
+            type.kind === Type.Kind.Parameterized ||
+            type.kind === Type.Kind.Array ||
+            type.kind === Type.Kind.ShallowClass
+        );
+    }
+
     export interface FullyQualified extends Type {
     }
 

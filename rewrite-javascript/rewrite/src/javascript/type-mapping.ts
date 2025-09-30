@@ -587,6 +587,15 @@ export class JavaScriptTypeMapping {
             if (builtInTypes.has(cleanedName)) {
                 return `lib.${cleanedName}`;
             }
+
+            // Handle constructor types for built-in objects
+            // e.g., PromiseConstructor -> lib.Promise
+            if (cleanedName.endsWith('Constructor')) {
+                const baseName = cleanedName.substring(0, cleanedName.length - 'Constructor'.length);
+                if (builtInTypes.has(baseName)) {
+                    return `lib.${baseName}`;
+                }
+            }
         }
 
         return cleanedName;
