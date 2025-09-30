@@ -46,9 +46,10 @@ public class Preconditions {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
+                    DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
                     for (TreeVisitor<?, ExecutionContext> v : vs) {
                         if (v.isAcceptable((SourceFile) tree, ctx)) {
-                            return v.visit(tree, ctx);
+                            return v.visit(tree, suppressingCtx);
                         }
                     }
                 }
