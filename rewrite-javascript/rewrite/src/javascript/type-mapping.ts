@@ -22,13 +22,6 @@ class NonDraftableType {
     [immerable] = false;
 }
 
-const builtInTypes = new Set([
-    'Array', 'Object', 'Function', 'String', 'Number', 'Boolean',
-    'Date', 'RegExp', 'Error', 'Promise', 'Map', 'Set', 'WeakMap',
-    'WeakSet', 'Symbol', 'BigInt', 'HTMLElement', 'Document',
-    'Window', 'Console', 'JSON', 'Math', 'Reflect', 'Proxy'
-]);
-
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<string | number, Type> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
@@ -121,7 +114,7 @@ export class JavaScriptTypeMapping {
 
     primitiveType(node: ts.Node): Type.Primitive {
         const type = this.type(node);
-        if (Type.isClass(type) && type.fullyQualifiedName === 'lib.RegExp') {
+        if (Type.isClass(type) && type.fullyQualifiedName === 'RegExp') {
             return Type.Primitive.String;
         }
         return Type.isPrimitive(type) ? type : Type.Primitive.None;
@@ -302,12 +295,12 @@ export class JavaScriptTypeMapping {
                         if ((mappedType as any).keyword === 'String') {
                             declaringType = {
                                 kind: Type.Kind.Class,
-                                fullyQualifiedName: 'lib.String'
+                                fullyQualifiedName: 'String'
                             } as Type.FullyQualified;
                         } else if ((mappedType as any).keyword === 'Number') {
                             declaringType = {
                                 kind: Type.Kind.Class,
-                                fullyQualifiedName: 'lib.Number'
+                                fullyQualifiedName: 'Number'
                             } as Type.FullyQualified;
                         } else {
                             // Fallback for other types
@@ -321,17 +314,17 @@ export class JavaScriptTypeMapping {
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
                 if (!isImport && declaringType === Type.unknownType) {
-                    // If the expression type is a primitive string, use lib.String as declaring type
+                    // If the expression type is a primitive string, use String as declaring type
                     const typeString = this.checker.typeToString(exprType);
                     if (typeString === 'string' || exprType.flags & ts.TypeFlags.String || exprType.flags & ts.TypeFlags.StringLiteral) {
                         declaringType = {
                             kind: Type.Kind.Class,
-                            fullyQualifiedName: 'lib.String'
+                            fullyQualifiedName: 'string'
                         } as Type.FullyQualified;
                     } else if (typeString === 'number' || exprType.flags & ts.TypeFlags.Number || exprType.flags & ts.TypeFlags.NumberLiteral) {
                         declaringType = {
                             kind: Type.Kind.Class,
-                            fullyQualifiedName: 'lib.Number'
+                            fullyQualifiedName: 'number'
                         } as Type.FullyQualified;
                     } else {
                         // Fallback for other primitive types or unknown
@@ -582,23 +575,9 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // If it's just a simple name without dots, check if it's a built-in type
-        if (!cleanedName.includes('.')) {
-            if (builtInTypes.has(cleanedName)) {
-                return `lib.${cleanedName}`;
-            }
-
-            // Handle constructor types for built-in objects
-            // e.g., PromiseConstructor -> lib.Promise
-            if (cleanedName.endsWith('Constructor')) {
-                const baseName = cleanedName.substring(0, cleanedName.length - 'Constructor'.length);
-                if (builtInTypes.has(baseName)) {
-                    return `lib.${baseName}`;
-                }
-            }
-        }
-
-        return cleanedName;
+        return cleanedName.endsWith('Constructor') ?
+            cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
+            cleanedName;
     }
 
 

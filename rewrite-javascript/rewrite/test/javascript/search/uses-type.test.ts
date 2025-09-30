@@ -23,7 +23,7 @@ import {UsesType} from "../../../src/javascript/search";
 describe('UsesType visitor', () => {
     test('should find exact type match', async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new UsesType("lib.Array"));
+        spec.recipe = fromVisitor(new UsesType("Array"));
 
         //language=typescript
         await spec.rewriteRun(
@@ -36,7 +36,7 @@ describe('UsesType visitor', () => {
 
     test('should match with glob pattern', async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new UsesType("*.Promise"));
+        spec.recipe = fromVisitor(new UsesType("*romise"));
 
         //language=typescript
         await spec.rewriteRun(

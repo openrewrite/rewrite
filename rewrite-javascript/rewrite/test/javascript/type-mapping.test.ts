@@ -294,7 +294,7 @@ describe('JavaScript type mapping', () => {
                         element = div;
                     `,
                     `
-                        let element: /*~~(lib.HTMLElement (235 members))~~>*/HTMLElement;
+                        let element: /*~~(HTMLElement (235 members))~~>*/HTMLElement;
                         const div = document.createElement('div');
                         element = div;
                     `
@@ -401,7 +401,7 @@ describe('JavaScript type mapping', () => {
                 typescript(
                     `Promise.resolve("data")`,
                     //@formatter:off
-                    `/*~~(lib.Promise)~~>*/Promise.resolve("data")`
+                    `/*~~(Promise)~~>*/Promise.resolve("data")`
                     //@formatter:on
                 )
             )
@@ -421,11 +421,13 @@ describe('JavaScript type mapping', () => {
                         typescript(
                             `
                                 import * as util from 'util';
+
                                 util.isArray([])
                             `,
                             //@formatter:off
                             `
                                 import * as util from 'util';
+
                                 /*~~(util)~~>*/util.isArray([])
                             `
                             //@formatter:on
@@ -566,12 +568,10 @@ describe('JavaScript type mapping', () => {
         test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
-                // Mark array literals - arrays are now treated as class types
                 if (node?.kind === J.Kind.NewArray) {
                     if (Type.isClass(type)) {
-                        // Arrays should now be mapped as lib.Array class type
-                        if (type.fullyQualifiedName === 'lib.Array') {
-                            return 'lib.Array';
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
                         }
                     }
                     return null;
@@ -587,8 +587,8 @@ describe('JavaScript type mapping', () => {
                         let strings: Array<string> = ["a", "b"];
                     `,
                     `
-                        let numbers: number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
-                        let strings: Array<string> = /*~~(lib.Array)~~>*/["a", "b"];
+                        let numbers: number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        let strings: Array<string> = /*~~(Array)~~>*/["a", "b"];
                     `
                 )
             );
@@ -639,9 +639,9 @@ describe('JavaScript type mapping', () => {
                 // Mark array literals assigned to readonly arrays - arrays are now class types
                 if (node?.kind === J.Kind.NewArray) {
                     if (Type.isClass(type)) {
-                        // Both readonly and regular arrays should be mapped as lib.Array
-                        if (type.fullyQualifiedName === 'lib.Array') {
-                            return 'lib.Array';
+                        // Both readonly and regular arrays should be mapped as Array
+                        if (type.fullyQualifiedName === 'Array') {
+                            return 'Array';
                         }
                     }
                     return null;
@@ -658,9 +658,9 @@ describe('JavaScript type mapping', () => {
                         const frozenArray = Object.freeze([1, 2, 3]);
                     `,
                     `
-                        const readonlyNumbers: readonly number[] = /*~~(lib.Array)~~>*/[1, 2, 3];
-                        const readonlyStrings: ReadonlyArray<string> = /*~~(lib.Array)~~>*/["a", "b"];
-                        const frozenArray = Object.freeze(/*~~(lib.Array)~~>*/[1, 2, 3]);
+                        const readonlyNumbers: readonly number[] = /*~~(Array)~~>*/[1, 2, 3];
+                        const readonlyStrings: ReadonlyArray<string> = /*~~(Array)~~>*/["a", "b"];
+                        const frozenArray = Object.freeze(/*~~(Array)~~>*/[1, 2, 3]);
                     `
                 )
             );

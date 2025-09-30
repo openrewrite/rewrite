@@ -23,7 +23,7 @@ import {UsesMethod} from "../../../src/javascript/search";
 describe('UsesMethod visitor', () => {
     test('should find exact method match', async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new UsesMethod("lib.Array push(..)"));
+        spec.recipe = fromVisitor(new UsesMethod("Array push(..)"));
 
         //language=typescript
         await spec.rewriteRun(
@@ -59,7 +59,7 @@ describe('UsesMethod visitor', () => {
 
     test('should match methods with any arguments', async () => {
         const spec = new RecipeSpec();
-        spec.recipe = fromVisitor(new UsesMethod("lib.Array push(..)"));
+        spec.recipe = fromVisitor(new UsesMethod("Array push(..)"));
 
         //language=typescript
         await spec.rewriteRun(
