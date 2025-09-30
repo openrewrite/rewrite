@@ -1083,7 +1083,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """,
-                """
+              """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -2241,89 +2241,158 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
 
-	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
-	@Test
-	void upgradeVersionForEjbTypeDependency() {
-		rewriteRun(
-		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
-			null, null)),
-		  pomXml(
-			"""
-			  <project>
-				  <groupId>com.mycompany.app</groupId>
-				  <artifactId>my-app</artifactId>
-				  <version>1</version>
-				  <dependencies>
-					  <dependency>
-						  <groupId>org.codeartisans.asadmin</groupId>
-						  <artifactId>ejb-example</artifactId>
-						  <version>0.11</version>
-						  <type>ejb</type>
-					  </dependency>
-				  </dependencies>
-			  </project>
-			  """,
-			"""
-			  <project>
-				  <groupId>com.mycompany.app</groupId>
-				  <artifactId>my-app</artifactId>
-				  <version>1</version>
-				  <dependencies>
-					  <dependency>
-						  <groupId>org.codeartisans.asadmin</groupId>
-						  <artifactId>ejb-example</artifactId>
-						  <version>0.12</version>
-						  <type>ejb</type>
-					  </dependency>
-				  </dependencies>
-			  </project>
-			  """
-		  )
-		);
-	}
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.11</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.12</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 
-	@Issue("https://github.com/openrewrite/rewrite/issues/5965")
-	@Test
-	void upgradeVersionForEjbTypeManagedDependency() {
-		rewriteRun(
-		  spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
-			null, null)),
-		  pomXml(
-			"""
-			  <project>
-				  <groupId>com.mycompany.app</groupId>
-				  <artifactId>my-app</artifactId>
-				  <version>1</version>
-				  <dependencyManagement>
-					  <dependencies>
-						  <dependency>
-							  <groupId>org.codeartisans.asadmin</groupId>
-							  <artifactId>ejb-example</artifactId>
-							  <version>0.11</version>
-							  <type>ejb</type>
-						  </dependency>
-					  </dependencies>
-				  </dependencyManagement>
-			  </project>
-			  """,
-			"""
-			  <project>
-				  <groupId>com.mycompany.app</groupId>
-				  <artifactId>my-app</artifactId>
-				  <version>1</version>
-				  <dependencyManagement>
-					  <dependencies>
-						  <dependency>
-							  <groupId>org.codeartisans.asadmin</groupId>
-							  <artifactId>ejb-example</artifactId>
-							  <version>0.12</version>
-							  <type>ejb</type>
-						  </dependency>
-					  </dependencies>
-				  </dependencyManagement>
-			  </project>
-			  """
-		  )
-		);
-	}
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.11</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.12</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotAddVersionToChildWhenParentDefinesInDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "spring-security-core", "4.2.16.RELEASE", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.13.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.16.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                	<parent>
+                		<groupId>com.mycompany.app</groupId>
+                		<artifactId>parent</artifactId>
+                		<version>1</version>
+                	</parent>
+                	<groupId>com.mycompany.app</groupId>
+                	<artifactId>child</artifactId>
+                	<version>1</version>
+                	<dependencies>
+                		<dependency>
+                			<groupId>org.springframework.security</groupId>
+                			<artifactId>spring-security-core</artifactId>
+                		</dependency>
+                		<dependency>
+                			<groupId>org.apache.logging.log4j</groupId>
+                			<artifactId>log4j</artifactId>
+                			<version>2.13.1</version>
+                		</dependency>
+                	</dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
 }

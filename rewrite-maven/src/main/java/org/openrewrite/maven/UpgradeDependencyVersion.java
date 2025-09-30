@@ -37,7 +37,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
-import static java.util.Optional.*;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -299,6 +298,27 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
             }
 
+            /**
+             * Check if a dependency is managed by a local parent POM (in the same repository).
+             * This helps avoid adding unnecessary explicit versions in child POMs when the version
+             * is already managed by a parent POM in the same multi-module project.
+             */
+            private boolean isManagedByLocalParent(String groupId, String artifactId) {
+                MavenResolutionResult current = getResolutionResult().getParent();
+                while (current != null) {
+                    ResolvedPom parentPom = current.getPom();
+                    if (accumulator.projectArtifacts.contains(new GroupArtifact(parentPom.getGroupId(), parentPom.getArtifactId()))) {
+                        for (ResolvedManagedDependency md : parentPom.getDependencyManagement()) {
+                            if (groupId.equals(md.getGroupId()) && artifactId.equals(md.getArtifactId())) {
+                                return true;
+                            }
+                        }
+                    }
+                    current = current.getParent();
+                }
+                return false;
+            }
+
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedDependency d = findDependency(t);
                 if (d != null && d.getRepository() != null) {
@@ -317,6 +337,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
                                         newerVersion, overrideManagedVersion, false).getVisitor());
+                            } else if (dm != null && dm.getBomGav() == null) {
+                                // if the version is managed directly (not from a BOM) and comes from a local parent POM
+                                // (in the same repository), don't add an explicit version
+                                boolean isManagedByLocalParent = isManagedByLocalParent(d.getGroupId(), d.getArtifactId());
+                                if (!isManagedByLocalParent) {
+                                    Xml.Tag versionTag = Xml.Tag.build("<version>" + newerVersion + "</version>");
+                                    //noinspection ConstantConditions
+                                    t = (Xml.Tag) new AddToTagVisitor<>(t, versionTag, new MavenTagInsertionComparator(t.getChildren()))
+                                            .visitNonNull(t, 0, getCursor().getParent());
+                                }
                             } else {
                                 // if the version is not present and the override managed version is set,
                                 // add a new explicit version tag
