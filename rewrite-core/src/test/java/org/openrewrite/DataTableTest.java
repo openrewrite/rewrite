@@ -97,6 +97,40 @@ class DataTableTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recipeUsedInPreconditionDoesNotEmitDataTableRows() {
+        Recipe preconditionRecipe = toRecipe(r -> new PlainTextVisitor<>() {
+            final WordTable wordTable = new WordTable(r);
+
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                // This row should NOT be emitted because it's in a precondition
+                wordTable.insertRow(ctx, new WordTable.Row(0, "precondition"));
+                return text.withText("modified");
+            }
+        });
+
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(r -> Preconditions.check(
+              preconditionRecipe,
+              new PlainTextVisitor<>() {
+                  final WordTable wordTable = new WordTable(r);
+
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                      wordTable.insertRow(ctx, new WordTable.Row(1, "main"));
+                      return text.withText("changed");
+                  }
+              }
+            )))
+            .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
+              // Only "main" should be present, not "precondition"
+              .containsExactly("main")),
+          text("test", "changed")
+        );
+    }
+
     @JsonIgnoreType
     static class WordTable extends DataTable<WordTable.Row> {
         public WordTable(Recipe recipe) {
