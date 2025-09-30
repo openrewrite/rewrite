@@ -62,7 +62,7 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         t = new SpacesVisitor<>(
                 spacesStyle,
-            Style.from(EmptyForInitializerPadStyle.class, cu),
+                Style.from(EmptyForInitializerPadStyle.class, cu),
                 Style.from(EmptyForIteratorPadStyle.class, cu),
                 stopAfter
         ).visit(t, p, cursor.fork());
