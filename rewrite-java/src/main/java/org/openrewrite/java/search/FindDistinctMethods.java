@@ -29,13 +29,14 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
+public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
     transient MethodCalls methodCalls = new MethodCalls(this);
 
     /**
@@ -61,8 +62,8 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
     @Override
     public String getDescription() {
         return "A sample of every distinct method in use in a repository. The code sample in the " +
-               "method calls data table will be a representative use of the method, though there " +
-               "may be many other such uses of the method.";
+                "method calls data table will be a representative use of the method, though there " +
+                "may be many other such uses of the method.";
     }
 
     @Override
@@ -82,12 +83,12 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
     }
 
     @Override
-    public Map<String, Cursor> getInitialValue(ExecutionContext ctx) {
+    public Map<String, UUID> getInitialValue(ExecutionContext ctx) {
         return new LinkedHashMap<>();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, Cursor> acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, UUID> acc) {
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaVisitor<ExecutionContext>() {
             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
@@ -96,7 +97,7 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
                 if (expression instanceof MethodCall) {
                     MethodCall methodCall = (MethodCall) expression;
                     if (methodMatcher.matches(methodCall) && methodCall.getMethodType() != null) {
-                        acc.computeIfAbsent(methodCall.getMethodType().toString(), signature -> getCursor());
+                        acc.computeIfAbsent(methodCall.getMethodType().toString(), signature -> expression.getId());
                     }
                 }
                 return super.visitExpression(expression, ctx);
@@ -105,7 +106,7 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, Cursor> acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, UUID> acc) {
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaVisitor<ExecutionContext>() {
             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
@@ -115,21 +116,19 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, Cursor>> {
                 if (expression instanceof MethodCall) {
                     MethodCall methodCall = (MethodCall) expression;
                     if (methodMatcher.matches(methodCall) && methodCall.getMethodType() != null) {
-                        for (Map.Entry<String, Cursor> sample : acc.entrySet()) {
-                            Cursor methodCursor = sample.getValue();
-                            if (methodCursor.getValue() == expression) {
-                                methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                        methodCursor.firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                                        methodCall.printTrimmed(methodCursor),
-                                        requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName(),
-                                        methodCall.getMethodType().getName(),
-                                        methodCall.getMethodType().getParameterTypes().stream().map(Object::toString)
-                                                .collect(Collectors.joining(","))
-                                ));
-                                acc.remove(sample.getKey());
-                                e = SearchResult.found(e);
-                                break;
-                            }
+                        String key = methodCall.getMethodType().toString();
+                        if (methodCall.getId().equals(acc.get(key))) {
+                            Cursor methodCursor = getCursor();
+                            methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                    methodCursor.firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
+                                    methodCall.printTrimmed(methodCursor),
+                                    requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName(),
+                                    methodCall.getMethodType().getName(),
+                                    methodCall.getMethodType().getParameterTypes().stream().map(Object::toString)
+                                            .collect(Collectors.joining(","))
+                            ));
+                            acc.remove(key);
+                            e = SearchResult.found(e);
                         }
                     }
                 }
