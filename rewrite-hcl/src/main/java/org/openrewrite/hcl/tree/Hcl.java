@@ -15,7 +15,9 @@
  */
 package org.openrewrite.hcl.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -1552,6 +1554,22 @@ public interface Hcl extends Tree {
         Markers markers;
 
         HclRightPadded<Expression> expression;
+
+        @JsonCreator
+        TemplateInterpolation(@JsonProperty("id") UUID id,
+                              @JsonProperty("prefix") Space prefix,
+                              @JsonProperty("markers") Markers markers,
+                              @JsonProperty("expression") Object expression) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            if (expression instanceof Expression) {
+                this.expression = HclRightPadded.withElement(null, (Expression) expression);
+            } else {
+                //noinspection unchecked
+                this.expression = (HclRightPadded<Expression>) expression;
+            }
+        }
 
         public Expression getExpression() {
             return expression.getElement();
