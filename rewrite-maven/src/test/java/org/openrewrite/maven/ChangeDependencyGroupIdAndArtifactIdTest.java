@@ -1859,4 +1859,106 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.codeartisans.asadmin",
+            "ejb-example",
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.codeartisans.asadmin</groupId>
+                          <artifactId>ejb-example</artifactId>
+                          <version>0.12</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>it.vige</groupId>
+                          <artifactId>school-ejb</artifactId>
+                          <version>1.1.1</version>
+                          <type>ejb</type>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void changeManagedDependencyGroupIdAndArtifactIdForEjbType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "org.codeartisans.asadmin",
+            "ejb-example",
+            "it.vige",
+            "school-ejb",
+            "1.1.1",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.codeartisans.asadmin</groupId>
+                              <artifactId>ejb-example</artifactId>
+                              <version>0.12</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>it.vige</groupId>
+                              <artifactId>school-ejb</artifactId>
+                              <version>1.1.1</version>
+                              <type>ejb</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
 }
