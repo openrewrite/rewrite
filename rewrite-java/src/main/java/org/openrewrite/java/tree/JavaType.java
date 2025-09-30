@@ -25,6 +25,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -77,6 +78,7 @@ public interface JavaType {
         return ShallowClass.build(typeName);
     }
 
+    @Deprecated
     default boolean isAssignableFrom(Pattern pattern) {
         if (this instanceof FullyQualified) {
             FullyQualified fq = (FullyQualified) this;
@@ -96,6 +98,32 @@ public interface JavaType {
             GenericTypeVariable generic = (GenericTypeVariable) this;
             for (JavaType bound : generic.getBounds()) {
                 if (bound.isAssignableFrom(pattern)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    default boolean isAssignableFrom(TypeNameMatcher matcher) {
+        if (this instanceof FullyQualified) {
+            FullyQualified fq = (FullyQualified) this;
+            if (matcher.matches(fq.getFullyQualifiedName())) {
+                return true;
+            }
+            if (fq.getSupertype() != null && fq.getSupertype().isAssignableFrom(matcher)) {
+                return true;
+            }
+            for (FullyQualified anInterface : fq.getInterfaces()) {
+                if (anInterface.isAssignableFrom(matcher)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (this instanceof GenericTypeVariable) {
+            GenericTypeVariable generic = (GenericTypeVariable) this;
+            for (JavaType bound : generic.getBounds()) {
+                if (bound.isAssignableFrom(matcher)) {
                     return true;
                 }
             }
@@ -2000,6 +2028,11 @@ public interface JavaType {
 
         @Override
         public boolean isAssignableFrom(Pattern pattern) {
+            return false;
+        }
+
+        @Override
+        public boolean isAssignableFrom(org.openrewrite.java.TypeNameMatcher matcher) {
             return false;
         }
 
