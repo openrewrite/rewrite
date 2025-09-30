@@ -32,7 +32,7 @@ public class ImportReorderingVisitor<P> extends KotlinIsoVisitor<P> {
     public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, P p) {
         List<JRightPadded<J.Import>> importList = cu.getPadding().getImports();
 
-        ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+        ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                 .orElse(IntelliJ.importLayout());
 
         List<JRightPadded<J.Import>> ordered = layoutStyle.orderImports(importList, new HashSet<>());

@@ -44,7 +44,7 @@ public class NormalizeLineBreaks extends Recipe {
     private static class LineBreaksFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            GeneralFormatStyle generalFormatStyle = document.getStyle(GeneralFormatStyle.class);
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, document);
             if (generalFormatStyle == null) {
                 generalFormatStyle = autodetectGeneralFormatStyle(document);
             }

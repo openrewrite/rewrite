@@ -58,7 +58,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            ImportLayoutStyle importLayoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))
+            ImportLayoutStyle importLayoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
             boolean typeUsed = false;

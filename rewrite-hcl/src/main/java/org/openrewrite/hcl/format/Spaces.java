@@ -42,7 +42,7 @@ public class Spaces extends Recipe {
     private static class SpacesFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile cf, ExecutionContext ctx) {
-            SpacesStyle style = cf.getStyle(SpacesStyle.class);
+            SpacesStyle style = Style.from(SpacesStyle.class, cf);
             if (style == null) {
                 style = SpacesStyle.DEFAULT;
             }

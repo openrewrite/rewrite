@@ -39,7 +39,7 @@ public class BlankLines extends Recipe {
     private static class BlankLinesFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext ctx) {
-            BlankLinesStyle style = configFile.getStyle(BlankLinesStyle.class);
+            BlankLinesStyle style = Style.from(BlankLinesStyle.class, configFile);
             if (style == null) {
                 style = BlankLinesStyle.DEFAULT;
             }
@@ -48,8 +48,7 @@ public class BlankLines extends Recipe {
     }
 
     public static <H extends Hcl> H formatBlankLines(Hcl j, Cursor cursor) {
-        BlankLinesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
-                .getStyle(BlankLinesStyle.class);
+        BlankLinesStyle style = Style.from(BlankLinesStyle.class, cursor.firstEnclosingOrThrow(SourceFile.class));
         //noinspection unchecked
         return (H) new BlankLinesVisitor<>(style == null ? BlankLinesStyle.DEFAULT : style)
                 .visitNonNull(j, 0, cursor);

@@ -31,7 +31,7 @@ public class SpacesFromCompilationUnitStyle extends KotlinIsoVisitor<ExecutionCo
             return (J) tree;
         }
         K.CompilationUnit cu = (K.CompilationUnit) tree;
-        SpacesStyle style = cu.getStyle(SpacesStyle.class, IntelliJ.spaces());
+        SpacesStyle style = Style.from(SpacesStyle.class, cu, () -> IntelliJ.spaces());
         return new SpacesVisitor<>(style).visitNonNull(cu, getCursor().fork());
     }
 }

@@ -39,7 +39,7 @@ public class ShiftFormat {
 
     public static <J2 extends J> J2 indent(J j, Cursor cursor, int shift) {
         JavaSourceFile cu = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
-        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+        TabsAndIndentsStyle tabsAndIndents = Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu)))
                 .orElse(IntelliJ.tabsAndIndents());
 
         //noinspection unchecked

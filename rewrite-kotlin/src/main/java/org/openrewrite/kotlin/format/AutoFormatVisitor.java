@@ -53,30 +53,30 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
+        t = new BlankLinesVisitor<>(Optional.ofNullable(Style.from(BlankLinesStyle.class, ((SourceFile) cu)))
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, ((SourceFile) cu)))
                 .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(
-                Optional.ofNullable(((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                Optional.ofNullable(Style.from(SpacesStyle.class, ((SourceFile) cu))).orElse(IntelliJ.spaces()),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu)))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(
-                Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class)).orElse(IntelliJ.tabsAndIndents()),
-                Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class)).orElse(IntelliJ.wrappingAndBraces()),
+                Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu))).orElse(IntelliJ.tabsAndIndents()),
+                Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, ((SourceFile) cu))).orElse(IntelliJ.wrappingAndBraces()),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
                 .orElse(new GeneralFormatStyle(false)), stopAfter)
                 .visit(t, p, cursor.fork());
 
@@ -98,26 +98,26 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
             JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
-            t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
+            t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(Style.from(BlankLinesStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.blankLines()), stopAfter)
                     .visit(t, p);
 
             t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
-                    ((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                        Style.from(SpacesStyle.class, ((SourceFile) cu))).orElse(IntelliJ.spaces()),
                     stopAfter)
                     .visit(t, p);
 
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                     .visit(t, p);
 
-            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                     .visit(t, p);
 
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(
-                    Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class)).orElse(IntelliJ.tabsAndIndents()),
-                    Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class)).orElse(IntelliJ.wrappingAndBraces()),
+                    Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu))).orElse(IntelliJ.tabsAndIndents()),
+                    Optional.ofNullable(Style.from(WrappingAndBracesStyle.class, ((SourceFile) cu))).orElse(IntelliJ.wrappingAndBraces()),
                     stopAfter
             ).visit(t, p);
 

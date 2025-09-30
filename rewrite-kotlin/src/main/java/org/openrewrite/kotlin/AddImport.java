@@ -182,7 +182,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                 }
             }
 
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                     .orElse(IntelliJ.importLayout());
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
@@ -192,7 +192,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
-            GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+            GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, cu))
               .orElse(autodetectGeneralFormatStyle(cu));
             newImports = checkCRLF(newImports, generalFormatStyle);
 

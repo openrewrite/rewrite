@@ -47,7 +47,7 @@ public class OmitParenthesesFormat extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                OmitParenthesesStyle style = Optional.ofNullable(cu.getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
+                OmitParenthesesStyle style = Optional.ofNullable(Style.from(OmitParenthesesStyle.class, cu)).orElse(OmitParenthesesStyle.DEFAULT);
                 if (style.getLastArgumentLambda()) {
                     doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
                 }

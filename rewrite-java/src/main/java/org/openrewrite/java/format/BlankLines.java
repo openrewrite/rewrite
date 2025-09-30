@@ -46,7 +46,7 @@ public class BlankLines extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
+                BlankLinesStyle style = Style.from(BlankLinesStyle.class, cu);
                 if (style == null) {
                     style = IntelliJ.blankLines();
                 }
@@ -57,8 +57,7 @@ public class BlankLines extends Recipe {
     }
 
     public static <J2 extends J> J2 formatBlankLines(J j, Cursor cursor) {
-        BlankLinesStyle style = cursor.firstEnclosingOrThrow(SourceFile.class)
-                .getStyle(BlankLinesStyle.class);
+        BlankLinesStyle style = Style.from(BlankLinesStyle.class, cursor.firstEnclosingOrThrow(SourceFile.class));
         //noinspection unchecked
         return (J2) new BlankLinesVisitor<>(style == null ? IntelliJ.blankLines() : style)
                 .visitNonNull(j, 0, cursor);

@@ -47,7 +47,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                TabsAndIndentsStyle style = ((SourceFile) cu).getStyle(TabsAndIndentsStyle.class);
+                TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, ((SourceFile) cu));
                 if (style == null) {
                     style = IntelliJ.tabsAndIndents();
                 }

@@ -62,7 +62,7 @@ public class MethodParamPad extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
+                spacesStyle = Optional.ofNullable(Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces());
                 methodParamPadStyle = Optional.ofNullable(Style.from(MethodParamPadStyle.class, cu)).orElse(Checkstyle.methodParamPadStyle());
 
                 spacesStyle = spacesStyle.withBeforeParentheses(

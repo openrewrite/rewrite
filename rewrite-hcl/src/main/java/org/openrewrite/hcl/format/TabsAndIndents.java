@@ -42,7 +42,7 @@ public class TabsAndIndents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile cf, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = cf.getStyle(TabsAndIndentsStyle.class);
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cf);
             if (style == null) {
                 style = TabsAndIndentsStyle.DEFAULT;
             }

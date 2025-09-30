@@ -48,7 +48,7 @@ public class NormalizeLineBreaks extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                GeneralFormatStyle generalFormatStyle = ((SourceFile) cu).getStyle(GeneralFormatStyle.class);
+                GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, ((SourceFile) cu));
                 if (generalFormatStyle == null) {
                     generalFormatStyle = autodetectGeneralFormatStyle(cu);
                 }
