@@ -39,25 +39,6 @@ public class Preconditions {
         return check ? v : TreeVisitor.noop();
     }
 
-    @Incubating(since = "8.0.0")
-    @SafeVarargs
-    public static TreeVisitor<?, ExecutionContext> firstAcceptable(TreeVisitor<?, ExecutionContext>... vs) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile) {
-                    DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
-                    for (TreeVisitor<?, ExecutionContext> v : vs) {
-                        if (v.isAcceptable((SourceFile) tree, ctx)) {
-                            return v.visit(tree, suppressingCtx);
-                        }
-                    }
-                }
-                return tree;
-            }
-        };
-    }
-
     public static TreeVisitor<?, ExecutionContext> not(TreeVisitor<?, ExecutionContext> v) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
