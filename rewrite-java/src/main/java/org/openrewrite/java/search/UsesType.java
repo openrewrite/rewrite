@@ -52,13 +52,14 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
         if (fullyQualifiedType.contains("*")) {
             this.fullyQualifiedType = null;
-            if (fullyQualifiedType.indexOf('*') == fullyQualifiedType.length() - 1) {
+            final int length = fullyQualifiedType.length();
+            if (fullyQualifiedType.indexOf('*') == length - 1) {
                 int dotdot = fullyQualifiedType.indexOf("..");
-                if (dotdot == -1 && fullyQualifiedType.charAt(fullyQualifiedType.length() - 2) == '.') {
+                if (dotdot == -1 && length > 1 && fullyQualifiedType.charAt(length - 2) == '.') {
                     PackagePattern packagePattern = new PackagePattern(fullyQualifiedType.substring(0, fullyQualifiedType.length() - 2));
                     this.typePattern = packagePattern;
                     this.referenceMatcher = packagePattern;
-                } else if (dotdot == fullyQualifiedType.length() - 3) {
+                } else if (dotdot == length - 3) {
                     PackagePrefixPattern packagePrefixPattern = new PackagePrefixPattern(fullyQualifiedType.substring(0, dotdot));
                     this.typePattern = packagePrefixPattern;
                     this.referenceMatcher = packagePrefixPattern;
