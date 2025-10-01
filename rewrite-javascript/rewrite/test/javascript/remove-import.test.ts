@@ -93,7 +93,7 @@ describe('RemoveImport visitor', () => {
     });
 
     describe('methods with same names from different types', () => {
-        test('deprecated node methods with CommonJS', async () => {
+        test('util.isArray coming from namespace import but uses Array.isArray', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
 
@@ -106,11 +106,11 @@ describe('RemoveImport visitor', () => {
                             `
                                 import * as util from 'util';
 
-                                console.log('hello');
+                                Array.isArray([]);
                             `,
                             //@formatter:off
                             `
-                                console.log('hello');
+                                Array.isArray([]);
                             `
                             //@formatter:on
                         ),
@@ -131,7 +131,7 @@ describe('RemoveImport visitor', () => {
             }, {unsafeCleanup: true});
         });
 
-        test('deprecated node methods with ES6', async () => {
+        test('isArray imported from node but uses Array.isArray', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
 
@@ -144,11 +144,49 @@ describe('RemoveImport visitor', () => {
                             `
                                 import {isArray} from 'util';
 
-                                console.log('hello');
+                                Array.isArray([]);
                             `,
                             //@formatter:off
                             `
-                                console.log('hello');
+                                Array.isArray([]);
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('aliased isArray imported from node but uses Array.isArray', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {isArray as oldIsArray} from 'util';
+
+                                Array.isArray([]);
+                            `,
+                            //@formatter:off
+                            `
+                                Array.isArray([]);
                             `
                             //@formatter:on
                         ),

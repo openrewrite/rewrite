@@ -314,8 +314,26 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             namedImports.elements.elements,
             (elem: J) => {
                 if (elem.kind === JS.Kind.ImportSpecifier) {
-                    const importName = this.getImportName(elem as JS.ImportSpecifier);
-                    return !this.shouldRemoveImport(importName, usedIdentifiers, usedTypes);
+                    const specifier = elem as JS.ImportSpecifier;
+                    const importName = this.getImportName(specifier);
+                    const aliasName = this.getImportAlias(specifier);
+
+                    // For aliased imports, check if the alias is used
+                    // For non-aliased imports, check if the import name is used
+                    const nameToCheck = aliasName || importName;
+
+                    // Check if we should remove this import
+                    if (this.member !== undefined) {
+                        // We're removing a specific member - check if this matches
+                        if (this.member === importName) {
+                            // This is the member we want to remove - check if it's used
+                            return usedIdentifiers.has(nameToCheck) || usedTypes.has(nameToCheck);
+                        }
+                        return true; // Keep imports that don't match the member
+                    } else {
+                        // We're removing based on the import name itself
+                        return !this.shouldRemoveImport(importName, usedIdentifiers, usedTypes);
+                    }
                 }
                 return true; // Keep non-ImportSpecifier elements
             },
@@ -467,6 +485,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         const spec = specifier.specifier;
         if (spec?.kind === JS.Kind.Alias) {
             // Handle aliased import: import { foo as bar }
+            // Return the original name (foo)
             const alias = spec as JS.Alias;
             const propertyName = alias.propertyName.element;
             if (propertyName?.kind === J.Kind.Identifier) {
@@ -477,6 +496,20 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             return (spec as J.Identifier).simpleName;
         }
         return '';
+    }
+
+    private getImportAlias(specifier: JS.ImportSpecifier): string | undefined {
+        const spec = specifier.specifier;
+        if (spec?.kind === JS.Kind.Alias) {
+            // Handle aliased import: import { foo as bar }
+            // Return the alias name (bar)
+            const alias = spec as JS.Alias;
+            if (alias.alias?.kind === J.Kind.Identifier) {
+                return (alias.alias as J.Identifier).simpleName;
+            }
+        }
+        // No alias for regular imports
+        return undefined;
     }
 
     private getBindingElementName(bindingElement: JS.BindingElement): string {
@@ -612,12 +645,15 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
             } else if (methodInv.select?.element?.kind === J.Kind.Identifier) {
                 // Direct identifier like fs in fs.method() - though this is rare
                 usedIdentifiers.add((methodInv.select.element as J.Identifier).simpleName);
+            } else if (!methodInv.select) {
+                // No select means this is a direct function call like isArray()
+                // Only in this case should we add the method name as a used identifier
+                if (methodInv.name && methodInv.name.kind === J.Kind.Identifier) {
+                    usedIdentifiers.add((methodInv.name as J.Identifier).simpleName);
+                }
             }
-
-            // Collect method name
-            if (methodInv.name && methodInv.name.kind === J.Kind.Identifier) {
-                usedIdentifiers.add((methodInv.name as J.Identifier).simpleName);
-            }
+            // Note: We don't add method names for calls like Array.isArray() or obj.method()
+            // because those are methods on objects, not standalone imported functions
             // Recursively check arguments
             if (methodInv.arguments) {
                 for (const arg of methodInv.arguments.elements) {
