@@ -19,6 +19,7 @@ import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
+import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.HasAttributes;
 import org.gradle.api.initialization.Settings;
@@ -87,14 +88,16 @@ public final class GradleProjectBuilder {
         return repositories.stream()
                 .filter(MavenArtifactRepository.class::isInstance)
                 .map(MavenArtifactRepository.class::cast)
-                .map(repo -> MavenRepository.builder()
-                        .id(repo.getName())
-                        .uri(repo.getUrl().toString())
-                        .username(repo.getCredentials().getUsername())
-                        .password(repo.getCredentials().getPassword())
-                        .releases(true)
-                        .snapshots(true)
-                        .build())
+                .map(repo -> {
+                    MavenRepository.Builder builder = MavenRepository.builder()
+                            .id(repo.getName())
+                            .uri(repo.getUrl().toString())
+                            .releases(true)
+                            .snapshots(true);
+                    Optional.ofNullable(repo.getCredentials().getUsername()).ifPresent(builder::username);
+                    Optional.ofNullable(repo.getCredentials().getPassword()).ifPresent(builder::password);
+                    return builder.build();
+                })
                 .collect(toList());
     }
 
