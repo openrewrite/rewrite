@@ -64,14 +64,14 @@ public class ChangeValue extends Recipe {
                 }
 
                 String withQuotes = value;
-                String withoutQoutes = value;
+                String withoutQuotes = value;
                 if (value.startsWith("\"") || value.startsWith("'")) {
-                    withoutQoutes = value.substring(1, value.length() - 1);
+                    withoutQuotes = value.substring(1, value.length() - 1);
                 } else {
                     withQuotes = "\"" + value + "\"";
                 }
                 return JsonParser.builder().build()
-                        .parse(withoutQoutes, withQuotes)
+                        .parse(withoutQuotes, withQuotes)
                         .filter(it -> it instanceof Json.Document)
                         .findFirst()
                         .map(Json.Document.class::cast)

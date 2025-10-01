@@ -249,4 +249,34 @@ class ChangeValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeToNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "null")),
+          json(
+            """                                                                                                                                                                                                                                                                    
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": null }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToStringLiteralNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"null\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": "null" }
+              """
+          )
+        );
+    }
 }
