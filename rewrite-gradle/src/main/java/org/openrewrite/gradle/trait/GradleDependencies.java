@@ -64,7 +64,20 @@ public class GradleDependencies implements Trait<J.MethodInvocation> {
                         J.Lambda lambda = (J.Lambda) expression;
                         if (lambda.getBody() instanceof J.Block) {
                             return new Block.Matcher().get(lambda.getBody(), new Cursor(cursor, lambda))
-                                    .map(block -> block.mapStatements(mapper))
+                                    .map(block -> block.mapStatements(statement -> {
+                                        if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof Statement) {
+                                            Statement originalStatement = (Statement) ((J.Return) statement).getExpression();
+                                            Statement newStatement = mapper.apply(originalStatement);
+                                            if (originalStatement == newStatement) {
+                                                return statement;
+                                            } else if (newStatement instanceof Expression) {
+                                                return ((J.Return) statement).withExpression((Expression) newStatement);
+                                            } else if (newStatement == null) {
+                                                return null;
+                                            }
+                                        }
+                                        return mapper.apply(statement);
+                                    }))
                                     .map(Trait::getTree)
                                     .filter(block -> !(block.getStatements().isEmpty() && block.getComments().isEmpty() && block.getEnd().getComments().isEmpty()))
                                     .map(lambda::withBody)

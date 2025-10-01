@@ -207,6 +207,7 @@ public class ChangeDependency extends Recipe {
                 return super.visit(tree, ctx);
             }
 
+            //select.doSomething(arg1, arg2);
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

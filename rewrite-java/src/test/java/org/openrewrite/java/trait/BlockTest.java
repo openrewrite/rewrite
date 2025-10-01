@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
@@ -31,8 +30,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
 class BlockTest implements RewriteTest {
@@ -159,7 +156,7 @@ class BlockTest implements RewriteTest {
     }
 
     @Test
-    void emptyBlockIsRemoved() {
+    void emptyBlocksPreserved() {
         rewriteRun(
           java(
             """
@@ -743,6 +740,34 @@ class BlockTest implements RewriteTest {
     }
 
     @Test
+    void beforeLineComments() {
+        rewriteRun(
+          java(
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  void method() {
+                      keep();
+                      /* before line comment remains */ keep();
+                      remove();
+                      /* before line comment remains */ remove();
+                  }
+              }
+              """,
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  void method() {
+                      keep();
+                      /* before line comment remains */ keep();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multilineComments() {
         rewriteRun(
           java(
@@ -859,17 +884,19 @@ class BlockTest implements RewriteTest {
     }
 
     @Test
-    void returnStatementHasRemovedStatement() {
+    void userShouldUnwrapReturnStatementIfRequired() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                  Block trait = new Block(getCursor()).filterStatements(statement -> {
-                      if (statement instanceof J.MethodInvocation) {
-                          return !new MethodMatcher("testing.TestMethods condition(..)").matches((MethodCall) statement);
-                      }
-                      return true;
-                  });
+                  Block trait = new Block(getCursor()).filterStatements(
+                    statement -> {
+                        if (statement instanceof J.MethodInvocation) {
+                            return !new MethodMatcher("testing.TestMethods condition(..)").matches((MethodCall) statement);
+                        }
+                        return true;
+                    }
+                  );
                   return super.visitBlock(trait.getTree(), ctx);
               }
           })),
@@ -883,58 +910,9 @@ class BlockTest implements RewriteTest {
                       return condition();
                   }
               }
-              """,
-            """
-              import static testing.TestMethods.*;
-              class Test {
-                  boolean method() {
-                      keep();
-                      return anotherCondition();
-                  }
-              }
               """
           )
         );
-    }
-
-    @Test
-    void filterStatementsWithCustomReturnMapperReplacingWithOriginal() {
-        AssertionError assertionError = assertThrows(AssertionError.class, () ->
-          rewriteRun(
-            spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                    Block trait = new Block(getCursor()).filterStatements(
-                      statement -> {
-                          if (statement instanceof J.MethodInvocation) {
-                              return !new MethodMatcher("testing.TestMethods condition(..)").matches((MethodCall) statement);
-                          }
-                          return true;
-                      },
-                      (returnStmt, expr) -> {
-                          // Custom mapper that keeps the original return statement unchanged
-                          return returnStmt;
-                      }
-                    );
-                    return super.visitBlock(trait.getTree(), ctx);
-                }
-            })),
-            java(
-              """
-                import static testing.TestMethods.*;
-                class Test {
-                    boolean method() {
-                        keep();
-                        anotherCondition();
-                        return condition();
-                    }
-                }
-                """
-            )
-          )
-        );
-        assertThat(assertionError.getCause()).isInstanceOf(RecipeRunException.class);
-        assertThat(assertionError.getCause().getMessage()).isEqualTo("java.lang.IllegalArgumentException: The return statement replacement result should not be one that gets filtered out to avoid cyclic changes that result in the entire block being cleared. Did you return something from the old return that still return null when the mapper would be applied?");
     }
 
     @Test
@@ -951,21 +929,20 @@ class BlockTest implements RewriteTest {
                                 return null;
                             }
                         }
+                        if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation) {
+                            return ((J.Return) statement).withExpression(
+                              new J.Unary(
+                                Tree.randomId(),
+                                Space.SINGLE_SPACE,
+                                Markers.EMPTY,
+                                JLeftPadded.build(J.Unary.Type.Not),
+                                ((J.Return) statement).getExpression().withPrefix(Space.EMPTY),
+                                null
+                              )
+                            );
+                        }
                         return statement;
-                    },
-                    (returnStmt, expr) -> {
-                        // Custom mapper that wraps the expression in a NOT operation
-                        J.Unary notExpr = new J.Unary(
-                          Tree.randomId(),
-                          Space.SINGLE_SPACE,
-                          Markers.EMPTY,
-                          JLeftPadded.build(J.Unary.Type.Not),
-                          expr.withPrefix(Space.EMPTY),
-                          null
-                        );
-                        return returnStmt.withExpression(notExpr);
-                    }
-                  );
+                    });
                   return super.visitBlock(trait.getTree(), ctx);
               }
           })),
@@ -976,6 +953,7 @@ class BlockTest implements RewriteTest {
                   boolean method() {
                       keep();
                       anotherCondition();
+                      condition();
                       return condition();
                   }
               }
@@ -985,7 +963,8 @@ class BlockTest implements RewriteTest {
               class Test {
                   boolean method() {
                       keep();
-                      return !anotherCondition();
+                      anotherCondition();
+                      return !condition();
                   }
               }
               """
