@@ -1506,9 +1506,25 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         Space prefix = whitespace();
         TypeTree elemType = convert(typeIdent);
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
-        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+
+        // Check if this is varargs (...) or regular array brackets ([])
+        int saveCursor = cursor;
+        whitespace();
+        Markers markers = Markers.EMPTY;
+        JLeftPadded<Space> dimension;
+        if (source.startsWith("...", cursor)) {
+            // Varargs syntax
+            cursor = saveCursor;
+            markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
+            dimension = padLeft(sourceBefore("..."), EMPTY);
+        } else {
+            // Regular array brackets
+            cursor = saveCursor;
+            dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        }
+
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+        return new J.ArrayType(randomId(), prefix, markers,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
@@ -1526,20 +1542,34 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
             int saveCursor = cursor;
             whitespace();
-            if (source.startsWith("[", cursor)) {
+
+            // Check if this is varargs (...) or regular array brackets ([])
+            Markers markers = Markers.EMPTY;
+            JLeftPadded<Space> dimension;
+            if (source.startsWith("...", cursor)) {
+                // Varargs syntax
                 cursor = saveCursor;
-                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-                return new J.ArrayType(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                        annotations,
-                        dimension,
-                        typeMapping.type(tree)
-                );
+                markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
+                dimension = padLeft(sourceBefore("..."), EMPTY);
+            } else if (source.startsWith("[", cursor)) {
+                // Regular array brackets
+                cursor = saveCursor;
+                dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+            } else {
+                // No dimension found
+                cursor = saveCursor;
+                return baseType;
             }
-            cursor = saveCursor;
+
+            return new J.ArrayType(
+                    randomId(),
+                    EMPTY,
+                    markers,
+                    mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                    annotations,
+                    dimension,
+                    typeMapping.type(tree)
+            );
         }
         return baseType;
     }

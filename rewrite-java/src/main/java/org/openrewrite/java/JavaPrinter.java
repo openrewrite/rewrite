@@ -22,6 +22,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.Varargs;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -210,9 +211,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(arrayType.getAnnotations(), p);
         if (arrayType.getDimension() != null) {
             visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
+            if (arrayType.getMarkers().findFirst(Varargs.class).isPresent()) {
+                // Print varargs syntax
+                p.append("...");
+            } else {
+                // Print regular array brackets
+                p.append('[');
+                visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
 
             if (arrayType.getElementType() instanceof J.ArrayType) {
                 printDimensions((ArrayType) arrayType.getElementType(), p);
@@ -226,9 +233,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
         visit(arrayType.getAnnotations(), p);
         visitSpace(arrayType.getDimension().getBefore(), Space.Location.DIMENSION_PREFIX, p);
-        p.append('[');
-        visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
-        p.append(']');
+        if (arrayType.getMarkers().findFirst(Varargs.class).isPresent()) {
+            // Print varargs syntax
+            p.append("...");
+        } else {
+            // Print regular array brackets
+            p.append('[');
+            visitSpace(arrayType.getDimension().getElement(), Space.Location.DIMENSION, p);
+            p.append(']');
+        }
         if (arrayType.getElementType() instanceof J.ArrayType) {
             printDimensions((ArrayType) arrayType.getElementType(), p);
         }
