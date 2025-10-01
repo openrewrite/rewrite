@@ -338,10 +338,10 @@ export class JavaScriptTypeMapping {
                 // Check if this is an import first
                 const symbol = this.checker.getSymbolAtLocation(node.expression);
                 let moduleSpecifier: string | undefined;
+                let aliasedSymbol: ts.Symbol | undefined;
 
                 if (symbol) {
                     // Check if this is an aliased symbol (i.e., an import)
-                    let aliasedSymbol: ts.Symbol | undefined;
                     if (symbol.flags & ts.SymbolFlags.Alias) {
                         aliasedSymbol = this.checker.getAliasedSymbol(symbol);
                     }
@@ -383,7 +383,12 @@ export class JavaScriptTypeMapping {
                             kind: Type.Kind.Class,
                             fullyQualifiedName: moduleSpecifier
                         } as Type.FullyQualified;
-                        methodName = '<default>';
+                        // For aliased imports, use the original function name from the aliased symbol
+                        if (aliasedSymbol && aliasedSymbol.name) {
+                            methodName = aliasedSymbol.name;
+                        } else {
+                            methodName = '<default>';
+                        }
                     }
                 } else {
                     // Fall back to the original logic for non-imported functions

@@ -407,6 +407,58 @@ describe('JavaScript type mapping', () => {
             )
         })
 
+        test('aliased destructured ES6 import has correct method name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (Type.isMethod(type)) {
+                    const method = type as Type.Method;
+                    if (FullyQualified.getFullyQualifiedName(method.declaringType) === 'fs') {
+                        return method.name;
+                    }
+                }
+                return null;
+            });
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {readFile as rf} from 'fs';
+
+                                rf('test.txt', (err, data) => {
+                                    console.log(data);
+                                });
+                            `,
+                            //@formatter:off
+                            `
+                                import {readFile as rf} from 'fs';
+
+                                /*~~(readFile)~~>*/rf('test.txt', (err, data) => {
+                                    console.log(data);
+                                });
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        })
+
         test('deprecated node methods with ES6 imports', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((_, type) => {

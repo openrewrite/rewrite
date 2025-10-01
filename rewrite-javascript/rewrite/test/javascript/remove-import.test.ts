@@ -17,9 +17,7 @@
  */
 import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {npm, packageJson, typescript} from "../../src/javascript";
-import {RemoveImport} from "../../src/javascript";
-import {Type} from "../../src/java";
+import {npm, packageJson, RemoveImport, typescript} from "../../src/javascript";
 import {withDir} from "tmp-promise";
 
 describe('RemoveImport visitor', () => {
