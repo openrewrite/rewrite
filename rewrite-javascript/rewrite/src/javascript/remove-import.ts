@@ -18,8 +18,8 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * @param member Optionally, the specific member to remove from the import.
      *               If not specified, removes the import matching `target`
      */
-    constructor(private readonly target: string,
-                private readonly member?: string) {
+    constructor(readonly target: string,
+                readonly member?: string) {
         super();
     }
 
