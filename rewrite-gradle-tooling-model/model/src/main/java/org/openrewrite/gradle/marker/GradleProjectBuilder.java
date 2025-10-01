@@ -94,8 +94,10 @@ public final class GradleProjectBuilder {
                             .uri(repo.getUrl().toString())
                             .releases(true)
                             .snapshots(true);
-                    Optional.ofNullable(repo.getCredentials().getUsername()).ifPresent(builder::username);
-                    Optional.ofNullable(repo.getCredentials().getPassword()).ifPresent(builder::password);
+                    if (GradleVersion.current().compareTo(GradleVersion.version("6.6")) >= 0) {
+                        Optional.ofNullable(repo.getCredentials().getUsername()).ifPresent(builder::username);
+                        Optional.ofNullable(repo.getCredentials().getPassword()).ifPresent(builder::password);
+                    }
                     return builder.build();
                 })
                 .collect(toList());
