@@ -220,7 +220,22 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const identifier = namedBindings as J.Identifier;
                 const name = identifier.simpleName;
 
-                if (this.shouldRemoveImport(name, usedIdentifiers, usedTypes)) {
+                // When removing a specific member from a namespace import,
+                // we can only remove the entire namespace if it's not used
+                if (this.member !== undefined) {
+                    // We're trying to remove a specific member from this namespace
+                    // Check if the namespace itself is used
+                    if (!usedIdentifiers.has(name) && !usedTypes.has(name)) {
+                        // Namespace is not used, remove the entire import
+                        if (!importClause.name) {
+                            return undefined;
+                        }
+                        return this.updateImportClause(jsImport, importClause, draft => {
+                            draft.namedBindings = undefined;
+                        }, p);
+                    }
+                    // Namespace is used, we can't remove individual members from it
+                } else if (this.shouldRemoveImport(name, usedIdentifiers, usedTypes)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
                         return undefined;
@@ -235,7 +250,22 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 const alias = namedBindings as JS.Alias;
                 const aliasName = (alias.alias as J.Identifier).simpleName;
 
-                if (this.shouldRemoveImport(aliasName, usedIdentifiers, usedTypes)) {
+                // When removing a specific member from a namespace import,
+                // we can only remove the entire namespace if it's not used
+                if (this.member !== undefined) {
+                    // We're trying to remove a specific member from this namespace
+                    // Check if the namespace itself is used
+                    if (!usedIdentifiers.has(aliasName) && !usedTypes.has(aliasName)) {
+                        // Namespace is not used, remove the entire import
+                        if (!importClause.name) {
+                            return undefined;
+                        }
+                        return this.updateImportClause(jsImport, importClause, draft => {
+                            draft.namedBindings = undefined;
+                        }, p);
+                    }
+                    // Namespace is used, we can't remove individual members from it
+                } else if (this.shouldRemoveImport(aliasName, usedIdentifiers, usedTypes)) {
                     // If there's no default import, remove the entire import
                     if (!importClause.name) {
                         return undefined;

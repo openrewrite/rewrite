@@ -17,8 +17,10 @@
  */
 import {describe, test} from "@jest/globals";
 import {fromVisitor, RecipeSpec} from "../../src/test";
-import {typescript} from "../../src/javascript";
-import {RemoveImport} from "../../src/javascript/remove-import";
+import {npm, packageJson, typescript} from "../../src/javascript";
+import {RemoveImport} from "../../src/javascript";
+import {Type} from "../../src/java";
+import {withDir} from "tmp-promise";
 
 describe('RemoveImport visitor', () => {
     describe('named imports', () => {
@@ -91,6 +93,84 @@ describe('RemoveImport visitor', () => {
             );
         });
     });
+
+    describe('methods with same names from different types', () => {
+        test('deprecated node methods with CommonJS', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import * as util from 'util';
+
+                                console.log('hello');
+                            `,
+                            //@formatter:off
+                            `
+                                console.log('hello');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+
+        test('deprecated node methods with ES6', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("util", "isArray"));
+
+            //language=typescript
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import {isArray} from 'util';
+
+                                console.log('hello');
+                            `,
+                            //@formatter:off
+                            `
+                                console.log('hello');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "devDependencies": {
+                                  "@types/node": "^20"
+                                }
+                              }
+                            `
+                        )
+                    )
+                )
+            }, {unsafeCleanup: true});
+        });
+    })
 
     describe('default imports', () => {
         test('should remove default import', async () => {
