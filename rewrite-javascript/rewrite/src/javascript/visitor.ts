@@ -22,24 +22,8 @@ import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "
 import {createDraft, Draft, finishDraft} from "immer";
 import {isJavaScript, JS, JSX} from "./tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
-import {RemoveImport} from "./remove-import";
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
-
-    /**
-     * @param target Either the module name (e.g., 'fs') to remove specific members from,
-     *               or the name of the import to remove entirely
-     * @param member Optionally, the specific member to remove from the import.
-     *               If not specified, removes the import matching `target`
-     */
-    protected maybeRemoveImport(target: string, member?: string) {
-        for (const v of this.afterVisit || []) {
-            if (v instanceof RemoveImport && v.target === target && v.member === member) {
-                return;
-            }
-        }
-        this.afterVisit.push(new RemoveImport(target, member));
-    }
 
     override async isAcceptable(sourceFile: SourceFile): Promise<boolean> {
         return isJavaScript(sourceFile);

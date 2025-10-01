@@ -3,6 +3,22 @@ import {J} from "../java";
 import {JS} from "./tree";
 import {mapAsync} from "../util";
 
+/**
+ * @param visitor The visitor to add the import removal to
+ * @param target Either the module name (e.g., 'fs') to remove specific members from,
+ *               or the name of the import to remove entirely
+ * @param member Optionally, the specific member to remove from the import.
+ *               If not specified, removes the import matching `target`
+ */
+export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, target: string, member?: string) {
+    for (const v of visitor.afterVisit || []) {
+        if (v instanceof RemoveImport && v.target === target && v.member === member) {
+            return;
+        }
+    }
+    visitor.afterVisit.push(new RemoveImport(target, member));
+}
+
 // Type alias for RightPadded elements to simplify type signatures
 type RightPaddedElement<T extends J> = {
     element?: T;
@@ -90,7 +106,6 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
 
         // Traverse the AST to collect used identifiers
         await this.collectUsedIdentifiers(compilationUnit, usedIdentifiers, usedTypes);
-
 
 
         // Now process imports with knowledge of what's used
@@ -265,7 +280,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         usedTypes: Set<string>,
         p: P
     ): Promise<JS.NamedImports | undefined> {
-        const { filtered, allRemoved } = await this.filterElementsWithPrefixPreservation(
+        const {filtered, allRemoved} = await this.filterElementsWithPrefixPreservation(
             namedImports.elements.elements,
             (elem: J) => {
                 if (elem.kind === JS.Kind.ImportSpecifier) {
@@ -366,12 +381,12 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return varDecls;
     }
 
-private async processObjectBindingPattern(
+    private async processObjectBindingPattern(
         pattern: JS.ObjectBindingPattern,
         usedIdentifiers: Set<string>,
         p: P
     ): Promise<JS.ObjectBindingPattern | undefined> {
-        const { filtered, allRemoved } = await this.filterElementsWithPrefixPreservation(
+        const {filtered, allRemoved} = await this.filterElementsWithPrefixPreservation(
             pattern.bindings.elements,
             (elem: J) => {
                 if (elem.kind === JS.Kind.BindingElement) {
