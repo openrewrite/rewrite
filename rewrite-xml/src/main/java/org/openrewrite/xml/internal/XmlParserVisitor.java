@@ -467,9 +467,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
      */
     @SuppressWarnings("UnusedReturnValue")
     private int advanceCursor(int newCodePointIndex) {
-        for (; codePointCursor < newCodePointIndex; codePointCursor++) {
-            cursor = source.offsetByCodePoints(cursor, 1);
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
         }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
         return cursor;
     }
 
