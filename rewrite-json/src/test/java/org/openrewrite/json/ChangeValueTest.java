@@ -86,7 +86,7 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
-    void changeToNumber() {
+    void changeToNumberAsString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"123\"")),
           json(
@@ -94,7 +94,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": 123 }
+              { "apiVersion": "123" }
               """
           )
         );
@@ -116,7 +116,7 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
-    void changeToBoolean() {
+    void changeToBooleanAsString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"true\"")),
           json(
@@ -124,7 +124,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": true }
+              { "apiVersion": "true" }
               """
           )
         );
@@ -169,7 +169,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": 'v2' }
+              { "apiVersion": "'v2'" }
               """
           )
         );
@@ -199,7 +199,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": "v2" }
+              { "apiVersion": '"v2"' }
               """
           )
         );
@@ -221,9 +221,24 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
+    void changeToObjectAsString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"{\\\"a\\\":\\\"b\\\"}\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": "{\\"a\\":\\"b\\"}" }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeToObject() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"{\"a\":\"b\"}\"")),
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "{\"a\":\"b\"}")),
           json(
             """
               { "apiVersion": "v1" }
@@ -251,22 +266,7 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
-    void changeToNull() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeValue("$.apiVersion", "null")),
-          json(
-            """                                                                                                                                                                                                                                                                    
-              { "apiVersion": "v1" }
-              """,
-            """
-              { "apiVersion": null }
-              """
-          )
-        );
-    }
-
-    @Test
-    void changeToStringLiteralNull() {
+    void changeToNullAsString() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"null\"")),
           json(
@@ -275,6 +275,21 @@ class ChangeValueTest implements RewriteTest {
               """,
             """
               { "apiVersion": "null" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToLiteralNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "null")),
+          json(
+            """                                                                                                                                                                                                                                                                    
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": null }
               """
           )
         );

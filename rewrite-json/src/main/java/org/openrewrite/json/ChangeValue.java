@@ -18,10 +18,12 @@ package org.openrewrite.json;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Marker;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Value
@@ -33,8 +35,9 @@ public class ChangeValue extends Recipe {
     String oldKeyPath;
 
     @Option(displayName = "New value",
-            description = "The new value to set for the key identified by oldKeyPath.",
+            description = "The new JSON value to set for the key identified by oldKeyPath.",
             example = "'Deployment'")
+    @Language("json")
     String value;
 
     @Override
@@ -62,25 +65,22 @@ public class ChangeValue extends Recipe {
                 if (!matcher.matches(getCursor()) || m.getMarkers().findFirst(Changed.class).isPresent()) {
                     return m;
                 }
-
-                String withQuotes = value;
-                String withoutQuotes = value;
-                if (value.startsWith("\"") || value.startsWith("'")) {
-                    withoutQuotes = value.substring(1, value.length() - 1);
-                } else {
-                    withQuotes = "\"" + value + "\"";
-                }
-                return JsonParser.builder().build()
-                        .parse(withoutQuotes, withQuotes)
-                        .filter(it -> it instanceof Json.Document)
-                        .findFirst()
-                        .map(Json.Document.class::cast)
-                        .map(Json.Document::getValue)
-                        .map(jsonValue -> m.withValue(jsonValue.withPrefix(m.getValue().getPrefix())))
-                        .map(newMember -> newMember.withMarkers(newMember.getMarkers().add(new Changed(Tree.randomId()))))
-                        .orElse(m);
+                return parseValue(m, value).orElseGet(() ->
+                        parseValue(m, value.startsWith("\"") || value.startsWith("'") ? value.substring(1, value.length() - 1) : "\"" + value + "\"")
+                                .orElse(m));
             }
         };
+    }
+
+    private static Optional<Json.Member> parseValue(Json.Member m, @Language("json") String value) {
+        return JsonParser.builder().build()
+                .parse(value)
+                .filter(it -> it instanceof Json.Document)
+                .findFirst()
+                .map(Json.Document.class::cast)
+                .map(Json.Document::getValue)
+                .map(jsonValue -> m.withValue(jsonValue.withPrefix(m.getValue().getPrefix())))
+                .map(newMember -> newMember.withMarkers(newMember.getMarkers().add(new Changed(Tree.randomId()))));
     }
 
     @Value
