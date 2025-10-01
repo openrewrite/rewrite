@@ -17,14 +17,14 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
-import org.openrewrite.marker.Markers;
 
 import java.util.Optional;
-
-import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -66,12 +66,23 @@ public class ChangeValue extends Recipe {
                 }
 
                 String targetValue = value;
-                if (m.getValue() instanceof Json.Literal && ((Json.Literal) m.getValue()).getSource().equals(targetValue)) {
-                    return m;
+                String withoutQoutes = targetValue;
+                if (targetValue.startsWith("\"") || targetValue.startsWith("'")) {
+                    withoutQoutes = withoutQoutes.substring(1, withoutQoutes.length() - 1);
+                }
+                String withQuotes = targetValue;
+                if (!(targetValue.startsWith("\"") || targetValue.startsWith("'"))) {
+                    withQuotes = "\"" + withQuotes + "\"";
                 }
 
+                if (m.getValue() instanceof Json.Literal &&
+                        (((Json.Literal) m.getValue()).getSource().equals(targetValue) ||
+                                ((Json.Literal) m.getValue()).getSource().equals(withoutQoutes) ||
+                                ((Json.Literal) m.getValue()).getSource().equals(withQuotes))) {
+                    return m;
+                }
                 Optional<JsonValue> jsonValue = JsonParser.builder().build()
-                        .parse(targetValue, '"' + targetValue + '"')
+                        .parse(withoutQoutes, targetValue, withQuotes)
                         .filter(it -> it instanceof Json.Document)
                         .findFirst()
                         .map(Json.Document.class::cast)

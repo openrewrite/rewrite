@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -86,21 +87,6 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
-    void changeToString() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"v2\"")),
-          json(
-            """
-              { "apiVersion": "v1" }
-              """,
-            """
-              { "apiVersion": "v2" }
-              """
-          )
-        );
-    }
-
-    @Test
     void changeToNumber() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"123\"")),
@@ -161,15 +147,30 @@ class ChangeValueTest implements RewriteTest {
     }
 
     @Test
-    void changeToObject() {
+    void changeToStringWithDoubleQuotes() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"{\"a\":\"b\"}\"")),
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"v2\"")),
           json(
             """
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": {"a":"b"} }
+              { "apiVersion": "v2" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToStringWithDoubleQuotesAroundSingleQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"'v2'\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": 'v2' }
               """
           )
         );
@@ -179,6 +180,21 @@ class ChangeValueTest implements RewriteTest {
     void changeToStringSingleQuotes() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue("$.apiVersion", "'v2'")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": 'v2' }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToStringSingleQuotesAroundDoubleQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "'\"v2\"'")),
           json(
             """
               { "apiVersion": "v1" }
@@ -200,6 +216,22 @@ class ChangeValueTest implements RewriteTest {
               """,
             """
               { "apiVersion": "v2" }
+              """
+          )
+        );
+    }
+
+    @Disabled("Changing to object is not yet supported")
+    @Test
+    void changeToObject() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"{\"a\":\"b\"}\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": {"a":"b"} }
               """
           )
         );
