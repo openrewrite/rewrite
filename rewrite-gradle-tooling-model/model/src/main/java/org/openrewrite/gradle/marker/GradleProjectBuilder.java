@@ -90,6 +90,8 @@ public final class GradleProjectBuilder {
                 .map(repo -> MavenRepository.builder()
                         .id(repo.getName())
                         .uri(repo.getUrl().toString())
+                        .username(repo.getCredentials().getUsername())
+                        .password(repo.getCredentials().getPassword())
                         .releases(true)
                         .snapshots(true)
                         .build())

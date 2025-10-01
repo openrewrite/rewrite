@@ -77,6 +77,39 @@ class GradleProjectTest implements RewriteTest {
     }
 
     @Test
+    void repositoryWithBasicCredentials() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyInMarker(
+            new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
+            "implementation",
+            (original, updated) -> assertThat(updated).isSameAs(original)
+          )),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              repositories {
+                  maven {
+                      url = "https://example.com/maven2"
+                      credentials {
+                        user = "dummyuser"
+                        password = "dummypass"
+                      }
+                      authentication {
+                        basic(BasicAuthentication)
+                      }
+                  }
+              }
+              dependencies {
+                  implementation("org.openrewrite:rewrite-java:8.56.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiProject() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyInMarker(
