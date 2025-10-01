@@ -82,7 +82,16 @@ class GradleProjectTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyInMarker(
             new GroupArtifactVersion("org.openrewrite", "rewrite-java", "8.56.0"),
             "implementation",
-            (original, updated) -> assertThat(updated).isSameAs(original)
+            (original, updated) -> assertThat(updated)
+              .isSameAs(original)
+              .extracting(GradleProject::getMavenRepositories)
+              .satisfies(list -> assertThat(list)
+                .singleElement()
+                .satisfies(repo -> {
+                      assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                      assertThat(repo.getUsername()).isEqualTo("dummyuser");
+                      assertThat(repo.getPassword()).isEqualTo("dummypass");
+                }))
           )),
           buildGradle(
             """
