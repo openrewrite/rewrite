@@ -72,10 +72,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(alias, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Alias) {
-               return expression;
-           }
-           alias = expression as JS.Alias;
+        if (!expression?.kind || expression.kind !== JS.Kind.Alias) {
+            return expression;
+        }
+        alias = expression as JS.Alias;
 
         return this.produceJavaScript<JS.Alias>(alias, p, async draft => {
             draft.propertyName = await this.visitRightPadded(alias.propertyName, p);
@@ -85,10 +85,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitArrowFunction(arrowFunction: JS.ArrowFunction, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(arrowFunction, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ArrowFunction) {
-               return expression;
-           }
-           arrowFunction = expression as JS.ArrowFunction;
+        if (!expression?.kind || expression.kind !== JS.Kind.ArrowFunction) {
+            return expression;
+        }
+        arrowFunction = expression as JS.ArrowFunction;
 
         const statement = await this.visitStatement(arrowFunction, p);
         if (!statement?.kind || statement.kind !== JS.Kind.ArrowFunction) {
@@ -115,10 +115,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitAwait(await_: JS.Await, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(await_, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Await) {
-               return expression;
-           }
-           await_ = expression as JS.Await;
+        if (!expression?.kind || expression.kind !== JS.Kind.Await) {
+            return expression;
+        }
+        await_ = expression as JS.Await;
 
         return this.produceJavaScript<JS.Await>(await_, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(await_.expression, p);
@@ -175,10 +175,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitConditionalType(conditionalType: JS.ConditionalType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(conditionalType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ConditionalType) {
-               return expression;
-           }
-           conditionalType = expression as JS.ConditionalType;
+        if (!expression?.kind || expression.kind !== JS.Kind.ConditionalType) {
+            return expression;
+        }
+        conditionalType = expression as JS.ConditionalType;
 
         return this.produceJavaScript<JS.ConditionalType>(conditionalType, p, async draft => {
             draft.checkType = await this.visitDefined<Expression>(conditionalType.checkType, p);
@@ -189,10 +189,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitDelete(delete_: JS.Delete, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(delete_, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Delete) {
-               return expression;
-           }
-           delete_ = expression as JS.Delete;
+        if (!expression?.kind || expression.kind !== JS.Kind.Delete) {
+            return expression;
+        }
+        delete_ = expression as JS.Delete;
 
         const statement = await this.visitStatement(delete_, p);
         if (!statement?.kind || statement.kind !== JS.Kind.Delete) {
@@ -207,10 +207,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(expressionStatement, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ExpressionStatement) {
-               return expression;
-           }
-           expressionStatement = expression as JS.ExpressionStatement;
+        if (!expression?.kind || expression.kind !== JS.Kind.ExpressionStatement) {
+            return expression;
+        }
+        expressionStatement = expression as JS.ExpressionStatement;
 
         const statement = await this.visitStatement(expressionStatement, p);
         if (!statement?.kind || statement.kind !== JS.Kind.ExpressionStatement) {
@@ -225,10 +225,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(expressionWithTypeArguments, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ExpressionWithTypeArguments) {
-               return expression;
-           }
-           expressionWithTypeArguments = expression as JS.ExpressionWithTypeArguments;
+        if (!expression?.kind || expression.kind !== JS.Kind.ExpressionWithTypeArguments) {
+            return expression;
+        }
+        expressionWithTypeArguments = expression as JS.ExpressionWithTypeArguments;
 
         return this.produceJavaScript<JS.ExpressionWithTypeArguments>(expressionWithTypeArguments, p, async draft => {
             draft.clazz = await this.visitDefined<J>(expressionWithTypeArguments.clazz, p);
@@ -260,10 +260,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitFunctionType(functionType: JS.FunctionType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(functionType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.FunctionType) {
-               return expression;
-           }
-           functionType = expression as JS.FunctionType;
+        if (!expression?.kind || expression.kind !== JS.Kind.FunctionType) {
+            return expression;
+        }
+        functionType = expression as JS.FunctionType;
 
         return this.produceJavaScript<JS.FunctionType>(functionType, p, async draft => {
             draft.constructorType = await this.visitLeftPadded(functionType.constructorType, p);
@@ -275,10 +275,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitInferType(inferType: JS.InferType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(inferType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.InferType) {
-               return expression;
-           }
-           inferType = expression as JS.InferType;
+        if (!expression?.kind || expression.kind !== JS.Kind.InferType) {
+            return expression;
+        }
+        inferType = expression as JS.InferType;
 
         return this.produceJavaScript<JS.InferType>(inferType, p, async draft => {
             draft.typeParameter = await this.visitLeftPadded(inferType.typeParameter, p);
@@ -288,10 +288,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitImportType(importType: JS.ImportType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(importType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ImportType) {
-               return expression;
-           }
-           importType = expression as JS.ImportType;
+        if (!expression?.kind || expression.kind !== JS.Kind.ImportType) {
+            return expression;
+        }
+        importType = expression as JS.ImportType;
 
         return this.produceJavaScript<JS.ImportType>(importType, p, async draft => {
             draft.hasTypeof = await this.visitRightPadded(importType.hasTypeof, p);
@@ -327,10 +327,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitNamedImports(namedImports: JS.NamedImports, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(namedImports, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.NamedImports) {
-               return expression;
-           }
-           namedImports = expression as JS.NamedImports;
+        if (!expression?.kind || expression.kind !== JS.Kind.NamedImports) {
+            return expression;
+        }
+        namedImports = expression as JS.NamedImports;
 
         return this.produceJavaScript<JS.NamedImports>(namedImports, p, async draft => {
             draft.elements = await this.visitContainer(namedImports.elements, p);
@@ -340,10 +340,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitImportSpecifier(importSpecifier: JS.ImportSpecifier, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(importSpecifier, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ImportSpecifier) {
-               return expression;
-           }
-           importSpecifier = expression as JS.ImportSpecifier;
+        if (!expression?.kind || expression.kind !== JS.Kind.ImportSpecifier) {
+            return expression;
+        }
+        importSpecifier = expression as JS.ImportSpecifier;
 
         return this.produceJavaScript<JS.ImportSpecifier>(importSpecifier, p, async draft => {
             draft.importType = await this.visitLeftPadded(importSpecifier.importType, p);
@@ -390,10 +390,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitLiteralType(literalType: JS.LiteralType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(literalType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.LiteralType) {
-               return expression;
-           }
-           literalType = expression as JS.LiteralType;
+        if (!expression?.kind || expression.kind !== JS.Kind.LiteralType) {
+            return expression;
+        }
+        literalType = expression as JS.LiteralType;
 
         return this.produceJavaScript<JS.LiteralType>(literalType, p, async draft => {
             draft.literal = await this.visitDefined<Expression>(literalType.literal, p);
@@ -403,10 +403,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitMappedType(mappedType: JS.MappedType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(mappedType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.MappedType) {
-               return expression;
-           }
-           mappedType = expression as JS.MappedType;
+        if (!expression?.kind || expression.kind !== JS.Kind.MappedType) {
+            return expression;
+        }
+        mappedType = expression as JS.MappedType;
 
         return this.produceJavaScript<JS.MappedType>(mappedType, p, async draft => {
             draft.prefixToken = mappedType.prefixToken && await this.visitLeftPadded(mappedType.prefixToken, p);
@@ -435,10 +435,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(objectBindingPattern, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingPattern) {
-               return expression;
-           }
-           objectBindingPattern = expression as JS.ObjectBindingPattern;
+        if (!expression?.kind || expression.kind !== JS.Kind.ObjectBindingPattern) {
+            return expression;
+        }
+        objectBindingPattern = expression as JS.ObjectBindingPattern;
 
         return this.produceJavaScript<JS.ObjectBindingPattern>(objectBindingPattern, p, async draft => {
             draft.leadingAnnotations = await mapAsync(objectBindingPattern.leadingAnnotations, item => this.visitDefined<J.Annotation>(item, p));
@@ -464,10 +464,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(satisfiesExpression, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.SatisfiesExpression) {
-               return expression;
-           }
-           satisfiesExpression = expression as JS.SatisfiesExpression;
+        if (!expression?.kind || expression.kind !== JS.Kind.SatisfiesExpression) {
+            return expression;
+        }
+        satisfiesExpression = expression as JS.SatisfiesExpression;
 
         return this.produceJavaScript<JS.SatisfiesExpression>(satisfiesExpression, p, async draft => {
             draft.expression = await this.visitDefined<J>(satisfiesExpression.expression, p);
@@ -491,10 +491,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitStatementExpression(statementExpression: JS.StatementExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(statementExpression, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.StatementExpression) {
-               return expression;
-           }
-           statementExpression = expression as JS.StatementExpression;
+        if (!expression?.kind || expression.kind !== JS.Kind.StatementExpression) {
+            return expression;
+        }
+        statementExpression = expression as JS.StatementExpression;
 
         const statement = await this.visitStatement(statementExpression, p);
         if (!statement?.kind || statement.kind !== JS.Kind.StatementExpression) {
@@ -509,10 +509,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(taggedTemplateExpression, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TaggedTemplateExpression) {
-               return expression;
-           }
-           taggedTemplateExpression = expression as JS.TaggedTemplateExpression;
+        if (!expression?.kind || expression.kind !== JS.Kind.TaggedTemplateExpression) {
+            return expression;
+        }
+        taggedTemplateExpression = expression as JS.TaggedTemplateExpression;
 
         const statement = await this.visitStatement(taggedTemplateExpression, p);
         if (!statement?.kind || statement.kind !== JS.Kind.TaggedTemplateExpression) {
@@ -530,10 +530,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTemplateExpression(templateExpression: JS.TemplateExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(templateExpression, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TemplateExpression) {
-               return expression;
-           }
-           templateExpression = expression as JS.TemplateExpression;
+        if (!expression?.kind || expression.kind !== JS.Kind.TemplateExpression) {
+            return expression;
+        }
+        templateExpression = expression as JS.TemplateExpression;
 
         const statement = await this.visitStatement(templateExpression, p);
         if (!statement?.kind || statement.kind !== JS.Kind.TemplateExpression) {
@@ -557,10 +557,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTuple(tuple: JS.Tuple, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(tuple, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Tuple) {
-               return expression;
-           }
-           tuple = expression as JS.Tuple;
+        if (!expression?.kind || expression.kind !== JS.Kind.Tuple) {
+            return expression;
+        }
+        tuple = expression as JS.Tuple;
 
         return this.produceJavaScript<JS.Tuple>(tuple, p, async draft => {
             draft.elements = await this.visitContainer(tuple.elements, p);
@@ -586,10 +586,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeOf(typeOf: JS.TypeOf, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typeOf, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypeOf) {
-               return expression;
-           }
-           typeOf = expression as JS.TypeOf;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeOf) {
+            return expression;
+        }
+        typeOf = expression as JS.TypeOf;
 
         return this.produceJavaScript<JS.TypeOf>(typeOf, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(typeOf.expression, p);
@@ -599,10 +599,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typeTreeExpression, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypeTreeExpression) {
-               return expression;
-           }
-           typeTreeExpression = expression as JS.TypeTreeExpression;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeTreeExpression) {
+            return expression;
+        }
+        typeTreeExpression = expression as JS.TypeTreeExpression;
 
         return this.produceJavaScript<JS.TypeTreeExpression>(typeTreeExpression, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(typeTreeExpression.expression, p);
@@ -620,10 +620,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(indexedAccessType, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.IndexedAccessType) {
-               return expression;
-           }
-           indexedAccessType = expression as JS.IndexedAccessType;
+        if (!expression?.kind || expression.kind !== JS.Kind.IndexedAccessType) {
+            return expression;
+        }
+        indexedAccessType = expression as JS.IndexedAccessType;
 
         return this.produceJavaScript<JS.IndexedAccessType>(indexedAccessType, p, async draft => {
             draft.objectType = await this.visitDefined<TypedTree>(indexedAccessType.objectType, p);
@@ -641,10 +641,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeQuery(typeQuery: JS.TypeQuery, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typeQuery, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypeQuery) {
-               return expression;
-           }
-           typeQuery = expression as JS.TypeQuery;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeQuery) {
+            return expression;
+        }
+        typeQuery = expression as JS.TypeQuery;
 
         return this.produceJavaScript<JS.TypeQuery>(typeQuery, p, async draft => {
             draft.typeExpression = await this.visitDefined<TypedTree>(typeQuery.typeExpression, p);
@@ -655,10 +655,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeInfo(typeInfo: JS.TypeInfo, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typeInfo, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypeInfo) {
-               return expression;
-           }
-           typeInfo = expression as JS.TypeInfo;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeInfo) {
+            return expression;
+        }
+        typeInfo = expression as JS.TypeInfo;
 
         return this.produceJavaScript<JS.TypeInfo>(typeInfo, p, async draft => {
             draft.typeIdentifier = await this.visitDefined<TypedTree>(typeInfo.typeIdentifier, p);
@@ -667,10 +667,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(computedPropertyName, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.ComputedPropertyName) {
-               return expression;
-           }
-           computedPropertyName = expression as JS.ComputedPropertyName;
+        if (!expression?.kind || expression.kind !== JS.Kind.ComputedPropertyName) {
+            return expression;
+        }
+        computedPropertyName = expression as JS.ComputedPropertyName;
 
         return this.produceJavaScript<JS.ComputedPropertyName>(computedPropertyName, p, async draft => {
             draft.expression = await this.visitRightPadded(computedPropertyName.expression, p);
@@ -679,10 +679,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypeOperator(typeOperator: JS.TypeOperator, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typeOperator, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypeOperator) {
-               return expression;
-           }
-           typeOperator = expression as JS.TypeOperator;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypeOperator) {
+            return expression;
+        }
+        typeOperator = expression as JS.TypeOperator;
 
         return this.produceJavaScript<JS.TypeOperator>(typeOperator, p, async draft => {
             draft.expression = await this.visitLeftPadded(typeOperator.expression, p);
@@ -691,10 +691,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitTypePredicate(typePredicate: JS.TypePredicate, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(typePredicate, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.TypePredicate) {
-               return expression;
-           }
-           typePredicate = expression as JS.TypePredicate;
+        if (!expression?.kind || expression.kind !== JS.Kind.TypePredicate) {
+            return expression;
+        }
+        typePredicate = expression as JS.TypePredicate;
 
         return this.produceJavaScript<JS.TypePredicate>(typePredicate, p, async draft => {
             draft.asserts = await this.visitLeftPadded(typePredicate.asserts, p);
@@ -706,10 +706,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitUnion(union: JS.Union, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(union, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Union) {
-               return expression;
-           }
-           union = expression as JS.Union;
+        if (!expression?.kind || expression.kind !== JS.Kind.Union) {
+            return expression;
+        }
+        union = expression as JS.Union;
 
         return this.produceJavaScript<JS.Union>(union, p, async draft => {
             draft.types = await mapAsync(union.types, item => this.visitRightPadded(item, p));
@@ -719,10 +719,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitIntersection(intersection: JS.Intersection, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(intersection, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Intersection) {
-               return expression;
-           }
-           intersection = expression as JS.Intersection;
+        if (!expression?.kind || expression.kind !== JS.Kind.Intersection) {
+            return expression;
+        }
+        intersection = expression as JS.Intersection;
 
         return this.produceJavaScript<JS.Intersection>(intersection, p, async draft => {
             draft.types = await mapAsync(intersection.types, item => this.visitRightPadded(item, p));
@@ -732,10 +732,10 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
     protected async visitVoid(void_: JS.Void, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(void_, p);
-           if (!expression?.kind || expression.kind !== JS.Kind.Void) {
-               return expression;
-           }
-           void_ = expression as JS.Void;
+        if (!expression?.kind || expression.kind !== JS.Kind.Void) {
+            return expression;
+        }
+        void_ = expression as JS.Void;
 
         return this.produceJavaScript<JS.Void>(void_, p, async draft => {
             draft.expression = await this.visitDefined<Expression>(void_.expression, p);
