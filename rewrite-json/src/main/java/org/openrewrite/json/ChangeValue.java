@@ -17,14 +17,12 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.With;
+import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.marker.Marker;
 
-import java.util.Optional;
+import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -61,37 +59,33 @@ public class ChangeValue extends Recipe {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (!matcher.matches(getCursor())) {
+                if (!matcher.matches(getCursor()) || m.getMarkers().findFirst(Changed.class).isPresent()) {
                     return m;
                 }
 
-                String targetValue = value;
-                String withoutQoutes = targetValue;
-                if (targetValue.startsWith("\"") || targetValue.startsWith("'")) {
-                    withoutQoutes = withoutQoutes.substring(1, withoutQoutes.length() - 1);
+                String withQuotes = value;
+                String withoutQoutes = value;
+                if (value.startsWith("\"") || value.startsWith("'")) {
+                    withoutQoutes = value.substring(1, value.length() - 1);
+                } else {
+                    withQuotes = "\"" + value + "\"";
                 }
-                String withQuotes = targetValue;
-                if (!(targetValue.startsWith("\"") || targetValue.startsWith("'"))) {
-                    withQuotes = "\"" + withQuotes + "\"";
-                }
-
-                if (m.getValue() instanceof Json.Literal &&
-                        (((Json.Literal) m.getValue()).getSource().equals(targetValue) ||
-                                ((Json.Literal) m.getValue()).getSource().equals(withoutQoutes) ||
-                                ((Json.Literal) m.getValue()).getSource().equals(withQuotes))) {
-                    return m;
-                }
-                Optional<JsonValue> jsonValue = JsonParser.builder().build()
-                        .parse(withoutQoutes, targetValue, withQuotes)
+                return JsonParser.builder().build()
+                        .parse(withoutQoutes, withQuotes)
                         .filter(it -> it instanceof Json.Document)
                         .findFirst()
                         .map(Json.Document.class::cast)
-                        .map(Json.Document::getValue);
-                if (jsonValue.isPresent()) {
-                    return m.withValue(jsonValue.get().withPrefix(m.getValue().getPrefix()));
-                }
-                return m;
+                        .map(Json.Document::getValue)
+                        .map(jsonValue -> m.withValue(jsonValue.withPrefix(m.getValue().getPrefix())))
+                        .map(newMember -> newMember.withMarkers(newMember.getMarkers().add(new Changed(Tree.randomId()))))
+                        .orElse(m);
             }
         };
+    }
+
+    @Value
+    @With
+    static class Changed implements Marker {
+        UUID id;
     }
 }

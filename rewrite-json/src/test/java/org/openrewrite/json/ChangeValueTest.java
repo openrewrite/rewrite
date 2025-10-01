@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -221,7 +220,6 @@ class ChangeValueTest implements RewriteTest {
         );
     }
 
-    @Disabled("Changing to object is not yet supported")
     @Test
     void changeToObject() {
         rewriteRun(
@@ -232,6 +230,21 @@ class ChangeValueTest implements RewriteTest {
               """,
             """
               { "apiVersion": {"a":"b"} }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeStringToNumberOfSameValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "123")),
+          json(
+            """
+              { "apiVersion": "123" }
+              """,
+            """
+              { "apiVersion": 123 }
               """
           )
         );
