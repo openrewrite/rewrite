@@ -1766,15 +1766,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
         }
 
-        Space varargs = null;
-        if (typeExpr != null && typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
-            int varargStart = indexOfNextNonWhitespace(cursor, source);
-            if (source.startsWith("...", varargStart)) {
-                varargs = format(source, cursor, varargStart);
-                cursor = varargStart + 3;
-            }
-        }
-
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(nodes.size());
         for (int i = 0; i < nodes.size(); i++) {
             JCVariableDecl n = (JCVariableDecl) nodes.get(i);
@@ -1800,7 +1791,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
-        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, varargs, vars);
+        return new J.VariableDeclarations(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), typeExpr, null, vars);
     }
 
     private List<JLeftPadded<Space>> arrayDimensions() {
