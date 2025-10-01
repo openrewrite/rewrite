@@ -831,6 +831,104 @@ class BlockTest implements RewriteTest {
     }
 
     @Test
+    void filterCanRemoveLine() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(new Block(getCursor()).filterLines(line -> !(line instanceof Block.CommentLine)).getTree(), ctx);
+              }
+          })),
+          java(
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  //This block has a line comment
+                  void /* and a comment in the middle */ method() {
+                      /* First comment remains */
+                      keep();
+                      /* before line comment remains */ keep();
+                      keep(); /* Comment at the end of a statement remains */
+                      keep();         /* Even if they are indented with more than a single space */
+                      keep(); /*
+                      Comment at end over multiple lines
+                      */
+                      keep();
+                      /*
+                      Comment at new line
+                       */
+                  }
+              }
+              """,
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  void /* and a comment in the middle */ method() {
+                      keep();
+                      /* before line comment remains */ keep();
+                      keep(); /* Comment at the end of a statement remains */
+                      keep();         /* Even if they are indented with more than a single space */
+                      keep(); /*
+                      Comment at end over multiple lines
+                      */
+                      keep();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapCanRemoveCommentLine() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  return super.visitBlock(new Block(getCursor()).mapLines(line -> line instanceof Block.CommentLine ? line.remove() : line).getTree(), ctx);
+              }
+          })),
+          java(
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  //This block has a line comment
+                  void /* and a comment in the middle */ method() {
+                      /* First comment remains */
+                      keep();
+                      /* before line comment remains */ keep();
+                      keep(); /* Comment at the end of a statement remains */
+                      keep();         /* Even if they are indented with more than a single space */
+                      keep(); /*
+                      Comment at end over multiple lines
+                      */
+                      keep();
+                      /*
+                      Comment at new line
+                       */
+                  }
+              }
+              """,
+            """
+              import static testing.TestMethods.*;
+              class Test {
+                  void /* and a comment in the middle */ method() {
+                      keep();
+                      /* before line comment remains */ keep();
+                      keep(); /* Comment at the end of a statement remains */
+                      keep();         /* Even if they are indented with more than a single space */
+                      keep(); /*
+                      Comment at end over multiple lines
+                      */
+                      keep();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void filterStatements() {
         rewriteRun(
           java(
