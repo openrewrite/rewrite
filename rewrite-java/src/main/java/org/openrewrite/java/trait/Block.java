@@ -106,13 +106,12 @@ public class Block implements Trait<J.Block> {
 
     @EqualsAndHashCode
     public static abstract class Line {
-        @Nullable
-        public Line remove() {
+
+        public @Nullable Line remove() {
             return null;
         }
 
-        @Nullable
-        public Line mapStatement(Function<Statement, Statement> mapper) {
+        public @Nullable Line mapStatement(Function<Statement, Statement> mapper) {
             return this;
         }
 
@@ -135,8 +134,7 @@ public class Block implements Trait<J.Block> {
         }
 
         @Override
-        @Nullable
-        public Line mapStatement(Function<Statement, @Nullable Statement> mapper) {
+        public @Nullable Line mapStatement(Function<Statement, @Nullable Statement> mapper) {
             Statement newStatement = mapper.apply(statement);
             if (newStatement == null) {
                 return null;
