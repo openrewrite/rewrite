@@ -23,6 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -59,25 +60,40 @@ public class ChangeValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
-        Optional<JsonValue> parsedValue = parseValue(value);
+        // Parse the value once here, outside the visitor
+        Optional<JsonValue> jsonValue = parseValueWithQuoteHandling(value);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (!matcher.matches(getCursor()) || m.getMarkers().findFirst(Changed.class).isPresent()) {
-                    return m;
+                if (matcher.matches(getCursor()) && !m.getMarkers().findFirst(Changed.class).isPresent()) {
+                    if (!jsonValue.isPresent()) {
+                        return SearchResult.found(m, "Could not parse value: " + value);
+                    }
+                    JsonValue parsedValue = jsonValue.get();
+                    return m.withValue(parsedValue.withPrefix(m.getValue().getPrefix()))
+                            .withMarkers(parsedValue.getMarkers().add(new Changed(Tree.randomId())));
                 }
-                return parsedValue
-                        .map(jsonValue -> m.withValue(jsonValue.withPrefix(m.getValue().getPrefix())))
-                        .map(newMember -> newMember.withMarkers(newMember.getMarkers().add(new Changed(Tree.randomId()))))
-                        .orElse(m);
+                return m;
             }
         };
     }
 
-    private static Optional<JsonValue> parseValue(@Language("json") String value) {
+    private static Optional<JsonValue> parseValueWithQuoteHandling(@Language("json") String value) {
+        if (value.startsWith("\"") || value.startsWith("'")) {
+            // User provided quotes - strip and parse content, but handle null specially
+            @Language("json") String withoutQuotes = value.substring(1, value.length() - 1);
+            // null keyword inside quotes should remain a string as the quotes are intentional
+            return "null".equals(withoutQuotes) ? parseValues(value) : parseValues(withoutQuotes, value);
+            // Try to parse stripped content first (could be number, boolean, object, etc.), fallback to quoted version (string)
+        }
+        // User didn't provide quotes - try as keyword/number/array/object first, fallback to string
+        return parseValues(value, "\"" + value + "\"");
+    }
+
+    private static Optional<JsonValue> parseValues(@Language("json") String... values) {
         return JsonParser.builder().build()
-                .parse(value)
+                .parse(values)
                 .filter(it -> it instanceof Json.Document)
                 .findFirst()
                 .map(Json.Document.class::cast)

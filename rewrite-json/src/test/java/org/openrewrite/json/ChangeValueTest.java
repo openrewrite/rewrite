@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -95,7 +94,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": "123" }
+              { "apiVersion": 123 }
               """
           )
         );
@@ -125,7 +124,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": "true" }
+              { "apiVersion": true }
               """
           )
         );
@@ -170,7 +169,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": "'v2'" }
+              { "apiVersion": 'v2' }
               """
           )
         );
@@ -200,13 +199,12 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": '"v2"' }
+              { "apiVersion": "v2" }
               """
           )
         );
     }
 
-    @Disabled("Wrapping quotes (or any valid JSON) has always been a required argument")
     @Test
     void changeToStringWithoutQuotes() {
         rewriteRun(
