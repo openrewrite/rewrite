@@ -49,7 +49,119 @@ public class Block implements Trait<J.Block> {
         if (!(object instanceof J.Block)) {
             throw new IllegalArgumentException("Expected a J.Block, got " + object);
         }
-        J.Block block = (J.Block) object;
+        this.cursor = cursor;
+        this.lines = extractLines((J.Block) object);
+    }
+
+    public Block filterStatements(Predicate<Statement> predicate) {
+        return mapStatements(statement -> predicate.test(statement) ? statement : null);
+    }
+
+    public Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
+        return mapLines(line -> line.mapStatement(mapper));
+    }
+
+    public Block filterLines(Predicate<Line> predicate) {
+        return mapLines(line -> predicate.test(line) ? line : null);
+    }
+
+    public Block mapLines(Function<Line, @Nullable Line> mapper) {
+        J.Block block = getTree();
+        List<Line> newLines = ListUtils.map(lines, mapper);
+        if (lines == newLines) {
+            return this;
+        }
+
+        return new Block(
+                new Cursor(this.cursor.getParent(),
+                        block.withEnd(buildEnd(block.getEnd(), newLines))
+                                .withStatements(buildStatements(newLines))),
+                newLines);
+    }
+
+    public static class Matcher extends SimpleTraitMatcher<Block> {
+        @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<Block, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitBlock(J.Block block, P p) {
+                    Block trait = test(getCursor());
+                    return trait != null ?
+                            (J) visitor.visit(trait, p) :
+                            super.visitBlock(block, p);
+                }
+            };
+        }
+
+        @Override
+        protected @Nullable Block test(Cursor cursor) {
+            Object object = cursor.getValue();
+            if (object instanceof J.Block) {
+                return new Block(cursor);
+            }
+
+            return null;
+        }
+    }
+
+    @EqualsAndHashCode
+    public static abstract class Line {
+        @Nullable
+        public Line remove() {
+            return null;
+        }
+
+        @Nullable
+        public Line mapStatement(Function<Statement, Statement> mapper) {
+            return this;
+        }
+
+        public abstract String getWhitespace();
+    }
+
+    @Getter
+    @EqualsAndHashCode(callSuper = false)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    public static class StatementLine extends Line {
+        private final Space beforeLine;
+        private final Statement statement;
+        @Setter(AccessLevel.PRIVATE)
+        private Space endOfLine;
+
+        private StatementLine(Space beforeLine, Statement statement) {
+            this.beforeLine = beforeLine;
+            this.statement = statement;
+            this.endOfLine = Space.EMPTY;
+        }
+
+        @Override
+        @Nullable
+        public Line mapStatement(Function<Statement, @Nullable Statement> mapper) {
+            Statement newStatement = mapper.apply(statement);
+            if (newStatement == null) {
+                return null;
+            }
+            if (statement != newStatement) {
+                return new StatementLine(getBeforeLine(), newStatement, getEndOfLine());
+            }
+            return this;
+        }
+
+        @Override
+        public String getWhitespace() {
+            return getBeforeLine().getWhitespace();
+        }
+    }
+
+    @Getter
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false)
+    public static class CommentLine extends Line {
+        private final String whitespace;
+        private final Comment comment;
+    }
+
+    private static List<Line> extractLines(J.Block block) {
         List<Line> lines = new ArrayList<>();
         int indexOfFirstNewLineComment;
         int indexOfLastNewLineComment;
@@ -111,37 +223,11 @@ public class Block implements Trait<J.Block> {
                 }
             }
         }
-        this.cursor = cursor;
-        this.lines = lines;
+
+        return lines;
     }
 
-    public Block filterStatements(Predicate<Statement> predicate) {
-        return mapStatements(statement -> predicate.test(statement) ? statement : null);
-    }
-
-    public Block mapStatements(Function<Statement, @Nullable Statement> mapper) {
-        return mapLines(line -> line.mapStatement(mapper));
-    }
-
-    public Block filterLines(Predicate<Line> predicate) {
-        return mapLines(line -> predicate.test(line) ? line : null);
-    }
-
-    public Block mapLines(Function<Line, @Nullable Line> mapper) {
-        J.Block block = getTree();
-        List<Line> newLines = ListUtils.map(lines, mapper);
-        if (lines == newLines) {
-            return this;
-        }
-
-        return new Block(
-                new Cursor(this.cursor.getParent(),
-                        block.withEnd(buildEnd(block.getEnd(), newLines))
-                                .withStatements(buildStatements(newLines))),
-                newLines);
-    }
-
-    private List<Statement> buildStatements(List<Line> lines) {
+    private static List<Statement> buildStatements(List<Line> lines) {
         List<Statement> statements = new ArrayList<>();
         List<CommentLine> commentLines = new ArrayList<>();
         Space endOfLine = Space.EMPTY;
@@ -189,7 +275,7 @@ public class Block implements Trait<J.Block> {
         return statements;
     }
 
-    private Space buildEnd(Space end, List<Line> lines) {
+    private static Space buildEnd(Space end, List<Line> lines) {
         if (lines.isEmpty()) {
             return end.withComments(emptyList());
         }
@@ -230,7 +316,7 @@ public class Block implements Trait<J.Block> {
         }
         for (; i < lines.size(); i++) {
             if (i + 1 < lines.size()) {
-                suffix = ((CommentLine) lines.get(i + 1)).getWhitespace();
+                suffix = lines.get(i + 1).getWhitespace();
             } else {
                 suffix = end.getWhitespace();
                 if (!end.getComments().isEmpty()) {
@@ -241,89 +327,6 @@ public class Block implements Trait<J.Block> {
         }
 
         return end.withWhitespace(prefix).withComments(comments);
-    }
-
-    public static class Matcher extends SimpleTraitMatcher<Block> {
-        @Override
-        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<Block, P> visitor) {
-            return new JavaVisitor<P>() {
-                @Override
-                public J visitBlock(J.Block block, P p) {
-                    Block trait = test(getCursor());
-                    return trait != null ?
-                            (J) visitor.visit(trait, p) :
-                            super.visitBlock(block, p);
-                }
-            };
-        }
-
-        @Override
-        protected @Nullable Block test(Cursor cursor) {
-            Object object = cursor.getValue();
-            if (object instanceof J.Block) {
-                return new Block(cursor);
-            }
-
-            return null;
-        }
-    }
-
-    @Getter
-    @EqualsAndHashCode
-    public static abstract class Line {
-        @Nullable
-        Line remove() {
-            return null;
-        }
-
-        @Nullable
-        Line mapStatement(Function<Statement, Statement> mapper) {
-            return this;
-        }
-
-        public abstract String getWhitespace();
-    }
-
-    @Getter
-    @EqualsAndHashCode(callSuper = false)
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class StatementLine extends Line {
-        private final Space beforeLine;
-        private final Statement statement;
-        @Setter
-        private Space endOfLine;
-
-        public StatementLine(Space beforeLine, Statement statement) {
-            this.beforeLine = beforeLine;
-            this.statement = statement;
-            this.endOfLine = Space.EMPTY;
-        }
-
-        @Override
-        @Nullable
-        Line mapStatement(Function<Statement, @Nullable Statement> mapper) {
-            Statement newStatement = mapper.apply(statement);
-            if (newStatement == null) {
-                return null;
-            }
-            if (statement != newStatement) {
-                return new StatementLine(getBeforeLine(), newStatement, getEndOfLine());
-            }
-            return this;
-        }
-
-        @Override
-        public String getWhitespace() {
-            return getBeforeLine().getWhitespace();
-        }
-    }
-
-    @Getter
-    @RequiredArgsConstructor
-    @EqualsAndHashCode(callSuper = false)
-    public static class CommentLine extends Line {
-        private final String whitespace;
-        private final Comment comment;
     }
 
     private static int findIndexOfFirstCommentOnNewLine(List<Comment> comments, Space prefix) {
