@@ -1508,18 +1508,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
 
         // Check if this is varargs (...) or regular array brackets ([])
-        int saveCursor = cursor;
-        whitespace();
         Markers markers = Markers.EMPTY;
         JLeftPadded<Space> dimension;
-        if (source.startsWith("...", cursor)) {
+        int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+        if (source.startsWith("...", nextNonWhitespace)) {
             // Varargs syntax
-            cursor = saveCursor;
             markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
             dimension = padLeft(sourceBefore("..."), EMPTY);
         } else {
             // Regular array brackets
-            cursor = saveCursor;
             dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         }
 
@@ -1540,24 +1537,20 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         if (typeIdent instanceof JCArrayTypeTree) {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
-            int saveCursor = cursor;
-            whitespace();
 
             // Check if this is varargs (...) or regular array brackets ([])
             Markers markers = Markers.EMPTY;
             JLeftPadded<Space> dimension;
-            if (source.startsWith("...", cursor)) {
+            int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (source.startsWith("...", nextNonWhitespace)) {
                 // Varargs syntax
-                cursor = saveCursor;
                 markers = markers.addIfAbsent(new org.openrewrite.java.marker.Varargs(randomId()));
                 dimension = padLeft(sourceBefore("..."), EMPTY);
-            } else if (source.startsWith("[", cursor)) {
+            } else if (source.startsWith("[", nextNonWhitespace)) {
                 // Regular array brackets
-                cursor = saveCursor;
                 dimension = padLeft(sourceBefore("["), sourceBefore("]"));
             } else {
                 // No dimension found
-                cursor = saveCursor;
                 return baseType;
             }
 
