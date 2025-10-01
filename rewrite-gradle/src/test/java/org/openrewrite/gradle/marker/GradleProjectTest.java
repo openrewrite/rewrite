@@ -93,7 +93,7 @@ class GradleProjectTest implements RewriteTest {
                   maven {
                       url = "https://example.com/maven2"
                       credentials {
-                        user = "dummyuser"
+                        username = "dummyuser"
                         password = "dummypass"
                       }
                       authentication {
