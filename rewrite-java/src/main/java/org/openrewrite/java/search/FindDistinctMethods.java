@@ -45,7 +45,9 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
      */
     @Option(displayName = "Method pattern",
             description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
-            example = "java.util.List add(..)")
+            example = "java.util.List add(..)",
+            required = false)
+    @Nullable
     String methodPattern;
 
     @Option(displayName = "Match on overrides",
@@ -62,19 +64,8 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
     @Override
     public String getDescription() {
         return "A sample of every distinct method in use in a repository. The code sample in the " +
-                "method calls data table will be a representative use of the method, though there " +
-                "may be many other such uses of the method.";
-    }
-
-    @Override
-    public String getInstanceName() {
-        //noinspection ConstantValue
-        if (methodPattern == null) {
-            // Temporary while the defensive coding in Recipe is percolating to all
-            // deployed environments.
-            return getDisplayName();
-        }
-        return super.getInstanceName();
+               "method calls data table will be a representative use of the method, though there " +
+               "may be many other such uses of the method.";
     }
 
     @Override
@@ -89,8 +80,8 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<String, UUID> acc) {
-        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaVisitor<ExecutionContext>() {
-            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+        return Preconditions.check(new UsesMethod<>(getMethodPattern(), matchOverrides), new JavaVisitor<ExecutionContext>() {
+            final MethodMatcher methodMatcher = new MethodMatcher(getMethodPattern(), matchOverrides);
 
             @Override
             public J visitExpression(Expression expression, ExecutionContext ctx) {
@@ -107,8 +98,8 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, UUID> acc) {
-        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaVisitor<ExecutionContext>() {
-            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+        return Preconditions.check(new UsesMethod<>(getMethodPattern(), matchOverrides), new JavaVisitor<ExecutionContext>() {
+            final MethodMatcher methodMatcher = new MethodMatcher(getMethodPattern(), matchOverrides);
 
             @Override
             public J visitExpression(Expression expression, ExecutionContext ctx) {
@@ -135,5 +126,9 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
                 return e;
             }
         });
+    }
+
+    private String getMethodPattern() {
+        return methodPattern == null ? "*..* *(..)" : methodPattern;
     }
 }
