@@ -582,4 +582,36 @@ class XmlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void utf8SurrogatePairsInComments() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project>
+                  <!-- 👇 Problem below -->
+                  <dependency>
+                      <groupId>org.example</groupId>
+                      <artifactId>example</artifactId>
+                  </dependency>
+                  <!-- 👆 Problem above -->
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void utf8SurrogatePairsSimple() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!-- 👇 -->
+              <a></a>
+              """
+          )
+        );
+    }
 }
