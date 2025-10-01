@@ -31,7 +31,7 @@ class ChangeValueTest implements RewriteTest {
             "\"monitoring\""
           )),
           json(
-                """
+            """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -61,7 +61,7 @@ class ChangeValueTest implements RewriteTest {
             "\"Deployment\""
           )),
           json(
-                """
+            """
               {
                 "subjects": [
                   {
@@ -80,6 +80,126 @@ class ChangeValueTest implements RewriteTest {
                   }
                 ]
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"v2\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": "v2" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToNumber() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"123\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": 123 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToNumberWithoutQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "123")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": 123 }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToBoolean() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"true\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": true }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToBooleanWithoutQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "true")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": true }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToObject() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "\"{\"a\":\"b\"}\"")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": {"a":"b"} }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToStringSingleQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "'v2'")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": "v2" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeToStringWithoutQuotes() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "v2")),
+          json(
+            """
+              { "apiVersion": "v1" }
+              """,
+            """
+              { "apiVersion": "v2" }
               """
           )
         );

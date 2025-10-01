@@ -17,12 +17,12 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.marker.Markers;
+
+import java.util.Optional;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -61,14 +61,23 @@ public class ChangeValue extends Recipe {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (matcher.matches(getCursor()) && (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getValue().equals(value))) {
-                    String source = ChangeValue.this.value;
-                    if (source.startsWith("'") || source.startsWith("\"")) {
-                        source = source.substring(1, source.length() - 1);
-                    }
-                    if (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getSource().equals(ChangeValue.this.value)) {
-                        m = m.withValue(new Json.Literal(randomId(), m.getValue().getPrefix(), Markers.EMPTY, ChangeValue.this.value, source));
-                    }
+                if (!matcher.matches(getCursor())) {
+                    return m;
+                }
+
+                String targetValue = value;
+                if (m.getValue() instanceof Json.Literal && ((Json.Literal) m.getValue()).getSource().equals(targetValue)) {
+                    return m;
+                }
+
+                Optional<JsonValue> jsonValue = JsonParser.builder().build()
+                        .parse(targetValue, '"' + targetValue + '"')
+                        .filter(it -> it instanceof Json.Document)
+                        .findFirst()
+                        .map(Json.Document.class::cast)
+                        .map(Json.Document::getValue);
+                if (jsonValue.isPresent()) {
+                    return m.withValue(jsonValue.get().withPrefix(m.getValue().getPrefix()));
                 }
                 return m;
             }
