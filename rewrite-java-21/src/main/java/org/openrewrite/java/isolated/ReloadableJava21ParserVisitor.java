@@ -1743,7 +1743,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
             int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
-            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@') ? convert(vartype) :
+            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@' || source.startsWith("...", idx)) ? convert(vartype) :
                     // we'll capture the array dimensions in a bit, just convert the element type
                     convert(elementType);
         } else {
