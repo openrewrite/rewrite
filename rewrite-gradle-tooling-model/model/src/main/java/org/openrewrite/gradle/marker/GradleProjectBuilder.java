@@ -19,6 +19,7 @@ import org.gradle.api.Project;
 import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.repositories.ArtifactRepository;
 import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
+import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.HasAttributes;
 import org.gradle.api.initialization.Settings;
@@ -87,13 +88,24 @@ public final class GradleProjectBuilder {
         return repositories.stream()
                 .filter(MavenArtifactRepository.class::isInstance)
                 .map(MavenArtifactRepository.class::cast)
-                .map(repo -> MavenRepository.builder()
+                .map(repo -> withAuthentication(repo, MavenRepository.builder()
                         .id(repo.getName())
                         .uri(repo.getUrl().toString())
                         .releases(true)
-                        .snapshots(true)
+                        .snapshots(true))
                         .build())
                 .collect(toList());
+    }
+
+    private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
+        try {
+            PasswordCredentials passwordCredentials = repo.getCredentials(PasswordCredentials.class);
+            Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
+            Optional.ofNullable(passwordCredentials.getPassword()).ifPresent(builder::password);
+        } catch (IllegalArgumentException e) {
+            // We're not using password credentials
+        }
+        return builder;
     }
 
     public static List<GradlePluginDescriptor> pluginDescriptors(@Nullable PluginManager pluginManager) {
