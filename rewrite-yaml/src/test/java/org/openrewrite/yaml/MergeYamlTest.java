@@ -391,18 +391,15 @@ class MergeYamlTest implements RewriteTest {
             """
               apiVersion: policy/v1beta1
               kind: PodSecurityPolicy
-              ...
-              ---
               configuration: prod
+              ...
               """,
             """
               apiVersion: policy/v1beta1
               kind: PodSecurityPolicy
-              spec: 0
-              ...
-              ---
               configuration: prod
               spec: 0
+              ...
               """
           )
         );
