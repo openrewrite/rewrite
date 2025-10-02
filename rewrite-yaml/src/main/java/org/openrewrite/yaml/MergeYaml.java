@@ -195,17 +195,14 @@ public class MergeYaml extends Recipe {
                 Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
                 if (documents != null) {
                     int currentIndex = documents.getDocuments().indexOf(document);
-                    if (currentIndex >= 0 && currentIndex < documents.getDocuments().size() - 1) {
-                        Yaml.Document nextDoc = documents.getDocuments().get(currentIndex + 1);
-                        if (nextDoc.isExplicit()) {
-                            // Preserve a newline before the document separator
-                            return "\n";
-                        }
+                    // Preserve a newline before the next document separator
+                    if (0 <= currentIndex && currentIndex < documents.getDocuments().size() - 1 &&
+                            documents.getDocuments().get(currentIndex + 1).isExplicit()) {
+                        return "\n";
                     }
-                    if (currentIndex == documents.getDocuments().size() - 1) {
-                        if (document.getEnd().isExplicit()) {
-                            return "\n";
-                        }
+                    // Or if this is the last document and it is explicit
+                    if (currentIndex == documents.getDocuments().size() - 1 && document.getEnd().isExplicit()) {
+                        return "\n";
                     }
                 }
                 return "";
