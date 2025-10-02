@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
@@ -41,7 +40,7 @@ public class FindTypes extends Recipe {
 
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified type name, that is used to find matching type references. " +
-                          "Supports glob expressions. `java..*` finds every type from every subpackage of the `java` package.",
+                    "Supports glob expressions. `java..*` finds every type from every subpackage of the `java` package.",
             example = "java.util.List")
     String fullyQualifiedTypeName;
 
@@ -116,7 +115,7 @@ public class FindTypes extends Recipe {
                 N n = super.visitTypeName(name, ns);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
-                    getCursor().firstEnclosing(J.Import.class) == null) {
+                        getCursor().firstEnclosing(J.Import.class) == null) {
                     ns.add(name);
                 }
                 return n;
@@ -127,7 +126,7 @@ public class FindTypes extends Recipe {
                 J.FieldAccess fa = super.visitFieldAccess(fieldAccess, ns);
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(checkAssignability, fullyQualifiedType, type) &&
-                    "class".equals(fa.getName().getSimpleName())) {
+                        "class".equals(fa.getName().getSimpleName())) {
                     ns.add(fieldAccess);
                 }
                 return fa;
@@ -145,26 +144,13 @@ public class FindTypes extends Recipe {
             return false;
         }
         if (checkAssignability) {
-            return isAssignableFrom(matcher, test);
+            return TypeUtils.isAssignableTo(
+                    t -> t instanceof JavaType.FullyQualified &&
+                            matcher.matches(((JavaType.FullyQualified) t).getFullyQualifiedName()),
+                    test);
         } else {
             return matcher.matches(test.getFullyQualifiedName());
         }
-    }
-
-    @ToBeRemoved(after = "2025-10-15")
-    private static boolean isAssignableFrom(TypeNameMatcher matcher, JavaType.FullyQualified test) {
-        if (matcher.matches(test.getFullyQualifiedName())) {
-            return true;
-        }
-        if (test.getSupertype() != null && isAssignableFrom(matcher, test.getSupertype())) {
-            return true;
-        }
-        for (JavaType.FullyQualified anInterface : test.getInterfaces()) {
-            if (isAssignableFrom(matcher, anInterface)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Value
@@ -188,13 +174,13 @@ public class FindTypes extends Recipe {
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             if (ident.getType() != null &&
-                getCursor().firstEnclosing(J.Import.class) == null &&
-                getCursor().firstEnclosing(J.FieldAccess.class) == null &&
-                !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
-                !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
+                    getCursor().firstEnclosing(J.Import.class) == null &&
+                    getCursor().firstEnclosing(J.FieldAccess.class) == null &&
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.ParameterizedType) &&
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.ArrayType)) {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                    ident.getSimpleName().equals(type.getClassName())) {
+                        ident.getSimpleName().equals(type.getClassName())) {
                     return found(ident, ctx);
                 }
             }
@@ -206,7 +192,7 @@ public class FindTypes extends Recipe {
             N n = super.visitTypeName(name, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                getCursor().firstEnclosing(J.Import.class) == null) {
+                    getCursor().firstEnclosing(J.Import.class) == null) {
                 return found(n, ctx);
             }
             return n;
@@ -217,7 +203,7 @@ public class FindTypes extends Recipe {
             J.FieldAccess fa = (J.FieldAccess) super.visitFieldAccess(fieldAccess, ctx);
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
             if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
-                "class".equals(fa.getName().getSimpleName())) {
+                    "class".equals(fa.getName().getSimpleName())) {
                 return found(fa, ctx);
             }
             return fa;
