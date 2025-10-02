@@ -61,11 +61,8 @@ public class ChangeValue extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         // Parse the value once here, outside the visitor
-        Optional<JsonValue> jsonValue = value.startsWith("\"") || value.startsWith("'") ?
-                // User provided quotes - parse as-is
-                parseValues(value) :
-                // User didn't provide quotes - try as keyword/number/array/object first, fallback to string
-                parseValues(value, "\"" + value + "\"");
+        // Try as keyword/number/array/object first, fallback to string
+        Optional<JsonValue> jsonValue = parseValues(value, "\"" + value + "\"");
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
