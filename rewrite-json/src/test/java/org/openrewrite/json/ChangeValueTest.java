@@ -294,4 +294,49 @@ class ChangeValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void intentionalSingleQuotedNullAsString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "'null'")),
+          json(
+            """
+            { "apiVersion": "v1" }
+            """,
+            """
+            { "apiVersion": "'null'" }
+            """
+          )
+        );
+    }
+
+    @Test
+    void intentionalSingleQuotedNumberAsString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "'123'")),
+          json(
+            """
+            { "apiVersion": "v1" }
+            """,
+            """
+            { "apiVersion": "'123'" }
+            """
+          )
+        );
+    }
+
+    @Test
+    void  intentionalSingleQuotedBooleanAsString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue("$.apiVersion", "'true'")),
+          json(
+            """
+            { "apiVersion": "v1" }
+            """,
+            """
+            { "apiVersion": "'true'" }
+            """
+          )
+        );
+    }
 }
