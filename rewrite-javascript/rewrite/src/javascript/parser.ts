@@ -153,7 +153,19 @@ export class JavaScriptParser extends Parser {
             if (sourceText !== undefined) {
                 // Determine script kind based on file extension
                 const scriptKind = getScriptKindFromFileName(fileName);
-                sourceFile = ts.createSourceFile(fileName, sourceText, languageVersion, true, scriptKind);
+
+                // Build CreateSourceFileOptions with jsDocParsingMode
+                const sourceFileOptions: ts.CreateSourceFileOptions = typeof languageVersion === 'number'
+                    ? {
+                        languageVersion: languageVersion,
+                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
+                    }
+                    : {
+                        ...languageVersion,
+                        jsDocParsingMode: ts.JSDocParsingMode.ParseNone // We override this as otherwise invalid JSDoc causes parse errors
+                    };
+
+                sourceFile = ts.createSourceFile(fileName, sourceText, sourceFileOptions, true, scriptKind);
                 // Cache the SourceFile if it's a dependency
                 if (!input && this.sourceFileCache) {
                     this.sourceFileCache.set(fileName, sourceFile);

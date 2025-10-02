@@ -97,5 +97,4 @@ public class FindSourceFiles extends Recipe {
         }
         return filePattern;
     }
-
 }

@@ -828,6 +828,42 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('should auto-box primitives when methods are called on them', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, _type) => {
+                // Mark toString() invocations and verify the declaring type is boxed
+                if (node?.kind === J.Kind.MethodInvocation) {
+                    const invocation = node as J.MethodInvocation;
+                    const methodType = invocation.methodType;
+                    if (methodType && methodType.name === 'toString') {
+                        // Verify that declaringType is NOT a primitive
+                        const isPrimitive = Type.isPrimitive(methodType.declaringType);
+                        const declaringTypeName = Type.isClass(methodType.declaringType) ?
+                            methodType.declaringType.fullyQualifiedName :
+                            'PRIMITIVE';
+
+                        return `toString on ${declaringTypeName} (isPrimitive: ${isPrimitive})`;
+                    }
+                    return null;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const a = "test";
+                        const hex = a.charCodeAt(0).toString(16);
+                    `,
+                    `
+                        const a = "test";
+                        const hex = /*~~(toString on Number (isPrimitive: false))~~>*/a.charCodeAt(0).toString(16);
+                    `
+                )
+            );
+        });
+
         test.skip('should map generic types', async () => {
             // TODO: Implement in Phase 5
             const spec = new RecipeSpec();
