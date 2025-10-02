@@ -62,7 +62,7 @@ public class ChangeValue extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         // Parse the value once here, outside the visitor
         // Try as keyword/number/array/object first, fallback to string
-        Optional<JsonValue> jsonValue = parseValues(value, "\"" + value + "\"");
+        Optional<JsonValue> jsonValue = parseValues(firstParserInput(), '"' + value + '"');
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
@@ -78,6 +78,17 @@ public class ChangeValue extends Recipe {
                 return m;
             }
         };
+    }
+
+    private String firstParserInput() {
+        if (value.startsWith("'") && value.endsWith("'")) {
+            // Our parser tolerates single quotes for strings, which we want to convert to double quotes.
+            if (value.startsWith("'\"") && value.endsWith("\"'") && value.length() > 3) {
+                return "\"'\\\"" + value.substring(2, value.length() - 2) + "\\\"'\"";
+            }
+            return '"' + value + '"';
+        }
+        return value;
     }
 
     private static Optional<JsonValue> parseValues(@Language("json") String... values) {
