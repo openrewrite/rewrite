@@ -25,6 +25,9 @@ class NonDraftableType {
 export class JavaScriptTypeMapping {
     private readonly typeCache: Map<string | number, Type> = new Map();
     private readonly regExpSymbol: ts.Symbol | undefined;
+    private readonly stringWrapperType: ts.Type | undefined;
+    private readonly numberWrapperType: ts.Type | undefined;
+    private readonly booleanWrapperType: ts.Type | undefined;
 
     constructor(
         private readonly checker: ts.TypeChecker
@@ -35,6 +38,24 @@ export class JavaScriptTypeMapping {
             ts.SymbolFlags.Type,
             false
         );
+
+        // Resolve global wrapper types for primitives from TypeScript's lib
+        const stringSymbol = checker.resolveName("String", undefined, ts.SymbolFlags.Type, false);
+        const numberSymbol = checker.resolveName("Number", undefined, ts.SymbolFlags.Type, false);
+        const booleanSymbol = checker.resolveName("Boolean", undefined, ts.SymbolFlags.Type, false);
+
+        // Store the TypeScript types; conversion to Type happens on-demand
+        if (stringSymbol) {
+            this.stringWrapperType = checker.getDeclaredTypeOfSymbol(stringSymbol);
+        }
+
+        if (numberSymbol) {
+            this.numberWrapperType = checker.getDeclaredTypeOfSymbol(numberSymbol);
+        }
+
+        if (booleanSymbol) {
+            this.booleanWrapperType = checker.getDeclaredTypeOfSymbol(booleanSymbol);
+        }
     }
 
     type(node: ts.Node): Type | undefined {
@@ -171,6 +192,19 @@ export class JavaScriptTypeMapping {
         }) as Type.Method;
     }
 
+    private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
+        if (declaringType == Type.Primitive.String && this.stringWrapperType) {
+            return this.getType(this.stringWrapperType) as Type.FullyQualified;
+        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.Long) && this.numberWrapperType) {
+            return this.getType(this.numberWrapperType) as Type.FullyQualified;
+        } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
+            return this.getType(this.booleanWrapperType) as Type.FullyQualified;
+        } else {
+            // This should not really happen, but we'll fallback to unknown if needed
+            return Type.unknownType as Type.FullyQualified;
+        }
+    }
+
     methodType(node: ts.Node): Type.Method | undefined {
 
         let signature: ts.Signature | undefined;
@@ -289,27 +323,12 @@ export class JavaScriptTypeMapping {
                     } else {
                         declaringType = mappedType as Type.FullyQualified;
                     }
+                } else if (mappedType && mappedType.kind === Type.Kind.Primitive) {
+                    // Box the primitive to its wrapper type
+                    declaringType = this.wrapperType(mappedType as Type.Primitive);
                 } else {
-                    // Handle primitive types and other non-class types
-                    if (mappedType) {
-                        if ((mappedType as any).keyword === 'String') {
-                            declaringType = {
-                                kind: Type.Kind.Class,
-                                fullyQualifiedName: 'String'
-                            } as Type.FullyQualified;
-                        } else if ((mappedType as any).keyword === 'Number') {
-                            declaringType = {
-                                kind: Type.Kind.Class,
-                                fullyQualifiedName: 'Number'
-                            } as Type.FullyQualified;
-                        } else {
-                            // Fallback for other types
-                            declaringType = mappedType as Type.FullyQualified;
-                        }
-                    } else {
-                        // Default to unknown if we can't determine the type
-                        declaringType = Type.unknownType as Type.FullyQualified;
-                    }
+                    // Default to unknown if we can't determine the type
+                    declaringType = Type.unknownType as Type.FullyQualified;
                 }
 
                 // For string methods like 'hello'.split(), ensure we have a proper declaring type for primitives
@@ -317,15 +336,11 @@ export class JavaScriptTypeMapping {
                     // If the expression type is a primitive string, use String as declaring type
                     const typeString = this.checker.typeToString(exprType);
                     if (typeString === 'string' || exprType.flags & ts.TypeFlags.String || exprType.flags & ts.TypeFlags.StringLiteral) {
-                        declaringType = {
-                            kind: Type.Kind.Class,
-                            fullyQualifiedName: 'string'
-                        } as Type.FullyQualified;
+                        declaringType = this.wrapperType(Type.Primitive.String);
                     } else if (typeString === 'number' || exprType.flags & ts.TypeFlags.Number || exprType.flags & ts.TypeFlags.NumberLiteral) {
-                        declaringType = {
-                            kind: Type.Kind.Class,
-                            fullyQualifiedName: 'number'
-                        } as Type.FullyQualified;
+                        declaringType = this.wrapperType(Type.Primitive.Double);
+                    } else if (typeString === 'boolean' || exprType.flags & ts.TypeFlags.Boolean || exprType.flags & ts.TypeFlags.BooleanLiteral) {
+                        declaringType = this.wrapperType(Type.Primitive.Boolean);
                     } else {
                         // Fallback for other primitive types or unknown
                         declaringType = Type.unknownType as Type.FullyQualified;
