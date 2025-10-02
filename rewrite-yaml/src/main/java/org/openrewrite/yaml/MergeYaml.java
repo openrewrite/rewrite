@@ -154,7 +154,12 @@ public class MergeYaml extends Recipe {
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                        d = insertMode == Before ? d.withPrefix("") : d.withEnd(d.getEnd().withPrefix(""));
+                        if (insertMode == Before) {
+                            d = d.withPrefix("");
+                        } else {
+                            // Preserve newline before document separator in multi-document YAML
+                            d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
+                        }
                     }
                     return d;
                 }
@@ -179,9 +184,26 @@ public class MergeYaml extends Recipe {
                                     .visitNonNull(d.getBlock(), ctx, getCursor()));
                 }
                 if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                    d = d.withEnd(d.getEnd().withPrefix(""));
+                    // Preserve newline before document separator in multi-document YAML
+                    d = d.withEnd(d.getEnd().withPrefix(preserveDocumentSeparator(d)));
                 }
                 return d;
+            }
+
+            private String preserveDocumentSeparator(Yaml.Document document) {
+                // Check if this is a multi-document YAML and if there's a following explicit document
+                Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
+                if (documents != null && documents.getDocuments().size() > 1) {
+                    int currentIndex = documents.getDocuments().indexOf(document);
+                    if (currentIndex >= 0 && currentIndex < documents.getDocuments().size() - 1) {
+                        Yaml.Document nextDoc = documents.getDocuments().get(currentIndex + 1);
+                        if (nextDoc.isExplicit()) {
+                            // Preserve a newline before the document separator
+                            return "\n";
+                        }
+                    }
+                }
+                return "";
             }
 
             private @Nullable String maybeKeyFromJsonPath(String jsonPath) {

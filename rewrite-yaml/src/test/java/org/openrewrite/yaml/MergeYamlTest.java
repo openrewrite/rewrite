@@ -338,6 +338,40 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/5972")
+    @Test
+    void insertAtRootMultiDocumentYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "spec: 0",
+            true,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              ---
+              configuration: prod
+              """,
+            """
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              spec: 0
+              ---
+              configuration: prod
+              spec: 0
+              """
+          )
+        );
+    }
+
     @Test
     void insertInSequenceEntries() {
         rewriteRun(
