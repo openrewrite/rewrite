@@ -88,19 +88,16 @@ public final class GradleProjectBuilder {
         return repositories.stream()
                 .filter(MavenArtifactRepository.class::isInstance)
                 .map(MavenArtifactRepository.class::cast)
-                .map(repo -> {
-                    MavenRepository.Builder builder = MavenRepository.builder()
-                            .id(repo.getName())
-                            .uri(repo.getUrl().toString())
-                            .releases(true)
-                            .snapshots(true);
-                    mapAuthentication(repo, builder);
-                    return builder.build();
-                })
+                .map(repo -> withAuthentication(repo, MavenRepository.builder()
+                        .id(repo.getName())
+                        .uri(repo.getUrl().toString())
+                        .releases(true)
+                        .snapshots(true))
+                        .build())
                 .collect(toList());
     }
 
-    private static void mapAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
+    private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
         try {
             PasswordCredentials passwordCredentials = repo.getCredentials(PasswordCredentials.class);
             Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
@@ -108,6 +105,7 @@ public final class GradleProjectBuilder {
         } catch (IllegalArgumentException e) {
             // We're not using password credentials
         }
+        return builder;
     }
 
     public static List<GradlePluginDescriptor> pluginDescriptors(@Nullable PluginManager pluginManager) {
