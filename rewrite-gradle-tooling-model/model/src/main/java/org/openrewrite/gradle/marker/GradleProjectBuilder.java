@@ -94,13 +94,20 @@ public final class GradleProjectBuilder {
                             .uri(repo.getUrl().toString())
                             .releases(true)
                             .snapshots(true);
-                    if (GradleVersion.current().compareTo(GradleVersion.version("6.6")) >= 0) {
-                        Optional.ofNullable(repo.getCredentials().getUsername()).ifPresent(builder::username);
-                        Optional.ofNullable(repo.getCredentials().getPassword()).ifPresent(builder::password);
-                    }
+                    mapAuthentication(repo, builder);
                     return builder.build();
                 })
                 .collect(toList());
+    }
+
+    private static void mapAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
+        try {
+            PasswordCredentials passwordCredentials = repo.getCredentials(PasswordCredentials.class);
+            Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
+            Optional.ofNullable(passwordCredentials.getPassword()).ifPresent(builder::password);
+        } catch (IllegalArgumentException e) {
+            // We're not using password credentials
+        }
     }
 
     public static List<GradlePluginDescriptor> pluginDescriptors(@Nullable PluginManager pluginManager) {
