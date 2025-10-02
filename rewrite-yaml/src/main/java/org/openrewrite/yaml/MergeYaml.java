@@ -193,12 +193,17 @@ public class MergeYaml extends Recipe {
             private String preserveDocumentSeparator(Yaml.Document document) {
                 // Check if this is a multi-document YAML and if there's a following explicit document
                 Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
-                if (documents != null && documents.getDocuments().size() > 1) {
+                if (documents != null) {
                     int currentIndex = documents.getDocuments().indexOf(document);
                     if (currentIndex >= 0 && currentIndex < documents.getDocuments().size() - 1) {
                         Yaml.Document nextDoc = documents.getDocuments().get(currentIndex + 1);
                         if (nextDoc.isExplicit()) {
                             // Preserve a newline before the document separator
+                            return "\n";
+                        }
+                    }
+                    if (currentIndex == documents.getDocuments().size() - 1) {
+                        if (document.getEnd().isExplicit()) {
                             return "\n";
                         }
                     }

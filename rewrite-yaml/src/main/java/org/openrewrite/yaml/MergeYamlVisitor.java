@@ -393,11 +393,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private boolean isMultiDocumentSeparator(Yaml.Document document) {
         // Check if this document is part of a multi-document YAML with a following explicit document
         Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
-        if (documents != null && documents.getDocuments().size() > 1) {
+        if (documents != null) {
             int currentIndex = documents.getDocuments().indexOf(document);
             if (currentIndex >= 0 && currentIndex < documents.getDocuments().size() - 1) {
                 Yaml.Document nextDoc = documents.getDocuments().get(currentIndex + 1);
                 return nextDoc.isExplicit();
+            }
+            if (currentIndex == documents.getDocuments().size() - 1) {
+                return document.getEnd().isExplicit();
             }
         }
         return false;
