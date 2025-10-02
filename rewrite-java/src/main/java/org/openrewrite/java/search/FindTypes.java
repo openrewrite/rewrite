@@ -17,13 +17,13 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
+import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -145,10 +145,26 @@ public class FindTypes extends Recipe {
             return false;
         }
         if (checkAssignability) {
-            return test.isAssignableFrom(matcher);
+            return isAssignableFrom(matcher, test);
         } else {
             return matcher.matches(test.getFullyQualifiedName());
         }
+    }
+
+    @ToBeRemoved(after = "2025-10-15")
+    private static boolean isAssignableFrom(TypeNameMatcher matcher, JavaType.FullyQualified test) {
+        if (matcher.matches(test.getFullyQualifiedName())) {
+            return true;
+        }
+        if (test.getSupertype() != null && isAssignableFrom(matcher, test.getSupertype())) {
+            return true;
+        }
+        for (JavaType.FullyQualified anInterface : test.getInterfaces()) {
+            if (isAssignableFrom(matcher, anInterface)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Value
@@ -157,7 +173,7 @@ public class FindTypes extends Recipe {
         Set<Tree> matches;
 
         @Override
-        public Tree postVisit(@NonNull Tree tree, ExecutionContext ctx) {
+        public Tree postVisit(Tree tree, ExecutionContext ctx) {
             return matches.contains(tree) ? SearchResult.found(tree) : tree;
         }
     }
