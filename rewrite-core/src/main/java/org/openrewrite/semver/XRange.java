@@ -25,11 +25,12 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
 /**
- * Any of X, x, or * may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
+ * Any of X, x, *, or + may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
+ * The + wildcard is supported for Gradle-style dynamic versions (e.g., "2.+").
  */
 public class XRange extends LatestRelease {
-    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX]|\\d+)(?:\\.([*xX]|\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?)?");
+    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
     private final String major;
     private final String minor;
@@ -79,7 +80,7 @@ public class XRange extends LatestRelease {
 
     public static Validated<XRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
-        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*"))) {
+        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*") || pattern.contains("+"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");
         }
 
@@ -100,7 +101,7 @@ public class XRange extends LatestRelease {
     }
 
     private static String normalizeWildcard(String part) {
-        return "*".equals(part) || "x".equals(part) || "X".equals(part) ? "*" : part;
+        return "*".equals(part) || "x".equals(part) || "X".equals(part) || "+".equals(part) ? "*" : part;
     }
 
     @Override
