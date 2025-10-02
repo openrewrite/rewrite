@@ -83,9 +83,9 @@ public class ChangeValue extends Recipe {
     private static Optional<JsonValue> parseValues(@Language("json") String... values) {
         return JsonParser.builder().build()
                 .parse(values)
-                .filter(it -> it instanceof Json.Document)
-                .findFirst()
+                .filter(Json.Document.class::isInstance)
                 .map(Json.Document.class::cast)
+                .findFirst()
                 .map(Json.Document::getValue);
     }
 
