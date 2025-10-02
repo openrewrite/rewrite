@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.FindFullyQualifiedTypeReferences;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
@@ -91,14 +92,14 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
+                    boolean recursive = ChangePackage.this.recursive == null || ChangePackage.this.recursive;
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
                                 .printTrimmed(getCursor()).replaceAll("\\s", "");
-                        if (original.startsWith(oldPackageName)) {
+                        if (original.equals(oldPackageName) || recursive && original.startsWith(oldPackageName)) {
                             return SearchResult.found(cu);
                         }
                     }
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
                     for (J.Import anImport : cu.getImports()) {
                         String importedPackage = anImport.getPackageName();
@@ -109,6 +110,16 @@ public class ChangePackage extends Recipe {
                     for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
                         if (type instanceof JavaType.FullyQualified) {
                             String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                            if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
+                                return SearchResult.found(cu);
+                            }
+                        }
+                    }
+                    // Also check for fully qualified type references that might have Unknown types
+                    for (String fqn : FindFullyQualifiedTypeReferences.find(cu)) {
+                        int lastDot = fqn.lastIndexOf('.');
+                        if (lastDot > 0) {
+                            String packageName = fqn.substring(0, lastDot);
                             if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
                                 return SearchResult.found(cu);
                             }
@@ -216,6 +227,14 @@ public class ChangePackage extends Recipe {
             if (updatePrefix != null && updatePrefix) {
                 _import = _import.withPrefix(Space.EMPTY);
             }
+            
+            // Check if this import should be changed based on recursive flag
+            String importedPackage = _import.getPackageName();
+            if (importedPackage.startsWith(oldPackageName + ".") && Boolean.FALSE.equals(recursive)) {
+                // This is a sub-package import and recursive is false, so don't process it
+                return _import;
+            }
+            
             return super.visitImport(_import, ctx);
         }
 
