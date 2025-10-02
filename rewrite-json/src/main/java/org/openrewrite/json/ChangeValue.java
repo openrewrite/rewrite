@@ -61,7 +61,11 @@ public class ChangeValue extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         // Parse the value once here, outside the visitor
-        Optional<JsonValue> jsonValue = parseValueWithQuoteHandling(value);
+        Optional<JsonValue> jsonValue = value.startsWith("\"") || value.startsWith("'") ?
+                // User provided quotes - parse as-is
+                parseValues(value) :
+                // User didn't provide quotes - try as keyword/number/array/object first, fallback to string
+                parseValues(value, "\"" + value + "\"");
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
@@ -77,18 +81,6 @@ public class ChangeValue extends Recipe {
                 return m;
             }
         };
-    }
-
-    private static Optional<JsonValue> parseValueWithQuoteHandling(@Language("json") String value) {
-        if (value.startsWith("\"") || value.startsWith("'")) {
-            // User provided quotes - strip and parse content, but handle null specially
-            @Language("json") String withoutQuotes = value.substring(1, value.length() - 1);
-            // null keyword inside quotes should remain a string as the quotes are intentional
-            return "null".equals(withoutQuotes) ? parseValues(value) : parseValues(withoutQuotes, value);
-            // Try to parse stripped content first (could be number, boolean, object, etc.), fallback to quoted version (string)
-        }
-        // User didn't provide quotes - try as keyword/number/array/object first, fallback to string
-        return parseValues(value, "\"" + value + "\"");
     }
 
     private static Optional<JsonValue> parseValues(@Language("json") String... values) {

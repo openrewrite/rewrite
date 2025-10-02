@@ -94,7 +94,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": 123 }
+              { "apiVersion": "123" }
               """
           )
         );
@@ -124,7 +124,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": true }
+              { "apiVersion": "true" }
               """
           )
         );
@@ -169,7 +169,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": 'v2' }
+              { "apiVersion": "'v2'" }
               """
           )
         );
@@ -199,7 +199,7 @@ class ChangeValueTest implements RewriteTest {
               { "apiVersion": "v1" }
               """,
             """
-              { "apiVersion": "v2" }
+              { "apiVersion": '"v2"' }
               """
           )
         );
