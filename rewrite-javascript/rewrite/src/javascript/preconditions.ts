@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 import {RewriteRpc} from "../rpc";
-import {Recipe} from "../recipe";
 import {UsesMethod, UsesType} from "./search";
 import {ExecutionContext} from "../execution";
 import {TreeVisitor} from "../visitor";
 import {IsSourceFile} from "../search";
+import {RpcRecipe} from "../rpc/recipe";
 
-export async function hasSourcePath(filePattern: string): Promise<TreeVisitor<any, ExecutionContext>> {
-    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.FindSourceFiles", {
+export function hasSourcePath(filePattern: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
+    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.FindSourceFiles", {
         filePattern
-    }))?.editor() || new IsSourceFile(filePattern);
+    }) : new IsSourceFile(filePattern);
 }
 
-export async function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<TreeVisitor<any, ExecutionContext>> {
-    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.java.search.UsesMethod", {
+export function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
+    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesMethod", {
         methodMatcher,
         matchOverrides
-    }))?.editor() || new UsesMethod(methodMatcher)
+    }) : new UsesMethod(methodMatcher);
 }
 
-export async function usesType(fullyQualifiedType: string): Promise<TreeVisitor<any, ExecutionContext>> {
-    return await (await RewriteRpc.get()?.prepareRecipe("org.openrewrite.java.search.UsesType", {
+export function usesType(fullyQualifiedType: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
+    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesType", {
         fullyQualifiedType
-    }))?.editor() || new UsesType(fullyQualifiedType);
+    }) : new UsesType(fullyQualifiedType);
 }
