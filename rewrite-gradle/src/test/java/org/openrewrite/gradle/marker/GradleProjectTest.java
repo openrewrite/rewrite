@@ -36,7 +36,6 @@ import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -87,13 +86,12 @@ class GradleProjectTest implements RewriteTest {
             "implementation",
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
-              .extracting(GradleProject::getMavenRepositories)
-              .satisfies(list -> assertThat(list)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
                 .singleElement()
                 .satisfies(repo -> {
-                      assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
-                      assertThat(repo.getUsername()).isEqualTo("dummyuser");
-                      assertThat(repo.getPassword()).isEqualTo("dummypass");
+                    assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
+                    assertThat(repo.getUsername()).isEqualTo("dummyuser");
+                    assertThat(repo.getPassword()).isEqualTo("dummypass");
                 }))
           )),
           properties(
@@ -133,8 +131,7 @@ class GradleProjectTest implements RewriteTest {
             "implementation",
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
-              .extracting(GradleProject::getMavenRepositories)
-              .satisfies(list -> assertThat(list)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -182,8 +179,7 @@ class GradleProjectTest implements RewriteTest {
             "implementation",
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
-              .extracting(GradleProject::getMavenRepositories)
-              .satisfies(list -> assertThat(list)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -193,9 +189,9 @@ class GradleProjectTest implements RewriteTest {
           )),
           properties(
             """
-            mySecureRepositoryUsername=dummyuser
-            mySecureRepositoryPassword=dummypass
-            """,
+              mySecureRepositoryUsername=dummyuser
+              mySecureRepositoryPassword=dummypass
+              """,
             spec -> spec.path("gradle.properties")
           ),
           buildGradle(
@@ -226,8 +222,7 @@ class GradleProjectTest implements RewriteTest {
             "implementation",
             (original, updated) -> assertThat(updated)
               .isSameAs(original)
-              .extracting(GradleProject::getMavenRepositories)
-              .satisfies(list -> assertThat(list)
+              .satisfies(gp -> assertThat(gp.getMavenRepositories())
                 .singleElement()
                 .satisfies(repo -> {
                     assertThat(repo.getUri()).isEqualTo("https://example.com/maven2");
@@ -551,7 +546,7 @@ class GradleProjectTest implements RewriteTest {
 
                 GradleDependencyConstraint jacksonConstraint = constraints.stream()
                   .filter(c -> "com.fasterxml.jackson.core".equals(c.getGroupId()) &&
-                               "jackson-databind".equals(c.getArtifactId()))
+                    "jackson-databind".equals(c.getArtifactId()))
                   .findFirst()
                   .orElse(null);
 
