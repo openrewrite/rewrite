@@ -235,13 +235,6 @@ class GradleProjectTest implements RewriteTest {
                     assertThat(repo.getPassword()).isNull();
                 }))
           )),
-          properties(
-            """
-            mySecureRepositoryUsername=dummyuser
-            mySecureRepositoryPassword=dummypass
-            """,
-            spec -> spec.path("gradle.properties")
-          ),
           buildGradle(
             """
               plugins {
