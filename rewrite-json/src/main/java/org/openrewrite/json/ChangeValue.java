@@ -73,7 +73,7 @@ public class ChangeValue extends Recipe {
                     }
                     JsonValue parsedValue = jsonValue.get();
                     return m.withValue(parsedValue.withPrefix(m.getValue().getPrefix()))
-                            .withMarkers(parsedValue.getMarkers().add(new Changed(Tree.randomId())));
+                            .withMarkers(m.getMarkers().add(new Changed(Tree.randomId())));
                 }
                 return m;
             }
