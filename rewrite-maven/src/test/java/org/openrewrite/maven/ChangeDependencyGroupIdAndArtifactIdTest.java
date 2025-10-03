@@ -628,6 +628,78 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void doesNotAddVersionNumberTagToDirectDependencyIfAbleToOnManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "com.fasterxml.jackson.core",
+              "jackson-core",
+              "org.apache.commons",
+              "commons-csv",
+              "1.14.1",
+              null
+            )
+          ),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-bom</artifactId>
+                  <version>2.20.0</version>
+                </parent>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-core</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>project</artifactId>
+                <version>1</version>
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-bom</artifactId>
+                  <version>2.20.0</version>
+                </parent>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.commons</groupId>
+                      <artifactId>commons-csv</artifactId>
+                      <version>1.14.1</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-csv</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeProfileManagedDependencyGroupIdAndArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
