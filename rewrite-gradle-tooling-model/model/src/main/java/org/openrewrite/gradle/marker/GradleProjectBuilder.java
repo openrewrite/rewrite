@@ -22,9 +22,13 @@ import org.gradle.api.artifacts.repositories.MavenArtifactRepository;
 import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.HasAttributes;
+import org.gradle.api.credentials.Credentials;
 import org.gradle.api.initialization.Settings;
+import org.gradle.api.internal.artifacts.repositories.AbstractAuthenticationSupportedRepository;
 import org.gradle.api.internal.plugins.PluginManagerInternal;
 import org.gradle.api.plugins.PluginManager;
+import org.gradle.api.provider.Property;
+import org.gradle.internal.artifacts.repositories.AuthenticationSupportedInternal;
 import org.gradle.invocation.DefaultGradle;
 import org.gradle.plugin.use.PluginId;
 import org.gradle.util.GradleVersion;
@@ -98,14 +102,30 @@ public final class GradleProjectBuilder {
     }
 
     private static MavenRepository.Builder withAuthentication(MavenArtifactRepository repo, MavenRepository.Builder builder) {
-        try {
-            PasswordCredentials passwordCredentials = repo.getCredentials(PasswordCredentials.class);
+        if (!(repo instanceof AuthenticationSupportedInternal)) {
+            return builder;
+        }
+
+        Credentials credentials = getCredentials((AuthenticationSupportedInternal) repo);
+        if (credentials instanceof PasswordCredentials) {
+            PasswordCredentials passwordCredentials = (PasswordCredentials) credentials;
             Optional.ofNullable(passwordCredentials.getUsername()).ifPresent(builder::username);
             Optional.ofNullable(passwordCredentials.getPassword()).ifPresent(builder::password);
-        } catch (IllegalArgumentException e) {
-            // We're not using password credentials
         }
         return builder;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable Credentials getCredentials(AuthenticationSupportedInternal authenticatedRepo) {
+        Object configuredCredentials = authenticatedRepo.getConfiguredCredentials();
+        if (configuredCredentials instanceof Property) {
+            // Gradle 6.6+ returns a Property<Credentials> instance
+            return ((Property<Credentials>) configuredCredentials).getOrNull();
+        } else if (configuredCredentials instanceof Credentials) {
+            // Gradle < 6.6 returns a Credentials instance
+            return (Credentials) configuredCredentials;
+        }
+        return null;
     }
 
     public static List<GradlePluginDescriptor> pluginDescriptors(@Nullable PluginManager pluginManager) {
