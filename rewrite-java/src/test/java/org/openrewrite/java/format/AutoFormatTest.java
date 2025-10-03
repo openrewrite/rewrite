@@ -25,11 +25,11 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
@@ -56,11 +56,11 @@ class AutoFormatTest implements RewriteTest {
             }
             """))
           .recipe(toRecipe(() -> new AutoFormatVisitor<>(null,
-            new NamedStyles(UUID.randomUUID(), "junit", "Unit Test style", "Only used in unit tests", Collections.emptySet(),
+            new NamedStyles(UUID.randomUUID(), "junit", "Unit Test style", "Only used in unit tests", emptySet(),
               List.of(
                 new WrappingAndBracesStyle(
                   new WrappingAndBracesStyle.IfStatement(false),
-                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, Arrays.asList("builder", "newBuilder", "stream")),
+                  new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, asList("builder", "newBuilder", "stream")),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
