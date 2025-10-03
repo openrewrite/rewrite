@@ -17,14 +17,16 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.With;
+import org.intellij.lang.annotations.Language;
+import org.openrewrite.*;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 
-import static org.openrewrite.Tree.randomId;
+import java.util.Optional;
+import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -35,8 +37,9 @@ public class ChangeValue extends Recipe {
     String oldKeyPath;
 
     @Option(displayName = "New value",
-            description = "The new value to set for the key identified by oldKeyPath.",
+            description = "The new JSON value to set for the key identified by oldKeyPath.",
             example = "'Deployment'")
+    @Language("json")
     String value;
 
     @Override
@@ -57,21 +60,49 @@ public class ChangeValue extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
+        // Parse the value once here, outside the visitor
+        // Try as keyword/number/array/object first, fallback to string
+        Optional<JsonValue> jsonValue = parseValues(firstParserInput(), '"' + value + '"');
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
             public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
                 Json.Member m = super.visitMember(member, ctx);
-                if (matcher.matches(getCursor()) && (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getValue().equals(value))) {
-                    String source = ChangeValue.this.value;
-                    if (source.startsWith("'") || source.startsWith("\"")) {
-                        source = source.substring(1, source.length() - 1);
+                if (matcher.matches(getCursor()) && !m.getMarkers().findFirst(Changed.class).isPresent()) {
+                    if (!jsonValue.isPresent()) {
+                        return SearchResult.found(m, "Could not parse value: " + value);
                     }
-                    if (!(m.getValue() instanceof Json.Literal) || !((Json.Literal) m.getValue()).getSource().equals(ChangeValue.this.value)) {
-                        m = m.withValue(new Json.Literal(randomId(), m.getValue().getPrefix(), Markers.EMPTY, ChangeValue.this.value, source));
-                    }
+                    JsonValue parsedValue = jsonValue.get();
+                    return m.withValue(parsedValue.withPrefix(m.getValue().getPrefix()))
+                            .withMarkers(m.getMarkers().add(new Changed(Tree.randomId())));
                 }
                 return m;
             }
         };
+    }
+
+    private String firstParserInput() {
+        if (value.startsWith("'") && value.endsWith("'")) {
+            // Our parser tolerates single quotes for strings, which we want to convert to double quotes.
+            if (value.startsWith("'\"") && value.endsWith("\"'") && value.length() > 3) {
+                return "\"'\\\"" + value.substring(2, value.length() - 2) + "\\\"'\"";
+            }
+            return '"' + value + '"';
+        }
+        return value;
+    }
+
+    private static Optional<JsonValue> parseValues(@Language("json") String... values) {
+        return JsonParser.builder().build()
+                .parse(values)
+                .filter(Json.Document.class::isInstance)
+                .map(Json.Document.class::cast)
+                .findFirst()
+                .map(Json.Document::getValue);
+    }
+
+    @Value
+    @With
+    static class Changed implements Marker {
+        UUID id;
     }
 }
