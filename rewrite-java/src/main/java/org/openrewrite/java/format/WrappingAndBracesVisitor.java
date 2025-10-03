@@ -137,6 +137,14 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        if (style.getChainedMethodCalls().getWrap() == WrapAlways) {
+            method = new AlwaysWrapMethodChains<>(style.getChainedMethodCalls().getBuilderMethods()).visitMethodInvocation(method, p);
+        }
+        return super.visitMethodInvocation(method, p);
+    }
+
+    @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         String whitespace = j.getPrefix().getWhitespace().replaceFirst("^[\\n\\s]+\\n", "\n");
