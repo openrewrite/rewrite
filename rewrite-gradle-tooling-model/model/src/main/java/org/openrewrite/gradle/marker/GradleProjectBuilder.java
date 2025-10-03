@@ -116,15 +116,18 @@ public final class GradleProjectBuilder {
 
     @SuppressWarnings("unchecked")
     private static @Nullable Credentials getCredentials(AuthenticationSupportedInternal authenticatedRepo) {
-        Object configuredCredentials = authenticatedRepo.getConfiguredCredentials();
-        if (configuredCredentials instanceof Property) {
-            // Gradle 6.6+ returns a Property<Credentials> instance
-            return ((Property<Credentials>) configuredCredentials).getOrNull();
-        }
-        if (configuredCredentials instanceof Credentials) {
-            // Gradle < 6.6 returns a Credentials instance
-            return (Credentials) configuredCredentials;
-        }
+        try {
+            Method getConfiguredCredentialsMethod = AuthenticationSupportedInternal.class.getDeclaredMethod("getConfiguredCredentials");
+            Object configuredCredentials = getConfiguredCredentialsMethod.invoke(authenticatedRepo);
+            if (configuredCredentials instanceof Property) {
+                // Gradle 6.6+ returns a Property<Credentials> instance
+                return ((Property<Credentials>) configuredCredentials).getOrNull();
+            }
+            if (configuredCredentials instanceof Credentials) {
+                // Gradle < 6.6 returns a Credentials instance
+                return (Credentials) configuredCredentials;
+            }
+        } catch (Exception ignored) {}
         return null;
     }
 
