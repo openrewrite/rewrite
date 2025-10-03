@@ -24,7 +24,6 @@ import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.HasAttributes;
 import org.gradle.api.credentials.Credentials;
 import org.gradle.api.initialization.Settings;
-import org.gradle.api.internal.artifacts.repositories.AbstractAuthenticationSupportedRepository;
 import org.gradle.api.internal.plugins.PluginManagerInternal;
 import org.gradle.api.plugins.PluginManager;
 import org.gradle.api.provider.Property;
@@ -121,7 +120,8 @@ public final class GradleProjectBuilder {
         if (configuredCredentials instanceof Property) {
             // Gradle 6.6+ returns a Property<Credentials> instance
             return ((Property<Credentials>) configuredCredentials).getOrNull();
-        } else if (configuredCredentials instanceof Credentials) {
+        }
+        if (configuredCredentials instanceof Credentials) {
             // Gradle < 6.6 returns a Credentials instance
             return (Credentials) configuredCredentials;
         }
