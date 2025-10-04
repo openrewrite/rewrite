@@ -623,11 +623,11 @@ class AlwaysWrapMethodChainsTest implements RewriteTest {
                   }
               
                   boolean someCondition(Item item) {
-               return true;
-               }
+              return true;
+              }
                   boolean otherCondition(Item item) {
-               return false;
-               }
+              return false;
+              }
               
                   static class Item {
               }
@@ -702,8 +702,8 @@ class AlwaysWrapMethodChainsTest implements RewriteTest {
               
                   static class Item {
                       boolean isValid() {
-               return true;
-               }
+              return true;
+              }
                   }
               }
               """
@@ -894,11 +894,11 @@ class AlwaysWrapMethodChainsTest implements RewriteTest {
                   }
               
                   boolean isValid(String s) {
-               return s != null && !s.isEmpty();
-               }
+              return s != null && !s.isEmpty();
+              }
                   String preprocess(String s) {
-               return s.trim();
-               }
+              return s.trim();
+              }
               }
               """
           )
@@ -1020,11 +1020,11 @@ class AlwaysWrapMethodChainsTest implements RewriteTest {
                   }
               
                   boolean someCondition(Item item) {
-               return true;
-               }
+              return true;
+              }
                   boolean otherCondition(Item item) {
-               return false;
-               }
+              return false;
+              }
               
                   static class Item {
               }
