@@ -70,7 +70,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public class Test {
                   {
-                      int n = 0;
+              int n = 0;
                       n++;
                   }
               }
