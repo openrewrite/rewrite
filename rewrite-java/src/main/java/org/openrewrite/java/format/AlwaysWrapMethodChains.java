@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.format;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -26,13 +24,10 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
 
 import java.util.List;
-import java.util.UUID;
 
 import static java.util.Collections.emptyList;
-import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
 
 @Value
@@ -50,9 +45,6 @@ public class AlwaysWrapMethodChains<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
-        if (method.getMarkers().findFirst(FormattedMethodChain.class).isPresent()) {
-            return method;
-        }
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
         J.MethodInvocation chainStarter = findChainStarterInChain(m);
@@ -64,7 +56,7 @@ public class AlwaysWrapMethodChains<P> extends JavaIsoVisitor<P> {
         Space after = m.getPadding().getSelect().getAfter();
         //Already on a new line
         if (after.getLastWhitespace().contains("\n")) {
-            return m.withMarkers(method.getMarkers().add(new FormattedMethodChain()));
+            return m;
         }
 
         //Only update the whitespace, preserving comments
@@ -78,7 +70,7 @@ public class AlwaysWrapMethodChains<P> extends JavaIsoVisitor<P> {
                     .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
         }
 
-        return m.withMarkers(method.getMarkers().add(new FormattedMethodChain()));
+        return m;
     }
 
     private J.@Nullable MethodInvocation findChainStarterInChain(J.MethodInvocation method) {
@@ -99,16 +91,5 @@ public class AlwaysWrapMethodChains<P> extends JavaIsoVisitor<P> {
             current = select;
         }
         return null;
-    }
-
-    @Value
-    @With
-    @AllArgsConstructor
-    private static class FormattedMethodChain implements Marker {
-        UUID id;
-
-        public FormattedMethodChain() {
-            this.id = randomUUID();
-        }
     }
 }

@@ -15,9 +15,6 @@
  */
 package org.openrewrite.java.format;
 
-import lombok.AllArgsConstructor;
-import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
@@ -26,18 +23,15 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
-import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
@@ -58,12 +52,6 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
-        if (sourceFile.getMarkers().findAll(AutoFormatted.class).stream()
-                .map(AutoFormatted::getStyles)
-                .filter(list -> !list.isEmpty())
-                .anyMatch(styles::equals)) {
-            return false;
-        }
         return sourceFile instanceof J.CompilationUnit;
     }
 
@@ -104,7 +92,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new RemoveTrailingWhitespaceVisitor<>(stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        return tree == t ? t : t.withMarkers(t.getMarkers().add(new AutoFormatted<>(styles)));
+        return t;
     }
 
     @Override
@@ -138,7 +126,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
                     .visitNonNull(t, p);
 
-            return tree == t ? t : t.withMarkers(t.getMarkers().add(new AutoFormatted<>(styles)));
+            return t;
         }
         return (J) tree;
     }
@@ -157,19 +145,5 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             return style;
         }
         return Style.from(styleClass, sourceFile, defaultStyle);
-    }
-
-    @Value
-    @With
-    @AllArgsConstructor
-    private static class AutoFormatted<P> implements Marker {
-        UUID id;
-
-        List<NamedStyles> styles;
-
-        public AutoFormatted(List<NamedStyles> styles) {
-            this.id = randomUUID();
-            this.styles = styles;
-        }
     }
 }

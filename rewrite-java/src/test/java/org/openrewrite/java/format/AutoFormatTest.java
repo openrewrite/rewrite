@@ -667,9 +667,6 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
-    //When the input is correctly formatted already, it is possible that some formatting visitors change the lst, but that after all of them has run the input is equal to the output.
-    // Example: the MinimumViableSpacingVisitor will replace indents with single space, but then the indention is fixed again by the indentation visitor.
-    // But no way of knowing that up front -> we add a marker for shielding against cyclic updates when used in a recipe run.
     @Test
     void annotationWrappingGenericsAlreadyCorrect() {
         rewriteRun(
@@ -686,29 +683,6 @@ class AutoFormatTest implements RewriteTest {
               """,
             SourceSpec::skip),
           java(
-            """
-              @Foo
-              @Foo
-              class Test<T> {
-                  @Foo
-                  @Foo
-                  private int field;
-              
-                  @Foo
-                  @Foo
-                  Test(int field) {
-                      this.field = field;
-                  }
-              
-                  @Foo
-                  @Foo
-                  T method(
-                          @Foo @Foo T param) {
-                      @Foo @Foo T localVar;
-                      return param;
-                  }
-              }
-              """,
             """
               @Foo
               @Foo
@@ -896,18 +870,6 @@ class AutoFormatTest implements RewriteTest {
     void preserveAlreadyFormattedBuilder() {
         rewriteRun(
           java(
-            """
-              package com.example;
-              
-              class Test {
-                  void test() {
-                      MyObject obj = MyObject.builder()
-                              .name("test")
-                              .age(25)
-                              .build();
-                  }
-              }
-              """,
             """
               package com.example;
               
@@ -1712,32 +1674,6 @@ class AutoFormatTest implements RewriteTest {
     void preserveAlreadyFormattedStreamWithMultilineLambda() {
         rewriteRun(
           java(
-            """
-              package com.example;
-              
-              import java.util.Collection;
-              import java.util.Optional;
-              
-              class Test {
-                  Optional<Item> findItem(Collection<Item> collection) {
-                      return collection.stream()
-                              .filter(item -> {
-                                  if (someCondition(item)) {
-                                      return true;
-                                  } else if (otherCondition(item)) {
-                                      return true;
-                                  }
-                                  return false;
-                              })
-                              .findFirst();
-                  }
-              
-                  boolean someCondition(Item item) { return true; }
-                  boolean otherCondition(Item item) { return false; }
-              
-                  static class Item {}
-              }
-              """,
             """
               package com.example;
               
