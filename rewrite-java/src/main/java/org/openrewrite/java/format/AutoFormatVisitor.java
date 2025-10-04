@@ -89,10 +89,8 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new NormalizeLineBreaksVisitor<>(getStyle(GeneralFormatStyle.class, cu, () -> autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visitNonNull(t, p, cursor.fork());
 
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter)
+        return new RemoveTrailingWhitespaceVisitor<>(stopAfter)
                 .visitNonNull(t, p, cursor.fork());
-
-        return t;
     }
 
     @Override
@@ -123,10 +121,8 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(tabsAndIndentsStyle, stopAfter)
                     .visitNonNull(t, p);
 
-            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
+            return new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, spacesStyle, stopAfter)
                     .visitNonNull(t, p);
-
-            return t;
         }
         return (J) tree;
     }
