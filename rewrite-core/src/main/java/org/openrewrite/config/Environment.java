@@ -15,7 +15,7 @@
  */
 package org.openrewrite.config;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -159,7 +159,7 @@ public class Environment {
             @SuppressWarnings("deprecation")
             List<String> suggestions = recipesNotFound.stream()
                     .map(r -> recipesByName.keySet().stream()
-                            .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
+                            .min(comparingInt(a -> LevenshteinDistance.getDefaultInstance().apply(a, r)))
                             .orElse(r))
                     .collect(toList());
             String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",

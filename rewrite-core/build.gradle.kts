@@ -18,7 +18,8 @@ dependencies {
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.apache.commons:commons-lang3:latest.release")
+    // For Levenshtein distance of mismatched recipes
+    implementation("org.apache.commons:commons-text:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
