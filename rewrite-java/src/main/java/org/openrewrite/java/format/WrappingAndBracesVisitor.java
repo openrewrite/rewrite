@@ -134,9 +134,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        if (style.getChainedMethodCalls().getWrap() == WrapAlways) {
-            method = new AlwaysWrapMethodChains<>(style.getChainedMethodCalls().getBuilderMethods()).visitMethodInvocation(method, p);
-        }
+        method = (J.MethodInvocation) new WrapMethodChains<>(style).visit(method, p, getCursor().getParent());
         return super.visitMethodInvocation(method, p);
     }
 

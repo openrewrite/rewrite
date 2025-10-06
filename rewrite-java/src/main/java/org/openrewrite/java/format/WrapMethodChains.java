@@ -21,59 +21,63 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AlwaysWrapMethodChains<P> extends JavaIsoVisitor<P> {
+public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
 
-    List<MethodMatcher> matchers;
+    WrappingAndBracesStyle style;
 
-    public AlwaysWrapMethodChains(@Nullable List<String> methodNames) {
-        this.matchers = methodNames == null ? emptyList() : methodNames.stream()
-                .map(name -> String.format("*..* %s(..)", name))
-                .map(MethodMatcher::new)
-                .collect(toList());
+    public WrapMethodChains(WrappingAndBracesStyle style) {
+        this.style = style;
     }
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-        J.MethodInvocation chainStarter = findChainStarterInChain(m);
-        // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
-        if (chainStarter == null || chainStarter == m) {
-            return m;
-        }
+        if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+            List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
+                    .map(name -> String.format("*..* %s(..)", name))
+                    .map(MethodMatcher::new)
+                    .collect(toList());
+            J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
+            // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
+            if (chainStarter == null || chainStarter == m) {
+                return m;
+            }
 
-        Space after = m.getPadding().getSelect().getAfter();
-        //Already on a new line
-        if (after.getLastWhitespace().contains("\n")) {
-            return m;
-        }
+            Space after = m.getPadding().getSelect().getAfter();
+            //Already on a new line
+            if (after.getLastWhitespace().contains("\n")) {
+                return m;
+            }
 
-        //Only update the whitespace, preserving comments
-        if (after.getComments().isEmpty()) {
-            after = after.withWhitespace("\n");
-        } else {
-            after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
-        }
-        if (after != m.getPadding().getSelect().getAfter()) {
-            m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                    .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+            //Only update the whitespace, preserving comments
+            if (after.getComments().isEmpty()) {
+                after = after.withWhitespace("\n");
+            } else {
+                after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
+            }
+            if (after != m.getPadding().getSelect().getAfter()) {
+                m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
+                        .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+            }
         }
 
         return m;
     }
 
-    private J.@Nullable MethodInvocation findChainStarterInChain(J.MethodInvocation method) {
+    private J.@Nullable MethodInvocation findChainStarterInChain(J.MethodInvocation method, List<MethodMatcher> matchers) {
         Expression current = method;
         while (current instanceof J.MethodInvocation) {
             J.MethodInvocation mi = (J.MethodInvocation) current;

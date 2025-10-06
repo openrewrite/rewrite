@@ -28,7 +28,7 @@ import static org.openrewrite.style.LineWrapSetting.DoNotWrap;
 import static org.openrewrite.style.LineWrapSetting.WrapAlways;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-class AlwaysWrapMethodChainsTest implements RewriteTest {
+class WrapMethodChainsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
