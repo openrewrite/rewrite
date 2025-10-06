@@ -37,10 +37,6 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
 
     WrappingAndBracesStyle style;
 
-    public WrapMethodChains(WrappingAndBracesStyle style) {
-        this.style = style;
-    }
-
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
