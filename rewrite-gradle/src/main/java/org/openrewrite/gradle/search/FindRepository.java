@@ -88,7 +88,7 @@ public class FindRepository extends Recipe {
     }
 
     private class RepositoryVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final MethodMatcher repositoryMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + type + "(..)", true);
+        private final MethodMatcher repositoryMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + (type != null ? type : "*") + "(..)", true);
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
