@@ -152,16 +152,16 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     public @Nullable J preVisit(@NonNull J tree, ExecutionContext ctx) {
         if (tree instanceof JavaSourceFile) {
             if (tree instanceof G.CompilationUnit) {
-                return visitCompilationUnit((G.CompilationUnit) tree, ctx);
+                return addPluginToGroovyCompilationUnit((G.CompilationUnit) tree, ctx);
             }
             if (tree instanceof K.CompilationUnit) {
-                return visitCompilationUnit((K.CompilationUnit) tree, ctx);
+                return addPluginToKotlinCompilationUnit((K.CompilationUnit) tree, ctx);
             }
         }
         return super.preVisit(tree, ctx);
     }
 
-    private G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+    private G.CompilationUnit addPluginToGroovyCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         if (!FindPlugins.find(cu, pluginId).isEmpty() && (acceptTransitive == null || acceptTransitive)) {
             return cu;
         }
@@ -291,7 +291,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }
     }
 
-    private K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+    private K.CompilationUnit addPluginToKotlinCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
         MethodMatcher pluginsMatcher = new MethodMatcher("*..* plugins(..)");
         MethodMatcher pluginIdMatcher = new MethodMatcher("*..* id(..)");
         AtomicBoolean hasPlugin = new JavaIsoVisitor<AtomicBoolean>() {
