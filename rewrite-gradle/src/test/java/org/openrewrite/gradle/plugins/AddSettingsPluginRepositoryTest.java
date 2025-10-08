@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class AddSettingsPluginRepositoryTest implements RewriteTest {
     @DocumentExample
@@ -160,6 +161,150 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
               pluginManagement {
                   repositories {
                       maven { url "${NEXUS_URL}/snapshots" }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptySettingsFileKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradleKts(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/snapshots")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noPluginManagementBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradleKts(
+            """
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/snapshots")
+                      }
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingPluginManagementBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      maven {
+                          url = uri("https://repo.example.com/snapshots")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven { url = uri("https://repo.example.com/snapshots") }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addMavenLocalKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("mavenLocal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/snapshots")
+                      }
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/snapshots")
+                      }
+                      mavenLocal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingRepositoryUsingMethodKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven { url = uri("https://repo.example.com/snapshots") }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingRepositoryUsingMethodAndGroovyStringKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "${NEXUS_URL}/snapshots")),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven { url = uri("${NEXUS_URL}/snapshots") }
                   }
               }
               """

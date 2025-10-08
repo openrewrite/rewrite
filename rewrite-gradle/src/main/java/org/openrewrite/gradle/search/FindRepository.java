@@ -21,13 +21,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
 
 @Value
@@ -68,13 +69,13 @@ public class FindRepository extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginManagementMatcher = new MethodMatcher("RewriteSettings pluginManagement(..)");
         MethodMatcher buildscriptMatcher = new MethodMatcher("RewriteGradleProject buildscript(..)");
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (purpose == null) {
                     return new RepositoryVisitor().visitMethodInvocation(method, ctx);
                 } else {
-                    boolean isPluginBlock = pluginManagementMatcher.matches(method) || buildscriptMatcher.matches(method);
+                    boolean isPluginBlock = pluginManagementMatcher.matches(method, true) || buildscriptMatcher.matches(method, true);
                     if ((purpose == Purpose.Project && !isPluginBlock) ||
                         (purpose == Purpose.Plugin && isPluginBlock)) {
                         return new RepositoryVisitor().visitMethodInvocation(method, ctx);
@@ -86,14 +87,14 @@ public class FindRepository extends Recipe {
         });
     }
 
-    private class RepositoryVisitor extends GroovyIsoVisitor<ExecutionContext> {
-        private final MethodMatcher repositoryMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler *(..)", true);
+    private class RepositoryVisitor extends JavaIsoVisitor<ExecutionContext> {
+        private final MethodMatcher repositoryMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + (type != null ? type : "*") + "(..)", true);
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-            if (!repositoryMatcher.matches(m)) {
+            if (!repositoryMatcher.matches(m, true)) {
                 return m;
             }
 
@@ -130,12 +131,17 @@ public class FindRepository extends Recipe {
                             url.equals(((J.Literal) assignment.getAssignment()).getValue())) {
                             return true;
                         } else if (assignment.getAssignment() instanceof J.MethodInvocation &&
-                                   "uri".equals(((J.MethodInvocation) assignment.getAssignment()).getSimpleName()) &&
-                                   ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof J.Literal &&
+                                   "uri".equals(((J.MethodInvocation) assignment.getAssignment()).getSimpleName())) {
+                            if (((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof J.Literal &&
                                    url.equals(((J.Literal) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getValue())) {
-                            return true;
+                                return true;
+                            } else if (((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof K.StringTemplate) {
+                                String valueSource = TemplateAsString.getValueSource(((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0));
+                                String testSource = ((K.StringTemplate) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getDelimiter() + url + ((K.StringTemplate) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getDelimiter();
+                                return testSource.equals(valueSource);
+                            }
                         } else if (assignment.getAssignment() instanceof G.GString) {
-                            String valueSource = assignment.getAssignment().withPrefix(Space.EMPTY).printTrimmed(new GroovyPrinter<>());
+                            String valueSource = TemplateAsString.getValueSource(assignment.getAssignment());
                             String testSource = ((G.GString) assignment.getAssignment()).getDelimiter() + url + ((G.GString) assignment.getAssignment()).getDelimiter();
                             return testSource.equals(valueSource);
                         }
@@ -162,6 +168,59 @@ public class FindRepository extends Recipe {
             }
 
             return false;
+        }
+    }
+
+    private static class TemplateAsString extends JavaIsoVisitor<StringBuilder> {
+
+        private static String getValueSource(J tree) {
+            return new TemplateAsString().reduce((Tree) tree.withPrefix(Space.EMPTY), new StringBuilder()).toString();
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, StringBuilder builder) {
+            if (tree instanceof K.StringTemplate) {
+                builder.append(((K.StringTemplate) tree).getDelimiter());
+                super.visit(tree, builder);
+                builder.append(((K.StringTemplate) tree).getDelimiter());
+            } else if (tree instanceof K.StringTemplate.Expression) {
+                builder.append("$");
+                if (((K.StringTemplate.Expression) tree).isEnclosedInBraces()) {
+                    builder.append("{");
+                }
+                super.visit(tree, builder);
+                if (((K.StringTemplate.Expression) tree).isEnclosedInBraces()) {
+                    builder.append("}");
+                }
+            } else if (tree instanceof G.GString) {
+                builder.append(((G.GString) tree).getDelimiter());
+                super.visit(tree, builder);
+                builder.append(((G.GString) tree).getDelimiter());
+            } else if (tree instanceof G.GString.Value) {
+                builder.append("$");
+                if (((G.GString.Value) tree).isEnclosedInBraces()) {
+                    builder.append("{");
+                }
+                super.visit(tree, builder);
+                if (((G.GString.Value) tree).isEnclosedInBraces()) {
+                    builder.append("}");
+                }
+            } else {
+                super.visit(tree, builder);
+            }
+            return (J) tree;
+        }
+
+        @Override
+        public J.Literal visitLiteral(J.Literal literal, StringBuilder builder) {
+            builder.append(literal.getValue());
+            return super.visitLiteral(literal, builder);
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, StringBuilder builder) {
+            builder.append(identifier.getSimpleName());
+            return super.visitIdentifier(identifier, builder);
         }
     }
 
