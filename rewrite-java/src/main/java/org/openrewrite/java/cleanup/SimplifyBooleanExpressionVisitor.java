@@ -186,13 +186,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else if (parenthesized instanceof J.Ternary) {
                 J.Ternary ternary = (J.Ternary) parenthesized;
-                // When negating a ternary !(c ? t : f), we need to apply the negation correctly.
-                // The correct transformation is: !(c ? t : f) => (c ? !t : !f)
-                // We should NOT negate the condition or swap branches
                 Expression truePart = ternary.getTruePart();
                 Expression falsePart = ternary.getFalsePart();
 
-                // Always negate the branch expressions, not the condition
                 j = ternary
                         .withTruePart(maybeNegate(truePart))
                         .withFalsePart(maybeNegate(falsePart))
@@ -227,7 +223,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (isLiteralFalse(expr)) {
             return ((J.Literal) expr).withValue(true).withValueSource("true");
         }
-        // For other expressions (like method invocations), wrap with NOT
         return not(expr).withPrefix(expr.getPrefix());
     }
 
