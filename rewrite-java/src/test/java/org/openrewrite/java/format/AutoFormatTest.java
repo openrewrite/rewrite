@@ -59,6 +59,7 @@ class AutoFormatTest implements RewriteTest {
             new NamedStyles(UUID.randomUUID(), "junit", "Unit Test style", "Only used in unit tests", emptySet(),
               List.of(
                 new WrappingAndBracesStyle(
+                  120,
                   new WrappingAndBracesStyle.IfStatement(false),
                   new WrappingAndBracesStyle.ChainedMethodCalls(WrapAlways, asList("builder", "newBuilder", "stream")),
                   new WrappingAndBracesStyle.Annotations(WrapAlways),
