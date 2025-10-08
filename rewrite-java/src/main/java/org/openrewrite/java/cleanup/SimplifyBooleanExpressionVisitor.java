@@ -186,12 +186,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 }
             } else if (parenthesized instanceof J.Ternary) {
                 J.Ternary ternary = (J.Ternary) parenthesized;
-                Expression truePart = ternary.getTruePart();
-                Expression falsePart = ternary.getFalsePart();
-
                 j = ternary
-                        .withTruePart(maybeNegate(truePart))
-                        .withFalsePart(maybeNegate(falsePart))
+                        .withTruePart(maybeNegate(ternary.getTruePart()))
+                        .withFalsePart(maybeNegate(ternary.getFalsePart()))
                         .withPrefix(j.getPrefix());
             } else if (parenthesized instanceof Expression) {
                 j = unpackExpression((Expression) parenthesized, j);
