@@ -18,6 +18,7 @@ package org.openrewrite.rpc.request;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
@@ -34,6 +35,7 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @Value
 public class GetObject implements RpcRequest {
     String id;
+    @Nullable String sourceFileType;
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
@@ -66,7 +68,7 @@ public class GetObject implements RpcRequest {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs);
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType());
                 forkJoin.submit(() -> {
                     try {
                         sendQueue.send(after, before, null);

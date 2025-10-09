@@ -276,6 +276,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public Validated<Object> validate() {
+            return delegate.validate();
+        }
     }
 
     @Value
@@ -328,6 +333,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
+
+        @Override
+        public Validated<Object> validate() {
+            return delegate.validate();
         }
     }
 

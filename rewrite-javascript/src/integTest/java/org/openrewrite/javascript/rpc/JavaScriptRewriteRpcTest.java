@@ -330,66 +330,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    @Test
-    void profilerGeneratesAndProcessesOutput() throws IOException, InterruptedException {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-          .workingDirectory(tempDir)  // Set working directory for profile output
-          .profiler(true)  // Enable profiling via --profile flag
-          .log(tempDir.resolve("rpc.log"))  // Add logging to debug
-          .verboseLogging()  // Enable verbose logging
-          .recipeInstallDir(tempDir)  // Required for the client to work
-        );
-
-        JavaScriptRewriteRpc profilerClient = JavaScriptRewriteRpc.getOrStart();
-
-        try {
-            // Generate some work for the profiler
-            @Language("javascript")
-            @SuppressWarnings("JSUnusedLocalSymbols")
-            String source = """
-              function fibonacci(n) {
-                  if (n <= 1) return n;
-                  return fibonacci(n - 1) + fibonacci(n - 2);
-              }
-              const result = fibonacci(20);
-              """;
-
-            SourceFile cu = JavaScriptParser.builder().build()
-              .parseInputs(List.of(Parser.Input.fromString(Path.of("test.js"), source)),
-                null, new InMemoryExecutionContext())
-              .findFirst().orElseThrow();
-
-            // Generate CPU usage
-            for (int i = 0; i < 100; i++) {
-                profilerClient.print(cu);
-            }
-
-            // Wait for the profiler to save (saves every 10 seconds)
-            Thread.sleep(11000);
-        } finally {
-            JavaScriptRewriteRpc.shutdownCurrent();
-
-            // Check that a trace file was created
-            Path tracePath = tempDir.resolve("chrome-trace.json");
-            assertThat(tracePath).exists();
-
-            // Verify the file is valid JSON and non-empty
-            String content = Files.readString(tracePath);
-            assertThat(content).isNotEmpty();
-            assertThat(content).startsWith("{");
-
-            // Verify it has trace events and metadata
-            assertThat(content).contains("\"traceEvents\"");
-            assertThat(content).contains("\"metadata\"");
-
-            // Verify it has memory counter events with correct format
-            assertThat(content).contains("\"UpdateCounters\"");
-            assertThat(content).contains("\"jsHeapSizeUsed\"");
-            assertThat(content).contains("\"ph\": \"I\"");  // Instant events (with space after colon)
-            assertThat(content).contains("\"s\": \"t\"");    // Required for instant events (with space after colon)
-        }
-    }
-
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();

@@ -35,8 +35,10 @@ import java.security.CodeSource;
  */
 public class LessAstTransformationsCompilationUnit extends CompilationUnit {
 
+    private static final int CONVERT_ENUM_OPERATION = 0;
     private static final int STATIC_IMPORT_OPERATION = 0;
 
+    private int conversionOperation = 0;
     private int semanticAnalysisOperation = 0;
 
     public LessAstTransformationsCompilationUnit(CompilerConfiguration configuration, @Nullable CodeSource codeSource, GroovyClassLoader loader, GroovyClassLoader transformLoader) {
@@ -47,7 +49,12 @@ public class LessAstTransformationsCompilationUnit extends CompilationUnit {
 
     @Override
     public void addPhaseOperation(IPrimaryClassNodeOperation op, int phase) {
-        if (phase == Phases.SEMANTIC_ANALYSIS) {
+        if (phase == Phases.CONVERSION) {
+            if (conversionOperation++ == CONVERT_ENUM_OPERATION) {
+                // we don't want to register the `EnumVisitor` operation
+                return;
+            }
+        } else if (phase == Phases.SEMANTIC_ANALYSIS) {
             if (semanticAnalysisOperation++ == STATIC_IMPORT_OPERATION) {
                 // we don't want to register the `StaticImportVisitor` operation
                 return;

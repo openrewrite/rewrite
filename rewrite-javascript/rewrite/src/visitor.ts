@@ -40,7 +40,7 @@ const stopAfterPreVisit = Symbol("STOP_AFTER_PRE_VISIT")
 export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
-    private afterVisit?: TreeVisitor<any, P>[];
+    public afterVisit: TreeVisitor<any, P>[] = [];
 
     async visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
         return (await this.visit<R>(tree, p, parent))!;
@@ -80,14 +80,14 @@ export abstract class TreeVisitor<T extends Tree, P> {
 
             if (topLevel) {
                 if (this.afterVisit) {
-                    for (const v of this.afterVisit) {
+                    while (this.afterVisit.length > 0) {
+                        const v = this.afterVisit.shift()!;
                         v.cursor = this.cursor;
                         if (t !== undefined) {
                             t = await v.visit(t, p);
                         }
                     }
                 }
-                this.afterVisit = undefined;
                 this.visitCount = 0;
             }
         } catch (e) {

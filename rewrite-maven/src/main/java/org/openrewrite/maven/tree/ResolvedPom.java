@@ -1025,7 +1025,7 @@ public class ResolvedPom {
                                 (d.getScope() == null ? "" : ":" + d.getScope());
                         throw new MavenDownloadingException("No version provided for direct dependency " + coordinates, null, dd.getDependency().getGav());
                     }
-                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType()) && !"tgz".equals(d.getType())))) {
+                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"ejb".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()) && !"bom".equals(d.getType()) && !"tgz".equals(d.getType())))) {
                         continue;
                     }
 

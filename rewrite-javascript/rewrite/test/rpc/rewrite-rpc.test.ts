@@ -1,4 +1,4 @@
-// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport
+// noinspection JSUnusedLocalSymbols,TypeScriptCheckImport,JSUnusedGlobalSymbols
 
 /*
  * Copyright 2025 the original author or authors.
@@ -99,10 +99,10 @@ describe("Rewrite RPC", () => {
     ));
 
     test("parse", async () => {
-        let sourceFile = (await client.parse([{
+        const sourceFile = (await client.parse([{
             text: "console.info('hello',)",
             sourcePath: "hello.js"
-        }]))[0];
+        }], JS.Kind.CompilationUnit))[0];
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
@@ -259,9 +259,9 @@ describe("Rewrite RPC", () => {
                             const result = _.map([1, 2, 3], n => n * 2);
                         `,
                         `
-                            import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
+                            import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
 
-                            const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                            const result = /*~~(_.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
                         `
                     ),
                     //language=json

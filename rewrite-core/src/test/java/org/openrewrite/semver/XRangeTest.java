@@ -146,4 +146,38 @@ class XRangeTest {
         assertThat(xrange.compare(null, "1.x", "1.0.x")).isPositive();
         assertThat(xrange.compare(null, "1.0.x", "1.x")).isNegative();
     }
+
+    /**
+     * Tests Gradle-style dynamic versions using '+' as a wildcard.
+     * The '+' wildcard should behave identically to 'x', '*', or 'X'.
+     */
+    @Test
+    void gradleDynamicVersionWithPlus() {
+        // Test that '+' is recognized as a valid wildcard
+        assertThat(XRange.build("2.+", null).isValid()).isTrue();
+        assertThat(XRange.build("1.0.+", null).isValid()).isTrue();
+        assertThat(XRange.build("1.2.3.+", null).isValid()).isTrue();
+
+        // Test major version wildcard: 2.+ should match any 2.x.x version
+        XRange majorWildcard = XRange.build("2.+", null).getValue();
+        assertThat(majorWildcard).isNotNull();
+        assertThat(majorWildcard.isValid("2.0", "2.0.0")).isTrue();
+        assertThat(majorWildcard.isValid("2.0", "2.5.3")).isTrue();
+        assertThat(majorWildcard.isValid("2.0", "2.99.99")).isTrue();
+        assertThat(majorWildcard.isValid("2.0", "3.0.0")).isFalse();
+        assertThat(majorWildcard.isValid("2.0", "1.9.9")).isFalse();
+
+        // Test minor version wildcard: 1.0.+ should match any 1.0.x version
+        XRange minorWildcard = XRange.build("1.0.+", null).getValue();
+        assertThat(minorWildcard).isNotNull();
+        assertThat(minorWildcard.isValid("1.0", "1.0.0")).isTrue();
+        assertThat(minorWildcard.isValid("1.0", "1.0.9")).isTrue();
+        assertThat(minorWildcard.isValid("1.0", "1.1.0")).isFalse();
+
+        // Test that 2.+ behaves identically to 2.x
+        XRange plusRange = XRange.build("2.+", null).getValue();
+        XRange xRange = XRange.build("2.x", null).getValue();
+        assertThat(plusRange.isValid("2.0", "2.5.3")).isEqualTo(xRange.isValid("2.0", "2.5.3"));
+        assertThat(plusRange.isValid("2.0", "3.0.0")).isEqualTo(xRange.isValid("2.0", "3.0.0"));
+    }
 }

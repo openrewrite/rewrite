@@ -19,7 +19,7 @@ import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tre
 import {Recipe, RecipeDescriptor, RecipeRegistry} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
-    Generate,
+    Generate, GenerateResponse,
     GetObject,
     GetRecipes,
     Parse,
@@ -69,8 +69,8 @@ export class RewriteRpc {
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
         // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
-        const getObject = (id: string) => this.getObject(id);
-        const getCursor = (cursorIds: string[] | undefined) => this.getCursor(cursorIds);
+        const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
+        const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
 
         const registry = options.registry || new RecipeRegistry();
 
@@ -92,10 +92,7 @@ export class RewriteRpc {
         this._global = value;
     }
 
-    static get(): RewriteRpc {
-        if (!this._global) {
-            throw new Error("RewriteRpc not initialized");
-        }
+    static get(): RewriteRpc | undefined {
         return this._global;
     }
 
@@ -104,14 +101,13 @@ export class RewriteRpc {
         return this;
     }
 
-    async getObject<P>(id: string): Promise<P> {
+    async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
         const localObject = this.localObjects.get(id);
-        const lastKnownId = localObject ? id : undefined;
 
-        const q = new RpcReceiveQueue(this.remoteRefs, () => {
+        const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
-                new GetObject(id, lastKnownId)
+                new GetObject(id, sourceFileType)
             );
         }, this.options.traceGetObjectInput);
 
@@ -128,11 +124,11 @@ export class RewriteRpc {
         return remoteObject;
     }
 
-    async getCursor(cursorIds: string[] | undefined): Promise<Cursor> {
+    async getCursor(cursorIds: string[] | undefined, sourceFileType?: string): Promise<Cursor> {
         let cursor = rootCursor();
         if (cursorIds) {
             for (let i = cursorIds.length - 1; i >= 0; i--) {
-                const cursorObject = await this.getObject(cursorIds[i]);
+                const cursorObject = await this.getObject(cursorIds[i], sourceFileType);
                 this.remoteObjects.set(cursorIds[i], cursorObject);
                 cursor = new Cursor(cursorObject, cursor);
             }
@@ -140,13 +136,13 @@ export class RewriteRpc {
         return cursor;
     }
 
-    async parse(inputs: ParserInput[], relativeTo?: string): Promise<SourceFile[]> {
+    async parse(inputs: ParserInput[], sourceFileType: string, relativeTo?: string): Promise<SourceFile[]> {
         const parsed: SourceFile[] = [];
         for (const g of await this.connection.sendRequest(
             new rpc.RequestType<Parse, string[], Error>("Parse"),
             new Parse(inputs, relativeTo)
         )) {
-            parsed.push(await this.getObject(g));
+            parsed.push(await this.getObject(g, sourceFileType));
         }
         return parsed;
     }
@@ -193,21 +189,26 @@ export class RewriteRpc {
         this.localObjects.set(tree.id.toString(), tree);
         const pId = this.localObject(p);
         const cursorIds = this.getCursorIds(cursor);
+
+        const sourceFileType = isSourceFile(tree) ? tree.kind :
+            cursor!.firstEnclosing(t => isSourceFile(t))!.kind;
+
         const response = await this.connection.sendRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
-            new Visit(visitorName, undefined, tree.id.toString(), pId, cursorIds)
+            new Visit(visitorName, sourceFileType, undefined, tree.id.toString(), pId, cursorIds)
         );
-        return response.modified ? this.getObject(tree.id.toString()) : tree;
+        return response.modified ? this.getObject(tree.id.toString(), sourceFileType) : tree;
     }
 
     async generate(remoteRecipeId: string, ctx: ExecutionContext): Promise<SourceFile[]> {
         const ctxId = this.localObject(ctx);
         const generated: SourceFile[] = [];
-        for (const g of await this.connection.sendRequest(
-            new rpc.RequestType<Generate, string[], Error>("Generate"),
+        const response = await this.connection.sendRequest(
+            new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"),
             new Generate(remoteRecipeId, ctxId)
-        )) {
-            generated.push(await this.getObject(g));
+        );
+        for (let i = 0; i < response.ids.length; i++) {
+            generated.push(await this.getObject(response.ids[i], response.sourceFileTypes[i]));
         }
         return generated;
     }

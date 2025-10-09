@@ -18,7 +18,7 @@ import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc"
 import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {createDraft, finishDraft} from "immer";
-import {JavaReceiver, JavaSender} from "../java/rpc";
+import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
@@ -105,7 +105,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         await q.getAndSend(functionCall, m => m.function, f => this.visitRightPadded(f, q));
         await q.getAndSend(functionCall, m => m.typeParameters, params => this.visitContainer(params, q));
         await q.getAndSend(functionCall, m => m.arguments, args => this.visitContainer(args, q));
-        await q.getAndSend(functionCall, m => asRef(m.functionType), type => this.visitType(type, q));
+        await q.getAndSend(functionCall, m => asRef(m.methodType), type => this.visitType(type, q));
         return functionCall;
     }
 
@@ -643,7 +643,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         draft.function = await q.receive(functionCall.function, select => this.visitRightPadded(select, q));
         draft.typeParameters = await q.receive(functionCall.typeParameters, typeParams => this.visitContainer(typeParams, q));
         draft.arguments = await q.receive(functionCall.arguments, args => this.visitContainer(args, q));
-        draft.functionType = await q.receive(functionCall.functionType, type => this.visitType(type, q) as unknown as Type.Method);
+        draft.methodType = await q.receive(functionCall.methodType, type => this.visitType(type, q) as unknown as Type.Method);
 
         return finishDraft(draft);
     }
@@ -1106,11 +1106,11 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
         return this.javaReceiverDelegate.visitRightPadded(right, q)
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
+    async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
         return this.javaReceiverDelegate.visitLeftPadded(left, q);
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
+    async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
         return this.javaReceiverDelegate.visitContainer(container, q);
     }
 
@@ -1139,17 +1139,4 @@ class JavaScriptReceiverDelegate extends JavaReceiver {
     }
 }
 
-const javaScriptCodec: RpcCodec<JS> = {
-    async rpcReceive(before: JS, q: RpcReceiveQueue): Promise<JS> {
-        return (await new JavaScriptReceiver().visit(before, q))! as JS;
-    },
-
-    async rpcSend(after: JS, q: RpcSendQueue): Promise<void> {
-        await new JavaScriptSender().visit(after, q);
-    }
-}
-
-// Register codec for all JavaScript AST node types
-Object.values(JS.Kind).forEach(kind => {
-    RpcCodecs.registerCodec(kind, javaScriptCodec);
-});
+registerJLanguageCodecs(JS.Kind.CompilationUnit, new JavaScriptReceiver(), new JavaScriptSender(), JS.Kind);

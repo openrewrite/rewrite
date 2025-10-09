@@ -22,12 +22,11 @@ import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 import org.openrewrite.*;
 
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 @Value
 public class Print implements RpcRequest {
     String treeId;
-
     String sourceFileType;
 
     @Nullable
@@ -35,11 +34,11 @@ public class Print implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Print> {
-        private final Function<String, ?> getObject;
+        private final BiFunction<String, @Nullable String, ?> getObject;
 
         @Override
         protected Object handle(Print request) throws Exception {
-            Tree tree = (Tree) getObject.apply(request.getTreeId());
+            Tree tree = (Tree) getObject.apply(request.getTreeId(), request.sourceFileType);
 
             try {
                 // Create an instance of the SourceFile type using Objenesis

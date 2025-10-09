@@ -16,16 +16,32 @@
 import {Cursor, isTree, SourceFile} from "../tree";
 import {mapAsync} from "../util";
 import {produceAsync, TreeVisitor, ValidImmerRecipeReturnType} from "../visitor";
-import {
-    Expression,
-    isJava,
-    isSpace,
-    J,
-    NameTree,
-    Statement, TypedTree, TypeTree
-} from "./tree";
+import {Expression, isSpace, J, NameTree, Statement, TypedTree, TypeTree} from "./tree";
 import {createDraft, Draft, finishDraft} from "immer";
 import {Type} from "./type";
+
+const javaKindValues = new Set(Object.values(J.Kind));
+
+const extendedJavaKinds = new Map<string, <P>(visitor: JavaVisitor<P>) => JavaVisitor<P>>();
+
+/**
+ * Register additional kind values for interfaces that extend J.
+ * This allows isJava to recognize implementations of those interfaces.
+ * @param kinds - Array of kind values to register
+ * @param adapter - Adapter function to transform a JavaVisitor to, for example, a JavaScriptVisitor
+ */
+export function registerJavaExtensionKinds(
+    kinds: readonly string[],
+    adapter: <P>(visitor: JavaVisitor<P>) => JavaVisitor<P>
+): void {
+    for (const kind of kinds) {
+        extendedJavaKinds.set(kind, adapter);
+    }
+}
+
+export function isJava(tree: any): tree is J {
+    return javaKindValues.has(tree["kind"]) || extendedJavaKinds.has(tree["kind"]);
+}
 
 export class JavaVisitor<P> extends TreeVisitor<J, P> {
     // protected javadocVisitor: any | null = null;
@@ -45,7 +61,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     // noinspection JSUnusedLocalSymbols
-    protected async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+    public async visitSpace(space: J.Space, p: P): Promise<J.Space> {
         return space;
     }
 
@@ -995,7 +1011,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return right ? this.visitRightPadded(right, p) : undefined;
     }
 
-    protected async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
+    public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: P): Promise<J.RightPadded<T>> {
         return produceAsync<J.RightPadded<T>>(right, async draft => {
             this.cursor = new Cursor(right, this.cursor);
             if (isTree(right.element)) {
@@ -1011,7 +1027,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return left ? this.visitLeftPadded(left, p) : undefined;
     }
 
-    protected async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
+    public async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, p: P): Promise<J.LeftPadded<T>> {
         return produceAsync<J.LeftPadded<T>>(left, async draft => {
             this.cursor = new Cursor(left, this.cursor);
             draft.before = await this.visitSpace(left.before, p);
@@ -1029,7 +1045,7 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
         return container ? this.visitContainer(container, p) : undefined;
     }
 
-    protected async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
+    public async visitContainer<T extends J>(container: J.Container<T>, p: P): Promise<J.Container<T>> {
         return produceAsync<J.Container<T>>(container, async draft => {
             this.cursor = new Cursor(container, this.cursor);
             draft.before = await this.visitSpace(container.before, p);
@@ -1200,6 +1216,10 @@ export class JavaVisitor<P> extends TreeVisitor<J, P> {
             case J.Kind.Yield:
                 return this.visitYield(t as J.Yield, p);
             default:
+                const adapter = extendedJavaKinds.get(t.kind)
+                if (adapter) {
+                    return adapter(this).visit(t, p);
+                }
                 return Promise.resolve(t);
         }
     }

@@ -16,66 +16,48 @@
 package org.openrewrite.java;
 
 import lombok.Getter;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
-import org.openrewrite.java.internal.grammar.MethodSignatureParser;
-import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.trait.Reference;
 
-import java.util.regex.Pattern;
-
-import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
-
 @Getter
 public class TypeMatcher implements Reference.Matcher {
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
-    @Getter
-    private Pattern targetTypePattern;
-
-    @Nullable
-    private String targetType;
-
     private final String signature;
+    private final TypeNameMatcher typeNameMatcher;
 
     /**
-     * Whether to match on subclasses of {@link #targetTypePattern}.
+     * Whether to match on subclasses.
      */
     @Getter
     private final boolean matchInherited;
 
-    public TypeMatcher(@Nullable String fieldType) {
-        this(fieldType, false);
+    public TypeMatcher(@Nullable String typePattern) {
+        this(typePattern, false);
     }
 
-    public TypeMatcher(@Nullable String fieldType, boolean matchInherited) {
-        this.signature = fieldType == null ? ".*" : fieldType;
+    public TypeMatcher(@Nullable String typePattern, boolean matchInherited) {
+        this.signature = typePattern == null ? ".*" : typePattern;
         this.matchInherited = matchInherited;
 
-        if (StringUtils.isBlank(fieldType)) {
-            targetTypePattern = Pattern.compile(".*");
+        if (StringUtils.isBlank(typePattern)) {
+            // Blank means wildcard - use PatternTypeNameMatcher with FullWildcard type
+            typeNameMatcher = PatternTypeNameMatcher.fullWildcard("*");
         } else {
-            MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                    CharStreams.fromString(fieldType + "#dummy()"))));
+            // Parse the type pattern
+            ParsedType parsed = parseTypePattern(typePattern);
+            String pattern = parsed.getFullPattern();
 
-            new MethodSignatureParserBaseVisitor<Void>() {
-
-                @Override
-                public @Nullable Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
-                    String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
-                    if (isPlainIdentifier(ctx)) {
-                        targetType = pattern;
-                    }
-                    targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
-                    return null;
-                }
-            }.visitTargetTypePattern(parser.targetTypePattern());
+            // Determine if it's a plain identifier (no wildcards)
+            if (!pattern.contains("*") && !pattern.contains("..")) {
+                typeNameMatcher = new ExactTypeNameMatcher(pattern);
+            } else {
+                // All patterns (including "*" and "*..*") use PatternTypeNameMatcher
+                typeNameMatcher = PatternTypeNameMatcher.fromPattern(pattern);
+            }
         }
     }
 
@@ -84,30 +66,42 @@ public class TypeMatcher implements Reference.Matcher {
     }
 
     public boolean matchesPackage(String packageName) {
-        return targetTypePattern.matcher(packageName).matches() ||
-               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
+        // Direct match first
+        if (typeNameMatcher.matches(packageName)) {
+            return true;
+        }
+
+        // If packageName ends with .*, try matching with the class name from signature
+        if (packageName.endsWith(".*")) {
+            String packagePrefix = packageName.substring(0, packageName.length() - 2);
+            int lastDot = signature.lastIndexOf('.');
+            if (lastDot >= 0) {
+                String fullName = packagePrefix + "." + signature.substring(lastDot + 1);
+                return typeNameMatcher.matches(fullName);
+            }
+        }
+
+        return false;
     }
 
     public boolean matches(@Nullable JavaType type) {
-        return TypeUtils.isOfTypeWithName(
-                TypeUtils.asFullyQualified(type),
-                matchInherited,
-                this::matchesTargetTypeName
-        );
+        if (type instanceof JavaType.FullyQualified && typeNameMatcher.matches(((JavaType.FullyQualified) type).getFullyQualifiedName())) {
+            return true;
+        }
+
+        if (matchInherited && type instanceof JavaType.FullyQualified) {
+            return TypeUtils.isOfTypeWithName(
+                    TypeUtils.asFullyQualified(type),
+                    matchInherited,
+                    this::matchesTargetTypeName
+            );
+        }
+
+        return false;
     }
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
-        return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
-    }
-
-    private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
-        return context.BANG() == null &&
-               context.AND() == null &&
-               context.OR() == null &&
-               context.classNameOrInterface().DOTDOT().isEmpty() &&
-               context.classNameOrInterface().WILDCARD().isEmpty();
+        return typeNameMatcher.matches(fullyQualifiedTypeName);
     }
 
     @Override
@@ -118,5 +112,69 @@ public class TypeMatcher implements Reference.Matcher {
     @Override
     public Reference.Renamer createRenamer(String newName) {
         return reference -> newName;
+    }
+
+    /**
+     * Parses a type pattern, handling array dimensions and qualifying simple type names.
+     * Package-private for use by MethodMatcher.
+     */
+    static ParsedType parseTypePattern(String pattern) {
+        // Handle array types by preserving [] suffixes
+        int arrayDimensions = 0;
+        int pos = pattern.length();
+        while (pos >= 2 && pattern.charAt(pos - 2) == '[' && pattern.charAt(pos - 1) == ']') {
+            arrayDimensions++;
+            pos -= 2;
+        }
+
+        String baseType = arrayDimensions > 0 ? pattern.substring(0, pos).trim() : pattern;
+
+        // Special handling for simple type names
+        if (!baseType.contains(".") && !baseType.contains("*")) {
+            // Check if it's a primitive
+            if (Character.isLowerCase(baseType.charAt(0)) && JavaType.Primitive.fromKeyword(baseType) != null) {
+                // It's a primitive, keep as-is
+            } else {
+                // Check if it's a java.lang type
+                if (TypeUtils.findQualifiedJavaLangTypeName(baseType) != null) {
+                    baseType = "java.lang." + baseType;
+                }
+            }
+        }
+
+        return new ParsedType(baseType, arrayDimensions);
+    }
+
+    /**
+     * Represents a parsed type pattern with its base type and array dimensions.
+     * Package-private for use by MethodMatcher.
+     */
+    static class ParsedType {
+        private final String baseType;
+        private final int arrayDimensions;
+
+        ParsedType(String baseType, int arrayDimensions) {
+            this.baseType = baseType;
+            this.arrayDimensions = arrayDimensions;
+        }
+
+        public String getBaseType() {
+            return baseType;
+        }
+
+        public int getArrayDimensions() {
+            return arrayDimensions;
+        }
+
+        public String getFullPattern() {
+            if (arrayDimensions == 0) {
+                return baseType;
+            }
+            StringBuilder result = new StringBuilder(baseType);
+            for (int i = 0; i < arrayDimensions; i++) {
+                result.append("[]");
+            }
+            return result.toString();
+        }
     }
 }

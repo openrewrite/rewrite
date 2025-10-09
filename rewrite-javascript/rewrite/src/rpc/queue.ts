@@ -46,37 +46,58 @@ export interface RpcCodec<T> {
  * A registry for managing RPC codecs based on object types.
  */
 export class RpcCodecs {
-    private static codecs = new Map<string, RpcCodec<any>>();
+    private static nonTreeCodecs = new Map<string, RpcCodec<any>>();
+
+    /**
+     * The first key is on sourceFileType and the second on object type
+     */
+    private static treeCodecs = new Map<string, Map<string, RpcCodec<any>>>();
 
     /**
      * Registers an RPC codec for a given type.
      *
      * @param type - The string identifier of the object type.
      * @param codec - The codec implementation to be registered.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      */
-    static registerCodec(type: string, codec: RpcCodec<any>): void {
-        this.codecs.set(type, codec);
+    static registerCodec(type: string, codec: RpcCodec<any>, sourceFileType?: string): void {
+        if (sourceFileType) {
+            let codecsForSourceFile = this.treeCodecs.get(sourceFileType);
+            if (!codecsForSourceFile) {
+                codecsForSourceFile = new Map<string, RpcCodec<any>>();
+                this.treeCodecs.set(sourceFileType, codecsForSourceFile);
+            }
+            codecsForSourceFile.set(type, codec);
+        } else {
+            this.nonTreeCodecs.set(type, codec);
+        }
     }
 
     /**
      * Retrieves the registered codec for a given type.
      *
      * @param type - The string identifier of the object type.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      * @returns The corresponding `RpcCodec`, or `undefined` if not found.
      */
-    static forType(type: string): RpcCodec<any> | undefined {
-        return this.codecs.get(type);
+    static forType(type: string, sourceFileType?: string): RpcCodec<any> | undefined {
+        if (sourceFileType) {
+            const treeCodec = this.treeCodecs.get(sourceFileType)?.get(type);
+            return treeCodec || this.nonTreeCodecs.get(type);
+        }
+        return this.nonTreeCodecs.get(type);
     }
 
     /**
      * Determines the appropriate codec for an instance based on its `kind` property.
      *
      * @param before - The object instance to find a codec for.
+     * @param sourceFileType The source file type of the source file containing (or will contain) this element.
      * @returns The corresponding `RpcCodec`, or `undefined` if no matching codec is found.
      */
-    static forInstance(before: any): RpcCodec<any> | undefined {
+    static forInstance(before: any, sourceFileType?: string): RpcCodec<any> | undefined {
         if (before !== undefined && before !== null && typeof before === "object" && "kind" in before) {
-            return RpcCodecs.forType(before["kind"] as string);
+            return RpcCodecs.forType(before["kind"] as string, sourceFileType);
         }
     }
 }
@@ -86,7 +107,9 @@ export class RpcSendQueue {
 
     private before?: any;
 
-    constructor(private readonly refs: ReferenceMap, private readonly trace: boolean) {
+    constructor(private readonly refs: ReferenceMap,
+                private readonly sourceFileType: string | undefined,
+                private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
@@ -132,7 +155,7 @@ export class RpcSendQueue {
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
             } else {
-                let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
+                let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
                 this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
                 await this.doChange(after, before, onChange, afterCodec);
             }
@@ -161,7 +184,7 @@ export class RpcSendQueue {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
-                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter));
+                        await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
                     }
                 }
             }
@@ -199,7 +222,7 @@ export class RpcSendQueue {
             }
             ref = this.refs.create(after);
         }
-        let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after);
+        let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
         this.put({
             state: RpcObjectState.ADD,
             valueType: this.getValueType(after),
@@ -236,6 +259,7 @@ export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
 
     constructor(private readonly refs: Map<number, any>,
+                private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logFile?: Writable) {
     }
@@ -301,7 +325,7 @@ export class RpcReceiveQueue {
                     let codec;
                     if (onChange) {
                         after = await onChange(before!);
-                    } else if ((codec = RpcCodecs.forInstance(before))) {
+                    } else if ((codec = RpcCodecs.forInstance(before, this.sourceFileType))) {
                         after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;

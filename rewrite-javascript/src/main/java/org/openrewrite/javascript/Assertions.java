@@ -32,7 +32,7 @@ import java.util.function.Consumer;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.json.Assertions.json;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "DataFlowIssue"})
 public class Assertions {
 
     private Assertions() {
@@ -122,8 +122,13 @@ public class Assertions {
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, null);
-        spec.accept(js);
+        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(
+                JS.CompilationUnit.class, null, JavaScriptParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        acceptSpec(spec, js);
         return js;
     }
 
@@ -134,8 +139,13 @@ public class Assertions {
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before, @Language("js") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
-        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(JS.CompilationUnit.class, null, JavaScriptParser.builder(), before, s -> after);
-        spec.accept(js);
+        SourceSpec<JS.CompilationUnit> js = new SourceSpec<>(
+                JS.CompilationUnit.class, null, JavaScriptParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        ).after(s -> after);
+        acceptSpec(spec, js);
         return js;
     }
 
@@ -146,7 +156,10 @@ public class Assertions {
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, spec);
+        return javascript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".ts");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after) {
@@ -157,7 +170,10 @@ public class Assertions {
     public static SourceSpecs typescript(@Language("ts") @Nullable String before, @Language("ts") @Nullable String after,
                                          Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, after, spec);
+        return javascript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before) {
@@ -168,18 +184,29 @@ public class Assertions {
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return typescript(before, spec);
+        return typescript(before, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after) {
-        //noinspection LanguageMismatch
-        return typescript(before, after, s -> {
+        return tsx(before, after, s -> {
         });
     }
 
     public static SourceSpecs tsx(@Language("tsx") @Nullable String before, @Language("tsx") @Nullable String after,
                                   Consumer<SourceSpec<JS.CompilationUnit>> spec) {
         //noinspection LanguageMismatch
-        return javascript(before, after, spec);
+        return typescript(before, after, spec2 -> {
+            spec2.path(System.nanoTime() + ".tsx");
+            spec.accept(spec2);
+        });
+    }
+
+    private static void acceptSpec(Consumer<SourceSpec<JS.CompilationUnit>> spec, SourceSpec<JS.CompilationUnit> js) {
+        Consumer<JS.CompilationUnit> userSuppliedAfterRecipe = js.getAfterRecipe();
+        js.afterRecipe(userSuppliedAfterRecipe::accept);
+        spec.accept(js);
     }
 }

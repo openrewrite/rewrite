@@ -38,7 +38,7 @@ public class Trace {
     public static void traceReceiver(RpcObjectData message) {
         PrintStream logFile = TRACE_RECEIVER;
         if (logFile != null && message.getTrace() != null) {
-            logFile.println(message.withTrace(null));
+            logFile.println(message.withTrace());
             logFile.println("  " + message.getTrace());
             logFile.println("  " + trace("Receiver"));
             logFile.flush();
@@ -66,10 +66,10 @@ public class Trace {
      */
     public static class StackElementSourceLookup {
         private final Map<String, Path> sourceByClassName = new HashMap<>();
-        private Path repositoryRoot = Paths.get(".").toAbsolutePath();
+        private @Nullable Path repositoryRoot = Paths.get(".").toAbsolutePath();
 
         public StackElementSourceLookup() {
-            while (!repositoryRoot.resolve(".git").toFile().exists()) {
+            while (repositoryRoot != null && !repositoryRoot.resolve(".git").toFile().exists()) {
                 repositoryRoot = repositoryRoot.getParent();
             }
         }
@@ -94,6 +94,10 @@ public class Trace {
         }
 
         private @Nullable Path lookupSourcePath(String className) {
+            if (repositoryRoot == null) {
+                // In case the current working directory was not inside a Git repository
+                return null;
+            }
             String relativePath = className.replace('.', File.separatorChar) + ".java";
             try (Stream<Path> paths = Files.walk(repositoryRoot)) {
                 return paths
