@@ -185,6 +185,9 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         for (String other : otherImportsUsed) {
             J.Import unfolded = starImport.withQualid(starImport.getQualid().withName(starImport
                     .getQualid().getName().withSimpleName(other))).withId(randomId());
+            if (unfolded.getQualid().getType() instanceof JavaType.Unknown) {
+                unfolded = unfolded.withQualid(unfolded.getQualid().withType(JavaType.buildType(unfolded.getQualid().toString())));
+            }
             unfoldedImports.add(i++ == 0 ? unfolded : unfolded.withPrefix(Space.format("\n")));
         }
         return unfoldedImports;
