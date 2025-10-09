@@ -55,6 +55,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     void before() {
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
           .recipeInstallDir(tempDir)
+          .metricsCsv(tempDir.resolve("rpc.csv"))
           .log(tempDir.resolve("rpc.log"))
           .verboseLogging()
         );
@@ -63,6 +64,9 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @AfterEach
     void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
+        if (Files.exists(tempDir.resolve("rpc.csv"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.csv")));
+        }
         if (Files.exists(tempDir.resolve("rpc.log"))) {
             System.out.println(Files.readString(tempDir.resolve("rpc.log")));
         }
@@ -308,8 +312,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
                 const result = _.map([1, 2, 3], n => n * 2);
                 """,
               """
-                import /*~~(@types/lodash.LoDashStatic)~~>*/_ from 'lodash';
-                const result = /*~~(@types/lodash.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
+                import /*~~(_.LoDashStatic)~~>*/_ from 'lodash';
+                const result = /*~~(_.LoDashStatic)~~>*/_.map([1, 2, 3], n => n * 2);
                 """
             ),
             packageJson(

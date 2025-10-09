@@ -15,11 +15,11 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
-import {UUID} from "node:crypto";
 import {ParserInput, Parsers} from "../../parser";
-import {randomId} from "../../uuid";
+import {randomId, UUID} from "../../uuid";
 import {produce} from "immer";
 import {SourceFile} from "../../tree";
+import {withMetrics} from "./metrics";
 
 export class Parse {
     constructor(private readonly inputs: ParserInput[],
@@ -27,8 +27,14 @@ export class Parse {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  localObjects: Map<string, ((input: string) => any) | any>): void {
-        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), async (request) => {
+                  localObjects: Map<string, ((input: string) => any) | any>,
+                  metricsCsv?: string): void {
+        const target = { target: '' };
+        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), withMetrics<Parse, UUID[]>("Parse", target, metricsCsv)(async (request) => {
+            // Set target to comma-separated list of file paths
+            target.target = request.inputs.map(input =>
+                typeof input === 'string' ? input : input.sourcePath
+            ).join(',');
             let parser = Parsers.createParser("javascript", {
                 ctx: new ExecutionContext(),
                 relativeTo: request.relativeTo
@@ -38,7 +44,7 @@ export class Parse {
                 return [];
             }
             const generator = parser.parse(...request.inputs);
-            const result: string[] = [];
+            const result: UUID[] = [];
 
             for (let i = 0; i < request.inputs.length; i++) {
                 const id = randomId();
@@ -50,6 +56,6 @@ export class Parse {
             }
 
             return result;
-        });
+        }));
     }
 }

@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor} from "../../tree";
 import {ExecutionContext} from "../../execution";
+import {withMetrics} from "./metrics";
 
 export interface GenerateResponse {
     ids: string[]
@@ -31,8 +32,11 @@ export class Generate {
                   localObjects: Map<string, any>,
                   preparedRecipes: Map<String, Recipe>,
                   recipeCursors: WeakMap<Recipe, Cursor>,
-                  getObject: (id: string) => any): void {
-        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), async (request) => {
+                  getObject: (id: string) => any,
+                  metricsCsv?: string): void {
+        const target = { target: '' };
+        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), withMetrics<Generate, GenerateResponse>("Generate", target, metricsCsv)(async (request) => {
+            target.target = request.id;
             const recipe = preparedRecipes.get(request.id);
             const response = {
                 ids: [],
@@ -57,6 +61,6 @@ export class Generate {
 
             }
             return response;
-        });
+        }));
     }
 }

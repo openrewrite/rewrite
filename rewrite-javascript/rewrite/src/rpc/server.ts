@@ -33,6 +33,7 @@ require('v8').setFlagsFromString('--stack-size=8000');
 
 interface ProgramOptions {
     logFile?: string;
+    metricsCsv?: string;
     verbose?: boolean;
     batchSize?: number;
     traceGetObjectOutput?: boolean;
@@ -46,6 +47,7 @@ async function main() {
     program
         .option('--port <number>', 'port number')
         .option('--log-file <log_path>', 'log file path')
+        .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
         .option('-v, --verbose', 'enable verbose output')
         .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
         .option('--trace-get-object-output', 'enable `GetObject` output tracing')
@@ -153,6 +155,7 @@ async function main() {
     RewriteRpc.set(new RewriteRpc(connection, {
         batchSize: options.batchSize,
         logger: logger,
+        metricsCsv: options.metricsCsv,
         traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
         traceGetObjectOutput: options.traceGetObjectOutput,
         recipeInstallDir: recipeInstallDir
