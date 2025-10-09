@@ -15,22 +15,26 @@
  */
 package org.openrewrite.maven;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddPlugin extends Recipe {
+public class AddPlugin extends ScanningRecipe<Set<ResolvedGroupArtifactVersion>> {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
 
@@ -99,11 +103,30 @@ public class AddPlugin extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPluginVisitor();
+    public Set<ResolvedGroupArtifactVersion> getInitialValue(ExecutionContext ctx) {
+        return new HashSet<>();
     }
 
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Set<ResolvedGroupArtifactVersion> acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                acc.add(getResolutionResult().getPom().getGav());
+                return document;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Set<ResolvedGroupArtifactVersion> acc) {
+        return new AddPluginVisitor(acc);
+    }
+
+    @AllArgsConstructor
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
+
+        private Set<ResolvedGroupArtifactVersion> projectPoms;
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -112,7 +135,7 @@ public class AddPlugin extends Recipe {
             }
 
             MavenResolutionResult mrr = sourceFile.getMarkers().findFirst(MavenResolutionResult.class).orElse(null);
-            if (mrr == null || mrr.parentPomIsProjectPom()) {
+            if (mrr == null || (mrr.getParent() != null && projectPoms.contains(mrr.getParent().getPom().getGav()))) {
                 return false;
             }
 

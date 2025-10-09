@@ -17,23 +17,19 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
+public class UpdateMavenProjectPropertyJavaVersion extends ScanningRecipe<Set<ResolvedGroupArtifactVersion>> {
 
     private static final List<String> JAVA_VERSION_PROPERTIES = Arrays.asList(
             "java.version",
@@ -78,7 +74,23 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Set<ResolvedGroupArtifactVersion> getInitialValue(ExecutionContext ctx) {
+        return new HashSet<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Set<ResolvedGroupArtifactVersion> acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                acc.add(getResolutionResult().getPom().getGav());
+                return document;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Set<ResolvedGroupArtifactVersion> acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
             boolean compilerPluginConfiguredExplicitly;
 
@@ -88,7 +100,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 Xml.Document d = super.visitDocument(document, ctx);
 
                 // Return early if the parent appears to be within the current repository, as properties defined there will be updated
-                if (getResolutionResult().getParent() != null && getResolutionResult().parentPomIsProjectPom()) {
+                if (getResolutionResult().getParent() != null && acc.contains(getResolutionResult().getParent().getPom().getGav())) {
                     // Unless the plugin config in the parent defines source/target/release with a property
                     for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
                         if ("org.apache.maven.plugins".equals(plugin.getGroupId()) && "maven-compiler-plugin".equals(plugin.getArtifactId()) && plugin.getConfiguration() != null) {
