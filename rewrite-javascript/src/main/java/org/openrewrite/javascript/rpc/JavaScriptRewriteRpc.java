@@ -98,6 +98,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Environment marketplace = Environment.builder().build();
         private Path npxPath = Paths.get("npx");
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
         private Duration timeout = Duration.ofSeconds(30);
         private boolean verboseLogging;
@@ -137,6 +138,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         public Builder log(@Nullable Path log) {
             this.log = log;
+            return this;
+        }
+
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
             return this;
         }
 
@@ -250,6 +256,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         version.endsWith("-SNAPSHOT") ? null : "--package=@openrewrite/rewrite@" + version,
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         verboseLogging ? "--verbose" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString(),
                         profiler ? "--profile" : null

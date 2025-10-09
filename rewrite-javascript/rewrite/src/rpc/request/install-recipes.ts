@@ -18,6 +18,7 @@ import {RecipeRegistry} from "../../recipe";
 import * as path from "path";
 import * as fs from "fs";
 import {spawn, ChildProcess} from "child_process";
+import {withMetrics} from "./metrics";
 
 export interface InstallRecipesResponse {
     recipesInstalled: number
@@ -68,8 +69,10 @@ export class InstallRecipes {
     }
 
     static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
-                  logger?: rpc.Logger): void {
-        connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), async (request) => {
+                  logger?: rpc.Logger, metricsCsv?: string): void {
+        const target = { target: '' };
+        connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), withMetrics<InstallRecipes, InstallRecipesResponse>("InstallRecipes", target, metricsCsv)(async (request) => {
+            target.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
             const beforeInstall = registry.all.size;
             let resolvedPath;
             let recipesName = request.recipes;
@@ -129,7 +132,7 @@ export class InstallRecipes {
             }
 
             return {recipesInstalled: registry.all.size - beforeInstall};
-        });
+        }));
     }
 }
 

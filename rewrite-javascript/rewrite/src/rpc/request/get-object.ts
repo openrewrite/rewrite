@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
+import {withMetrics, extractSourcePath} from "./metrics";
 
 export class GetObject {
     constructor(private readonly id: string,
@@ -28,11 +29,13 @@ export class GetObject {
         localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
-        trace: boolean
+        trace: boolean,
+        metricsCsv?: string
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
+        const target = { target: '' };
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async request => {
+        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), withMetrics<GetObject, any>("GetObject", target, metricsCsv)(async request => {
             let objId = request.id;
             if (!localObjects.has(objId)) {
                 return [
@@ -47,9 +50,12 @@ export class GetObject {
                 localObjects.set(objId, obj);
             }
 
+            const obj = localObjects.get(objId);
+            target.target = extractSourcePath(obj);
+
             let allData = pendingData.get(objId);
             if (!allData) {
-                const after = localObjects.get(objId);
+                const after = obj;
                 const before = remoteObjects.get(objId);
 
                 allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
@@ -66,6 +72,6 @@ export class GetObject {
             }
 
             return batch;
-        });
+        }));
     }
 }

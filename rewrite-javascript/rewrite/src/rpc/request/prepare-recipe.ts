@@ -21,6 +21,7 @@ import {Check} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {withMetrics} from "./metrics";
 
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
@@ -28,9 +29,12 @@ export class PrepareRecipe {
 
     static handle(connection: MessageConnection,
                   registry: RecipeRegistry,
-                  preparedRecipes: Map<String, Recipe>) {
+                  preparedRecipes: Map<String, Recipe>,
+                  metricsCsv?: string) {
         const snowflake = SnowflakeId();
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), async (request) => {
+        const target = { target: '' };
+        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), withMetrics<PrepareRecipe, PrepareRecipeResponse>("PrepareRecipe", target, metricsCsv)(async (request) => {
+            target.target = request.id;
             const id = snowflake.generate();
             const recipeCtor = registry.all.get(request.id);
             if (!recipeCtor) {
@@ -54,7 +58,7 @@ export class PrepareRecipe {
                 scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
                 scanPreconditions: scanPreconditions
             }
-        });
+        }));
     }
 
     /**

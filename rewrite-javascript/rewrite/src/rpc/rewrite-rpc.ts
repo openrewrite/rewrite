@@ -29,6 +29,7 @@ import {
     Visit,
     VisitResponse
 } from "./request";
+import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
 import {ExecutionContext} from "../execution";
@@ -61,10 +62,14 @@ export class RewriteRpc {
                     batchSize?: number,
                     registry?: RecipeRegistry,
                     logger?: rpc.Logger,
+                    metricsCsv?: string,
                     traceGetObjectOutput?: boolean,
                     traceGetObjectInput?: Writable,
                     recipeInstallDir?: string
                 }) {
+        // Initialize metrics CSV file if configured
+        initializeMetricsCsv(options.metricsCsv, options.logger);
+
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
@@ -74,16 +79,16 @@ export class RewriteRpc {
 
         const registry = options.registry || new RecipeRegistry();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
-        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
-            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput);
-        GetRecipes.handle(this.connection, registry);
-        GetLanguages.handle(this.connection);
-        PrepareRecipe.handle(this.connection, registry, preparedRecipes);
-        Parse.handle(this.connection, this.localObjects);
-        Print.handle(this.connection, getObject);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger);
+            this.localRefs, options?.batchSize || 200, !!options?.traceGetObjectOutput, options.metricsCsv);
+        GetRecipes.handle(this.connection, registry, options.metricsCsv);
+        GetLanguages.handle(this.connection, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
+        Parse.handle(this.connection, this.localObjects, options.metricsCsv);
+        Print.handle(this.connection, getObject, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
 
         this.connection.listen();
     }

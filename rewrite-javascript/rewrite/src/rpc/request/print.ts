@@ -17,6 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {isSourceFile, Tree} from "../../tree";
 import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
+import {withMetrics, extractSourcePath} from "./metrics";
 
 export const enum MarkerPrinter {
     DEFAULT = "DEFAULT",
@@ -29,15 +30,18 @@ export class Print {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  getObject: (id: string, sourceFileType?: string) => any): void {
-        connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
+                  getObject: (id: string, sourceFileType?: string) => any,
+                  metricsCsv?: string): void {
+        const target = { target: '' };
+        connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), withMetrics<Print, string>("Print", target, metricsCsv)(async request => {
             const tree: Tree = await getObject(request.treeId.toString(), request.sourceFileType);
+            target.target = extractSourcePath(tree);
             const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
             if (isSourceFile(tree)) {
                 return await printer(tree).print(tree, out);
             } else {
                 return await printer(request.sourceFileType).print(tree, out);
             }
-        });
+        }));
     }
 }
