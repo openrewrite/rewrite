@@ -19,7 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -206,7 +207,9 @@ public class ChangeDependencyConfiguration extends Recipe {
 
                     Dependency dependency;
                     if ("project".equals(inner.getSimpleName())) {
-                        dependency = new Dependency("", ((String) value.getValue()).substring(1), null, null, null);
+                        dependency = Dependency.builder()
+                                .gav(new GroupArtifactVersion("", ((String) value.getValue()).substring(1), null))
+                                .build();
                     } else {
                         dependency = DependencyStringNotationConverter.parse((String) value.getValue());
                     }

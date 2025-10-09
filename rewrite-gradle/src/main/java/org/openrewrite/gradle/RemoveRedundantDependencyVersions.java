@@ -19,8 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleDependencyConstraint;
@@ -29,7 +28,6 @@ import org.openrewrite.gradle.trait.GradleDependencies;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.trait.SpringDependencyManagementPluginEntry;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -453,7 +451,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
                         if (springPluginManagedDependencies.containsKey(dep.getGav().asGroupArtifact())) {
                             if (matchesComparator(springPluginManagedDependencies.get(dep.getGav().asGroupArtifact()), dep.getVersion())) {
-                                return maybeRemoveVersion(m);
+                                return gradleDependency.removeVersion().getTree();
                             }
                         }
 
@@ -461,7 +459,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             for (ResolvedPom platform : platforms.get(m.getSimpleName())) {
                                 String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
                                 if (matchesComparator(managedVersion, dep.getVersion())) {
-                                    return maybeRemoveVersion(m);
+                                    return gradleDependency.removeVersion().getTree();
                                 }
                             }
                         }
@@ -472,47 +470,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     for (ResolvedPom platform : platforms.get(configuration.getName())) {
                                         String managedVersion = platform.getManagedVersion(dep.getGroupId(), dep.getArtifactId(), null, dep.getRequested().getClassifier());
                                         if (matchesComparator(managedVersion, dep.getVersion())) {
-                                            return maybeRemoveVersion(m);
+                                            return gradleDependency.removeVersion().getTree();
                                         }
                                     }
                                 }
                             }
                         }
 
-                        return m;
-                    }
-
-                    private J.MethodInvocation maybeRemoveVersion(J.MethodInvocation m) {
-                        if (m.getArguments().get(0) instanceof J.Literal) {
-                            J.Literal l = (J.Literal) m.getArguments().get(0);
-                            if (l.getType() == JavaType.Primitive.String) {
-                                Dependency dep = DependencyStringNotationConverter.parse((String) l.getValue());
-                                if (dep == null || dep.getClassifier() != null || dep.getExt() != null) {
-                                    return m;
-                                }
-                                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                                        ChangeStringLiteral.withStringValue(l, dep.withVersion(null).toStringNotation()))
-                                );
-                            }
-                        } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
-                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                                G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
-                                    if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                                        return null;
-                                    }
-                                    return entry;
-                                }));
-                            }));
-                        } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                            return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                                G.MapEntry entry = (G.MapEntry) arg;
-                                if (entry.getKey() instanceof J.Literal && "version".equals(((J.Literal) entry.getKey()).getValue())) {
-                                    return null;
-                                }
-                                return entry;
-                            }));
-                        }
                         return m;
                     }
 
