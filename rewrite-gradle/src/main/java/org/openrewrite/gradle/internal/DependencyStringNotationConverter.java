@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 public class DependencyStringNotationConverter {
 
@@ -23,7 +25,10 @@ public class DependencyStringNotationConverter {
      * @param notation a String in the format group:artifact:version
      * @return A corresponding Dependency or null if the notation could not be parsed
      */
-    public static @Nullable Dependency parse(String notation) {
+    public static @Nullable Dependency parse(@Nullable String notation) {
+        if (notation == null) {
+            return null;
+        }
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
             return parse(notation, null);
@@ -37,8 +42,14 @@ public class DependencyStringNotationConverter {
         return parse(notation, null);
     }
 
-    private static @Nullable Dependency parse(String notation, @Nullable String ext) {
-        Dependency dependency = new Dependency(null, null, null, null, ext);
+    private static @Nullable Dependency parse(@Nullable String notation, @Nullable String type) {
+        if (notation == null) {
+            return null;
+        }
+        String groupId = null;
+        String artifactId = null;
+        String version = null;
+        String classifier = null;
 
         int count = 0;
         int idx = 0;
@@ -46,33 +57,49 @@ public class DependencyStringNotationConverter {
         while (++cur < notation.length()) {
             if (':' == notation.charAt(cur)) {
                 String fragment = notation.substring(idx, cur);
-                dependency = assignValue(dependency, count, fragment);
+                switch (count) {
+                    case 0:
+                        groupId = fragment;
+                        break;
+                    case 1:
+                        artifactId = fragment;
+                        break;
+                    case 2:
+                        version = fragment;
+                        break;
+                    case 3:
+                        classifier = fragment;
+                        break;
+                }
                 idx = cur + 1;
                 count++;
             }
         }
-        dependency = assignValue(dependency, count, notation.substring(idx, cur));
+        String fragment = notation.substring(idx, cur);
+        switch (count) {
+            case 0:
+                groupId = fragment;
+                break;
+            case 1:
+                artifactId = fragment;
+                break;
+            case 2:
+                version = fragment;
+                break;
+            case 3:
+                classifier = fragment;
+                break;
+        }
         count++;
 
         if (count < 2 || count > 4) {
             return null;
         }
 
-        return dependency;
-    }
-
-    private static Dependency assignValue(Dependency dependency, int count, String fragment) {
-        switch (count) {
-            case 0:
-                return dependency.withGroupId(fragment);
-            case 1:
-                return dependency.withArtifactId(fragment);
-            case 2:
-                return dependency.withVersion(fragment);
-            case 3:
-                return dependency.withClassifier(fragment);
-            default:
-                throw new IllegalArgumentException("Invalid count parameter: " + count);
-        }
+        return Dependency.builder()
+                .gav(new GroupArtifactVersion(groupId, artifactId, version))
+                .classifier(classifier)
+                .type(type)
+                .build();
     }
 }

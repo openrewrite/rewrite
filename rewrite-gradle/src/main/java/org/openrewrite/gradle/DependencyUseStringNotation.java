@@ -20,7 +20,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
@@ -162,7 +163,11 @@ public class DependencyUseStringNotation extends Recipe {
                     String classifier = coerceToStringNotation(mapNotation.get("classifier"));
                     String extension = coerceToStringNotation(mapNotation.get("ext"));
 
-                    Dependency dependency = new Dependency(group, name, version, classifier, extension);
+                    Dependency dependency = Dependency.builder()
+                            .gav(new GroupArtifactVersion(group, name, version))
+                            .classifier(classifier)
+                            .type(extension)
+                            .build();
                     String stringNotation = dependency.toStringNotation();
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", emptyList(), JavaType.Primitive.String);
