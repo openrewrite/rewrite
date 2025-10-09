@@ -35,4 +35,19 @@ public class HclParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void escapes() {
+        rewriteRun(
+          hcl(
+            """
+              variable "password_mask" {
+                description = "Characters not allowed in generated passwords."
+                type        = string
+                default     = "'()*+,./:;=?[]`{|}~\\"\\\\"  # fails only because escaped backslash is last character
+              }
+              """
+          )
+        );
+    }
 }
