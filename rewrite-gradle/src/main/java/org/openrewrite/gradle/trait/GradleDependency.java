@@ -625,6 +625,19 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         }
                     }
                 }
+            } else if (versionExp instanceof K.StringTemplate) {
+                // Handle Kotlin StringTemplate in map notation
+                K.StringTemplate template = (K.StringTemplate) versionExp;
+                List<J> strings = template.getStrings();
+                if (!strings.isEmpty() && strings.get(0) instanceof K.StringTemplate.Expression) {
+                    K.StringTemplate.Expression versionTemplateExpr = (K.StringTemplate.Expression) strings.get(0);
+                    Object tree = versionTemplateExpr.getTree();
+                    if (tree instanceof J.Identifier) {
+                        return ((J.Identifier) tree).getSimpleName();
+                    } else if (tree instanceof J.FieldAccess) {
+                        return ((J.FieldAccess) tree).printTrimmed(cursor);
+                    }
+                }
             }
         }
 
