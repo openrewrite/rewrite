@@ -33,45 +33,52 @@ export class GetObject {
         metricsCsv?: string
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
-        const target = { target: '' };
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), withMetrics<GetObject, any>("GetObject", target, metricsCsv)(async request => {
-            let objId = request.id;
-            if (!localObjects.has(objId)) {
-                return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
-                ];
-            }
+        connection.onRequest(
+            new rpc.RequestType<GetObject, any, Error>("GetObject"),
+            withMetrics<GetObject, any>(
+                "GetObject",
+                metricsCsv,
+                (context) => async request => {
+                    let objId = request.id;
+                    if (!localObjects.has(objId)) {
+                        context.target = '';
+                        return [
+                            {state: RpcObjectState.DELETE},
+                            {state: RpcObjectState.END_OF_OBJECT}
+                        ];
+                    }
 
-            let objectOrGenerator = localObjects.get(objId)!;
-            if (typeof objectOrGenerator === 'function') {
-                let obj = await objectOrGenerator(objId);
-                localObjects.set(objId, obj);
-            }
+                    let objectOrGenerator = localObjects.get(objId)!;
+                    if (typeof objectOrGenerator === 'function') {
+                        let obj = await objectOrGenerator(objId);
+                        localObjects.set(objId, obj);
+                    }
 
-            const obj = localObjects.get(objId);
-            target.target = extractSourcePath(obj);
+                    const obj = localObjects.get(objId);
+                    context.target = extractSourcePath(obj);
 
-            let allData = pendingData.get(objId);
-            if (!allData) {
-                const after = obj;
-                const before = remoteObjects.get(objId);
+                    let allData = pendingData.get(objId);
+                    if (!allData) {
+                        const after = obj;
+                        const before = remoteObjects.get(objId);
 
-                allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
-                pendingData.set(objId, allData);
+                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
+                        pendingData.set(objId, allData);
 
-                remoteObjects.set(objId, after);
-            }
+                        remoteObjects.set(objId, after);
+                    }
 
-            const batch = allData.splice(0, batchSize);
+                    const batch = allData.splice(0, batchSize);
 
-            // If we've sent all data, remove from pending
-            if (allData.length === 0) {
-                pendingData.delete(objId);
-            }
+                    // If we've sent all data, remove from pending
+                    if (allData.length === 0) {
+                        pendingData.delete(objId);
+                    }
 
-            return batch;
-        }));
+                    return batch;
+                }
+            )
+        );
     }
 }

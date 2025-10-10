@@ -29,33 +29,40 @@ export class Parse {
     static handle(connection: rpc.MessageConnection,
                   localObjects: Map<string, ((input: string) => any) | any>,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), withMetrics<Parse, UUID[]>("Parse", target, metricsCsv)(async (request) => {
-            // Set target to comma-separated list of file paths
-            target.target = request.inputs.map(input =>
-                typeof input === 'string' ? input : input.sourcePath
-            ).join(',');
-            let parser = Parsers.createParser("javascript", {
-                ctx: new ExecutionContext(),
-                relativeTo: request.relativeTo
-            });
+        connection.onRequest(
+            new rpc.RequestType<Parse, UUID[], Error>("Parse"),
+            withMetrics<Parse, UUID[]>(
+                "Parse",
+                metricsCsv,
+                (context) => async (request) => {
+                    // Set target to comma-separated list of file paths
+                    context.target = request.inputs.map(input =>
+                        typeof input === 'string' ? input : input.sourcePath
+                    ).join(',');
 
-            if (!parser) {
-                return [];
-            }
-            const generator = parser.parse(...request.inputs);
-            const result: UUID[] = [];
+                    let parser = Parsers.createParser("javascript", {
+                        ctx: new ExecutionContext(),
+                        relativeTo: request.relativeTo
+                    });
 
-            for (let i = 0; i < request.inputs.length; i++) {
-                const id = randomId();
-                localObjects.set(id, async (id: string) => {
-                    let sourceFile: SourceFile = (await generator.next()).value;
-                    return produce(sourceFile, (draft) => {draft.id = id;});
-                });
-                result.push(id);
-            }
+                    if (!parser) {
+                        return [];
+                    }
+                    const generator = parser.parse(...request.inputs);
+                    const resultIds: UUID[] = [];
 
-            return result;
-        }));
+                    for (let i = 0; i < request.inputs.length; i++) {
+                        const id = randomId();
+                        localObjects.set(id, async (id: string) => {
+                            let sourceFile: SourceFile = (await generator.next()).value;
+                            return produce(sourceFile, (draft) => {draft.id = id;});
+                        });
+                        resultIds.push(id);
+                    }
+
+                    return resultIds;
+                }
+            )
+        );
     }
 }

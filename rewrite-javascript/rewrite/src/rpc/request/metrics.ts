@@ -79,68 +79,74 @@ export function initializeMetricsCsv(metricsCsv?: string, logger?: rpc.Logger): 
 }
 
 /**
- * Internal function to wrap a handler with metrics recording.
- */
-async function wrapWithMetrics<R>(
-    handler: () => Promise<R>,
-    target: { target: string },
-    request: string,
-    metricsCsv?: string
-): Promise<R> {
-    if (!metricsCsv) {
-        // No metrics recording requested, just execute the handler
-        return handler();
-    }
-
-    const startTime = Date.now();
-
-    try {
-        const result = await handler();
-        recordMetrics(metricsCsv, target.target, request, startTime);
-        return result;
-    } catch (error) {
-        recordMetrics(metricsCsv, target.target, request, startTime);
-        throw error;
-    }
-}
-
-/**
  * Wraps an RPC request handler to record performance metrics to a CSV file.
  *
- * @param request The request type name (e.g., "Visit", "GetObject")
- * @param target A mutable object containing the target identifier for metrics
+ * @param requestType The request type name (e.g., "Visit", "GetObject")
  * @param metricsCsv Optional path to the CSV file for recording metrics
- * @returns A function that wraps a request handler with metrics recording
+ * @param handlerFactory A function that creates the handler with a mutable context for setting the target
+ * @returns A request handler compatible with rpc.MessageConnection#onRequest
  */
 export function withMetrics<P, R>(
-    request: string,
-    target: { target: string },
-    metricsCsv?: string
-): (handler: (request: P) => Promise<R>) => (request: P) => Promise<R> {
-    return (handler: (requestParam: P) => Promise<R>) => {
-        return async (requestParam: P): Promise<R> => {
-            return wrapWithMetrics(() => handler(requestParam), target, request, metricsCsv);
-        };
+    requestType: string,
+    metricsCsv: string | undefined,
+    handlerFactory: (context: {target: string}) => (request: P) => Promise<R>
+): (request: P) => Promise<R> {
+    return async (request: P): Promise<R> => {
+        const context = {target: ''};
+        const handler = handlerFactory(context);
+
+        if (!metricsCsv) {
+            // No metrics recording requested, just execute the handler
+            return await handler(request);
+        }
+
+        const startTime = Date.now();
+
+        try {
+            const result = await handler(request);
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            return result;
+        } catch (error) {
+            // On error, still try to record metrics with the target (maybe empty)
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            throw error;
+        }
     };
 }
 
 /**
  * Wraps an RPC request handler without parameters (RequestType0) to record performance metrics.
  *
- * @param request The request type name (e.g., "GetLanguages", "GetRecipes")
- * @param target A mutable object containing the target identifier for metrics
+ * @param requestType The request type name (e.g., "GetLanguages", "GetRecipes")
  * @param metricsCsv Optional path to the CSV file for recording metrics
- * @returns A function that wraps a request handler with metrics recording
+ * @param handlerFactory A function that creates the handler with a mutable context for setting the target
+ * @returns A request handler compatible with rpc.MessageConnection#onRequest
  */
 export function withMetrics0<R>(
-    request: string,
-    target: { target: string },
-    metricsCsv?: string
-): (handler: () => Promise<R>) => (token: any) => Promise<R> {
-    return (handler: () => Promise<R>) => {
-        return async (_: any): Promise<R> => {
-            return wrapWithMetrics(handler, target, request, metricsCsv);
-        };
+    requestType: string,
+    metricsCsv: string | undefined,
+    handlerFactory: (context: {target: string}) => () => Promise<R>
+): (token: any) => Promise<R> {
+    return async (_: any): Promise<R> => {
+        const context = {target: ''};
+        const handler = handlerFactory(context);
+
+        if (!metricsCsv) {
+            // No metrics recording requested, just execute the handler
+            return await handler();
+        }
+
+        const startTime = Date.now();
+
+        try {
+            const result = await handler();
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            return result;
+        } catch (error) {
+            // On error, still try to record metrics with the target (may be empty)
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            throw error;
+        }
     };
 }
 
