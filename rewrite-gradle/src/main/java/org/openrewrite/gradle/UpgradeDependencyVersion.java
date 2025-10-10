@@ -525,7 +525,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String configName = dependency.getConfigurationName();
 
                 if (currentVersion == null) {
-                    // For dependencies without a version (e.g., some platform dependencies)
+                    // Only handle dependencies without versions if they are platform dependencies
+                    // Regular dependencies without versions are governed by constraints and should not be upgraded
+                    if (!dependency.isPlatform()) {
+                        return dependency;
+                    }
                     GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(ga, configName, newVersion, versionPattern, ctx);
@@ -587,7 +591,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String configName = dependency.getConfigurationName();
 
                 if (currentVersion == null) {
-                    // For dependencies without a version (e.g., some platform dependencies)
+                    // Only handle dependencies without versions if they are platform dependencies
+                    // Regular dependencies without versions are governed by constraints and should not be upgraded
+                    if (!dependency.isPlatform()) {
+                        return dependency.getTree();
+                    }
                     GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(ga, configName, newVersion, versionPattern, ctx);
