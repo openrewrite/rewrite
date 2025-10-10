@@ -21,14 +21,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.style.LineWrapSetting;
 
-import java.util.List;
-
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
     IfStatement ifStatement;
-    ChainedMethodCalls chainedMethodCalls;
     @Nullable Annotations classAnnotations;
     @Nullable Annotations methodAnnotations;
     @Nullable Annotations fieldAnnotations;
@@ -51,12 +48,5 @@ public class WrappingAndBracesStyle implements JavaStyle {
     @With
     public static class Annotations {
         LineWrapSetting wrap;
-    }
-
-    @Value
-    @With
-    public static class ChainedMethodCalls {
-        LineWrapSetting wrap;
-        List<String> builderMethods;
     }
 }

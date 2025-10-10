@@ -21,10 +21,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
-import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.hasLineBreak;
@@ -53,7 +55,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         Tree parentTree = getCursor().getParentTreeCursor().getValue();
         if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
             // for `J.EnumValueSet` the prefix is on the enum constants
-            j = j.withPrefix(withNewline(j.getPrefix()));
+            if (!hasLineBreak(j.getPrefix().getWhitespace())) {
+                j = j.withPrefix(withNewline(j.getPrefix()));
+            }
         }
 
         return j;
@@ -130,12 +134,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return e;
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        method = (J.MethodInvocation) new WrapMethodChains<>(style).visit(method, p, getCursor().getParentTreeCursor());
-        return super.visitMethodInvocation(method, p);
     }
 
     @Override
@@ -222,10 +220,9 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space withNewline(Space prefix) {
         if (prefix.getComments().isEmpty()) {
-            return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? prefix.getWhitespace() : "\n"));
+            return prefix.withWhitespace((hasLineBreak(prefix.getWhitespace()) ? "" : "\n") + prefix.getWhitespace());
         } else if (prefix.getComments().get(prefix.getComments().size() - 1).isMultiline()) {
-            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), (Function<Comment, Comment>) c ->
-                    c.withSuffix((hasLineBreak(c.getSuffix()) ? c.getSuffix() : "\n"))));
+            return prefix.withComments(ListUtils.mapLast(prefix.getComments(), c -> requireNonNull(c).withSuffix("\n")));
         }
         return prefix;
     }
