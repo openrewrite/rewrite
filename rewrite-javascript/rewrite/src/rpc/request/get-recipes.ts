@@ -19,13 +19,12 @@ import {withMetrics0} from "./metrics";
 
 export class GetRecipes {
     static handle(connection: rpc.MessageConnection, registry: RecipeRegistry, metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"), withMetrics0<({ name: string } & RecipeDescriptor)[]>("GetRecipes", target, metricsCsv)(async () => {
+        connection.onRequest(new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"), withMetrics0<({ name: string } & RecipeDescriptor)[]>("GetRecipes", metricsCsv)(async () => {
             const recipes = [];
             for (const [_name, recipe] of registry.all.entries()) {
                 recipes.push(await new recipe().descriptor());
             }
-            return recipes;
+            return {result: recipes, target: ''};
         }));
     }
 }

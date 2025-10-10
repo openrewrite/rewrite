@@ -27,9 +27,6 @@ import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.Function;
@@ -39,7 +36,6 @@ import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
-import static org.openrewrite.rpc.Reference.asRef;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -131,7 +127,7 @@ public interface JavaType {
         return false;
     }
 
-    class MultiCatch implements JavaType, RpcCodec<MultiCatch> {
+    class MultiCatch implements JavaType {
         public MultiCatch(@Nullable List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
         }
@@ -170,20 +166,9 @@ public interface JavaType {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
         }
-
-        @Override
-        public void rpcSend(MultiCatch after, RpcSendQueue q) {
-            q.getAndSendListAsRef(after, MultiCatch::getThrowableTypes, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public MultiCatch rpcReceive(MultiCatch before, RpcReceiveQueue q) {
-            before.throwableTypes = arrayOrNullIfEmpty(q.receiveList(before.getThrowableTypes(), null), EMPTY_JAVA_TYPE_ARRAY);
-            return before;
-        }
     }
 
-    class Intersection implements JavaType, RpcCodec<Intersection> {
+    class Intersection implements JavaType {
         public Intersection(@Nullable List<JavaType> bounds) {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
         }
@@ -221,17 +206,6 @@ public interface JavaType {
         public Intersection unsafeSet(JavaType[] bounds) {
             this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
-        }
-
-        @Override
-        public void rpcSend(Intersection after, RpcSendQueue q) {
-            q.getAndSendListAsRef(after, Intersection::getBounds, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public Intersection rpcReceive(Intersection before, RpcReceiveQueue q) {
-            before.bounds = arrayOrNullIfEmpty(q.receiveList(before.getBounds(), null), EMPTY_JAVA_TYPE_ARRAY);
-            return before;
         }
     }
 
@@ -411,7 +385,7 @@ public interface JavaType {
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Class extends FullyQualified implements RpcCodec<Class> {
+    class Class extends FullyQualified {
         @With
         @Nullable
         @NonFinal
@@ -636,34 +610,6 @@ public interface JavaType {
         }
 
         @Override
-        public void rpcSend(Class after, RpcSendQueue q) {
-            q.getAndSend(after, Class::getKind);
-            q.getAndSend(after, Class::getFullyQualifiedName);
-            q.getAndSendListAsRef(after, Class::getTypeParameters, TypeIdForRpc.signature(), null);
-            q.getAndSend(after, c -> asRef(c.getSupertype()));
-            q.getAndSend(after, c -> asRef(c.getOwningClass()));
-            q.getAndSendListAsRef(after, Class::getAnnotations, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Class::getInterfaces, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Class::getMembers, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Class::getMethods, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public Class rpcReceive(Class before, RpcReceiveQueue q) {
-            before.kind = q.receiveAndGet(before.kind, k -> Kind.valueOf(k.toString()));
-            before.fullyQualifiedName = q.receive(before.fullyQualifiedName);
-            List<JavaType> typeParameters = q.receiveList(before.getTypeParameters(), null);
-            FullyQualified supertype = q.receive(before.supertype);
-            FullyQualified owningClass = q.receive(before.owningClass);
-            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
-            List<FullyQualified> interfaces = q.receiveList(before.getInterfaces(), null);
-            List<Variable> members = q.receiveList(before.getMembers(), null);
-            List<Method> methods = q.receiveList(before.getMethods(), null);
-            return before.unsafeSet(typeParameters, supertype, owningClass, annotations,
-                    interfaces, members, methods);
-        }
-
-        @Override
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
@@ -710,26 +656,10 @@ public interface JavaType {
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
-
-        @Override
-        public void rpcSend(Class after, RpcSendQueue q) {
-            q.getAndSend(after, Class::getFullyQualifiedName);
-            q.getAndSend(after, c -> asRef(c.getOwningClass()));
-        }
-
-        @Override
-        public Class rpcReceive(Class before, RpcReceiveQueue q) {
-            before.kind = Kind.Class;
-            before.fullyQualifiedName = q.receive(before.fullyQualifiedName);
-            ShallowClass c = (ShallowClass) before;
-            FullyQualified owningClass = q.receive(before.getOwningClass());
-            c.unsafeSet(emptyList(), null, owningClass, emptyList(), emptyList(), emptyList(), emptyList());
-            return c;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Annotation extends FullyQualified implements RpcCodec<Annotation> {
+    class Annotation extends FullyQualified {
 
         @Getter
         @With
@@ -827,7 +757,7 @@ public interface JavaType {
         }
 
         @Value
-        public static class SingleElementValue implements ElementValue, RpcCodec<SingleElementValue> {
+        public static class SingleElementValue implements ElementValue {
             JavaType element;
 
             @Nullable
@@ -849,26 +779,10 @@ public interface JavaType {
                 //noinspection DataFlowIssue
                 return constantValue != null ? constantValue : referenceValue;
             }
-
-            @Override
-            public void rpcSend(SingleElementValue after, RpcSendQueue q) {
-                q.getAndSend(after, e -> asRef(e.element));
-                q.getAndSend(after, e -> e.constantValue);
-                q.getAndSend(after, e -> asRef(e.referenceValue));
-            }
-
-            @Override
-            public SingleElementValue rpcReceive(SingleElementValue before, RpcReceiveQueue q) {
-                return new SingleElementValue(
-                        q.receive(before.element, null),
-                        q.receive(before.constantValue, null),
-                        q.receive(before.referenceValue, null)
-                );
-            }
         }
 
         @Value
-        public static class ArrayElementValue implements ElementValue, RpcCodec<ArrayElementValue> {
+        public static class ArrayElementValue implements ElementValue {
             JavaType element;
             Object @Nullable [] constantValues;
             JavaType @Nullable [] referenceValues;
@@ -890,47 +804,11 @@ public interface JavaType {
                 //noinspection DataFlowIssue
                 return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
-
-            @Override
-            public void rpcSend(ArrayElementValue after, RpcSendQueue q) {
-                q.getAndSend(after, e -> asRef(e.element));
-                q.getAndSendList(after, e -> e.constantValues == null ? null : Arrays.asList(e.constantValues),
-                        Object::toString, null);
-                q.getAndSendListAsRef(after, e -> e.referenceValues == null ? null : Arrays.asList(e.referenceValues),
-                        TypeIdForRpc.signature(), null);
-            }
-
-            @Override
-            public ArrayElementValue rpcReceive(ArrayElementValue before, RpcReceiveQueue q) {
-                JavaType element = q.receive(before.element, null);
-                List<Object> constantValues = q.receiveList(before.constantValues == null ? null : Arrays.asList(before.constantValues), null);
-                List<JavaType> referenceValues = q.receiveList(before.referenceValues == null ? null : Arrays.asList(before.referenceValues), null);
-                return new ArrayElementValue(
-                        element,
-                        constantValues == null ? null : constantValues.toArray(),
-                        referenceValues == null ? null : referenceValues.toArray(JavaType.EMPTY_JAVA_TYPE_ARRAY)
-                );
-            }
-        }
-
-        @Override
-        public void rpcSend(Annotation after, RpcSendQueue q) {
-            q.getAndSend(after, a -> asRef(a.getType()));
-            q.getAndSendListAsRef(after, Annotation::getValues, v ->
-                    new DefaultJavaTypeSignatureBuilder().signature(v.getElement()) + ":" + v.getValue(), null);
-        }
-
-        @Override
-        public Annotation rpcReceive(Annotation before, RpcReceiveQueue q) {
-            return new Annotation(
-                    q.receive(before.type),
-                    arrayOrNullIfEmpty(q.receiveList(before.getValues(), null), EMPTY_ANNOTATION_VALUE_ARRAY)
-            );
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Parameterized extends FullyQualified implements RpcCodec<Parameterized> {
+    class Parameterized extends FullyQualified {
         @Getter
         @With
         @Nullable
@@ -1074,23 +952,10 @@ public interface JavaType {
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
-
-        @Override
-        public void rpcSend(Parameterized after, RpcSendQueue q) {
-            q.getAndSend(after, a -> asRef(a.getType()), null);
-            q.getAndSendListAsRef(after, Parameterized::getTypeParameters, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public Parameterized rpcReceive(Parameterized before, RpcReceiveQueue q) {
-            before.type = q.receive(before.type);
-            before.typeParameters = arrayOrNullIfEmpty(q.receiveList(before.getTypeParameters(), null), EMPTY_JAVA_TYPE_ARRAY);
-            return before;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class GenericTypeVariable implements JavaType, RpcCodec<GenericTypeVariable> {
+    class GenericTypeVariable implements JavaType {
         @With
         @Getter
         @Nullable
@@ -1177,21 +1042,6 @@ public interface JavaType {
             return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
 
-        @Override
-        public void rpcSend(GenericTypeVariable after, RpcSendQueue q) {
-            q.getAndSend(after, GenericTypeVariable::getName);
-            q.getAndSend(after, GenericTypeVariable::getVariance);
-            q.getAndSendListAsRef(after, GenericTypeVariable::getBounds, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public GenericTypeVariable rpcReceive(GenericTypeVariable before, RpcReceiveQueue q) {
-            before.name = q.receive(before.name);
-            before.variance = q.receiveAndGet(before.variance, v -> Variance.valueOf(v.toString()));
-            before.bounds = arrayOrNullIfEmpty(q.receiveList(before.getBounds(), null), EMPTY_JAVA_TYPE_ARRAY);
-            return before;
-        }
-
         public enum Variance {
             INVARIANT,
             COVARIANT,
@@ -1201,7 +1051,7 @@ public interface JavaType {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @With
-    class Array implements JavaType, RpcCodec<Array> {
+    class Array implements JavaType {
         @Getter
         @Nullable
         @NonFinal
@@ -1265,22 +1115,9 @@ public interface JavaType {
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
-
-        @Override
-        public void rpcSend(Array after, RpcSendQueue q) {
-            q.getAndSend(after, a -> asRef(a.getElemType()), null);
-            q.getAndSendListAsRef(after, Array::getAnnotations, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public Array rpcReceive(Array before, RpcReceiveQueue q) {
-            before.elemType = q.receive(before.elemType);
-            before.annotations = arrayOrNullIfEmpty(q.receiveList(before.getAnnotations(), null), EMPTY_FULLY_QUALIFIED_ARRAY);
-            return before;
-        }
     }
 
-    enum Primitive implements JavaType, RpcCodec<Primitive> {
+    enum Primitive implements JavaType {
         Boolean,
         Byte,
         Char,
@@ -1418,26 +1255,11 @@ public interface JavaType {
         public boolean isNumeric() {
             return this == Double || this == Int || this == Float || this == Long || this == Short;
         }
-
-        @Override
-        public void rpcSend(Primitive after, RpcSendQueue q) {
-            q.getAndSend(after, Primitive::getKeyword);
-        }
-
-        @Override
-        public Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
-            String keyword = q.receive(before.getKeyword());
-            Primitive p = fromKeyword(keyword);
-            if (p == null) {
-                throw new IllegalArgumentException("Unknown primitive type keyword: " + keyword);
-            }
-            return p;
-        }
     }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Method implements JavaType, RpcCodec<Method> {
+    class Method implements JavaType {
         @With
         @Nullable
         @NonFinal
@@ -1771,38 +1593,11 @@ public interface JavaType {
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().methodSignature(this);
         }
-
-        @Override
-        public void rpcSend(Method after, RpcSendQueue q) {
-            q.getAndSend(after, m -> asRef(m.getDeclaringType()));
-            q.getAndSend(after, Method::getName);
-            q.getAndSend(after, m -> asRef(m.getReturnType()));
-            q.getAndSendList(after, Method::getParameterNames, String::toString, null);
-            q.getAndSendListAsRef(after, Method::getParameterTypes, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Method::getThrownExceptions, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Method::getAnnotations, TypeIdForRpc.signature(), null);
-            q.getAndSendListAsRef(after, Method::getDefaultValue, String::toString, null);
-            q.getAndSendListAsRef(after, Method::getDeclaredFormalTypeNames, String::toString, null);
-        }
-
-        @Override
-        public Method rpcReceive(Method before, RpcReceiveQueue q) {
-            before.declaringType = q.receive(before.declaringType, null);
-            before.name = q.receive(before.name, null);
-            before.returnType = q.receive(before.returnType, null);
-            before.parameterNames = arrayOrNullIfEmpty(q.receiveList(before.getParameterNames(), null), EMPTY_STRING_ARRAY);
-            before.parameterTypes = arrayOrNullIfEmpty(q.receiveList(before.getParameterTypes(), null), EMPTY_JAVA_TYPE_ARRAY);
-            before.thrownExceptions = arrayOrNullIfEmpty(q.receiveList(before.getThrownExceptions(), null), EMPTY_JAVA_TYPE_ARRAY);
-            before.annotations = arrayOrNullIfEmpty(q.receiveList(before.getAnnotations(), null), EMPTY_FULLY_QUALIFIED_ARRAY);
-            before.defaultValue = q.receiveList(before.defaultValue, null);
-            before.declaredFormalTypeNames = arrayOrNullIfEmpty(q.receiveList(before.getDeclaredFormalTypeNames(), null), EMPTY_STRING_ARRAY);
-            return before;
-        }
     }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    class Variable implements JavaType, RpcCodec<Variable> {
+    class Variable implements JavaType {
         @With
         @Nullable
         @NonFinal
@@ -1917,29 +1712,9 @@ public interface JavaType {
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().variableSignature(this);
         }
-
-        @Override
-        public void rpcSend(Variable after, RpcSendQueue q) {
-            q.getAndSend(after, Variable::getName);  // String, no asRef needed
-            q.getAndSend(after, v -> asRef(v.getOwner()));
-            q.getAndSend(after, v -> asRef(v.getType()));
-            q.getAndSendListAsRef(after, Variable::getAnnotations, TypeIdForRpc.signature(), null);
-        }
-
-        @Override
-        public Variable rpcReceive(Variable before, RpcReceiveQueue q) {
-            before.name = q.receive(before.name);
-            before.owner = q.receive(before.owner);
-            before.type = q.receive(before.type);
-
-            List<FullyQualified> annotations = q.receiveList(before.getAnnotations(), null);
-            before.annotations = annotations == null ? null : annotations.toArray(new FullyQualified[0]);
-
-            return before;
-        }
     }
 
-    final class Unknown extends FullyQualified implements RpcCodec<Unknown> {
+    final class Unknown extends FullyQualified {
         private static final Unknown INSTANCE = new Unknown();
 
         private Unknown() {
@@ -1947,17 +1722,6 @@ public interface JavaType {
 
         @JsonCreator
         public static Unknown getInstance() {
-            return INSTANCE;
-        }
-
-        @Override
-        public void rpcSend(Unknown after, RpcSendQueue q) {
-            // Unknown is a singleton, no data to send
-        }
-
-        @Override
-        public Unknown rpcReceive(Unknown before, RpcReceiveQueue q) {
-            // Unknown is a singleton, just return the instance
             return INSTANCE;
         }
 
@@ -2026,6 +1790,7 @@ public interface JavaType {
             return "Unknown";
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public boolean isAssignableFrom(Pattern pattern) {
             return false;
@@ -2045,11 +1810,5 @@ public interface JavaType {
         public boolean isAssignableTo(String fullyQualifiedName) {
             return false;
         }
-    }
-}
-
-class TypeIdForRpc {
-    public static Function<? super JavaType, Object> signature() {
-        return t -> new DefaultJavaTypeSignatureBuilder().signature(t);
     }
 }

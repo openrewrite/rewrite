@@ -70,9 +70,8 @@ export class InstallRecipes {
 
     static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
                   logger?: rpc.Logger, metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), withMetrics<InstallRecipes, InstallRecipesResponse>("InstallRecipes", target, metricsCsv)(async (request) => {
-            target.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
+        connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), withMetrics<InstallRecipes, InstallRecipesResponse>("InstallRecipes", metricsCsv)(async (request) => {
+            const target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
             const beforeInstall = registry.all.size;
             let resolvedPath;
             let recipesName = request.recipes;
@@ -131,7 +130,7 @@ export class InstallRecipes {
                 throw new Error(`${recipesName} does not export an 'activate' function`);
             }
 
-            return {recipesInstalled: registry.all.size - beforeInstall};
+            return {result: {recipesInstalled: registry.all.size - beforeInstall}, target};
         }));
     }
 }

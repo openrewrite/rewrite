@@ -79,47 +79,35 @@ export function initializeMetricsCsv(metricsCsv?: string, logger?: rpc.Logger): 
 }
 
 /**
- * Internal function to wrap a handler with metrics recording.
- */
-async function wrapWithMetrics<R>(
-    handler: () => Promise<R>,
-    target: { target: string },
-    request: string,
-    metricsCsv?: string
-): Promise<R> {
-    if (!metricsCsv) {
-        // No metrics recording requested, just execute the handler
-        return handler();
-    }
-
-    const startTime = Date.now();
-
-    try {
-        const result = await handler();
-        recordMetrics(metricsCsv, target.target, request, startTime);
-        return result;
-    } catch (error) {
-        recordMetrics(metricsCsv, target.target, request, startTime);
-        throw error;
-    }
-}
-
-/**
  * Wraps an RPC request handler to record performance metrics to a CSV file.
  *
- * @param request The request type name (e.g., "Visit", "GetObject")
- * @param target A mutable object containing the target identifier for metrics
+ * @param requestType The request type name (e.g., "Visit", "GetObject")
  * @param metricsCsv Optional path to the CSV file for recording metrics
  * @returns A function that wraps a request handler with metrics recording
  */
 export function withMetrics<P, R>(
-    request: string,
-    target: { target: string },
+    requestType: string,
     metricsCsv?: string
-): (handler: (request: P) => Promise<R>) => (request: P) => Promise<R> {
-    return (handler: (requestParam: P) => Promise<R>) => {
+): (handler: (request: P) => Promise<{result: R, target: string}>) => (request: P) => Promise<R> {
+    return (handler: (requestParam: P) => Promise<{result: R, target: string}>) => {
         return async (requestParam: P): Promise<R> => {
-            return wrapWithMetrics(() => handler(requestParam), target, request, metricsCsv);
+            if (!metricsCsv) {
+                // No metrics recording requested, just execute the handler and return result
+                const response = await handler(requestParam);
+                return response.result;
+            }
+
+            const startTime = Date.now();
+
+            try {
+                const response = await handler(requestParam);
+                recordMetrics(metricsCsv, response.target, requestType, startTime);
+                return response.result;
+            } catch (error) {
+                // On error, still try to record metrics with empty target
+                recordMetrics(metricsCsv, '', requestType, startTime);
+                throw error;
+            }
         };
     };
 }
@@ -127,19 +115,33 @@ export function withMetrics<P, R>(
 /**
  * Wraps an RPC request handler without parameters (RequestType0) to record performance metrics.
  *
- * @param request The request type name (e.g., "GetLanguages", "GetRecipes")
- * @param target A mutable object containing the target identifier for metrics
+ * @param requestType The request type name (e.g., "GetLanguages", "GetRecipes")
  * @param metricsCsv Optional path to the CSV file for recording metrics
  * @returns A function that wraps a request handler with metrics recording
  */
 export function withMetrics0<R>(
-    request: string,
-    target: { target: string },
+    requestType: string,
     metricsCsv?: string
-): (handler: () => Promise<R>) => (token: any) => Promise<R> {
-    return (handler: () => Promise<R>) => {
+): (handler: () => Promise<{result: R, target: string}>) => (token: any) => Promise<R> {
+    return (handler: () => Promise<{result: R, target: string}>) => {
         return async (_: any): Promise<R> => {
-            return wrapWithMetrics(handler, target, request, metricsCsv);
+            if (!metricsCsv) {
+                // No metrics recording requested, just execute the handler and return result
+                const response = await handler();
+                return response.result;
+            }
+
+            const startTime = Date.now();
+
+            try {
+                const response = await handler();
+                recordMetrics(metricsCsv, response.target, requestType, startTime);
+                return response.result;
+            } catch (error) {
+                // On error, still try to record metrics with empty target
+                recordMetrics(metricsCsv, '', requestType, startTime);
+                throw error;
+            }
         };
     };
 }

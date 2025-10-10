@@ -40,12 +40,11 @@ export class Visit {
                   getObject: (id: string, sourceFileType?: string) => any,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), withMetrics<Visit, VisitResponse>("Visit", target, metricsCsv)(async (request) => {
+        connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), withMetrics<Visit, VisitResponse>("Visit", metricsCsv)(async (request) => {
             const p = await getObject(request.p, undefined);
             const before: Tree = await getObject(request.treeId, request.sourceFileType);
             const cursor = await getCursor(request.cursor, request.sourceFileType);
-            target.target = extractSourcePath(before, cursor);
+            const target = extractSourcePath(before, cursor);
             localObjects.set(before.id.toString(), before);
 
             const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
@@ -56,7 +55,7 @@ export class Visit {
                 localObjects.set(after.id.toString(), after);
             }
 
-            return {modified: before !== after};
+            return {result: {modified: before !== after}, target};
         }));
     }
 

@@ -29,10 +29,9 @@ export class Parse {
     static handle(connection: rpc.MessageConnection,
                   localObjects: Map<string, ((input: string) => any) | any>,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), withMetrics<Parse, UUID[]>("Parse", target, metricsCsv)(async (request) => {
+        connection.onRequest(new rpc.RequestType<Parse, UUID[], Error>("Parse"), withMetrics<Parse, UUID[]>("Parse", metricsCsv)(async (request) => {
             // Set target to comma-separated list of file paths
-            target.target = request.inputs.map(input =>
+            const target = request.inputs.map(input =>
                 typeof input === 'string' ? input : input.sourcePath
             ).join(',');
             let parser = Parsers.createParser("javascript", {
@@ -41,10 +40,10 @@ export class Parse {
             });
 
             if (!parser) {
-                return [];
+                return {result: [], target};
             }
             const generator = parser.parse(...request.inputs);
-            const result: UUID[] = [];
+            const resultIds: UUID[] = [];
 
             for (let i = 0; i < request.inputs.length; i++) {
                 const id = randomId();
@@ -52,10 +51,10 @@ export class Parse {
                     let sourceFile: SourceFile = (await generator.next()).value;
                     return produce(sourceFile, (draft) => {draft.id = id;});
                 });
-                result.push(id);
+                resultIds.push(id);
             }
 
-            return result;
+            return {result: resultIds, target};
         }));
     }
 }

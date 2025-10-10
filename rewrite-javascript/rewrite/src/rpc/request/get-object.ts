@@ -33,15 +33,17 @@ export class GetObject {
         metricsCsv?: string
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
-        const target = { target: '' };
 
-        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), withMetrics<GetObject, any>("GetObject", target, metricsCsv)(async request => {
+        connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), withMetrics<GetObject, any>("GetObject", metricsCsv)(async request => {
             let objId = request.id;
             if (!localObjects.has(objId)) {
-                return [
-                    {state: RpcObjectState.DELETE},
-                    {state: RpcObjectState.END_OF_OBJECT}
-                ];
+                return {
+                    result: [
+                        {state: RpcObjectState.DELETE},
+                        {state: RpcObjectState.END_OF_OBJECT}
+                    ],
+                    target: ''
+                };
             }
 
             let objectOrGenerator = localObjects.get(objId)!;
@@ -51,7 +53,7 @@ export class GetObject {
             }
 
             const obj = localObjects.get(objId);
-            target.target = extractSourcePath(obj);
+            const target = extractSourcePath(obj);
 
             let allData = pendingData.get(objId);
             if (!allData) {
@@ -71,7 +73,7 @@ export class GetObject {
                 pendingData.delete(objId);
             }
 
-            return batch;
+            return {result: batch, target};
         }));
     }
 }

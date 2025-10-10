@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
@@ -22,6 +23,7 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.util.List;
 
+@Setter
 public class JavaTypeVisitor<P> {
     private Cursor cursor = new Cursor(null, "root");
 
@@ -29,12 +31,8 @@ public class JavaTypeVisitor<P> {
         return cursor;
     }
 
-    public void setCursor(Cursor cursor) {
-        this.cursor = cursor;
-    }
-
     public @Nullable <JT extends JavaType> List<JT> visit(@Nullable List<JT> javaTypes, P p) {
-        //noinspection unchecked
+        //noinspection unchecked,DataFlowIssue
         return ListUtils.map(javaTypes, jt -> (JT) visit(jt, p));
     }
 

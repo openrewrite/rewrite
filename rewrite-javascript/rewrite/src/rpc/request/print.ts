@@ -32,16 +32,17 @@ export class Print {
     static handle(connection: rpc.MessageConnection,
                   getObject: (id: string, sourceFileType?: string) => any,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), withMetrics<Print, string>("Print", target, metricsCsv)(async request => {
+        connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), withMetrics<Print, string>("Print", metricsCsv)(async request => {
             const tree: Tree = await getObject(request.treeId.toString(), request.sourceFileType);
-            target.target = extractSourcePath(tree);
+            const target = extractSourcePath(tree);
             const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
+            let result: string;
             if (isSourceFile(tree)) {
-                return await printer(tree).print(tree, out);
+                result = await printer(tree).print(tree, out);
             } else {
-                return await printer(request.sourceFileType).print(tree, out);
+                result = await printer(request.sourceFileType).print(tree, out);
             }
+            return {result, target};
         }));
     }
 }

@@ -34,9 +34,8 @@ export class Generate {
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), withMetrics<Generate, GenerateResponse>("Generate", target, metricsCsv)(async (request) => {
-            target.target = request.id;
+        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), withMetrics<Generate, GenerateResponse>("Generate", metricsCsv)(async (request) => {
+            const target = request.id;
             const recipe = preparedRecipes.get(request.id);
             const response = {
                 ids: [],
@@ -60,7 +59,7 @@ export class Generate {
                 }
 
             }
-            return response;
+            return {result: response, target};
         }));
     }
 }

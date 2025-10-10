@@ -32,9 +32,8 @@ export class PrepareRecipe {
                   preparedRecipes: Map<String, Recipe>,
                   metricsCsv?: string) {
         const snowflake = SnowflakeId();
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), withMetrics<PrepareRecipe, PrepareRecipeResponse>("PrepareRecipe", target, metricsCsv)(async (request) => {
-            target.target = request.id;
+        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), withMetrics<PrepareRecipe, PrepareRecipeResponse>("PrepareRecipe", metricsCsv)(async (request) => {
+            const target = request.id;
             const id = snowflake.generate();
             const recipeCtor = registry.all.get(request.id);
             if (!recipeCtor) {
@@ -50,14 +49,16 @@ export class PrepareRecipe {
 
             preparedRecipes.set(id, recipe);
 
-            return {
+            const result = {
                 id: id,
                 descriptor: await recipe.descriptor(),
                 editVisitor: `edit:${id}`,
                 editPreconditions: editPreconditions,
                 scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
                 scanPreconditions: scanPreconditions
-            }
+            };
+
+            return {result, target};
         }));
     }
 
