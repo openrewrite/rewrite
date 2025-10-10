@@ -39,7 +39,6 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -192,16 +191,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
              */
             private void scanDependency(GradleDependency gradleDependency, ExecutionContext ctx) {
                 gatherVariables(gradleDependency);
-                String declaredGroupId = gradleDependency.getDeclaredGroupId();
-                String declaredArtifactId = gradleDependency.getDeclaredArtifactId();
-                String declaredVersion = gradleDependency.getDeclaredVersion();
-
-                if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
-                    return;
-                }
+                String groupId = gradleDependency.getGroupId();
+                String artifactId = gradleDependency.getArtifactId();
 
                 // Record the dependency and resolve its version if needed
-                GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
+                GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                 String configName = gradleDependency.getConfigurationName();
                 if (gradleProject != null) {
                     acc.getConfigurationPerGAPerModule()
@@ -210,24 +204,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         .add(configName);
                 }
 
-                if (!acc.gaToNewVersion.containsKey(ga) && shouldResolveVersion(declaredGroupId, declaredArtifactId)) {
+                if (!acc.gaToNewVersion.containsKey(ga) && shouldResolveVersion(groupId, artifactId)) {
                     try {
-                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                .select(ga, configName, newVersion, versionPattern, ctx);
+                        String newVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(ga, configName, UpgradeDependencyVersion.this.newVersion, versionPattern, ctx);
 
-                        // If this uses a version variable, record that mapping
-                        // Check if this is a variable (not a literal version like "1.0" or "1.0-SNAPSHOT")
                         String versionVar = gradleDependency.getVersionVariable();
-                        if (versionVar != null || (declaredVersion != null && !declaredVersion.matches("^[\\d\\.].*"))) {
-                            String versionPropName = versionVar != null ? versionVar : declaredVersion;
+                        if (versionVar != null) {
                             acc.versionPropNameToGA
-                                .computeIfAbsent(versionPropName, k -> new HashMap<>())
+                                .computeIfAbsent(versionVar, k -> new HashMap<>())
                                 .computeIfAbsent(ga, k -> new HashSet<>())
                                 .add(configName);
                         }
 
-                        // Record the resolved version (may be null)
-                        acc.gaToNewVersion.put(ga, resolvedVersion);
+                        acc.gaToNewVersion.put(ga, newVersion);
                     } catch (MavenDownloadingException e) {
                         acc.gaToNewVersion.put(ga, e);
                     }
@@ -557,13 +547,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             // Get the current version and coordinates
-            String currentVersion = dependency.getDeclaredVersion();
-            String groupId = dependency.getDeclaredGroupId();
-            String artifactId = dependency.getDeclaredArtifactId();
-
-            if (groupId == null || artifactId == null) {
-                return dependency.getTree();
-            }
+            String declaredVersion = dependency.getDeclaredVersion();
+            String groupId = dependency.getGroupId();
+            String artifactId = dependency.getArtifactId();
 
             // Check if we have a new version for this dependency
             Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(groupId, artifactId));
@@ -578,8 +564,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return dependency.getTree();
             }
 
-            // If version starts with $, it's a variable reference we can't handle directly
-            if (currentVersion != null && currentVersion.startsWith("$")) {
+            // If version starts with $, it's a variable reference we can't process directly
+            if (declaredVersion != null && declaredVersion.startsWith("$")) {
                 return dependency.getTree();
             }
 
@@ -590,17 +576,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 // For platform dependencies, this ensures we use "implementation" not "platform"
                 String configName = dependency.getConfigurationName();
 
-                if (currentVersion == null) {
+                if (declaredVersion == null) {
                     // Only handle dependencies without versions if they are platform dependencies
-                    // Regular dependencies without versions are governed by constraints and should not be upgraded
-                    if (!dependency.isPlatform()) {
-                        return dependency.getTree();
-                    }
-                    GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                            .select(ga, configName, newVersion, versionPattern, ctx);
+                    return dependency.getTree();
                 } else {
-                    GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, currentVersion);
+                    GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, declaredVersion);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(gav, configName, newVersion, versionPattern, ctx);
                 }
@@ -608,7 +588,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return Markup.warn(dependency.getTree(), e);
             }
 
-            if (selectedVersion == null || (currentVersion != null && currentVersion.equals(selectedVersion))) {
+            if (selectedVersion == null || (declaredVersion != null && declaredVersion.equals(selectedVersion))) {
                 return dependency.getTree();
             }
 

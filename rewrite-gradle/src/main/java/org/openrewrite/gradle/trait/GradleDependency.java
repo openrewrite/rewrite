@@ -76,6 +76,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
+     * Gets the resolved version of the dependency
+     * @return the resolved version of the dependency, after any variable substitutions have taken place
+     */
+    public String getVersion() {
+        return resolvedDependency.getVersion();
+    }
+
+    /**
      * Gets the configuration name for this dependency.
      * For example, "implementation", "testImplementation", "api", etc.
      * For platform dependencies wrapped in platform() or enforcedPlatform(),
@@ -693,42 +701,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         }
         return null;
-    }
-
-    /**
-     * Gets the tree (J.MethodInvocation) that should be modified when updating this dependency.
-     * For regular dependencies, returns the current tree.
-     * For platform dependencies, returns the dependency declaration inside the platform() or enforcedPlatform() invocation.
-     *
-     * @return The J.MethodInvocation to update
-     */
-    public J.MethodInvocation getTreeToUpdate() {
-        if (isPlatform()) {
-            // The first argument is a platform() or enforcedPlatform() call
-            J.MethodInvocation m = getTree();
-            if (!m.getArguments().isEmpty() && m.getArguments().get(0) instanceof J.MethodInvocation) {
-                return (J.MethodInvocation) m.getArguments().get(0);
-            }
-        }
-        return getTree();
-    }
-
-    /**
-     * Wraps an updated dependency tree with the appropriate wrapper if needed.
-     * For regular dependencies, returns the updated tree as-is.
-     * For dependencies with platform wrappers, wraps the updated platform() call with the outer configuration method.
-     *
-     * @param updatedTree The updated dependency tree (potentially from getTreeToUpdate())
-     * @return The properly wrapped J.MethodInvocation
-     */
-    public J.MethodInvocation wrapUpdatedTree(J.MethodInvocation updatedTree) {
-        if (!isPlatform()) {
-            return updatedTree;
-        }
-
-        J.MethodInvocation m = getTree();
-        // Replace the platform method invocation argument with the updated one
-        return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updatedTree));
     }
 
     /**
