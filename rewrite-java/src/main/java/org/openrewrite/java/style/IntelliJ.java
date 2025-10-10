@@ -99,6 +99,7 @@ public class IntelliJ extends NamedStyles {
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle(
+                120,
                 new WrappingAndBracesStyle.IfStatement(false),
                 new WrappingAndBracesStyle.ChainedMethodCalls(DoNotWrap, emptyList()),
                 new WrappingAndBracesStyle.Annotations(WrapAlways),

@@ -27,6 +27,7 @@ import java.util.List;
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
 
+    int hardWrapAt;
     IfStatement ifStatement;
     ChainedMethodCalls chainedMethodCalls;
     @Nullable Annotations classAnnotations;
