@@ -147,14 +147,32 @@ public class ChangeDependencyGroupId extends Recipe {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
                     if (strings.size() >= 2 &&
                             strings.get(0) instanceof J.Literal) {
-                        Dependency dependency = Dependency.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
-                        if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
-                            Dependency newDependency = dependency.withGroupId(newGroupId);
-                            String replacement = newDependency.toStringNotation();
-                            m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
-                                G.GString gString = (G.GString) arg;
-                                return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
-                            }));
+                        J.Literal firstLiteral = (J.Literal) strings.get(0);
+                        String literalValue = (String) firstLiteral.getValue();
+                        if (literalValue != null) {
+                            // Preserve trailing colon if present (for version interpolation)
+                            boolean hasTrailingColon = literalValue.endsWith(":");
+                            String toParse = hasTrailingColon ? literalValue.substring(0, literalValue.length() - 1) : literalValue;
+
+                            // If there's no version part, add a dummy one for parsing
+                            String[] parts = toParse.split(":");
+                            if (parts.length == 2) {
+                                toParse = toParse + ":1.0"; // Add dummy version for parsing
+                            }
+
+                            Dependency dependency = Dependency.parse(toParse);
+                            if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
+                                // Reconstruct with new group ID, preserving original structure
+                                String replacementStr = newGroupId + ":" + dependency.getArtifactId();
+                                if (hasTrailingColon) {
+                                    replacementStr += ":";
+                                }
+                                final String replacement = replacementStr;
+                                m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
+                                    G.GString gString = (G.GString) arg;
+                                    return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
+                                }));
+                            }
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {
