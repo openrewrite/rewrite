@@ -83,32 +83,34 @@ export function initializeMetricsCsv(metricsCsv?: string, logger?: rpc.Logger): 
  *
  * @param requestType The request type name (e.g., "Visit", "GetObject")
  * @param metricsCsv Optional path to the CSV file for recording metrics
- * @returns A function that wraps a request handler with metrics recording
+ * @param handlerFactory A function that creates the handler with a mutable context for setting the target
+ * @returns A request handler compatible with rpc.MessageConnection#onRequest
  */
 export function withMetrics<P, R>(
     requestType: string,
-    metricsCsv?: string
-): (handler: (request: P) => Promise<{result: R, target: string}>) => (request: P) => Promise<R> {
-    return (handler: (requestParam: P) => Promise<{result: R, target: string}>) => {
-        return async (requestParam: P): Promise<R> => {
-            if (!metricsCsv) {
-                // No metrics recording requested, just execute the handler and return result
-                const response = await handler(requestParam);
-                return response.result;
-            }
+    metricsCsv: string | undefined,
+    handlerFactory: (context: {target: string}) => (request: P) => Promise<R>
+): (request: P) => Promise<R> {
+    return async (request: P): Promise<R> => {
+        const context = {target: ''};
+        const handler = handlerFactory(context);
 
-            const startTime = Date.now();
+        if (!metricsCsv) {
+            // No metrics recording requested, just execute the handler
+            return await handler(request);
+        }
 
-            try {
-                const response = await handler(requestParam);
-                recordMetrics(metricsCsv, response.target, requestType, startTime);
-                return response.result;
-            } catch (error) {
-                // On error, still try to record metrics with empty target
-                recordMetrics(metricsCsv, '', requestType, startTime);
-                throw error;
-            }
-        };
+        const startTime = Date.now();
+
+        try {
+            const result = await handler(request);
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            return result;
+        } catch (error) {
+            // On error, still try to record metrics with the target (maybe empty)
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            throw error;
+        }
     };
 }
 
@@ -117,32 +119,34 @@ export function withMetrics<P, R>(
  *
  * @param requestType The request type name (e.g., "GetLanguages", "GetRecipes")
  * @param metricsCsv Optional path to the CSV file for recording metrics
- * @returns A function that wraps a request handler with metrics recording
+ * @param handlerFactory A function that creates the handler with a mutable context for setting the target
+ * @returns A request handler compatible with rpc.MessageConnection#onRequest
  */
 export function withMetrics0<R>(
     requestType: string,
-    metricsCsv?: string
-): (handler: () => Promise<{result: R, target: string}>) => (token: any) => Promise<R> {
-    return (handler: () => Promise<{result: R, target: string}>) => {
-        return async (_: any): Promise<R> => {
-            if (!metricsCsv) {
-                // No metrics recording requested, just execute the handler and return result
-                const response = await handler();
-                return response.result;
-            }
+    metricsCsv: string | undefined,
+    handlerFactory: (context: {target: string}) => () => Promise<R>
+): (token: any) => Promise<R> {
+    return async (_: any): Promise<R> => {
+        const context = {target: ''};
+        const handler = handlerFactory(context);
 
-            const startTime = Date.now();
+        if (!metricsCsv) {
+            // No metrics recording requested, just execute the handler
+            return await handler();
+        }
 
-            try {
-                const response = await handler();
-                recordMetrics(metricsCsv, response.target, requestType, startTime);
-                return response.result;
-            } catch (error) {
-                // On error, still try to record metrics with empty target
-                recordMetrics(metricsCsv, '', requestType, startTime);
-                throw error;
-            }
-        };
+        const startTime = Date.now();
+
+        try {
+            const result = await handler();
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            return result;
+        } catch (error) {
+            // On error, still try to record metrics with the target (may be empty)
+            recordMetrics(metricsCsv, context.target, requestType, startTime);
+            throw error;
+        }
     };
 }
 
