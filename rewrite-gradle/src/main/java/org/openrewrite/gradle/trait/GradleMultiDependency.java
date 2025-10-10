@@ -104,13 +104,12 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
                     if (!syntheticWrapper.getArguments().isEmpty()) {
                         newArgs.add(syntheticWrapper.getArguments().get(0));
                     } else {
-                        newArgs.add(arg); // Fallback to original
+                        newArgs.add(arg);
                     }
                 } else {
                     newArgs.add(arg);
                 }
             } else {
-                // Not a dependency argument or doesn't match filters, keep as-is
                 newArgs.add(arg);
             }
         }
