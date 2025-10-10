@@ -17,7 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RecipeRegistry} from "../../recipe";
 import * as path from "path";
 import * as fs from "fs";
-import {spawn, ChildProcess} from "child_process";
+import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 
 export interface InstallRecipesResponse {
@@ -70,69 +70,75 @@ export class InstallRecipes {
 
     static handle(connection: rpc.MessageConnection, installDir: string, registry: RecipeRegistry,
                   logger?: rpc.Logger, metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"), withMetrics<InstallRecipes, InstallRecipesResponse>("InstallRecipes", target, metricsCsv)(async (request) => {
-            target.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
-            const beforeInstall = registry.all.size;
-            let resolvedPath;
-            let recipesName = request.recipes;
+        connection.onRequest(
+            new rpc.RequestType<InstallRecipes, InstallRecipesResponse, Error>("InstallRecipes"),
+            withMetrics<InstallRecipes, InstallRecipesResponse>(
+                "InstallRecipes",
+                metricsCsv,
+                (context) => async (request) => {
+                    context.target = typeof request.recipes === "object" ? request.recipes.packageName : request.recipes;
+                    const beforeInstall = registry.all.size;
+                    let resolvedPath;
+                    let recipesName = request.recipes;
 
-            if (typeof request.recipes === "object") {
-                const recipePackage = request.recipes;
-                const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
+                    if (typeof request.recipes === "object") {
+                        const recipePackage = request.recipes;
+                        const absoluteInstallDir = path.isAbsolute(installDir) ? installDir : path.join(process.cwd(), installDir);
 
-                // Ensure directory exists
-                if (!fs.existsSync(absoluteInstallDir)) {
-                    fs.mkdirSync(absoluteInstallDir, {recursive: true});
-                }
+                        // Ensure directory exists
+                        if (!fs.existsSync(absoluteInstallDir)) {
+                            fs.mkdirSync(absoluteInstallDir, {recursive: true});
+                        }
 
-                // Check if package.json exists, if not create one
-                const packageJsonPath = path.join(absoluteInstallDir, "package.json");
-                if (!fs.existsSync(packageJsonPath)) {
-                    // Create a minimal package.json with a custom name
-                    const packageJson = {
-                        name: "openrewrite-recipes",
-                        version: "1.0.0",
-                        description: "OpenRewrite recipe marketplace",
-                        private: true
-                    };
-                    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-                    if (logger) {
-                        logger.info("Created package.json for recipe dependencies");
+                        // Check if package.json exists, if not create one
+                        const packageJsonPath = path.join(absoluteInstallDir, "package.json");
+                        if (!fs.existsSync(packageJsonPath)) {
+                            // Create a minimal package.json with a custom name
+                            const packageJson = {
+                                name: "openrewrite-recipes",
+                                version: "1.0.0",
+                                description: "OpenRewrite recipe marketplace",
+                                private: true
+                            };
+                            fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+                            if (logger) {
+                                logger.info("Created package.json for recipe dependencies");
+                            }
+                        }
+
+                        // Rather than using npm on PATH, use `node_cli.js`.
+                        // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
+                        const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                        await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
+                        resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
+                        recipesName = request.recipes.packageName;
+                    } else {
+                        resolvedPath = request.recipes;
                     }
+
+                    let recipeModule;
+                    try {
+                        setupSharedDependencies(resolvedPath);
+                        recipeModule = require(resolvedPath);
+                    } catch (e: any) {
+                        throw new Error(`Failed to load recipe module from ${resolvedPath}: ${e.stack}`);
+                    }
+
+                    if (typeof recipeModule.activate === "function") {
+                        // noinspection JSVoidFunctionReturnValueUsed
+                        const activatePromise = recipeModule.activate(registry);
+                        // noinspection SuspiciousTypeOfGuard
+                        if (activatePromise instanceof Promise) {
+                            await activatePromise;
+                        }
+                    } else {
+                        throw new Error(`${recipesName} does not export an 'activate' function`);
+                    }
+
+                    return {recipesInstalled: registry.all.size - beforeInstall};
                 }
-
-                // Rather than using npm on PATH, use `node_cli.js`.
-                // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
-                const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
-                await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
-                resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
-                recipesName = request.recipes.packageName;
-            } else {
-                resolvedPath = request.recipes;
-            }
-
-            let recipeModule;
-            try {
-                setupSharedDependencies(resolvedPath);
-                recipeModule = require(resolvedPath);
-            } catch (e: any) {
-                throw new Error(`Failed to load recipe module from ${resolvedPath}: ${e.stack}`);
-            }
-
-            if (typeof recipeModule.activate === "function") {
-                // noinspection JSVoidFunctionReturnValueUsed
-                const activatePromise = recipeModule.activate(registry);
-                // noinspection SuspiciousTypeOfGuard
-                if (activatePromise instanceof Promise) {
-                    await activatePromise;
-                }
-            } else {
-                throw new Error(`${recipesName} does not export an 'activate' function`);
-            }
-
-            return {recipesInstalled: registry.all.size - beforeInstall};
-        }));
+            )
+        );
     }
 }
 

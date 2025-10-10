@@ -32,33 +32,41 @@ export class PrepareRecipe {
                   preparedRecipes: Map<String, Recipe>,
                   metricsCsv?: string) {
         const snowflake = SnowflakeId();
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), withMetrics<PrepareRecipe, PrepareRecipeResponse>("PrepareRecipe", target, metricsCsv)(async (request) => {
-            target.target = request.id;
-            const id = snowflake.generate();
-            const recipeCtor = registry.all.get(request.id);
-            if (!recipeCtor) {
-                throw new Error(`Could not find recipe with id ${request.id}`);
-            }
-            let recipe = new recipeCtor(request.options);
+        connection.onRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            withMetrics<PrepareRecipe, PrepareRecipeResponse>(
+                "PrepareRecipe",
+                metricsCsv,
+                (context) => async (request) => {
+                    context.target = request.id;
+                    const id = snowflake.generate();
+                    const recipeCtor = registry.all.get(request.id);
+                    if (!recipeCtor) {
+                        throw new Error(`Could not find recipe with id ${request.id}`);
+                    }
+                    let recipe = new recipeCtor(request.options);
 
-            const editPreconditions: Precondition[] = [];
-            recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
+                    const editPreconditions: Precondition[] = [];
+                    recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
 
-            const scanPreconditions: Precondition[] = [];
-            recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
+                    const scanPreconditions: Precondition[] = [];
+                    recipe = await this.optimizePreconditions(recipe, "scan", scanPreconditions);
 
-            preparedRecipes.set(id, recipe);
+                    preparedRecipes.set(id, recipe);
 
-            return {
-                id: id,
-                descriptor: await recipe.descriptor(),
-                editVisitor: `edit:${id}`,
-                editPreconditions: editPreconditions,
-                scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
-                scanPreconditions: scanPreconditions
-            }
-        }));
+                    const result = {
+                        id: id,
+                        descriptor: await recipe.descriptor(),
+                        editVisitor: `edit:${id}`,
+                        editPreconditions: editPreconditions,
+                        scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
+                        scanPreconditions: scanPreconditions
+                    };
+
+                    return result;
+                }
+            )
+        );
     }
 
     /**

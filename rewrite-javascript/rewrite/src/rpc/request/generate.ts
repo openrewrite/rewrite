@@ -34,33 +34,39 @@ export class Generate {
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string) => any,
                   metricsCsv?: string): void {
-        const target = { target: '' };
-        connection.onRequest(new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"), withMetrics<Generate, GenerateResponse>("Generate", target, metricsCsv)(async (request) => {
-            target.target = request.id;
-            const recipe = preparedRecipes.get(request.id);
-            const response = {
-                ids: [],
-                sourceFileTypes: []
-            } as GenerateResponse;
+        connection.onRequest(
+            new rpc.RequestType<Generate, GenerateResponse, Error>("Generate"),
+            withMetrics<Generate, GenerateResponse>(
+                "Generate",
+                metricsCsv,
+                (context) => async (request) => {
+                    context.target = request.id;
+                    const recipe = preparedRecipes.get(request.id);
+                    const response = {
+                        ids: [],
+                        sourceFileTypes: []
+                    } as GenerateResponse;
 
-            if (recipe && recipe instanceof ScanningRecipe) {
-                let cursor = recipeCursors.get(recipe);
-                if (!cursor) {
-                    cursor = rootCursor();
-                    recipeCursors.set(recipe, cursor);
+                    if (recipe && recipe instanceof ScanningRecipe) {
+                        let cursor = recipeCursors.get(recipe);
+                        if (!cursor) {
+                            cursor = rootCursor();
+                            recipeCursors.set(recipe, cursor);
+                        }
+                        const ctx = getObject(request.p) as ExecutionContext;
+                        const acc = recipe.accumulator(cursor, ctx);
+                        const generated = await recipe.generate(acc, ctx)
+
+                        for (const g of generated) {
+                            localObjects.set(g.id.toString(), g);
+                            response.ids.push(g.id.toString());
+                            response.sourceFileTypes.push(g.kind);
+                        }
+
+                    }
+                    return response;
                 }
-                const ctx = getObject(request.p) as ExecutionContext;
-                const acc = recipe.accumulator(cursor, ctx);
-                const generated = await recipe.generate(acc, ctx)
-
-                for (const g of generated) {
-                    localObjects.set(g.id.toString(), g);
-                    response.ids.push(g.id.toString());
-                    response.sourceFileTypes.push(g.kind);
-                }
-
-            }
-            return response;
-        }));
+            )
+        );
     }
 }

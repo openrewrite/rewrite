@@ -299,7 +299,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
     @Test
-    void javaTypeClassCodecsAcrossRpcBoundary(@TempDir Path projectDir) {
+    void javaTypeAcrossRpcBoundary(@TempDir Path projectDir) {
         installRecipes();
         rewriteRun(
           spec -> spec

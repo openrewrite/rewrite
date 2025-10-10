@@ -20,7 +20,274 @@ import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
 import {Type} from "./type";
+import {JavaTypeVisitor} from "./type-visitor";
 import Space = J.Space;
+
+class JavaTypeSenderVisitor extends JavaTypeVisitor<RpcSendQueue> {
+    async preVisit(_type: Type, _q: RpcSendQueue): Promise<Type | undefined> {
+        // Don't call default preVisit to avoid circular references
+        return _type;
+    }
+
+    async postVisit(_type: Type, _q: RpcSendQueue): Promise<Type | undefined> {
+        // Don't call default postVisit to avoid circular references
+        return _type;
+    }
+
+    protected async visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(primitive, p => p.keyword);
+        return primitive;
+    }
+
+    protected async visitClass(cls: Type.Class, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(cls, c => c.classKind);
+        await q.getAndSend(cls, c => c.fullyQualifiedName);
+        await q.getAndSendList(cls, c => (c.typeParameters || []).map(t => asRef(t)), t => Type.signature(t), t => this.visit(t, q));
+        await q.getAndSend(cls, c => asRef(c.supertype), st => this.visit(st, q));
+        await q.getAndSend(cls, c => asRef(c.owningClass), oc => this.visit(oc, q));
+        await q.getAndSendList(cls, c => (c.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
+        await q.getAndSendList(cls, c => (c.interfaces || []).map(i => asRef(i)), t => Type.signature(t), i => this.visit(i, q));
+        await q.getAndSendList(cls, c => (c.members || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
+        await q.getAndSendList(cls, c => (c.methods || []).map(m => asRef(m)), t => Type.signature(t), m => this.visit(m, q));
+        return cls;
+    }
+
+    protected async visitVariable(variable: Type.Variable, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(variable, v => v.name);
+        await q.getAndSend(variable, v => v.owner ? asRef(v.owner) : undefined, owner => this.visit(owner, q));
+        await q.getAndSend(variable, v => asRef(v.type), t => this.visit(t, q));
+        await q.getAndSendList(variable, v => (v.annotations || []).map(v2 => asRef(v2)), t => Type.signature(t), a => this.visit(a, q));
+        return variable;
+    }
+
+    protected async visitAnnotation(annotation: Type.Annotation, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(annotation, a => asRef(a.type), t => this.visit(t, q));
+        await q.getAndSendList(annotation, a => (a.values || []).map(v => asRef(v)), v => {
+            let value: any;
+            if (v.kind === Type.Kind.SingleElementValue) {
+                const single = v as Type.Annotation.SingleElementValue;
+                value = single.constantValue !== undefined ? single.constantValue : single.referenceValue;
+            } else {
+                const array = v as Type.Annotation.ArrayElementValue;
+                value = array.constantValues || array.referenceValues;
+            }
+            return `${Type.signature(v.element)}:${value == null ? "null" : value.toString()}`;
+        }, async v => {
+            // Handle element values inline like the Java implementation
+            await q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
+            if (v.kind === Type.Kind.SingleElementValue) {
+                const single = v as Type.Annotation.SingleElementValue;
+                await q.getAndSend(single, s => s.constantValue);
+                await q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
+            } else if (v.kind === Type.Kind.ArrayElementValue) {
+                const array = v as Type.Annotation.ArrayElementValue;
+                await q.getAndSendList(array, a => a.constantValues || [], val => val == null ? "null" : val.toString());
+                await q.getAndSendList(array, a => (a.referenceValues || []).map(r => asRef(r)), t => Type.signature(t), r => this.visit(r, q));
+            }
+        });
+        return annotation;
+    }
+
+    protected async visitMethod(method: Type.Method, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(method, m => asRef(m.declaringType), dt => this.visit(dt, q));
+        await q.getAndSend(method, m => m.name);
+        await q.getAndSend(method, m => asRef(m.returnType), rt => this.visit(rt, q));
+        await q.getAndSendList(method, m => m.parameterNames || [], v => v);
+        await q.getAndSendList(method, m => (m.parameterTypes || []).map(t => asRef(t)), t => Type.signature(t), pt => this.visit(pt, q));
+        await q.getAndSendList(method, m => (m.thrownExceptions || []).map(t => asRef(t)), t => Type.signature(t), et => this.visit(et, q));
+        await q.getAndSendList(method, m => (m.annotations || []).map(a => asRef(a)), t => Type.signature(t), a => this.visit(a, q));
+        await q.getAndSendList(method, m => m.defaultValue || undefined, v => v);
+        await q.getAndSendList(method, m => m.declaredFormalTypeNames || [], v => v);
+        return method;
+    }
+
+    protected async visitArray(array: Type.Array, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(array, a => asRef(a.elemType), et => this.visit(et, q));
+        await q.getAndSendList(array, a => (a.annotations || []).map(ann => asRef(ann)), t => Type.signature(t), ann => this.visit(ann, q));
+        return array;
+    }
+
+    protected async visitParameterized(parameterized: Type.Parameterized, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(parameterized, p => asRef(p.type), t => this.visit(t, q));
+        await q.getAndSendList(parameterized, p => (p.typeParameters || []).map(tp => asRef(tp)), t => Type.signature(t), tp => this.visit(tp, q));
+        return parameterized;
+    }
+
+    protected async visitGenericTypeVariable(generic: Type.GenericTypeVariable, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(generic, g => g.name);
+        // Convert TypeScript enum to Java enum string
+        await q.getAndSend(generic, g => {
+            switch (g.variance) {
+                case Type.GenericTypeVariable.Variance.Covariant:
+                    return 'COVARIANT';
+                case Type.GenericTypeVariable.Variance.Contravariant:
+                    return 'CONTRAVARIANT';
+                case Type.GenericTypeVariable.Variance.Invariant:
+                default:
+                    return 'INVARIANT';
+            }
+        });
+        await q.getAndSendList(generic, g => (g.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+        return generic;
+    }
+
+    protected async visitUnion(union: Type.Union, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSendList(union, u => (u.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+        return union;
+    }
+
+    protected async visitIntersection(intersection: Type.Intersection, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSendList(intersection, i => (i.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
+        return intersection;
+    }
+
+    protected async visitShallowClass(shallowClass: Type.ShallowClass, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(shallowClass, c => c.fullyQualifiedName);
+        await q.getAndSend(shallowClass, c => asRef(c.owningClass), oc => this.visit(oc, q));
+        return shallowClass;
+    }
+
+    protected async visitUnknown(_unknown: Type, _q: RpcSendQueue): Promise<Type | undefined> {
+        // Unknown type has no additional data
+        return Type.unknownType;
+    }
+}
+
+class JavaTypeReceiverVisitor extends JavaTypeVisitor<RpcReceiveQueue> {
+    async preVisit(_type: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
+        // Don't call default preVisit to avoid circular references
+        return _type;
+    }
+
+    async postVisit(_type: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
+        // Don't call default postVisit to avoid circular references
+        return _type;
+    }
+
+    protected async visitPrimitive(primitive: Type.Primitive, q: RpcReceiveQueue): Promise<Type | undefined> {
+        const keyword: string = await q.receive(primitive.keyword);
+        return Type.Primitive.fromKeyword(keyword)!;
+    }
+
+    protected async visitClass(cls: Type.Class, q: RpcReceiveQueue): Promise<Type | undefined> {
+        cls.classKind = await q.receive(cls.classKind);
+        cls.fullyQualifiedName = await q.receive(cls.fullyQualifiedName);
+        cls.typeParameters = await q.receiveList(cls.typeParameters, tp => this.visit(tp, q)) || [];
+        cls.supertype = await q.receive(cls.supertype, st => this.visit(st, q));
+        cls.owningClass = await q.receive(cls.owningClass, oc => this.visit(oc, q));
+        cls.annotations = await q.receiveList(cls.annotations, a => this.visit(a, q)) || [];
+        cls.interfaces = await q.receiveList(cls.interfaces, i => this.visit(i, q)) || [];
+        cls.members = await q.receiveList(cls.members, m => this.visit(m, q)) || [];
+        cls.methods = await q.receiveList(cls.methods, m => this.visit(m, q)) || [];
+        return cls;
+    }
+
+    protected async visitVariable(variable: Type.Variable, q: RpcReceiveQueue): Promise<Type | undefined> {
+        variable.name = await q.receive(variable.name);
+        variable.owner = await q.receive(variable.owner, owner => this.visit(owner, q));
+        variable.type = await q.receive(variable.type, t => this.visit(t, q));
+        variable.annotations = await q.receiveList(variable.annotations, a => this.visit(a, q)) || [];
+        return variable;
+    }
+
+    protected async visitAnnotation(annotation: Type.Annotation, q: RpcReceiveQueue): Promise<Type | undefined> {
+        annotation.type = await q.receive(annotation.type, t => this.visit(t, q));
+        annotation.values = await q.receiveList(annotation.values, async v => {
+            // Handle element values inline like the Java implementation
+            if (v.kind === Type.Kind.SingleElementValue) {
+                const single = v as Type.Annotation.SingleElementValue;
+                const element = await q.receive(single.element, elem => this.visit(elem, q));
+                const constantValue = await q.receive(single.constantValue);
+                const referenceValue = await q.receive(single.referenceValue, ref => this.visit(ref, q));
+                return {
+                    kind: Type.Kind.SingleElementValue,
+                    element,
+                    constantValue,
+                    referenceValue
+                } as Type.Annotation.SingleElementValue;
+            } else if (v.kind === Type.Kind.ArrayElementValue) {
+                const array = v as Type.Annotation.ArrayElementValue;
+                const element = await q.receive(array.element, elem => this.visit(elem, q));
+                const constantValues = await q.receiveList(array.constantValues);
+                const referenceValues = await q.receiveList(array.referenceValues, r => this.visit(r, q));
+                return {
+                    kind: Type.Kind.ArrayElementValue,
+                    element,
+                    constantValues,
+                    referenceValues
+                } as Type.Annotation.ArrayElementValue;
+            }
+            return v;
+        }) || [];
+        return annotation;
+    }
+
+    protected async visitMethod(method: Type.Method, q: RpcReceiveQueue): Promise<Type | undefined> {
+        method.declaringType = await q.receive(method.declaringType, dt => this.visit(dt, q));
+        method.name = await q.receive(method.name);
+        method.returnType = await q.receive(method.returnType, rt => this.visit(rt, q));
+        method.parameterNames = await q.receiveList(method.parameterNames) || [];
+        method.parameterTypes = await q.receiveList(method.parameterTypes, pt => this.visit(pt, q)) || [];
+        method.thrownExceptions = await q.receiveList(method.thrownExceptions, et => this.visit(et, q)) || [];
+        method.annotations = await q.receiveList(method.annotations, a => this.visit(a, q)) || [];
+        method.defaultValue = await q.receiveList(method.defaultValue);
+        method.declaredFormalTypeNames = await q.receiveList(method.declaredFormalTypeNames) || [];
+        return method;
+    }
+
+    protected async visitArray(array: Type.Array, q: RpcReceiveQueue): Promise<Type | undefined> {
+        array.elemType = await q.receive(array.elemType, et => this.visit(et, q));
+        array.annotations = await q.receiveList(array.annotations, ann => this.visit(ann, q)) || [];
+        return array;
+    }
+
+    protected async visitParameterized(parameterized: Type.Parameterized, q: RpcReceiveQueue): Promise<Type | undefined> {
+        parameterized.type = await q.receive(parameterized.type, t => this.visit(t, q));
+        parameterized.typeParameters = await q.receiveList(parameterized.typeParameters, tp => this.visit(tp, q)) || [];
+        return parameterized;
+    }
+
+    protected async visitGenericTypeVariable(generic: Type.GenericTypeVariable, q: RpcReceiveQueue): Promise<Type | undefined> {
+        generic.name = await q.receive(generic.name);
+        const varianceStr = await q.receive(generic.variance) as any as string;
+        // Convert Java enum string to TypeScript enum
+        switch (varianceStr) {
+            case 'COVARIANT':
+                generic.variance = Type.GenericTypeVariable.Variance.Covariant;
+                break;
+            case 'CONTRAVARIANT':
+                generic.variance = Type.GenericTypeVariable.Variance.Contravariant;
+                break;
+            case 'INVARIANT':
+            default:
+                generic.variance = Type.GenericTypeVariable.Variance.Invariant;
+                break;
+        }
+        generic.bounds = await q.receiveList(generic.bounds, b => this.visit(b, q)) || [];
+        return generic;
+    }
+
+    protected async visitUnion(union: Type.Union, q: RpcReceiveQueue): Promise<Type | undefined> {
+        union.bounds = await q.receiveList(union.bounds, b => this.visit(b, q)) || [];
+        return union;
+    }
+
+    protected async visitIntersection(intersection: Type.Intersection, q: RpcReceiveQueue): Promise<Type | undefined> {
+        intersection.bounds = await q.receiveList(intersection.bounds, b => this.visit(b, q)) || [];
+        return intersection;
+    }
+
+    protected async visitShallowClass(shallowClass: Type.ShallowClass, q: RpcReceiveQueue): Promise<Type | undefined> {
+        shallowClass.classKind = Type.Class.Kind.Class;
+        shallowClass.fullyQualifiedName = await q.receive(shallowClass.fullyQualifiedName);
+        shallowClass.owningClass = await q.receive(shallowClass.owningClass, oc => this.visit(oc, q));
+        return shallowClass;
+    }
+
+    protected async visitUnknown(_unknown: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
+        return Type.unknownType;
+    }
+}
 
 export class JavaSender extends JavaVisitor<RpcSendQueue> {
 
@@ -574,10 +841,14 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return container;
     }
 
+    private static typeVisitor = new JavaTypeSenderVisitor();
+
     public override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
-        const codec = RpcCodecs.forInstance(javaType);
-        await codec?.rpcSend(javaType, q);
-        return javaType;
+        if (!javaType) {
+            return undefined;
+        }
+
+        return await JavaSender.typeVisitor.visit(javaType, q);
     }
 }
 
@@ -1372,15 +1643,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft) as J.Container<T>;
     }
 
+    private static typeVisitor = new JavaTypeReceiverVisitor();
+
     public override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
-        const codec = RpcCodecs.forInstance(javaType);
-        if (codec) {
-            return await codec.rpcReceive(javaType, q);
+        if (!javaType) {
+            return undefined;
         }
-        if (javaType !== undefined) {
-            throw new Error("Missing codec for Type " + javaType.kind);
-        }
-        return undefined;
+
+        return await JavaReceiver.typeVisitor.visit(javaType, q);
     }
 }
 
