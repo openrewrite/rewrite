@@ -51,8 +51,6 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 public class GradleDependency implements Trait<J.MethodInvocation> {
-    private static final MethodMatcher PROPERTY_METHOD = new MethodMatcher("* property(String)");
-    private static final MethodMatcher FIND_PROPERTY_METHOD = new MethodMatcher("* findProperty(String)");
 
     Cursor cursor;
 
@@ -658,7 +656,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      */
     @Nullable
     private static String extractPropertyNameFromMethodInvocation(J.MethodInvocation mi) {
-        if (PROPERTY_METHOD.matches(mi, true) || FIND_PROPERTY_METHOD.matches(mi, true)) {
+        if (mi.getSimpleName().equals("property") || mi.getSimpleName().equals("findProperty")) {
             if (!mi.getArguments().isEmpty() && mi.getArguments().get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) mi.getArguments().get(0);
                 if (literal.getValue() instanceof String) {
