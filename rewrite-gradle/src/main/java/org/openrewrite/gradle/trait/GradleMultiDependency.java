@@ -32,6 +32,7 @@ import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
@@ -53,6 +54,17 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     List<GradleDependency> dependencies;
 
     /**
+     * Optional filters that were used when matching this multi-dependency.
+     * When present, the map() method will only apply transformations to dependencies
+     * that match these filters.
+     */
+    @Nullable
+    String groupIdFilter;
+
+    @Nullable
+    String artifactIdFilter;
+
+    /**
      * Gets the configuration name for these dependencies.
      * For example, "implementation", "testImplementation", "api", etc.
      *
@@ -64,13 +76,15 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
-     * Maps a transformation function over each GradleDependency in this multi-dependency.
+     * Maps a transformation function over each GradleDependency in this multi-dependency
+     * that matches the provided DependencyMatcher.
      * Returns a new J.MethodInvocation with updated arguments if any dependencies changed.
      *
-     * @param mapper Function to transform each GradleDependency
+     * @param matcher The DependencyMatcher to filter which dependencies to transform
+     * @param mapper Function to transform each matching GradleDependency
      * @return The updated J.MethodInvocation if any changes were made, or the original if not
      */
-    public J.MethodInvocation map(Function<GradleDependency, GradleDependency> mapper) {
+    public J.MethodInvocation map(DependencyMatcher matcher, Function<GradleDependency, GradleDependency> mapper) {
         J.MethodInvocation m = cursor.getValue();
         List<Expression> originalArgs = m.getArguments();
         List<Expression> newArgs = new ArrayList<>(originalArgs.size());
@@ -80,7 +94,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
             Expression arg = originalArgs.get(i);
             GradleDependency dep = findDependencyForArg(i);
 
-            if (dep != null) {
+            if (dep != null && dep.matches(matcher)) {
                 GradleDependency mapped = mapper.apply(dep);
                 if (mapped != dep) {
                     // The dependency was modified
@@ -96,7 +110,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
                     newArgs.add(arg);
                 }
             } else {
-                // Not a dependency argument, keep as-is
+                // Not a dependency argument or doesn't match filters, keep as-is
                 newArgs.add(arg);
             }
         }
@@ -105,24 +119,84 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     }
 
     /**
+     * Maps a transformation function over each GradleDependency in this multi-dependency.
+     * If groupIdFilter and/or artifactIdFilter are set, only applies the transformation
+     * to dependencies that match those filters.
+     * Returns a new J.MethodInvocation with updated arguments if any dependencies changed.
+     *
+     * @param mapper Function to transform each GradleDependency
+     * @return The updated J.MethodInvocation if any changes were made, or the original if not
+     */
+    public J.MethodInvocation map(Function<GradleDependency, GradleDependency> mapper) {
+        J.MethodInvocation m = cursor.getValue();
+        List<Expression> originalArgs = m.getArguments();
+        List<Expression> newArgs = new ArrayList<>(originalArgs.size());
+        boolean anyChanged = false;
+
+        for (int i = 0; i < originalArgs.size(); i++) {
+            Expression arg = originalArgs.get(i);
+            GradleDependency dep = findDependencyForArg(i);
+
+            if (dep != null && shouldTransform(dep)) {
+                GradleDependency mapped = mapper.apply(dep);
+                if (mapped != dep) {
+                    // The dependency was modified
+                    anyChanged = true;
+                    // Extract the literal from the synthetic wrapper
+                    J.MethodInvocation syntheticWrapper = mapped.getTree();
+                    if (!syntheticWrapper.getArguments().isEmpty()) {
+                        newArgs.add(syntheticWrapper.getArguments().get(0));
+                    } else {
+                        newArgs.add(arg); // Fallback to original
+                    }
+                } else {
+                    newArgs.add(arg);
+                }
+            } else {
+                // Not a dependency argument or doesn't match filters, keep as-is
+                newArgs.add(arg);
+            }
+        }
+
+        return anyChanged ? m.withArguments(newArgs) : m;
+    }
+
+    /**
+     * Determines if a dependency should be transformed based on the configured filters.
+     */
+    private boolean shouldTransform(GradleDependency dependency) {
+        if (groupIdFilter == null && artifactIdFilter == null) {
+            // No filters configured, transform all dependencies
+            return true;
+        }
+
+        String groupId = dependency.getDeclaredGroupId();
+        String artifactId = dependency.getDeclaredArtifactId();
+
+        boolean groupMatches = groupIdFilter == null ||
+            (groupId != null && StringUtils.matchesGlob(groupId, groupIdFilter));
+        boolean artifactMatches = artifactIdFilter == null ||
+            (artifactId != null && StringUtils.matchesGlob(artifactId, artifactIdFilter));
+
+        return groupMatches && artifactMatches;
+    }
+
+    /**
      * Finds the GradleDependency corresponding to the argument at the given index.
      */
     @Nullable
     private GradleDependency findDependencyForArg(int index) {
-        // Dependencies are created in the same order as the literal arguments
-        // So we need to count literal arguments to find the right dependency
         J.MethodInvocation m = cursor.getValue();
         int literalIndex = 0;
         for (int i = 0; i <= index && i < m.getArguments().size(); i++) {
             Expression arg = m.getArguments().get(i);
-            if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
+            if (arg instanceof J.Literal) {
                 if (i == index) {
-                    // This is the argument we're looking for
                     return literalIndex < dependencies.size() ? dependencies.get(literalIndex) : null;
                 }
                 literalIndex++;
             } else if (i == index) {
-                // The target argument is not a literal string
+
                 return null;
             }
         }
@@ -135,8 +209,24 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         @Nullable
         protected String configuration;
 
+        @Nullable
+        protected String groupId;
+
+        @Nullable
+        protected String artifactId;
+
         public Matcher configuration(@Nullable String configuration) {
             this.configuration = configuration;
+            return this;
+        }
+
+        public Matcher groupId(@Nullable String groupId) {
+            this.groupId = groupId;
+            return this;
+        }
+
+        public Matcher artifactId(@Nullable String artifactId) {
+            this.artifactId = artifactId;
             return this;
         }
 
@@ -216,7 +306,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
                 return null; // Not really a multi-dependency if only one or zero dependencies found
             }
 
-            return new GradleMultiDependency(cursor, dependencies);
+            return new GradleMultiDependency(cursor, dependencies, groupId, artifactId);
         }
 
         private boolean withinDependenciesBlock(Cursor cursor) {
