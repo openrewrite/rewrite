@@ -47,10 +47,14 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 public class GradleDependency implements Trait<J.MethodInvocation> {
+
+    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+    public static boolean isDependencyDeclaration(J.MethodInvocation methodInvocation) {
+        return DEPENDENCY_DSL_MATCHER.matches(methodInvocation);
+    }
 
     Cursor cursor;
 
@@ -92,8 +96,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * @return The configuration name
      */
     public String getConfigurationName() {
-        J.MethodInvocation m = cursor.getValue();
-        return m.getSimpleName();
+        return getTree().getSimpleName();
     }
 
     /**
@@ -1166,29 +1169,37 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
-        private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
         @Nullable
         protected String configuration;
 
         @Nullable
-        protected String groupId;
+        protected DependencyMatcher matcher;
 
-        @Nullable
-        protected String artifactId;
+        public Matcher(@Nullable DependencyMatcher matcher) {
+            this.matcher = matcher;
+        }
 
         public Matcher configuration(@Nullable String configuration) {
             this.configuration = configuration;
             return this;
         }
 
-        public Matcher groupId(@Nullable String groupId) {
-            this.groupId = groupId;
+        public Matcher groupId(@Nullable String groupPattern) {
+            if(matcher == null) {
+                matcher = new DependencyMatcher(groupPattern, null, null);
+            } else {
+                matcher = matcher.withGroupPattern(groupPattern);
+            }
             return this;
         }
 
-        public Matcher artifactId(@Nullable String artifactId) {
-            this.artifactId = artifactId;
+        public Matcher artifactId(@Nullable String artifactPattern) {
+            if(matcher == null) {
+                matcher = new DependencyMatcher(null, artifactPattern, null);
+            } else {
+                matcher = matcher.withArtifactPattern(artifactPattern);
+            }
             return this;
         }
 
@@ -1253,8 +1264,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (gdc != null) {
                     if (gdc.isCanBeResolved()) {
                         for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
-                            if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
-                                    (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
+                            if(matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                 Dependency req = resolvedDependency.getRequested();
                                 if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                         req.getArtifactId().equals(dependency.getArtifactId())) {
@@ -1264,10 +1274,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         }
                     } else {
                         for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
-                            if (transitiveConfiguration.isCanBeResolved()) {
+                            if (!transitiveConfiguration.isCanBeResolved()) {
                                 for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
-                                    if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
-                                            (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
+                                    if(matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                         Dependency req = resolvedDependency.getRequested();
                                         if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
                                                 req.getArtifactId().equals(dependency.getArtifactId())) {
@@ -1280,9 +1289,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     }
                 }
 
-                if ((groupId == null || matchesGlob(dependency.getGroupId(), groupId)) &&
-                        (artifactId == null || matchesGlob(dependency.getArtifactId(), artifactId))) {
-                    // Couldn't find the actual resolved dependency, return a virtualized one instead
+                if(matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                    // Couldn't find the actual resolved dependency, return a synthetic one instead
                     ResolvedDependency resolvedDependency = ResolvedDependency.builder()
                             .depth(-1)
                             .gav(new ResolvedGroupArtifactVersion(null, dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))

@@ -167,23 +167,22 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                // Check for multi-dependency (varargs) case first
+                // Check for any dependency (single or varargs with literal strings)
                 GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher().get(getCursor()).orElse(null);
                 if (multiDependency != null) {
-                    // Scan each dependency in the multi-dependency
+                    // Scan each dependency
                     for (GradleDependency dep : multiDependency.getDependencies()) {
                         scanDependency(dep, ctx);
                     }
                     return m;
                 }
 
-                // Handle single dependency case
+                // Handle other dependency notations (map notation, GStrings, etc.)
                 GradleDependency gradleDependency = new GradleDependency.Matcher().get(getCursor()).orElse(null);
-                if (gradleDependency == null) {
-                    return m;
+                if (gradleDependency != null) {
+                    scanDependency(gradleDependency, ctx);
                 }
 
-                scanDependency(gradleDependency, ctx);
                 return m;
             }
             /**
@@ -400,20 +399,36 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            // Check for multi-dependency (varargs) case first
+            // Check for any dependency with literal strings (single or varargs)
             GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher()
                     .groupId(groupId)
                     .artifactId(artifactId)
                     .get(getCursor()).orElse(null);
             if (multiDependency != null) {
+                // Check for exceptions before calling map()
+                if (!multiDependency.isVarargs()) {
+                    // For single dependencies, check for exceptions and mark warnings
+                    for (GradleDependency dep : multiDependency.getDependencies()) {
+                        String depGroupId = dep.getDeclaredGroupId();
+                        String depArtifactId = dep.getDeclaredArtifactId();
+                        if (depGroupId != null && depArtifactId != null) {
+                            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(depGroupId, depArtifactId));
+                            if (scanResult instanceof Exception && dep.matches(dependencyMatcher)) {
+                                return Markup.warn(m, (Exception) scanResult);
+                            }
+                        }
+                    }
+                }
                 // Use the map function to transform each dependency that matches our pattern
-                m = multiDependency.map(dependencyMatcher, dep -> updateSingleDependency(dep, ctx));
+                m = multiDependency.map(dependencyMatcher, dep -> updateDependency(dep, ctx));
             } else {
-                // Handle single dependency case
+                // Handle other dependency notations (map notation, GStrings, Kotlin templates, etc.)
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
                 if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     GradleDependency gradleDependency = gradleDependencyMatcher.get(getCursor()).get();
-                    m = updateDependency(gradleDependency, ctx);
+                    if (gradleDependency.matches(dependencyMatcher)) {
+                        m = updateNonLiteralDependency(gradleDependency, ctx);
+                    }
                 }
             }
 
@@ -477,10 +492,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         }
 
         /**
-         * Updates a single dependency and returns the transformed GradleDependency.
+         * Updates a dependency and returns the transformed GradleDependency.
          * This method is used by the GradleMultiDependency.map() function.
+         * For single dependencies, the real cursor is used directly.
+         * For varargs, synthetic wrappers are created and unwrapped within map().
          */
-        private GradleDependency updateSingleDependency(GradleDependency dependency, ExecutionContext ctx) {
+        private GradleDependency updateDependency(GradleDependency dependency, ExecutionContext ctx) {
             // Get the current version and coordinates
             String currentVersion = dependency.getDeclaredVersion();
             String groupId = dependency.getDeclaredGroupId();
@@ -540,12 +557,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return dependency.withDeclaredVersion(selectedVersion);
         }
 
-        private J.MethodInvocation updateDependency(GradleDependency dependency, ExecutionContext ctx) {
-            // Check if this dependency matches our pattern
-            if (!dependency.matches(dependencyMatcher)) {
-                return dependency.getTree();
-            }
-
+        /**
+         * Updates a dependency that uses non-literal notation (map notation, GStrings, Kotlin templates, etc.)
+         * This handles dependencies that aren't represented as simple string literals.
+         */
+        private J.MethodInvocation updateNonLiteralDependency(GradleDependency dependency, ExecutionContext ctx) {
             // Get the current version and coordinates
             String declaredVersion = dependency.getDeclaredVersion();
             String groupId = dependency.getGroupId();
@@ -572,8 +588,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             // Select the new version
             String selectedVersion;
             try {
-                // Use the outer method invocation's name as the configuration, not the tree to update
-                // For platform dependencies, this ensures we use "implementation" not "platform"
                 String configName = dependency.getConfigurationName();
 
                 if (declaredVersion == null) {
