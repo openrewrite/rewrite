@@ -166,6 +166,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+
+                // Handle varargs case first - scan all literal dependencies
+                if (isConfigurationMethod(m) && hasMultipleLiteralArguments(m)) {
+                    scanVarargsDependencies(m, ctx);
+                    return m;
+                }
+
                 GradleDependency gradleDependency = new GradleDependency.Matcher().get(getCursor()).orElse(null);
                 if (gradleDependency == null) {
                     return m;
@@ -223,6 +230,68 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 //noinspection ConstantValue
                 return (groupId == null || artifactId == null) ||
                         new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
+            }
+
+            private boolean isConfigurationMethod(J.MethodInvocation m) {
+                // Check if this is a dependency configuration method like implementation, api, etc.
+                MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+                return dependencyDsl.matches(m) && !"project".equals(m.getSimpleName());
+            }
+
+            private boolean hasMultipleLiteralArguments(J.MethodInvocation m) {
+                // Check if there are multiple literal string arguments (varargs case)
+                if (m.getArguments().size() <= 1) {
+                    return false;
+                }
+                int literalCount = 0;
+                for (Expression arg : m.getArguments()) {
+                    if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
+                        literalCount++;
+                        if (literalCount > 1) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private void scanVarargsDependencies(J.MethodInvocation m, ExecutionContext ctx) {
+                // Scan each literal dependency argument
+                for (Expression arg : m.getArguments()) {
+                    if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
+                        String gav = (String) ((J.Literal) arg).getValue();
+                        Dependency dep = Dependency.parse(gav);
+                        if (dep != null) {
+                            String declaredGroupId = dep.getGroupId();
+                            String declaredArtifactId = dep.getArtifactId();
+                            String declaredVersion = dep.getVersion();
+
+                            if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
+                                continue;
+                            }
+
+                            // Record the dependency and resolve its version if needed
+                            GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
+                            String configName = m.getSimpleName();
+                            if (gradleProject != null) {
+                                acc.getConfigurationPerGAPerModule()
+                                    .computeIfAbsent(getGradleProjectKey(gradleProject), k -> new HashMap<>())
+                                    .computeIfAbsent(ga, k -> new HashSet<>())
+                                    .add(configName);
+                            }
+
+                            if (!acc.gaToNewVersion.containsKey(ga) && shouldResolveVersion(declaredGroupId, declaredArtifactId)) {
+                                try {
+                                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                            .select(ga, configName, newVersion, versionPattern, ctx);
+                                    acc.gaToNewVersion.put(ga, resolvedVersion);
+                                } catch (MavenDownloadingException e) {
+                                    acc.gaToNewVersion.put(ga, e);
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             /**
