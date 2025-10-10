@@ -544,7 +544,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   boolean orElse(Boolean nullable, boolean nonnull) {
-                      return nullable == null ? nonnull : nullable;
+                      return nullable != null ? !nullable : !nonnull;
                   }
               }
               """
@@ -575,10 +575,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               public class A {
                   boolean m1(boolean a, boolean b, boolean c) {
-                      return a ? c : b;
+                      return a ? !b : !c;
                   }
                   boolean m2(boolean a, boolean b, boolean c) {
-                      return a ? b : c;
+                      return a ? !c : !b;
                   }
                   boolean m3(boolean a, boolean b, boolean c) {
                       return a ? c : b;
@@ -806,6 +806,30 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                           return;
                       }
                       this.b = b;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void correctlySimplifyNegatedTernaryEqualsNull() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void doSome(String o1, String o2) {
+                      if (!(o1 == null ? o2 == null : o1.equals(o2))) {
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  void doSome(String o1, String o2) {
+                      if (o1 == null ? o2 != null : !o1.equals(o2)) {
+                      }
                   }
               }
               """
