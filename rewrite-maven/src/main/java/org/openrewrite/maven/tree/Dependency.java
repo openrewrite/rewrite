@@ -75,4 +75,194 @@ public class Dependency implements Serializable, Attributed {
     public String toString() {
         return gav.toString();
     }
+
+    /**
+     * Returns a Gradle-style string notation for this dependency.
+     * <p>
+     * Format: {@code "group:name:version:classifier@extension"}
+     * <p>
+     * All parts are optional except the artifact name.
+     *
+     * @return the dependency in Gradle string notation
+     */
+    public String toStringNotation() {
+        StringBuilder sb = new StringBuilder();
+        // Build against spec from gradle docs, all options are optional apart from name
+        // configurationName "group:name:version:classifier@extension"
+        if (gav.getGroupId() != null) {
+            sb.append(gav.getGroupId());
+        }
+        sb.append(":").append(gav.getArtifactId());
+
+        if (gav.getVersion() != null) {
+            sb.append(":").append(gav.getVersion());
+        } else if (classifier != null) {
+            sb.append(":");
+        }
+
+        if (classifier != null) {
+            sb.append(":").append(classifier);
+        }
+
+        if (type != null) {
+            sb.append("@").append(type);
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Alias for {@link #getType()} for compatibility with Gradle terminology.
+     * In Gradle, the file extension is referred to as "ext" while Maven uses "type".
+     *
+     * @return the type/extension of the dependency
+     */
+    public @Nullable String getExt() {
+        return type;
+    }
+
+    /**
+     * Convenience method to update the group ID.
+     * Equivalent to {@code withGav(gav.withGroupId(groupId))}.
+     *
+     * @param groupId the new group ID
+     * @return a new Dependency with the updated group ID
+     */
+    public Dependency withGroupId(@Nullable String groupId) {
+        return withGav(gav.withGroupId(groupId));
+    }
+
+    /**
+     * Convenience method to update the artifact ID.
+     * Equivalent to {@code withGav(gav.withArtifactId(artifactId))}.
+     *
+     * @param artifactId the new artifact ID
+     * @return a new Dependency with the updated artifact ID
+     */
+    public Dependency withArtifactId(String artifactId) {
+        return withGav(gav.withArtifactId(artifactId));
+    }
+
+    /**
+     * Convenience method to update the version.
+     * Equivalent to {@code withGav(gav.withVersion(version))}.
+     *
+     * @param version the new version
+     * @return a new Dependency with the updated version
+     */
+    public Dependency withVersion(@Nullable String version) {
+        return withGav(gav.withVersion(version));
+    }
+
+    /**
+     * Alias for {@link #withType(String)} for compatibility with Gradle terminology.
+     * In Gradle, the file extension is referred to as "ext" while Maven uses "type".
+     *
+     * @param ext the new type/extension
+     * @return a new Dependency with the updated type
+     */
+    public Dependency withExt(@Nullable String ext) {
+        return withType(ext);
+    }
+
+    /**
+     * Parses a Gradle-style dependency string notation into a Dependency object.
+     * <p>
+     * Format: {@code "group:artifact:version:classifier@extension"}
+     * <p>
+     * All parts are optional except the artifact name. The minimum valid notation is ":artifact".
+     *
+     * @param notation a String in the format group:artifact:version:classifier@extension
+     * @return A corresponding Dependency or null if the notation could not be parsed
+     */
+    public static @Nullable Dependency parse(@Nullable String notation) {
+        if (notation == null) {
+            return null;
+        }
+        int idx = notation.lastIndexOf('@');
+        if (idx == -1) {
+            return parse(notation, null);
+        }
+
+        int versionIdx = notation.lastIndexOf(':');
+        if (versionIdx < idx) {
+            return parse(notation.substring(0, idx), notation.substring(idx + 1));
+        }
+
+        return parse(notation, null);
+    }
+
+    private static @Nullable Dependency parse(@Nullable String notation, @Nullable String type) {
+        if (notation == null) {
+            return null;
+        }
+        String groupId = null;
+        String artifactId = null;
+        String version = null;
+        String classifier = null;
+
+        int count = 0;
+        int idx = 0;
+        int cur = 0;
+        while (cur < notation.length()) {
+            if (':' == notation.charAt(cur)) {
+                String fragment = notation.substring(idx, cur);
+                switch (count) {
+                    case 0:
+                        groupId = fragment;
+                        break;
+                    case 1:
+                        artifactId = fragment;
+                        break;
+                    case 2:
+                        version = fragment;
+                        break;
+                    case 3:
+                        classifier = fragment;
+                        break;
+                }
+                idx = cur + 1;
+                count++;
+            }
+            cur++;
+        }
+        // Handle the last fragment
+        if (idx < notation.length()) {
+            String fragment = notation.substring(idx);
+            switch (count) {
+                case 0:
+                    artifactId = fragment;
+                    break;
+                case 1:
+                    artifactId = fragment;
+                    break;
+                case 2:
+                    version = fragment;
+                    break;
+                case 3:
+                    classifier = fragment;
+                    break;
+            }
+            count++;
+        }
+
+        // Validate we have at least group and artifact
+        if (count < 2 || count > 4 || artifactId == null || artifactId.isEmpty()) {
+            return null;
+        }
+
+        // Handle empty strings in version and classifier
+        if ("".equals(version)) {
+            version = "";  // Preserve empty strings
+        }
+        if ("".equals(classifier)) {
+            classifier = "";  // Preserve empty strings
+        }
+
+        return Dependency.builder()
+                .gav(new GroupArtifactVersion(groupId, artifactId, version))
+                .classifier(classifier)
+                .type(type)
+                .build();
+    }
 }
