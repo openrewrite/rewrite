@@ -194,8 +194,8 @@ public class ChangeDependency extends Recipe {
 
                     gradleProject = maybeGp.get();
 
-                    sourceFile = (JavaSourceFile) super.visitNonNull(sourceFile, ctx);
-                    if (sourceFile != tree) {
+                    sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
+                    if (sourceFile != null && sourceFile != tree) {
                         sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
                         if (changeManagedDependency == null || changeManagedDependency) {
                             doAfterVisit(new ChangeManagedDependency(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern).getVisitor());
@@ -273,7 +273,7 @@ public class ChangeDependency extends Recipe {
                         Dependency original = Dependency.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
@@ -566,7 +566,7 @@ public class ChangeDependency extends Recipe {
                         Dependency original = Dependency.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
@@ -604,7 +604,6 @@ public class ChangeDependency extends Recipe {
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc;
                     newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             requested = updatedRequested.computeIfAbsent(requested, r -> {
                                 GroupArtifactVersion gav = r.getGav();
