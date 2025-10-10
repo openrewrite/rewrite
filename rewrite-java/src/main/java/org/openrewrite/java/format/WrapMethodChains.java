@@ -41,38 +41,33 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-        try {
-            // TODO: This is nullable for backwards compatibility of lst styles. Remove this null-check in a future release.
-            if (style.getChainedMethodCalls() != null && style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
-                List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
-                        .map(name -> String.format("*..* %s(..)", name))
-                        .map(MethodMatcher::new)
-                        .collect(toList());
-                J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
-                // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
-                if (chainStarter == null || chainStarter == m) {
-                    return m;
-                }
-
-                Space after = m.getPadding().getSelect().getAfter();
-                //Already on a new line
-                if (after.getLastWhitespace().contains("\n")) {
-                    return m;
-                }
-
-                //Only update the whitespace, preserving comments
-                if (after.getComments().isEmpty()) {
-                    after = after.withWhitespace("\n");
-                } else {
-                    after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
-                }
-                if (after != m.getPadding().getSelect().getAfter()) {
-                    m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                            .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
-                }
+        if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+            List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
+                    .map(name -> String.format("*..* %s(..)", name))
+                    .map(MethodMatcher::new)
+                    .collect(toList());
+            J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
+            // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
+            if (chainStarter == null || chainStarter == m) {
+                return m;
             }
-        } catch (NoSuchMethodError ignore) {
-            // TODO: This can happen in older versions of the runtime (parent-first loaded). Remove this try/catch in a future release.
+
+            Space after = m.getPadding().getSelect().getAfter();
+            //Already on a new line
+            if (after.getLastWhitespace().contains("\n")) {
+                return m;
+            }
+
+            //Only update the whitespace, preserving comments
+            if (after.getComments().isEmpty()) {
+                after = after.withWhitespace("\n");
+            } else {
+                after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
+            }
+            if (after != m.getPadding().getSelect().getAfter()) {
+                m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
+                        .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+            }
         }
 
         return m;
