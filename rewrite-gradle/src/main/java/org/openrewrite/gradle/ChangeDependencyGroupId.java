@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
@@ -138,7 +137,7 @@ public class ChangeDependencyGroupId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency dependency = DependencyStringNotationConverter.parse(gav);
+                        Dependency dependency = Dependency.parse(gav);
                         if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
                             Dependency newDependency = dependency.withGroupId(newGroupId);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
@@ -148,7 +147,7 @@ public class ChangeDependencyGroupId extends Recipe {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
                     if (strings.size() >= 2 &&
                             strings.get(0) instanceof J.Literal) {
-                        Dependency dependency = DependencyStringNotationConverter.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
+                        Dependency dependency = Dependency.parse((String) requireNonNull(((J.Literal) strings.get(0)).getValue()));
                         if (dependency != null && !newGroupId.equals(dependency.getGroupId())) {
                             Dependency newDependency = dependency.withGroupId(newGroupId);
                             String replacement = newDependency.toStringNotation();

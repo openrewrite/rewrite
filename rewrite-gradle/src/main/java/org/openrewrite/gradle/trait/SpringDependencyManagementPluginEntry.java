@@ -23,7 +23,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -237,7 +236,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             GavMap gavMap = null;
             if (argument instanceof J.Literal) {
                 String stringNotation = (String) ((J.Literal) argument).getValue();
-                Dependency dependency = stringNotation == null ? null : DependencyStringNotationConverter.parse(stringNotation);
+                Dependency dependency = stringNotation == null ? null : Dependency.parse(stringNotation);
                 return dependency == null ? null : dependency.getGav();
             } else if (argument instanceof G.MapLiteral) {
                 gavMap = getGAVMapEntriesForGMapEntries(((G.MapLiteral) argument).getElements());
@@ -421,7 +420,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
             if (depArgs.get(0) instanceof J.Literal) {
                 String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                 if (gav != null) {
-                    Dependency original = DependencyStringNotationConverter.parse(gav);
+                    Dependency original = Dependency.parse(gav);
                     if (original != null) {
                         Dependency updated = original;
                         if (!StringUtils.isBlank(newGroup) && !updated.getGroupId().equals(newGroup)) {

@@ -23,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.tree.G;
@@ -172,10 +171,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return m;
                 }
 
-                // Gather variables for dependencies that use variables
                 gatherVariables(gradleDependency);
-
-                // Extract declared coordinates using the trait
                 String declaredGroupId = gradleDependency.getDeclaredGroupId();
                 String declaredArtifactId = gradleDependency.getDeclaredArtifactId();
                 String declaredVersion = gradleDependency.getDeclaredVersion();
@@ -229,7 +225,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             /**
-             * Gathers version variable names for dependencies using the GradleDependency trait.
+             * Gathers version variable names for dependencies
              */
             private void gatherVariables(GradleDependency gradleDependency) {
                 String versionVariableName = gradleDependency.getVersionVariable();
@@ -477,7 +473,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
                         return arg;
                     }
-                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    Dependency dep = Dependency.parse((String) groupArtifact.getValue());
                     if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
@@ -499,7 +495,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
                         return arg;
                     }
-                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    Dependency dep = Dependency.parse((String) groupArtifact.getValue());
                     if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
@@ -520,7 +516,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, new IllegalStateException("Unable to update version"));
                         return arg;
                     }
-                    Dependency dep = DependencyStringNotationConverter.parse(gav);
+                    Dependency dep = Dependency.parse(gav);
                     if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId()) &&
                             dep.getVersion() != null &&
                             !dep.getVersion().startsWith("$")) {

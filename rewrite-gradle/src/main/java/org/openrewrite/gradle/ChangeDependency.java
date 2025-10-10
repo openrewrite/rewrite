@@ -22,7 +22,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
@@ -176,6 +175,7 @@ public class ChangeDependency extends Recipe {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
 
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
@@ -194,7 +194,7 @@ public class ChangeDependency extends Recipe {
 
                     gradleProject = maybeGp.get();
 
-                    sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
+                    sourceFile = (JavaSourceFile) super.visitNonNull(sourceFile, ctx);
                     if (sourceFile != tree) {
                         sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
                         if (changeManagedDependency == null || changeManagedDependency) {
@@ -236,10 +236,10 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency original = DependencyStringNotationConverter.parse(gav);
+                        Dependency original = Dependency.parse(gav);
                         if (original != null) {
                             Dependency updated = original;
-                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
+                            if (!StringUtils.isBlank(newGroupId) && !Objects.equals(updated.getGroupId(), newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
                             }
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
@@ -270,7 +270,7 @@ public class ChangeDependency extends Recipe {
                             ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
-                        Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
+                        Dependency original = Dependency.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
@@ -563,7 +563,7 @@ public class ChangeDependency extends Recipe {
                             ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
-                        Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
+                        Dependency original = Dependency.parse((String) requireNonNull(literal.getValue()));
                         if (original != null) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {

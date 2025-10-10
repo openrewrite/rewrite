@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleDependencyConstraint;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -197,7 +196,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     if (m.getArguments().get(0) instanceof J.Literal) {
                                         J.Literal l = (J.Literal) m.getArguments().get(0);
                                         if (l.getType() == JavaType.Primitive.String) {
-                                            Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
+                                            Dependency dependency = Dependency.parse((String) l.getValue());
                                             gav = new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
                                         }
                                     } else if (m.getArguments().get(0) instanceof G.MapEntry) {
@@ -295,7 +294,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                             return m;
                                         }
                                         String value = (String) ((J.Literal) m.getArguments().get(0)).getValue();
-                                        Dependency dependency = DependencyStringNotationConverter.parse(value);
+                                        Dependency dependency = Dependency.parse(value);
                                         try {
                                             getCursor().dropParentUntil(obj -> obj instanceof J.MethodInvocation && "constraints".equals(((J.MethodInvocation) obj).getSimpleName())).getValue();
                                             if (shouldRemoveRedundantConstraint(dependency, gp.getConfiguration(m.getSimpleName()))) {
