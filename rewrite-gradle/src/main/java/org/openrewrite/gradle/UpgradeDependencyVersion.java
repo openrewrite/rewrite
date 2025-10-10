@@ -411,15 +411,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
             // Check for multi-dependency (varargs) case first
-            GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher().get(getCursor()).orElse(null);
+            GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher()
+                    .groupId(groupId)
+                    .artifactId(artifactId)
+                    .get(getCursor()).orElse(null);
             if (multiDependency != null) {
-                // Use the map function to transform each dependency
-                m = multiDependency.map(dep -> {
-                    if (!dep.matches(dependencyMatcher)) {
-                        return dep;
-                    }
-                    return updateSingleDependency(dep, ctx);
-                });
+                // Use the map function to transform each dependency that matches our pattern
+                m = multiDependency.map(dependencyMatcher, dep -> updateSingleDependency(dep, ctx));
             } else {
                 // Handle single dependency case
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
