@@ -145,7 +145,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
             if(value == null) {
                 return Optional.empty();
             }
-            Dependency dependency = DependencyStringNotationConverter.parse((String) value);
+            Dependency dependency = Dependency.parse((String) value);
             if(dependency == null) {
                 return Optional.empty();
             }
@@ -153,6 +153,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
                 case "group":
                     return Optional.ofNullable(dependency.getGroupId());
                 case "name":
+                    //noinspection OptionalOfNullableMisuse
                     return Optional.ofNullable(dependency.getArtifactId());
                 case "version":
                     return Optional.ofNullable(dependency.getVersion());
