@@ -41,7 +41,8 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-        if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+        // This is nullable for backwards compatibility
+        if (style.getChainedMethodCalls() != null && style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
             List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
                     .map(name -> String.format("*..* %s(..)", name))
                     .map(MethodMatcher::new)
