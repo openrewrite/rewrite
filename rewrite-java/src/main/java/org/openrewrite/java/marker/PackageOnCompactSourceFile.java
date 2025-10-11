@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.marker;
+package org.openrewrite.java.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Use {@link org.openrewrite.java.marker.OmitBraces} instead.
- */
 @Value
 @With
-@Deprecated
-public class OmitBraces implements Marker {
+public class PackageOnCompactSourceFile implements Marker {
     UUID id;
-
-    public OmitBraces(UUID id) {
-        this.id = id;
-    }
+    Space prefix;
+    String packageDefinition;
 }
