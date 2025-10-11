@@ -45,14 +45,7 @@ public class CreateJsonFile extends ScanningRecipe<AtomicBoolean> {
     @Language("json")
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
-            example = "{\n" +
-                      "  \"a\": {\n" +
-                      "    \"property\": \"value\"\n" +
-                      "  },\n" +
-                      "  \"another\": {\n" +
-                      "    \"property\": \"value\"\n" +
-                      "  }\n" +
-                      "}",
+            example = "{\"a\": {\"property\": \"value\"}, \"another\": {\"property\": \"value\"}}",
             required = false)
     @Nullable
     String fileContents;
