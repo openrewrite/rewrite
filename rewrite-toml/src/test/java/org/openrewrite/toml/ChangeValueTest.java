@@ -145,8 +145,8 @@ class ChangeValueTest implements RewriteTest {
               name = "project"
               """,
             """
-              description = \"\"\"A multi-line
-              description\"\"\"
+              description = \"""A multi-line
+              description\"""
               name = "project"
               """
           )

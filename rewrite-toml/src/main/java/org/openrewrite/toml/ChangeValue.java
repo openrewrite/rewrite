@@ -65,10 +65,8 @@ public class ChangeValue extends Recipe {
 
                 if (matcher.matches(getCursor()) && !kv.getMarkers().findFirst(Changed.class).isPresent()) {
                     Toml newValueNode = parseValue(newValue, kv.getValue().getPrefix());
-                    if (newValueNode != null) {
-                        kv = kv.withValue(newValueNode)
-                                .withMarkers(kv.getMarkers().add(new Changed(Tree.randomId())));
-                    }
+                    kv = kv.withValue(newValueNode)
+                            .withMarkers(kv.getMarkers().add(new Changed(Tree.randomId())));
                 }
 
                 return kv;
