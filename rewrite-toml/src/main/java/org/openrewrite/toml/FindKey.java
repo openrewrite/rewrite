@@ -49,12 +49,7 @@ public class FindKey extends Recipe {
             @Override
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
-
-                if (matcher.matches(getCursor())) {
-                    kv = SearchResult.found(kv);
-                }
-
-                return kv;
+                return matcher.matches(getCursor()) ? SearchResult.found(kv) : kv;
             }
         };
     }

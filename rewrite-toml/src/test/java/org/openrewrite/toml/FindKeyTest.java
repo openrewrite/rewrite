@@ -77,7 +77,7 @@ class FindKeyTest implements RewriteTest {
     }
 
     @Test
-    void findWithWildcard() {
+    void findWithSingleWildcard() {
         rewriteRun(
           spec -> spec.recipe(new FindKey(
             "*.version"
@@ -100,6 +100,35 @@ class FindKeyTest implements RewriteTest {
 
               [dependencies.serde]
               version = "1.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void findWithMultipleWildcards() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey(
+            "**.version"
+          )),
+          toml(
+            """
+              version = "1.0.0"
+
+              [package]
+              version = "0.1.0"
+
+              [dependencies.serde]
+              version = "1.0"
+              """,
+            """
+              ~~>version = "1.0.0"
+
+              [package]
+              ~~>version = "0.1.0"
+
+              [dependencies.serde]
+              ~~>version = "1.0"
               """
           )
         );
