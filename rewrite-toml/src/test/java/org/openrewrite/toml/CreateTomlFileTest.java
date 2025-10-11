@@ -37,7 +37,7 @@ class CreateTomlFileTest implements RewriteTest {
               """,
             null,
             null
-          )).expectedCyclesThatMakeChanges(1),
+          )),
           toml(
             doesNotExist(),
             """
@@ -66,7 +66,7 @@ class CreateTomlFileTest implements RewriteTest {
               """,
             null,
             null
-          )).expectedCyclesThatMakeChanges(1),
+          )),
           toml(
             doesNotExist(),
             """
@@ -115,7 +115,7 @@ class CreateTomlFileTest implements RewriteTest {
               """,
             null,
             true
-          )).expectedCyclesThatMakeChanges(2),
+          )),
           toml(
             """
               [existing]
@@ -161,7 +161,7 @@ class CreateTomlFileTest implements RewriteTest {
               """,
             null,
             null
-          )).expectedCyclesThatMakeChanges(1),
+          )),
           toml(
             doesNotExist(),
             """
@@ -217,7 +217,7 @@ class CreateTomlFileTest implements RewriteTest {
               """,
             null,
             null
-          )).expectedCyclesThatMakeChanges(1),
+          )),
           toml(
             doesNotExist(),
             """

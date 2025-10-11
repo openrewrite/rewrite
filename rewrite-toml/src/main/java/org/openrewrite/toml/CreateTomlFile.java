@@ -111,7 +111,7 @@ public class CreateTomlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(tomlContents)) {
                         return document.withValues(emptyList());
                     }
-                    if (document.printAll().equals(tomlContents)) {
+                    if (document.printAll().equals(tomlContents.trim())) {
                         return document;
                     }
                     Optional<SourceFile> sourceFiles = TomlParser.builder().build()
@@ -129,11 +129,10 @@ public class CreateTomlFile extends ScanningRecipe<AtomicBoolean> {
         };
     }
 
-    @Language("toml")
-    private String getTomlContents(ExecutionContext ctx) {
+    private @Language("toml") String getTomlContents(ExecutionContext ctx) {
         @Language("toml") String tomlContents = fileContents;
         if (tomlContents == null && fileContentsUrl != null) {
-            tomlContents = Remote.builder(Paths.get(relativeFileName))
+            return Remote.builder(Paths.get(relativeFileName))
                     .build(URI.create(fileContentsUrl))
                     .printAll(ctx);
         }
