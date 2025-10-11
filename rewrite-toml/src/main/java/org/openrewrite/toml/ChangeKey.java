@@ -59,35 +59,20 @@ public class ChangeKey extends Recipe {
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
 
-                if (matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor()) && kv.getKey() instanceof Toml.Identifier) {
                     String newKeyName = newKey;
                     if ((newKeyName.startsWith("\"") && newKeyName.endsWith("\"")) ||
                         (newKeyName.startsWith("'") && newKeyName.endsWith("'"))) {
                         newKeyName = newKeyName.substring(1, newKeyName.length() - 1);
                     }
 
-                    if (kv.getKey() instanceof Toml.Identifier) {
-                        Toml.Identifier currentKey = (Toml.Identifier) kv.getKey();
-                        Toml.Identifier updatedKey = currentKey
-                                .withName(newKeyName)
-                                .withSource(formatKey(newKeyName));
-
-                        kv = kv.withKey(updatedKey);
-                    }
+                    String formattedKey = newKeyName.matches("^[A-Za-z0-9_-]+$") ? newKeyName : "\"" + newKeyName + "\"";
+                    return kv.withKey(((Toml.Identifier) kv.getKey())
+                            .withName(newKeyName)
+                            .withSource(formattedKey));
                 }
 
                 return kv;
-            }
-
-            private String formatKey(String key) {
-                if (needsQuotes(key)) {
-                    return "\"" + key + "\"";
-                }
-                return key;
-            }
-
-            private boolean needsQuotes(String key) {
-                return !key.matches("^[A-Za-z0-9_-]+$"); // TOML bare key pattern
             }
         };
     }
