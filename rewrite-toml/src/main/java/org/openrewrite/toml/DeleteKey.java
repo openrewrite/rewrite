@@ -17,6 +17,7 @@ package org.openrewrite.toml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
@@ -45,33 +46,9 @@ public class DeleteKey extends Recipe {
         TomlPathMatcher matcher = new TomlPathMatcher(keyPath);
         return new TomlIsoVisitor<ExecutionContext>() {
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                Toml.Document doc = super.visitDocument(document, ctx);
-
-                return doc.withValues(ListUtils.map(doc.getValues(), value -> {
-                    if (value instanceof Toml.KeyValue) {
-                        Cursor valueCursor = new Cursor(getCursor(), value);
-                        if (matcher.matches(valueCursor)) {
-                            return null;
-                        }
-                    }
-                    return value;
-                }));
-            }
-
-            @Override
-            public Toml.Table visitTable(Toml.Table table, ExecutionContext ctx) {
-                Toml.Table t = super.visitTable(table, ctx);
-
-                return t.withValues(ListUtils.map(t.getValues(), value -> {
-                    if (value instanceof Toml.KeyValue) {
-                        Cursor valueCursor = new Cursor(getCursor(), value);
-                        if (matcher.matches(valueCursor)) {
-                            return null;
-                        }
-                    }
-                    return value;
-                }));
+            public Toml.@Nullable KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
+                Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
+                return matcher.matches(getCursor()) ? null : kv;
             }
         };
     }
