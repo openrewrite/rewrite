@@ -202,11 +202,12 @@ public class GroovyParserVisitor {
                 if (t instanceof StringIndexOutOfBoundsException) {
                     throw new GroovyParsingException("Failed to parse " + sourcePath + ", cursor position likely inaccurate.", t);
                 }
+                int safeCursor = Math.min(cursor, source.length());
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
                                 ". The surrounding characters in the original source are:\n" +
-                                source.substring(Math.max(0, cursor - 250), cursor) + "~cursor~>" +
-                                source.substring(cursor, Math.min(source.length(), cursor + 250)), t);
+                                source.substring(Math.max(0, safeCursor - 250), safeCursor) + "~cursor~>" +
+                                source.substring(safeCursor, Math.min(source.length(), safeCursor + 250)), t);
             }
         }
 
@@ -222,7 +223,7 @@ public class GroovyParserVisitor {
                 null,
                 pkg,
                 statements,
-                format(source, cursor, source.length())
+                format(source, Math.min(cursor, source.length()), source.length())
         );
     }
 
@@ -1850,7 +1851,9 @@ public class GroovyParserVisitor {
                         name = (J.Identifier) select.getElement();
                         select = null;
                     } else {
-                        throw new IllegalArgumentException("Unable to parse method call");
+                        // For special cases like Spock tests with method names containing spaces,
+                        // we create an identifier with the method name even if we can't match it exactly in the source
+                        name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodName != null ? methodName : "unknown", null, null);
                     }
                 }
 
