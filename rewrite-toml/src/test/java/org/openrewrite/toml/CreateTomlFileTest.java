@@ -39,7 +39,7 @@ class CreateTomlFileTest implements RewriteTest {
             null
           )).expectedCyclesThatMakeChanges(1),
           toml(
-            null,
+            doesNotExist(),
             """
               [tool.poetry]
               name = "my-project"
@@ -68,7 +68,7 @@ class CreateTomlFileTest implements RewriteTest {
             null
           )).expectedCyclesThatMakeChanges(1),
           toml(
-            null,
+            doesNotExist(),
             """
               [package]
               name = "hello_world"
@@ -163,7 +163,7 @@ class CreateTomlFileTest implements RewriteTest {
             null
           )).expectedCyclesThatMakeChanges(1),
           toml(
-            null,
+            doesNotExist(),
             """
               # This is a TOML document
               title = "TOML Example"
@@ -219,7 +219,7 @@ class CreateTomlFileTest implements RewriteTest {
             null
           )).expectedCyclesThatMakeChanges(1),
           toml(
-            null,
+            doesNotExist(),
             """
               [app]
               name = "MyApp"

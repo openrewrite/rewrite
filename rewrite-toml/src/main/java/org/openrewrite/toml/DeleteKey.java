@@ -48,7 +48,7 @@ public class DeleteKey extends Recipe {
             public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = super.visitDocument(document, ctx);
 
-                doc = doc.withValues(ListUtils.map(doc.getValues(), value -> {
+                return doc.withValues(ListUtils.map(doc.getValues(), value -> {
                     if (value instanceof Toml.KeyValue) {
                         Cursor valueCursor = new Cursor(getCursor(), value);
                         if (matcher.matches(valueCursor)) {
@@ -57,15 +57,13 @@ public class DeleteKey extends Recipe {
                     }
                     return value;
                 }));
-
-                return doc;
             }
 
             @Override
             public Toml.Table visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = super.visitTable(table, ctx);
 
-                t = t.withValues(ListUtils.map(t.getValues(), value -> {
+                return t.withValues(ListUtils.map(t.getValues(), value -> {
                     if (value instanceof Toml.KeyValue) {
                         Cursor valueCursor = new Cursor(getCursor(), value);
                         if (matcher.matches(valueCursor)) {
@@ -74,8 +72,6 @@ public class DeleteKey extends Recipe {
                     }
                     return value;
                 }));
-
-                return t;
             }
         };
     }

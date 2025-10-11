@@ -25,10 +25,6 @@ import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlType;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Value
@@ -84,7 +80,7 @@ public class ChangeValue extends Recipe {
                 if (value.startsWith("[") && value.endsWith("]")) {
                     // Array - parse as string literal for now
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,
@@ -96,7 +92,7 @@ public class ChangeValue extends Recipe {
                 if (value.startsWith("{") && value.endsWith("}")) {
                     // Inline table - parse as string literal for now
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,
@@ -109,7 +105,7 @@ public class ChangeValue extends Recipe {
                     (value.startsWith("'") && value.endsWith("'"))) {
                     String unquoted = value.substring(1, value.length() - 1);
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,
@@ -121,7 +117,7 @@ public class ChangeValue extends Recipe {
                 if (value.startsWith("\"\"\"") && value.endsWith("\"\"\"")) {
                     String unquoted = value.substring(3, value.length() - 3);
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,
@@ -133,7 +129,7 @@ public class ChangeValue extends Recipe {
                 if (value.startsWith("'''") && value.endsWith("'''")) {
                     String unquoted = value.substring(3, value.length() - 3);
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,
@@ -144,7 +140,7 @@ public class ChangeValue extends Recipe {
 
                 if ("true".equals(value) || "false".equals(value)) {
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.Boolean,
@@ -168,7 +164,7 @@ public class ChangeValue extends Recipe {
                             doubleValue = Double.NaN;
                     }
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.Float,
@@ -180,7 +176,7 @@ public class ChangeValue extends Recipe {
                 if (value.contains("T") || value.contains(":")) {
                     // Simplified datetime check
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.OffsetDateTime,
@@ -193,7 +189,7 @@ public class ChangeValue extends Recipe {
                     if (value.contains(".") || value.contains("e") || value.contains("E")) {
                         Double doubleValue = Double.parseDouble(value.replace("_", ""));
                         return new Toml.Literal(
-                                UUID.randomUUID(),
+                                Tree.randomId(),
                                 prefix,
                                 Markers.EMPTY,
                                 TomlType.Primitive.Float,
@@ -212,7 +208,7 @@ public class ChangeValue extends Recipe {
                             longValue = Long.parseLong(value.replace("_", ""));
                         }
                         return new Toml.Literal(
-                                UUID.randomUUID(),
+                                Tree.randomId(),
                                 prefix,
                                 Markers.EMPTY,
                                 TomlType.Primitive.Integer,
@@ -223,7 +219,7 @@ public class ChangeValue extends Recipe {
                 } catch (NumberFormatException e) {
                     // Fallback to string for unparseable values
                     return new Toml.Literal(
-                            UUID.randomUUID(),
+                            Tree.randomId(),
                             prefix,
                             Markers.EMPTY,
                             TomlType.Primitive.String,

@@ -224,8 +224,8 @@ class DeleteKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @org.junit.jupiter.api.Disabled
+    @Test
     void preserveComments() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey(
