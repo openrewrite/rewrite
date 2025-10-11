@@ -18,10 +18,11 @@ package org.openrewrite.toml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlValue;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
