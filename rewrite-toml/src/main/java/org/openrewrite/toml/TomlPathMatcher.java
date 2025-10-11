@@ -21,7 +21,6 @@ import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
