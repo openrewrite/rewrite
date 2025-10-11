@@ -53,4 +53,3 @@ public interface RpcCodec<T> {
         return DynamicDispatchRpcCodec.getCodec(t, sourceFileType);
     }
 }
-

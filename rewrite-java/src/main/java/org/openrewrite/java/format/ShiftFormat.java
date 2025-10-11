@@ -16,7 +16,6 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
@@ -27,7 +26,6 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.Style;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Less commonly used than {@link AutoFormat}, but useful in cases when a block of code is being

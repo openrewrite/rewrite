@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
-public class HclParserTest implements RewriteTest {
+class HclParserTest implements RewriteTest {
 
     @Test
     void unicode() {

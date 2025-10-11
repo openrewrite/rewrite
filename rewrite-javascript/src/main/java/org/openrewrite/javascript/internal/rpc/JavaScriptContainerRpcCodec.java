@@ -16,8 +16,6 @@
 package org.openrewrite.javascript.internal.rpc;
 
 import lombok.Getter;
-import org.openrewrite.java.internal.rpc.JavaReceiver;
-import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
