@@ -34,6 +34,7 @@ import java.util.function.BiFunction;
 @Value
 public class Visit implements RpcRequest {
     String visitor;
+
     @Nullable String sourceFileType;
 
     @Nullable

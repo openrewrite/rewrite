@@ -23,10 +23,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.Style;
 
-import java.util.Optional;
-
 import static java.util.Objects.requireNonNull;
 
+@SuppressWarnings("unused")
 public class OmitParenthesesFormat extends Recipe {
     @Override
     public String getDisplayName() {
@@ -45,7 +44,7 @@ public class OmitParenthesesFormat extends Recipe {
 
     private static class OmitParenthesesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 OmitParenthesesStyle style = Style.from(OmitParenthesesStyle.class, cu, () -> OmitParenthesesStyle.DEFAULT);

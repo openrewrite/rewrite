@@ -28,7 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -80,9 +80,9 @@ public class ManagedToRuntimeDependencies extends Recipe {
 
                             if (dependencies == null) {
                                 Xml.Tag dependencyManagement = tag.getChild("dependencyManagement").orElse(null);
-                                String indentToUse = dependencyManagement != null
-                                    ? dependencyManagement.getPrefix()
-                                    : "\n    ";
+                                String indentToUse = dependencyManagement != null ?
+                                    dependencyManagement.getPrefix() :
+                                    "\n    ";
 
                                 Xml.Tag newDependencies = Xml.Tag.build("<dependencies/>")
                                     .withPrefix(indentToUse);
