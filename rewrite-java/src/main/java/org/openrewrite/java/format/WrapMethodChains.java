@@ -42,15 +42,14 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
         try {
-            // TODO: This is nullable for backwards compatibility of lst styles. Remove this null-check in a future release.
-            if (style.getChainedMethodCalls() != null && style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
+            if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways) {
                 List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
                         .map(name -> String.format("*..* %s(..)", name))
                         .map(MethodMatcher::new)
                         .collect(toList());
                 J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
                 // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
-                if (chainStarter == null || chainStarter == m) {
+                if (chainStarter == null || chainStarter == m || m.getPadding().getSelect() == null) {
                     return m;
                 }
 
@@ -64,7 +63,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 if (after.getComments().isEmpty()) {
                     after = after.withWhitespace("\n");
                 } else {
-                    after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
+                    after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment == null ? null : comment.withSuffix("\n")));
                 }
                 if (after != m.getPadding().getSelect().getAfter()) {
                     m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
@@ -72,7 +71,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 }
             }
         } catch (NoSuchMethodError ignore) {
-            // TODO: This can happen in older versions of the runtime (parent-first loaded). Remove this try/catch in a future release.
+            // Styles are parent-first loaded and this can happen if the style is from a older version of the runtime. Can be removed in future releases.
         }
 
         return m;
