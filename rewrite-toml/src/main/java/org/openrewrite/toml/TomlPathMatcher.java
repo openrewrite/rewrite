@@ -15,13 +15,17 @@
  */
 package org.openrewrite.toml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A utility for matching TOML paths similar to JsonPathMatcher.
@@ -124,13 +128,11 @@ public class TomlPathMatcher {
     }
 
     private List<PathSegment> parsePath(String path) {
-        List<PathSegment> result = new ArrayList<>();
-
-        if (path == null || path.isEmpty()) {
-            return result;
+        path = path.trim();
+        if (path.isEmpty()) {
+            return emptyList();
         }
 
-        path = path.trim();
         if (path.startsWith("[") && path.endsWith("]")) {
             path = path.substring(1, path.length() - 1);
         }
@@ -162,17 +164,20 @@ public class TomlPathMatcher {
             }
         }
 
+        List<PathSegment> result = new ArrayList<>();
         for (String part : parts) {
-            if (part.isEmpty()) {
-                continue;
-            }
-
-            if ("**".equals(part)) {
-                result.add(new PathSegment(null, false, true));
-            } else if ("*".equals(part)) {
-                result.add(new PathSegment(null, true, false));
-            } else {
-                result.add(new PathSegment(part, false, false));
+            switch (part) {
+                case "":
+                    continue;
+                case "**":
+                    result.add(new PathSegment(null, false, true));
+                    break;
+                case "*":
+                    result.add(new PathSegment(null, true, false));
+                    break;
+                default:
+                    result.add(new PathSegment(part, false, false));
+                    break;
             }
         }
 
@@ -180,12 +185,12 @@ public class TomlPathMatcher {
     }
 
     private static class PathSegment {
-        final String literal;
+        final @Nullable String literal;
         final boolean isSingleWildcard;
         final boolean isDoubleWildcard;
-        final Pattern pattern;
+        final @Nullable Pattern pattern;
 
-        PathSegment(String literal, boolean isSingleWildcard, boolean isDoubleWildcard) {
+        PathSegment(@Nullable String literal, boolean isSingleWildcard, boolean isDoubleWildcard) {
             this.literal = literal;
             this.isSingleWildcard = isSingleWildcard;
             this.isDoubleWildcard = isDoubleWildcard;
