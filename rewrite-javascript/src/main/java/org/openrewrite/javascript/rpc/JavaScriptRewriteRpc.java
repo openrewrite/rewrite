@@ -246,7 +246,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString()
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             } else {
                 String version = StringUtils.readFully(getClass().getResourceAsStream("/META-INF/version.txt"));
@@ -258,7 +258,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         verboseLogging ? "--verbose" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize().toString(),
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize(),
                         profiler ? "--profile" : null
                 );
             }

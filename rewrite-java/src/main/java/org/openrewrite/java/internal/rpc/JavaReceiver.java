@@ -671,7 +671,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         @Override
         public JavaType visitAnnotation(JavaType.Annotation annotation, RpcReceiveQueue q) {
-            JavaType.FullyQualified type = q.receive(annotation.getType());
+            JavaType.FullyQualified type = q.receive(annotation.getType(), v -> (FullyQualified) visit(v, q));
             return annotation.unsafeSet(
                     type,
                     null
@@ -700,26 +700,26 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         @Override
         public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, RpcReceiveQueue q) {
-            return multiCatch.withThrowableTypes(q.receiveList(multiCatch.getThrowableTypes(), null));
+            return multiCatch.withThrowableTypes(q.receiveList(multiCatch.getThrowableTypes(), v -> visit(v, q)));
         }
 
         @Override
         public JavaType visitIntersection(JavaType.Intersection intersection, RpcReceiveQueue q) {
-            return intersection.withBounds(q.receiveList(intersection.getBounds(), null));
+            return intersection.withBounds(q.receiveList(intersection.getBounds(), v -> visit(v, q)));
         }
 
         @Override
         public JavaType visitClass(JavaType.Class aClass, RpcReceiveQueue q) {
-            long flags = q.receive(aClass.getFlagsBitMap());
+            long flags = q.receive((Number) aClass.getFlagsBitMap()).longValue();
             JavaType.FullyQualified.Kind kind = q.receiveAndGet(aClass.getKind(), k -> JavaType.FullyQualified.Kind.valueOf(k.toString()));
             String fqn = q.receive(aClass.getFullyQualifiedName());
-            List<JavaType> typeParameters = q.receiveList(aClass.getTypeParameters(), null);
-            JavaType.FullyQualified supertype = q.receive(aClass.getSupertype(), null);
-            JavaType.FullyQualified owningClass = q.receive(aClass.getOwningClass(), null);
-            List<JavaType.FullyQualified> annotations = q.receiveList(aClass.getAnnotations(), null);
-            List<JavaType.FullyQualified> interfaces = q.receiveList(aClass.getInterfaces(), null);
-            List<JavaType.Variable> members = q.receiveList(aClass.getMembers(), null);
-            List<JavaType.Method> methods = q.receiveList(aClass.getMethods(), null);
+            List<JavaType> typeParameters = q.receiveList(aClass.getTypeParameters(), v -> visit(v, q));
+            JavaType.FullyQualified supertype = q.receive(aClass.getSupertype(), v -> (FullyQualified) visit(v, q));
+            JavaType.FullyQualified owningClass = q.receive(aClass.getOwningClass(), v -> (FullyQualified) visit(v, q));
+            List<JavaType.FullyQualified> annotations = q.receiveList(aClass.getAnnotations(), v -> (FullyQualified) visit(v, q));
+            List<JavaType.FullyQualified> interfaces = q.receiveList(aClass.getInterfaces(), v -> (FullyQualified) visit(v, q));
+            List<JavaType.Variable> members = q.receiveList(aClass.getMembers(), v -> (Variable) visit(v, q));
+            List<JavaType.Method> methods = q.receiveList(aClass.getMethods(), v -> (Method) visit(v, q));
             return aClass.unsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass, annotations,
                     interfaces, members, methods);
         }
@@ -727,7 +727,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         @Override
         public JavaType visitParameterized(JavaType.Parameterized parameterized, RpcReceiveQueue q) {
             JavaType.FullyQualified type = q.receive(parameterized.getType());
-            List<JavaType> typeParameters = q.receiveList(parameterized.getTypeParameters(), null);
+            List<JavaType> typeParameters = q.receiveList(parameterized.getTypeParameters(), v -> visit(v, q));
             return parameterized.unsafeSet(type, typeParameters);
         }
 
@@ -736,17 +736,15 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             String name = q.receive(generic.getName());
             JavaType.GenericTypeVariable.Variance variance = q.receiveAndGet(generic.getVariance(),
                     v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString()));
-            List<JavaType> bounds = q.receiveList(generic.getBounds(), null);
+            List<JavaType> bounds = q.receiveList(generic.getBounds(), v -> visit(v, q));
             return generic.unsafeSet(name, variance, bounds);
         }
 
         @Override
         public JavaType visitArray(JavaType.Array array, RpcReceiveQueue q) {
             JavaType elemType = q.receive(array.getElemType());
-            List<JavaType.FullyQualified> annotations = q.receiveList(array.getAnnotations(), null);
-            JavaType.FullyQualified[] annotationsArray = annotations == null ? null :
-                    annotations.toArray(new JavaType.FullyQualified[0]);
-            return array.unsafeSet(elemType, annotationsArray);
+            List<JavaType.FullyQualified> annotations = q.receiveList(array.getAnnotations(), v -> (FullyQualified) visit(v, q));
+            return array.unsafeSet(elemType, arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY));
         }
 
         @Override
@@ -761,14 +759,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
         @Override
         public JavaType visitMethod(JavaType.Method method, RpcReceiveQueue q) {
-            JavaType.FullyQualified declaringType = q.receive(method.getDeclaringType(), null);
+            JavaType.FullyQualified declaringType = q.receive(method.getDeclaringType(), v -> (FullyQualified) visit(v, q));
             String name = q.receive(method.getName(), null);
-            long flags = q.receive(method.getFlagsBitMap(), null);
-            JavaType returnType = q.receive(method.getReturnType(), null);
+            long flags = q.receive((Number) method.getFlagsBitMap()).longValue();
+            JavaType returnType = q.receive(method.getReturnType(), v -> visit(v, q));
             List<String> parameterNames = q.receiveList(method.getParameterNames(), null);
-            List<JavaType> parameterTypes = q.receiveList(method.getParameterTypes(), null);
-            List<JavaType> thrownExceptions = q.receiveList(method.getThrownExceptions(), null);
-            List<JavaType.FullyQualified> annotations = q.receiveList(method.getAnnotations(), null);
+            List<JavaType> parameterTypes = q.receiveList(method.getParameterTypes(), v -> visit(v, q));
+            List<JavaType> thrownExceptions = q.receiveList(method.getThrownExceptions(), v -> visit(v, q));
+            List<JavaType.FullyQualified> annotations = q.receiveList(method.getAnnotations(), v -> (FullyQualified) visit(v, q));
             List<String> defaultValue = q.receiveList(method.getDefaultValue(), null);
             List<String> declaredFormalTypeNames = q.receiveList(method.getDeclaredFormalTypeNames(), null);
             method.unsafeSet(
@@ -788,9 +786,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         @Override
         public JavaType visitVariable(JavaType.Variable variable, RpcReceiveQueue q) {
             String name = q.receive(variable.getName());
-            JavaType owner = q.receive(variable.getOwner());
-            JavaType type = q.receive(variable.getType());
-            List<JavaType.FullyQualified> annotations = q.receiveList(variable.getAnnotations(), null);
+            JavaType owner = q.receive(variable.getOwner(), v -> visit(v, q));
+            JavaType type = q.receive(variable.getType(), v -> visit(v, q));
+            List<JavaType.FullyQualified> annotations = q.receiveList(variable.getAnnotations(), v -> (FullyQualified) visit(v, q));
             return variable.unsafeSet(name, owner, type, arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY));
         }
     };
