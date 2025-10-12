@@ -17,7 +17,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {isSourceFile, Tree} from "../../tree";
 import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
-import {withMetrics, extractSourcePath} from "./metrics";
+import {extractSourcePath, withMetrics} from "./metrics";
 
 export const enum MarkerPrinter {
     DEFAULT = "DEFAULT",
@@ -26,11 +26,13 @@ export const enum MarkerPrinter {
 }
 
 export class Print {
-    constructor(private readonly treeId: UUID, private readonly sourceFileType: string, readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
+    constructor(private readonly treeId: UUID,
+                private readonly sourceFileType: string,
+                readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  getObject: (id: string, sourceFileType?: string) => any,
+                  getObject: (id: string, sourceFileType: string) => any,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<Print, string, Error>("Print"),

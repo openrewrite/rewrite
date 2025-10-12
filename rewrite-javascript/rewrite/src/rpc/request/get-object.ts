@@ -16,7 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
-import {withMetrics, extractSourcePath} from "./metrics";
+import {extractSourcePath, withMetrics} from "./metrics";
 
 export class GetObject {
     constructor(private readonly id: string,
@@ -29,8 +29,8 @@ export class GetObject {
         localObjects: Map<string, any | ((input: string) => any)>,
         localRefs: ReferenceMap,
         batchSize: number,
-        trace: boolean,
-        metricsCsv?: string
+        trace: () => boolean,
+        metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
 
@@ -63,7 +63,8 @@ export class GetObject {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
-                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace).generate(after, before);
+                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                            .generate(after, before);
                         pendingData.set(objId, allData);
 
                         remoteObjects.set(objId, after);

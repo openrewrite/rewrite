@@ -18,6 +18,7 @@ package org.openrewrite.rpc;
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
 
+import java.io.PrintStream;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -32,11 +33,13 @@ public class RpcReceiveQueue {
     private final Map<Integer, Object> refs;
     private final Supplier<List<RpcObjectData>> pull;
     private final @Nullable String sourceFileType;
+    private final @Nullable PrintStream logFile;
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
-                           @Nullable String sourceFileType) {
+                           @Nullable String sourceFileType, @Nullable PrintStream logFile) {
         this.refs = refs;
         this.sourceFileType = sourceFileType;
+        this.logFile = logFile;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
@@ -93,7 +96,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-        Trace.traceReceiver(message);
+        Trace.traceReceiver(message, logFile);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:

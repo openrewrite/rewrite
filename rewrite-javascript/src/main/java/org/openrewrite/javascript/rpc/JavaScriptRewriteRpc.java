@@ -26,9 +26,13 @@ import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -101,7 +105,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path metricsCsv;
         private @Nullable Path recipeInstallDir;
         private Duration timeout = Duration.ofSeconds(30);
-        private boolean verboseLogging;
+        private boolean traceRpcMessages;
         private @Nullable Integer inspectBrk;
         private boolean profiler;
         private @Nullable Integer maxHeapSize;
@@ -151,13 +155,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
          *
          * @return This builder.
          */
-        public Builder verboseLogging(boolean verboseLogging) {
-            this.verboseLogging = verboseLogging;
+        public Builder traceRpcMessages(boolean verboseLogging) {
+            this.traceRpcMessages = verboseLogging;
             return this;
         }
 
-        public Builder verboseLogging() {
-            return verboseLogging(true);
+        public Builder traceRpcMessages() {
+            return traceRpcMessages(true);
         }
 
         /**
@@ -245,7 +249,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             } else {
@@ -257,7 +261,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "rewrite-rpc",
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
-                        verboseLogging ? "--verbose" : null,
+                        traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize(),
                         profiler ? "--profile" : null
                 );
@@ -284,10 +288,15 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             process.environment().put("NODE_OPTIONS", nodeOptions.toString());
             process.start();
 
-            return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace,
-                    String.join(" ", cmdArr), process.environment())
-                    .livenessCheck(process::getLivenessCheck)
-                    .timeout(timeout);
+            try {
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace,
+                        String.join(" ", cmdArr), process.environment())
+                        .livenessCheck(process::getLivenessCheck)
+                        .timeout(timeout)
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 }

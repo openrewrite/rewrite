@@ -22,7 +22,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
-import org.openrewrite.rpc.Trace;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -40,13 +39,11 @@ class FindMethodsTest implements RewriteTest {
 
     @BeforeEach
     void before() {
-        Trace.TRACE_SENDER = true;
-
         JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-          .recipeInstallDir(tempDir)
-          .metricsCsv(tempDir.resolve("rpc.csv"))
-          .log(tempDir.resolve("rpc.log"))
-          .verboseLogging()
+            .recipeInstallDir(tempDir)
+            .metricsCsv(tempDir.resolve("rpc.csv"))
+            .log(tempDir.resolve("rpc.log"))
+            .traceRpcMessages()
 //          .inspectBrk()
         );
     }
@@ -111,6 +108,7 @@ class FindMethodsTest implements RewriteTest {
 
     @Test
     void splitWithTemplateString() {
+        JavaScriptRewriteRpc.getOrStart().traceGetObject(true, false);
         rewriteRun(
           spec -> spec
             .typeValidationOptions(TypeValidation.none())

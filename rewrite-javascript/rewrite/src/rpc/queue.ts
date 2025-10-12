@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as rpc from "vscode-jsonrpc/node";
 import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
 import {createDraft, finishDraft} from "immer";
 import {isRef, ReferenceMap} from "../reference";
-import {Writable} from "node:stream";
 
 /**
  * Interface representing an RPC codec that defines methods
@@ -261,7 +261,8 @@ export class RpcReceiveQueue {
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logFile?: Writable) {
+                private readonly logger: rpc.Logger,
+                private readonly trace: boolean) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -276,7 +277,7 @@ export class RpcReceiveQueue {
             markers = emptyMarkers;
         }
         return this.receive(markers, async m => {
-            return saveTrace(this.logFile, async () => {
+            return saveTrace(this.trace, async () => {
                 const draft = createDraft(markers!);
                 draft.id = await this.receive(m.id);
                 draft.markers = (await this.receiveList(m.markers))!;
@@ -289,7 +290,7 @@ export class RpcReceiveQueue {
         before: T | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T> {
-        return saveTrace(this.logFile, async () => {
+        return saveTrace(this.trace, async () => {
             const message = await this.take();
             this.traceMessage(message);
             let ref: number | undefined;
@@ -353,7 +354,7 @@ export class RpcReceiveQueue {
         before: T[] | undefined,
         onChange?: (before: T) => T | Promise<T | undefined> | undefined
     ): Promise<T[] | undefined> {
-        return saveTrace(this.logFile, async () => {
+        return saveTrace(this.trace, async () => {
             const message = await this.take();
             this.traceMessage(message);
             switch (message.state) {
@@ -386,12 +387,12 @@ export class RpcReceiveQueue {
     }
 
     private traceMessage(message: RpcObjectData) {
-        if (this.logFile && message.trace) {
+        if (this.trace && message.trace) {
             const sendTrace = message.trace;
             delete message.trace;
-            this.logFile.write(`${JSON.stringify(message)}\n`);
-            this.logFile.write(`  ${sendTrace}\n`);
-            this.logFile.write(`  ${trace("Receiver")}\n`);
+            this.logger.info(`${JSON.stringify(message)}`);
+            this.logger.info(`  ${sendTrace || 'No sender trace'}`);
+            this.logger.info(`  ${trace("Receiver") || 'No receiver trace'}`);
         }
     }
 
