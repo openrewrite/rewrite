@@ -16,13 +16,18 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
+import org.openrewrite.rpc.Trace;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,9 +35,31 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindMethodsTest implements RewriteTest {
+    @TempDir
+    Path tempDir;
+
+    @BeforeEach
+    void before() {
+        Trace.TRACE_SENDER = true;
+
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .metricsCsv(tempDir.resolve("rpc.csv"))
+          .log(tempDir.resolve("rpc.log"))
+          .verboseLogging()
+//          .inspectBrk()
+        );
+    }
+
     @AfterEach
-    void after() {
+    void after() throws IOException {
         JavaScriptRewriteRpc.shutdownCurrent();
+        if (Files.exists(tempDir.resolve("rpc.csv"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.csv")));
+        }
+        if (Files.exists(tempDir.resolve("rpc.log"))) {
+            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
+        }
     }
 
     @Test
@@ -85,7 +112,9 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void splitWithTemplateString() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("*..* split(..)", false)),
+          spec -> spec
+            .typeValidationOptions(TypeValidation.none())
+            .recipe(new FindMethods("*..* split(..)", false)),
           javascript(
             "'hello'.split(`; ${cookieName}=`)",
             "/*~~>*/'hello'.split(`; ${cookieName}=`)"

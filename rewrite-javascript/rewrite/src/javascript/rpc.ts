@@ -23,11 +23,11 @@ import {Cursor, Tree} from "../tree";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
 class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
-    private javaSender: JavaScriptSenderDelegate;
+    private delegate: JavaScriptDelegateSender;
 
     constructor() {
         super();
-        this.javaSender = new JavaScriptSenderDelegate(this);
+        this.delegate = new JavaScriptDelegateSender(this);
     }
 
     override async visit<R extends J>(tree: Tree, p: RpcSendQueue, parent?: Cursor): Promise<R | undefined> {
@@ -35,7 +35,7 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
             return super.visit(tree, p, parent);
         }
 
-        return this.javaSender.visit(tree, p, parent);
+        return this.delegate.visit(tree, p, parent);
     }
 
     override async preVisit(j: JS, q: RpcSendQueue): Promise<J | undefined> {
@@ -507,27 +507,27 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcSendQueue): Promise<J.RightPadded<T>> {
-        return this.javaSender.visitRightPadded(right, q);
+        return this.delegate.visitRightPadded(right, q);
     }
 
     override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcSendQueue): Promise<J.LeftPadded<T>> {
-        return this.javaSender.visitLeftPadded(left, q);
+        return this.delegate.visitLeftPadded(left, q);
     }
 
     override async visitContainer<T extends J>(container: J.Container<T>, q: RpcSendQueue): Promise<J.Container<T>> {
-        return this.javaSender.visitContainer(container, q);
+        return this.delegate.visitContainer(container, q);
     }
 
     override async visitSpace(space: J.Space, q: RpcSendQueue): Promise<J.Space> {
-        return this.javaSender.visitSpace(space, q);
+        return this.delegate.visitSpace(space, q);
     }
 
     override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
-        return this.javaSender.visitType(javaType, q);
+        return this.delegate.visitType(javaType, q);
     }
 }
 
-class JavaScriptSenderDelegate extends JavaSender {
+class JavaScriptDelegateSender extends JavaSender {
     private javascriptSender: JavaScriptSender;
 
     constructor(javascriptSender: JavaScriptSender) {
@@ -547,18 +547,18 @@ class JavaScriptSenderDelegate extends JavaSender {
 }
 
 class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
-    private javaReceiverDelegate: JavaReceiver;
+    private delegate: JavaReceiver;
 
     constructor() {
         super();
-        this.javaReceiverDelegate = new JavaScriptReceiverDelegate(this);
+        this.delegate = new JavaScriptDelegateReceiver(this);
     }
 
     async visit<R extends J>(tree: Tree, p: RpcReceiveQueue, parent?: Cursor): Promise<R | undefined> {
         if (isJavaScript(tree)) {
             return super.visit(tree, p, parent);
         }
-        return this.javaReceiverDelegate.visit(tree, p, parent);
+        return this.delegate.visit(tree, p, parent);
     }
 
     override async preVisit(j: JS, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1103,27 +1103,27 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
     }
 
     override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
-        return this.javaReceiverDelegate.visitRightPadded(right, q)
+        return this.delegate.visitRightPadded(right, q)
     }
 
     async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
-        return this.javaReceiverDelegate.visitLeftPadded(left, q);
+        return this.delegate.visitLeftPadded(left, q);
     }
 
     async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
-        return this.javaReceiverDelegate.visitContainer(container, q);
+        return this.delegate.visitContainer(container, q);
     }
 
     override async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
-        return this.javaReceiverDelegate.visitSpace(space, q);
+        return this.delegate.visitSpace(space, q);
     }
 
     override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
-        return this.javaReceiverDelegate.visitType(javaType, q);
+        return this.delegate.visitType(javaType, q);
     }
 }
 
-class JavaScriptReceiverDelegate extends JavaReceiver {
+class JavaScriptDelegateReceiver extends JavaReceiver {
     private javascriptReceiver: JavaScriptReceiver;
 
     constructor(javascriptReceiver: JavaScriptReceiver) {

@@ -20,10 +20,10 @@ import {produceAsync} from "../visitor";
 import {createDraft, Draft, finishDraft, WritableDraft} from "immer";
 import {isTree} from "../tree";
 import {Type} from "./type";
-import {JavaTypeVisitor} from "./type-visitor";
+import {TypeVisitor} from "./type-visitor";
 import Space = J.Space;
 
-class JavaTypeSenderVisitor extends JavaTypeVisitor<RpcSendQueue> {
+class TypeSender extends TypeVisitor<RpcSendQueue> {
     protected async visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Promise<Type | undefined> {
         await q.getAndSend(primitive, p => p.keyword);
         return primitive;
@@ -139,7 +139,7 @@ class JavaTypeSenderVisitor extends JavaTypeVisitor<RpcSendQueue> {
     }
 }
 
-class JavaTypeReceiverVisitor extends JavaTypeVisitor<RpcReceiveQueue> {
+class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     async preVisit(_type: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
         // Don't call default preVisit to avoid circular references
         return _type;
@@ -822,7 +822,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         return container;
     }
 
-    private static typeVisitor = new JavaTypeSenderVisitor();
+    private static typeVisitor = new TypeSender();
 
     public override async visitType(javaType: Type | undefined, q: RpcSendQueue): Promise<Type | undefined> {
         if (!javaType) {
@@ -1624,7 +1624,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return finishDraft(draft) as J.Container<T>;
     }
 
-    private static typeVisitor = new JavaTypeReceiverVisitor();
+    private static typeVisitor = new TypeReceiver();
 
     public override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
         if (!javaType) {

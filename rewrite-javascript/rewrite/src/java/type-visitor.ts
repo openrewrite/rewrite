@@ -19,7 +19,7 @@ import {Type} from "./type";
 import {createDraft, Draft, finishDraft} from "immer";
 import {produceAsync, ValidImmerRecipeReturnType} from "../visitor";
 
-export class JavaTypeVisitor<P> {
+export class TypeVisitor<P> {
     protected cursor: Cursor = rootCursor();
 
     async visitList<T extends Type>(types: T[] | undefined, p: P): Promise<T[] | undefined> {

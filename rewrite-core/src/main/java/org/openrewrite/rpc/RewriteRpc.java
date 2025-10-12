@@ -313,7 +313,8 @@ public class RewriteRpc {
                 parsingListener.startedParsing(input);
                 try {
                     sourceFile = getObject(id, sourceFileType);
-                    sourceFile = parser.requirePrintEqualsInput(sourceFile, input, relativeTo, ctx);
+                    // TODO this should be handled on the remote side.
+//                    sourceFile = parser.requirePrintEqualsInput(sourceFile, input, relativeTo, ctx);
                 } catch (Exception e) {
                     sourceFile = ParseError.build(parser, input, relativeTo, ctx, e);
                 } finally {

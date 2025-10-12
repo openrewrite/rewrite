@@ -156,7 +156,7 @@ async function main() {
         batchSize: options.batchSize,
         logger: logger,
         metricsCsv: options.metricsCsv,
-        traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
+        traceGetObjectInput: log, //options.traceGetObjectInput ? log : undefined,
         traceGetObjectOutput: options.traceGetObjectOutput,
         recipeInstallDir: recipeInstallDir
     }));

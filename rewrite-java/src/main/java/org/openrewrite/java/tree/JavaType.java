@@ -157,7 +157,7 @@ public interface JavaType {
             return new MultiCatch(throwableTypesArray);
         }
 
-        public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
+        public MultiCatch unsafeSet(@Nullable List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
@@ -198,7 +198,7 @@ public interface JavaType {
             return new Intersection(boundsArray);
         }
 
-        public Intersection unsafeSet(List<JavaType> bounds) {
+        public Intersection unsafeSet(@Nullable List<JavaType> bounds) {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
