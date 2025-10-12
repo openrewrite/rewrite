@@ -33,13 +33,13 @@ public class RpcReceiveQueue {
     private final Map<Integer, Object> refs;
     private final Supplier<List<RpcObjectData>> pull;
     private final @Nullable String sourceFileType;
-    private final @Nullable PrintStream logFile;
+    private final @Nullable PrintStream log;
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
-                           @Nullable String sourceFileType, @Nullable PrintStream logFile) {
+                           @Nullable String sourceFileType, @Nullable PrintStream log) {
         this.refs = refs;
         this.sourceFileType = sourceFileType;
-        this.logFile = logFile;
+        this.log = log;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
@@ -96,7 +96,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData message = take();
-        Trace.traceReceiver(message, logFile);
+        Trace.traceReceiver(message, log);
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -153,6 +153,7 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         RpcObjectData msg = take();
+        Trace.traceReceiver(msg, log);
         switch (msg.getState()) {
             case NO_CHANGE:
                 return before;

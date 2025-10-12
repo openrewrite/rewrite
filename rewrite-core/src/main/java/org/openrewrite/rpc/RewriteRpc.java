@@ -42,7 +42,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -66,7 +65,8 @@ public class RewriteRpc {
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
     private final AtomicReference<PrintStream> log = new AtomicReference<>();
-    private final AtomicBoolean traceGetObject = new AtomicBoolean();
+    private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
+            new TraceGetObject(false, false));
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -108,11 +108,18 @@ public class RewriteRpc {
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
-                localRefs, log, traceGetObject));
+                localRefs, log, () -> traceGetObject.get().isSend()));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
                 return marketplace.listRecipeDescriptors();
+            }
+        });
+        jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
+            @Override
+            protected Boolean handle(TraceGetObject request) {
+                traceGetObject.set(request);
+                return true;
             }
         });
         jsonRpc.rpc("GetLanguages", new JsonRpcMethod<Void>() {
@@ -387,9 +394,10 @@ public class RewriteRpc {
         );
     }
 
-    public void traceGetObject(boolean receive, boolean send) {
-        this.traceGetObject.set(receive);
+    public RewriteRpc traceGetObject(boolean receive, boolean send) {
+        this.traceGetObject.set(new TraceGetObject(receive, send));
         send("TraceGetObject", new TraceGetObject(receive, send), Boolean.class);
+        return this;
     }
 
     @VisibleForTesting

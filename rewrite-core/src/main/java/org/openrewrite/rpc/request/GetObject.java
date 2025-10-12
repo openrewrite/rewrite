@@ -28,9 +28,9 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
@@ -57,7 +57,7 @@ public class GetObject implements RpcRequest {
         private final IdentityHashMap<Object, Integer> localRefs;
 
         private final AtomicReference<PrintStream> log;
-        private final AtomicBoolean traceGetObject;
+        private final Supplier<Boolean> traceGetObject;
 
         private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 

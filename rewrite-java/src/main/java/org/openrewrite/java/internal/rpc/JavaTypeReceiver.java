@@ -85,7 +85,7 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
 
     @Override
     public JavaType visitParameterized(JavaType.Parameterized parameterized, RpcReceiveQueue q) {
-        JavaType.FullyQualified type = q.receive(parameterized.getType());
+        JavaType.FullyQualified type = q.receive(parameterized.getType(), v -> (JavaType.FullyQualified) visit(v, q));
         List<JavaType> typeParameters = q.receiveList(parameterized.getTypeParameters(), v -> visit(v, q));
         return parameterized.unsafeSet(type, typeParameters);
     }
@@ -101,7 +101,7 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
 
     @Override
     public JavaType visitArray(JavaType.Array array, RpcReceiveQueue q) {
-        JavaType elemType = q.receive(array.getElemType());
+        JavaType elemType = q.receive(array.getElemType(), v -> visit(v, q));
         List<JavaType.FullyQualified> annotations = q.receiveList(array.getAnnotations(), v -> (JavaType.FullyQualified) visit(v, q));
         return array.unsafeSet(elemType, arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY));
     }

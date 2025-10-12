@@ -292,7 +292,7 @@ export class RpcReceiveQueue {
     ): Promise<T> {
         return saveTrace(this.trace, async () => {
             const message = await this.take();
-            this.traceMessage(message);
+            RpcObjectData.logTrace(message, this.trace, this.logger);
             let ref: number | undefined;
             switch (message.state) {
                 case RpcObjectState.NO_CHANGE:
@@ -356,7 +356,7 @@ export class RpcReceiveQueue {
     ): Promise<T[] | undefined> {
         return saveTrace(this.trace, async () => {
             const message = await this.take();
-            this.traceMessage(message);
+            RpcObjectData.logTrace(message, this.trace, this.logger);
             switch (message.state) {
                 case RpcObjectState.NO_CHANGE:
                     return before;
@@ -386,16 +386,6 @@ export class RpcReceiveQueue {
         });
     }
 
-    private traceMessage(message: RpcObjectData) {
-        if (this.trace && message.trace) {
-            const sendTrace = message.trace;
-            delete message.trace;
-            this.logger.info(`${JSON.stringify(message)}`);
-            this.logger.info(`  ${sendTrace || 'No sender trace'}`);
-            this.logger.info(`  ${trace("Receiver") || 'No receiver trace'}`);
-        }
-    }
-
     private newObj<T>(type: string): T {
         return {
             kind: type
@@ -412,6 +402,18 @@ export interface RpcObjectData {
     value?: any
     ref?: number
     trace?: string
+}
+
+export namespace RpcObjectData {
+    export function logTrace(message: RpcObjectData, enabled: boolean, logger: rpc.Logger): void {
+        if (enabled && message.trace) {
+            const sendTrace = message.trace;
+            delete message.trace;
+            logger.info(`${JSON.stringify(message)}`);
+            logger.info(`  ${sendTrace || 'No sender trace'}`);
+            logger.info(`  ${trace("Receiver") || 'No receiver trace'}`);
+        }
+    }
 }
 
 export enum RpcObjectState {

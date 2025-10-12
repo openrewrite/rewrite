@@ -65,7 +65,7 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
 
     @Override
     public JavaType visitClass(JavaType.Class aClass, RpcSendQueue q) {
-        q.getAndSend(aClass, JavaType.Class::getFlags);
+        q.getAndSend(aClass, JavaType.Class::getFlagsBitMap);
         q.getAndSend(aClass, JavaType.Class::getKind);
         q.getAndSend(aClass, JavaType.Class::getFullyQualifiedName);
         q.getAndSendListAsRef(aClass, JavaType.Class::getTypeParameters, sig::signature, t -> visit(t, q));

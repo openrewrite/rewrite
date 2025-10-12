@@ -26,7 +26,8 @@ import {
     Parse,
     PrepareRecipe,
     PrepareRecipeResponse,
-    Print, TraceGetObject,
+    Print,
+    TraceGetObject,
     Visit,
     VisitResponse
 } from "./request";
@@ -130,6 +131,7 @@ export class RewriteRpc {
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
             throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
         }
 
