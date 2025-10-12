@@ -40,7 +40,7 @@ export class GetObject {
                 "GetObject",
                 metricsCsv,
                 (context) => async request => {
-                    let objId = request.id;
+                    const objId = request.id;
                     if (!localObjects.has(objId)) {
                         context.target = '';
                         return [
@@ -49,9 +49,9 @@ export class GetObject {
                         ];
                     }
 
-                    let objectOrGenerator = localObjects.get(objId)!;
+                    const objectOrGenerator = localObjects.get(objId)!;
                     if (typeof objectOrGenerator === 'function') {
-                        let obj = await objectOrGenerator(objId);
+                        const obj = await objectOrGenerator(objId);
                         localObjects.set(objId, obj);
                     }
 

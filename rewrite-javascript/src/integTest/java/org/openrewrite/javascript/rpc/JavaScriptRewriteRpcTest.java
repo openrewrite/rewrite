@@ -58,6 +58,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .metricsCsv(tempDir.resolve("rpc.csv"))
           .log(tempDir.resolve("rpc.log"))
           .verboseLogging()
+//          .inspectBrk()
         );
     }
 

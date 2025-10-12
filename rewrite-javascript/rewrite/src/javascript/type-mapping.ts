@@ -177,6 +177,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Method object
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Method,
+            flags: 0, // FIXME - determine flags
             declaringType: declaringType,
             name: name,
             returnType: this.getType(returnType),
@@ -265,6 +266,7 @@ export class JavaScriptTypeMapping {
 
                                             inferredDeclaringType = {
                                                 kind: Type.Kind.Class,
+                                                flags: 0, // TODO - determine flags
                                                 fullyQualifiedName: moduleName
                                             } as Type.FullyQualified;
                                         }
@@ -315,6 +317,7 @@ export class JavaScriptTypeMapping {
                             const typeName = origFqn.substring(lastDot + 1);
                             declaringType = {
                                 kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
                                 fullyQualifiedName: `${importName}.${typeName}`
                             } as Type.FullyQualified;
                         } else {
@@ -389,6 +392,7 @@ export class JavaScriptTypeMapping {
                         // Node.js built-in module
                         declaringType = {
                             kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
                             fullyQualifiedName: 'node'
                         } as Type.FullyQualified;
                         methodName = moduleSpecifier.substring(5); // Remove 'node:' prefix
@@ -396,6 +400,7 @@ export class JavaScriptTypeMapping {
                         // Regular module import
                         declaringType = {
                             kind: Type.Kind.Class,
+                            flags: 0, // TODO - determine flags
                             fullyQualifiedName: moduleSpecifier
                         } as Type.FullyQualified;
                         // For aliased imports, use the original function name from the aliased symbol
@@ -418,6 +423,7 @@ export class JavaScriptTypeMapping {
                             // For functions from modules, use the module part as declaring type
                             declaringType = {
                                 kind: Type.Kind.Class,
+                                flags: 0, // TODO - determine flags
                                 fullyQualifiedName: fqn.substring(0, lastDot)
                             } as Type.FullyQualified;
                         } else {
@@ -625,6 +631,7 @@ export class JavaScriptTypeMapping {
         // Create empty class type shell (no members yet to avoid recursion)
         return Object.assign(new NonDraftableType(), {
             kind: Type.Kind.Class,
+            flags: 0, // TODO - determine flags
             classKind: classKind,
             fullyQualifiedName: fullyQualifiedName,
             typeParameters: [],

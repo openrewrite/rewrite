@@ -99,7 +99,7 @@ export class JavaTypeVisitor<P> {
                 result = await this.visitVariable(result as Type.Variable, p);
                 break;
             case Type.Kind.ShallowClass:
-                result = await this.visitShallowClass(result as Type.ShallowClass, p);
+                result = await this.visitClass(result as Type.ShallowClass, p);
                 break;
             case Type.Kind.Unknown:
                 result = await this.visitUnknown(result, p);
@@ -218,12 +218,6 @@ export class JavaTypeVisitor<P> {
             draft.owner = await this.visit(variable.owner, p);
             draft.type = await this.visit(variable.type, p) as Type;
             draft.annotations = await mapAsync(variable.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>);
-        });
-    }
-
-    protected async visitShallowClass(shallowClass: Type.ShallowClass, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.ShallowClass>(shallowClass, p, async draft => {
-            draft.owningClass = await this.visit(shallowClass.owningClass, p) as Type.Class | undefined;
         });
     }
 
