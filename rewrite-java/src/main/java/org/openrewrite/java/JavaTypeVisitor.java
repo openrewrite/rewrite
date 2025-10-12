@@ -87,6 +87,8 @@ public class JavaTypeVisitor<P> {
                 javaType = visitMethod((JavaType.Method) javaType, p);
             } else if (javaType instanceof JavaType.Variable) {
                 javaType = visitVariable((JavaType.Variable) javaType, p);
+            } else if (javaType instanceof JavaType.Unknown) {
+                javaType = visitUnknown((JavaType.Unknown) javaType, p);
             }
 
             if (javaType != null) {
@@ -183,6 +185,10 @@ public class JavaTypeVisitor<P> {
 
     public JavaType visitPrimitive(JavaType.Primitive primitive, P p) {
         return primitive;
+    }
+
+    public JavaType visitUnknown(JavaType.Unknown unknown, P p) {
+        return unknown;
     }
 
     /**

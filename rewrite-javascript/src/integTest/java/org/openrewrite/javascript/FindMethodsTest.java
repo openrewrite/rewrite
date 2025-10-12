@@ -16,7 +16,6 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.java.search.FindMethods;
@@ -25,8 +24,6 @@ import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,29 +31,9 @@ import static org.openrewrite.javascript.Assertions.*;
 
 @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
 class FindMethodsTest implements RewriteTest {
-    @TempDir
-    Path tempDir;
-
-    @BeforeEach
-    void before() {
-        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
-            .recipeInstallDir(tempDir)
-            .metricsCsv(tempDir.resolve("rpc.csv"))
-            .log(tempDir.resolve("rpc.log"))
-            .traceRpcMessages()
-//          .inspectBrk()
-        );
-    }
-
     @AfterEach
-    void after() throws IOException {
+    void after() {
         JavaScriptRewriteRpc.shutdownCurrent();
-        if (Files.exists(tempDir.resolve("rpc.csv"))) {
-            System.out.println(Files.readString(tempDir.resolve("rpc.csv")));
-        }
-        if (Files.exists(tempDir.resolve("rpc.log"))) {
-            System.out.println(Files.readString(tempDir.resolve("rpc.log")));
-        }
     }
 
     @Test
@@ -108,7 +85,7 @@ class FindMethodsTest implements RewriteTest {
 
     @Test
     void splitWithTemplateString() {
-        JavaScriptRewriteRpc.getOrStart().traceGetObject(true, false);
+//        JavaScriptRewriteRpc.getOrStart().traceGetObject(false, true);
         rewriteRun(
           spec -> spec
             .typeValidationOptions(TypeValidation.none())

@@ -666,8 +666,10 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
-        if (javaType == null || javaType instanceof JavaType.Unknown) {
+        if (javaType == null) {
             return null;
+        } else if (javaType instanceof JavaType.Unknown) {
+            return JavaType.Unknown.getInstance();
         }
         return javaTypeReceiver.visit(javaType, q);
     }

@@ -132,11 +132,6 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
         await q.getAndSendList(intersection, i => (i.bounds || []).map(b => asRef(b)), t => Type.signature(t), b => this.visit(b, q));
         return intersection;
     }
-
-    protected async visitUnknown(_unknown: Type, _q: RpcSendQueue): Promise<Type | undefined> {
-        // Unknown type has no additional data
-        return Type.unknownType;
-    }
 }
 
 class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
@@ -263,10 +258,6 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     protected async visitIntersection(intersection: Type.Intersection, q: RpcReceiveQueue): Promise<Type | undefined> {
         intersection.bounds = await q.receiveList(intersection.bounds, b => this.visit(b, q)) || [];
         return intersection;
-    }
-
-    protected async visitUnknown(_unknown: Type, _q: RpcReceiveQueue): Promise<Type | undefined> {
-        return Type.unknownType;
     }
 }
 
@@ -1629,8 +1620,9 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     public override async visitType(javaType: Type | undefined, q: RpcReceiveQueue): Promise<Type | undefined> {
         if (!javaType) {
             return undefined;
+        } else if (javaType.kind === Type.Kind.Unknown) {
+            return Type.unknownType;
         }
-
         return await JavaReceiver.typeVisitor.visit(javaType, q);
     }
 }
