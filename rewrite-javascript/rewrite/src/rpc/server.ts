@@ -119,17 +119,17 @@ async function main() {
         logger.info(`connection disposed`);
     });
 
-    RewriteRpc.set(new RewriteRpc(connection, {
-        batchSize: options.batchSize,
-        logger: logger,
-        metricsCsv: options.metricsCsv,
-        recipeInstallDir: recipeInstallDir
-    }));
-
     // log uncaught exceptions
     process.on('uncaughtException', (error) => {
         logger.error('Fatal error:' + error.message);
         process.exit(8);
+    });
+
+    new RewriteRpc(connection, {
+        batchSize: options.batchSize,
+        logger: logger,
+        metricsCsv: options.metricsCsv,
+        recipeInstallDir: recipeInstallDir
     });
 }
 

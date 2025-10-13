@@ -106,7 +106,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private @Nullable Path recipeInstallDir;
         private Duration timeout = Duration.ofSeconds(30);
         private boolean traceRpcMessages;
+
         private @Nullable Integer inspectBrk;
+        private Path inspectBrkRewriteSourcePath;
+
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
         private ClassLoader recipeClassLoader = JavaScriptRewriteRpc.class.getClassLoader();
@@ -169,16 +172,22 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
          * an "Attach to Node.js/Chrome" run configuration in IDEA to debug the JavaScript Rewrite RPC process.
          * The Rewrite RPC process will block waiting for this connection.
          *
-         * @param inspectBrk The port for the Node.js inspector to listen on.
+         * @param rewriteSourcePath The path to either OpenRewrite TypeScript source code, or inside a
+         *                          node_modules folder e.g., @openrewrite/rewrite. When
+         *                          running a test from within this project, the value should be
+         *                          "rewrite" (since "rewrite-javascript/rewrite" contains the TypeScript
+         *                          source code).
+         * @param inspectBrk        The port for the Node.js inspector to listen on.
          * @return This builder
          */
-        public Builder inspectBrk(@Nullable Integer inspectBrk) {
+        public Builder inspectBrk(Path rewriteSourcePath, int inspectBrk) {
             this.inspectBrk = inspectBrk;
+            this.inspectBrkRewriteSourcePath = rewriteSourcePath;
             return this;
         }
 
-        public Builder inspectBrk() {
-            return inspectBrk(9229);
+        public Builder inspectBrk(Path rewriteDistPath) {
+            return inspectBrk(rewriteDistPath, 9229);
         }
 
         /**
@@ -217,11 +226,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
-                // Find the server.js file - check local development path first, then installed package
-                Path serverJs = Paths.get("rewrite/dist/rpc/server.js");
-                if (!Files.exists(serverJs)) {
-                    serverJs = Paths.get("node_modules/@openrewrite/rewrite/dist/rpc/server.js");
-                }
+                Path serverJs = inspectBrkRewriteSourcePath.resolve("dist/rpc/server.js");
 
                 // We have to use node directly here because npx spawns a child node process. The
                 // IDE's debug configuration would connect to the npx process rather than the spawned

@@ -101,6 +101,7 @@ export class RewriteRpc {
             }
         )
 
+        RewriteRpc.set(this);
         this.connection.listen();
     }
 
