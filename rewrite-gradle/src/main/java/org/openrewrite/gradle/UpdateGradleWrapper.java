@@ -468,6 +468,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         script = script.replaceAll("(?sm)<% /\\*.*?\\*/ %>", "");
         script = script.replaceAll("(?sm)<% if \\( mainClassName\\.startsWith\\('--module '\\) \\) \\{.*?} %>", "");
         script = script.replaceAll("(?sm)<% if \\( appNameSystemProperty \\) \\{.*?%>(.*?)<% } %>", "$1");
+        script = script.replaceAll("(?sm)<% if \\( classpath \\) \\{%>\\\\?\n?(.*?)<% } %>\\\\?\n?", "$1");
         script = script.replace("\\$", "$");
         script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
         script = script.replace("\\\\", "\\");
