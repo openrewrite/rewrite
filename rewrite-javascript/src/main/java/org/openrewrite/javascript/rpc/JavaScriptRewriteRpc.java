@@ -107,9 +107,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(30);
         private boolean traceRpcMessages;
         private @Nullable Integer inspectBrk;
-        private boolean profiler;
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
+        private ClassLoader recipeClassLoader = JavaScriptRewriteRpc.class.getClassLoader();
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -182,26 +182,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Enable V8 CPU profiling for performance analysis. When enabled, the process will
-         * generate a CPU profile that can be analyzed to identify performance bottlenecks.
-         * The profile is saved in Chrome DevTools format (.cpuprofile) on shutdown.
-         * <p>
-         * Profiling uses the V8 Inspector API and works with both npx and direct node execution modes.
-         * The profile file can be loaded in Chrome DevTools for analysis.
-         *
-         * @param profiler Whether to enable profiling
-         * @return This builder
-         */
-        public Builder profiler(boolean profiler) {
-            this.profiler = profiler;
-            return this;
-        }
-
-        public Builder profiler() {
-            return profiler(true);
-        }
-
-        /**
          * Set the maximum heap size for the Node.js process in megabytes.
          * Default V8 heap size is approximately 1.5-2 GB on 64-bit systems.
          * For large repositories with many source files, you may need to increase this.
@@ -227,6 +207,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        public Builder recipeClassLoader(ClassLoader recipeClassLoader) {
+            this.recipeClassLoader = recipeClassLoader;
+            return this;
+        }
+
         @Override
         public JavaScriptRewriteRpc get() {
             Stream<@Nullable String> cmd;
@@ -245,7 +230,6 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "node",
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
-                        profiler ? "--prof" : null,
                         maxHeapSize != null ? "--max-old-space-size=" + maxHeapSize : null,
                         serverJs.toAbsolutePath().normalize().toString(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
@@ -262,8 +246,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
-                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize(),
-                        profiler ? "--profile" : null
+                        recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                 );
             }
 
@@ -293,7 +276,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
-                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
+                        .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
+                        .recipeClassLoader(recipeClassLoader);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

@@ -25,6 +25,7 @@ import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 
@@ -36,10 +37,11 @@ public class PrepareRecipe implements RpcRequest {
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<PrepareRecipe> {
         private final PreparedRecipeCache preparedRecipes;
+        private final AtomicReference<ClassLoader> recipeClassLoader;
 
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
-            Recipe recipe = new RecipeLoader(null).load(request.getId(), request.getOptions());
+            Recipe recipe = new RecipeLoader(recipeClassLoader.get()).load(request.getId(), request.getOptions());
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);
             return new PrepareRecipeResponse(

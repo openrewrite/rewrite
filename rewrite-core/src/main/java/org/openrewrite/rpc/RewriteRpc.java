@@ -67,6 +67,8 @@ public class RewriteRpc {
     private final AtomicReference<PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
+    private final AtomicReference<ClassLoader> recipeClassLoader = new AtomicReference<>(
+            RewriteRpc.class.getClassLoader());
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -142,7 +144,7 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeClassLoader));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
 
         jsonRpc.bind();
@@ -166,6 +168,11 @@ public class RewriteRpc {
     public RewriteRpc log(@Nullable PrintStream logFile) {
         //noinspection DataFlowIssue
         this.log.set(logFile);
+        return this;
+    }
+
+    public RewriteRpc recipeClassLoader(ClassLoader recipeClassLoader) {
+        this.recipeClassLoader.set(recipeClassLoader);
         return this;
     }
 
