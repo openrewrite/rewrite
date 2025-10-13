@@ -17,6 +17,7 @@ package org.openrewrite.toml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -62,7 +63,7 @@ public class DeleteTable extends Recipe {
             }
 
             @Override
-            public Toml visitTable(Toml.Table table, ExecutionContext ctx) {
+            public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
                 if (t.getName() != null && tableName.equals(t.getName().getName())) {
                     return null;
