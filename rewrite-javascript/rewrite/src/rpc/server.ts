@@ -15,12 +15,10 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {Trace, Tracer} from "vscode-jsonrpc/node";
 import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
-import {ChromeProfiler} from './chrome-profiler';
 
 // Include all languages you want this server to support.
 import "../text";
@@ -34,10 +32,8 @@ require('v8').setFlagsFromString('--stack-size=8000');
 interface ProgramOptions {
     logFile?: string;
     metricsCsv?: string;
-    verbose?: boolean;
+    traceRpcMessages?: boolean;
     batchSize?: number;
-    traceGetObjectOutput?: boolean;
-    traceGetObjectInput?: boolean;
     recipeInstallDir?: string;
     profile?: boolean;
 }
@@ -48,22 +44,12 @@ async function main() {
         .option('--port <number>', 'port number')
         .option('--log-file <log_path>', 'log file path')
         .option('--metrics-csv <metrics_csv_path>', 'metrics CSV output path')
-        .option('-v, --verbose', 'enable verbose output')
+        .option('--trace-rpc-messages', 'trace RPC messages at the protocol level')
         .option('--batch-size [size]', 'sets the batch size (default is 200)', s => parseInt(s, 10), 200)
-        .option('--trace-get-object-output', 'enable `GetObject` output tracing')
-        .option('--trace-get-object-input', 'enable `GetObject` input tracing')
         .option('--recipe-install-dir <install_dir>', 'Recipe installation directory (default is a temporary directory)')
-        .option('--profile', 'enable profiling')
         .parse();
 
     const options = program.opts() as ProgramOptions;
-
-    // Chrome profiling
-    let profiler: ChromeProfiler | undefined;
-    if (options.profile) {
-        profiler = new ChromeProfiler();
-        profiler.start().catch(console.error);
-    }
 
     let recipeInstallDir: string;
     if (!options.recipeInstallDir) {
@@ -77,9 +63,6 @@ async function main() {
 
         // Register cleanup on exit
         process.on('SIGINT', async () => {
-            if (profiler) {
-                await profiler.stop();
-            }
             if (recipeCleanup) {
                 await recipeCleanup();
             }
@@ -87,9 +70,6 @@ async function main() {
         });
 
         process.on('SIGTERM', async () => {
-            if (profiler) {
-                await profiler.stop();
-            }
             if (recipeCleanup) {
                 await recipeCleanup();
             }
@@ -99,30 +79,17 @@ async function main() {
         recipeInstallDir = await setupRecipeDir();
     } else {
         recipeInstallDir = options.recipeInstallDir;
-
-        // Register cleanup for profiler when no recipe cleanup is needed
-        if (profiler) {
-            process.on('SIGINT', async () => {
-                await profiler.stop();
-                process.exit(0);
-            });
-
-            process.on('SIGTERM', async () => {
-                await profiler.stop();
-                process.exit(0);
-            });
-        }
     }
 
     const log = options.logFile ? fs.createWriteStream(options.logFile, {flags: 'a'}) : undefined;
     const logger: rpc.Logger = {
-        error: (msg: string) => log && log.write(`[js-rewrite-rpc] [error] ${msg}\n`),
-        warn: (msg: string) => log && log.write(`[js-rewrite-rpc] [warn] ${msg}\n`),
-        info: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [info] ${msg}\n`),
-        log: (msg: string) => log && options.verbose && log.write(`[js-rewrite-rpc] [log] ${msg}\n`)
+        error: (msg: string) => log && log.write(`[js error] ${msg}\n`),
+        warn: (msg: string) => log && log.write(`[js warn] ${msg}\n`),
+        info: (msg: string) => log && log.write(`[js info] ${msg}\n`),
+        // The RPC Tracer configured below itself writes to this "log" level for every message it sends or receives,
+        // because the Tracer type has a log method on it that matches this signature.
+        log: (msg: string) => log && options.traceRpcMessages && log.write(`[js trace] ${msg}\n`)
     };
-
-    logger.log(`starting`);
 
     // Create the connection with the custom logger
     const connection = rpc.createMessageConnection(
@@ -131,13 +98,13 @@ async function main() {
         logger
     );
 
-    if (options.verbose) {
+    if (options.traceRpcMessages) {
         await connection.trace(rpc.Trace.Verbose, logger).catch((err: Error) => {
             // Handle any unexpected errors during trace configuration
             logger.error(`Failed to set trace: ${err}`);
         });
     } else {
-        await connection.trace(Trace.Off, {} as Tracer);
+        await connection.trace(rpc.Trace.Off, {} as rpc.Tracer);
     }
 
     connection.onError(err => {
@@ -156,8 +123,6 @@ async function main() {
         batchSize: options.batchSize,
         logger: logger,
         metricsCsv: options.metricsCsv,
-        traceGetObjectInput: options.traceGetObjectInput ? log : undefined,
-        traceGetObjectOutput: options.traceGetObjectOutput,
         recipeInstallDir: recipeInstallDir
     }));
 

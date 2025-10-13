@@ -40,22 +40,21 @@ export class Parse {
                         typeof input === 'string' ? input : input.sourcePath
                     ).join(',');
 
-                    let parser = Parsers.createParser("javascript", {
+                    const parser = Parsers.createParser("javascript", {
                         ctx: new ExecutionContext(),
                         relativeTo: request.relativeTo
-                    });
+                    })!;
 
-                    if (!parser) {
-                        return [];
-                    }
                     const generator = parser.parse(...request.inputs);
                     const resultIds: UUID[] = [];
 
                     for (let i = 0; i < request.inputs.length; i++) {
                         const id = randomId();
                         localObjects.set(id, async (id: string) => {
-                            let sourceFile: SourceFile = (await generator.next()).value;
-                            return produce(sourceFile, (draft) => {draft.id = id;});
+                            const sourceFile: SourceFile = (await generator.next()).value;
+                            return produce(sourceFile, (draft) => {
+                                draft.id = id;
+                            });
                         });
                         resultIds.push(id);
                     }

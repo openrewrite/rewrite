@@ -26,7 +26,6 @@ import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
 import {javascript, JavaScriptVisitor, JS, npm, packageJson, typescript} from "@openrewrite/rewrite/javascript";
 import {J} from "@openrewrite/rewrite/java";
-import fs from "node:fs";
 import {withDir} from "tmp-promise";
 
 describe("Rewrite RPC", () => {
@@ -45,9 +44,7 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageWriter(clientToServer)
         );
         client = new RewriteRpc(clientConnection, {
-            batchSize: 1,
-            traceGetObjectOutput: true,
-            traceGetObjectInput: fs.createWriteStream('client.txt')
+            batchSize: 1
         });
 
         const serverConnection = rpc.createMessageConnection(
@@ -57,19 +54,13 @@ describe("Rewrite RPC", () => {
         const registry = new RecipeRegistry();
         activate(registry);
         server = new RewriteRpc(serverConnection, {
-            registry: registry,
-            traceGetObjectOutput: true,
-            traceGetObjectInput: fs.createWriteStream('server.txt')
+            registry: registry
         });
     });
 
     afterEach(() => {
         server.end();
         client.end();
-        fs.unlink('client.txt', () => {
-        });
-        fs.unlink('server.txt', () => {
-        });
     });
 
     test("print", () => spec.rewriteRun(

@@ -40,6 +40,7 @@ export namespace Type {
 
     export interface Class extends Type, FullyQualified {
         readonly kind: typeof Kind.Class,
+        flags: number;
         classKind: Class.Kind;
         fullyQualifiedName: string;
         typeParameters: Type[];
@@ -90,6 +91,7 @@ export namespace Type {
 
     export interface Method extends Type {
         readonly kind: typeof Kind.Method;
+        flags: number;
         declaringType: Type.FullyQualified;
         name: string;
         returnType: Type;
@@ -300,37 +302,37 @@ export namespace Type {
             case Type.Kind.GenericTypeVariable: {
                 const generic = type as Type.GenericTypeVariable;
                 let result = "Generic{" + generic.name;
-                
+
                 // Initialize stack if needed
                 if (typeVariableNameStack === null) {
                     typeVariableNameStack = new Set<string>();
                 }
-                
+
                 // Check for recursion in type variable names
                 if (generic.name !== "?" && typeVariableNameStack.has(generic.name)) {
                     return result + "}";
                 }
-                
+
                 // Add to stack to track
                 if (generic.name !== "?") {
                     typeVariableNameStack.add(generic.name);
                 }
-                
+
                 try {
                     if (!generic.bounds || generic.bounds.length === 0) {
                         return result + "}";
                     }
-                    
+
                     // Filter out bounds that would cause cycles through parameterized types
                     const safeBounds = generic.bounds.filter(b => {
                         return !parameterizedStack || !parameterizedStack.has(b);
                     });
-                    
+
                     if (safeBounds.length > 0) {
                         const bounds = safeBounds.map(b => signature(b)).join(" & ");
                         result += " extends " + bounds;
                     }
-                    
+
                     return result + "}";
                 } finally {
                     // Remove from stack when done
@@ -351,15 +353,15 @@ export namespace Type {
             }
             case Type.Kind.Parameterized: {
                 const parameterized = type as Type.Parameterized;
-                
+
                 // Initialize stack if needed
                 if (parameterizedStack === null) {
                     parameterizedStack = new Set<Type>();
                 }
-                
+
                 // Add to stack to track cycles
                 parameterizedStack.add(parameterized);
-                
+
                 try {
                     const baseType = signature(parameterized.type);
                     if (!parameterized.typeParameters || parameterized.typeParameters.length === 0) {

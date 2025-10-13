@@ -591,7 +591,7 @@ export namespace J {
 
     export interface Primitive extends J, TypeTree, Expression {
         readonly kind: typeof Kind.Primitive;
-        readonly type: Type.Primitive;
+        type: Type.Primitive;
     }
 
     export interface Return extends J, Statement {

@@ -32,16 +32,18 @@ public class RpcSendQueue {
     private final Consumer<List<RpcObjectData>> drain;
     private final IdentityHashMap<Object, Integer> refs;
     private final @Nullable String sourceFileType;
+    private final boolean trace;
 
     private @Nullable Object before;
 
     public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs,
-                        @Nullable String sourceFileType) {
+                        @Nullable String sourceFileType, boolean trace) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
         this.refs = refs;
         this.sourceFileType = sourceFileType;
+        this.trace = trace;
     }
 
     public void put(RpcObjectData rpcObjectData) {
@@ -103,14 +105,14 @@ public class RpcSendQueue {
         Object beforeVal = Reference.getValue(before);
 
         if (beforeVal == afterVal) {
-            put(new RpcObjectData(NO_CHANGE, null, null, null));
+            put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
         } else if (beforeVal == null) {
             add(after, onChange);
         } else if (afterVal == null) {
-            put(new RpcObjectData(DELETE, null, null, null));
+            put(new RpcObjectData(DELETE, null, null, null, trace));
         } else {
             RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
-            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null));
+            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
             doChange(after, before, onChange, afterCodec);
         }
     }
@@ -133,9 +135,9 @@ public class RpcSendQueue {
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
-                        put(new RpcObjectData(NO_CHANGE, null, null, null));
+                        put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
                     } else {
-                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null));
+                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
                         doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
                     }
                 }
@@ -155,7 +157,7 @@ public class RpcSendQueue {
             Integer beforePos = beforeIdx.get(id.apply(t));
             positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
         }
-        put(new RpcObjectData(CHANGE, null, positions, null));
+        put(new RpcObjectData(CHANGE, null, positions, null, trace));
         return beforeIdx;
     }
 
@@ -164,7 +166,7 @@ public class RpcSendQueue {
         Integer ref = null;
         if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
-                put(new RpcObjectData(ADD, null, null, refs.get(afterVal)));
+                put(new RpcObjectData(ADD, null, null, refs.get(afterVal), trace));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
@@ -173,7 +175,7 @@ public class RpcSendQueue {
         }
         RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
         put(new RpcObjectData(ADD, getValueType(afterVal),
-                onChange == null && afterCodec == null ? afterVal : null, ref));
+                onChange == null && afterCodec == null ? afterVal : null, ref, trace));
         doChange(afterVal, null, onChange, afterCodec);
     }
 
