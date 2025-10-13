@@ -40,7 +40,7 @@ export interface Expression extends J {
 }
 
 export interface MethodCall extends Expression {
-    readonly methodType?: Type.Method;
+    methodType?: Type.Method;
 }
 
 export interface TypedTree extends J {
@@ -163,7 +163,7 @@ export namespace J {
         readonly kind: typeof Kind.ArrayAccess;
         readonly indexed: Expression;
         readonly dimension: ArrayDimension;
-        readonly type?: Type
+        type?: Type
     }
 
     export interface ArrayDimension extends J {
@@ -176,7 +176,7 @@ export namespace J {
         readonly elementType: TypeTree;
         readonly annotations?: Annotation[];
         readonly dimension: LeftPadded<Space>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface Assert extends J, Statement {
@@ -189,7 +189,7 @@ export namespace J {
         readonly kind: typeof Kind.Assignment;
         readonly variable: Expression;
         readonly assignment: LeftPadded<Expression>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface AssignmentOperation extends J, Statement, Expression, TypedTree {
@@ -197,7 +197,7 @@ export namespace J {
         readonly variable: Expression;
         readonly operator: LeftPadded<AssignmentOperation.Type>;
         readonly assignment: Expression;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export namespace AssignmentOperation {
@@ -224,7 +224,7 @@ export namespace J {
         readonly left: Expression;
         readonly operator: LeftPadded<Binary.Type>;
         readonly right: Expression;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export namespace Binary {
@@ -291,7 +291,7 @@ export namespace J {
         readonly implements?: Container<TypeTree>;
         readonly permitting?: Container<TypeTree>;
         readonly body: Block;
-        readonly type?: Type.FullyQualified;
+        type?: Type.FullyQualified;
     }
 
     export namespace ClassDeclaration {
@@ -350,7 +350,7 @@ export namespace J {
         readonly kind: typeof Kind.FieldAccess;
         readonly target: Expression;
         readonly name: LeftPadded<Identifier>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface ForEachLoop extends J, Statement {
@@ -392,8 +392,8 @@ export namespace J {
         readonly kind: typeof Kind.Identifier;
         readonly annotations: Annotation[];
         readonly simpleName: string;
-        readonly type?: Type;
-        readonly fieldType?: Type.Variable;
+        type?: Type;
+        fieldType?: Type.Variable;
     }
 
     export interface If extends J, Statement {
@@ -422,7 +422,7 @@ export namespace J {
         readonly expression: RightPadded<Expression>;
         readonly class: J;
         readonly pattern?: J;
-        readonly type?: Type;
+        type?: Type;
         readonly modifier?: Modifier;
     }
 
@@ -430,13 +430,13 @@ export namespace J {
         readonly kind: typeof Kind.DeconstructionPattern;
         readonly deconstructor: Expression;
         readonly nested: Container<J>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface IntersectionType extends J, TypeTree, Expression {
         readonly kind: typeof Kind.IntersectionType;
         readonly bounds: Container<TypeTree>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface Label extends J, Statement {
@@ -450,7 +450,7 @@ export namespace J {
         readonly parameters: Lambda.Parameters;
         readonly arrow: Space;
         readonly body: Statement | Expression;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export namespace Lambda {
@@ -466,7 +466,7 @@ export namespace J {
         readonly value?: string | number | bigint | boolean | null | undefined;
         readonly valueSource?: string;
         readonly unicodeEscapes?: LiteralUnicodeEscape[];
-        readonly type?: Type.Primitive;
+        type?: Type.Primitive;
     }
 
     export interface LiteralUnicodeEscape {
@@ -479,8 +479,8 @@ export namespace J {
         readonly containing: RightPadded<Expression>;
         readonly typeParameters?: Container<Expression>;
         readonly reference: LeftPadded<Identifier>;
-        readonly type?: Type;
-        readonly variableType?: Type.Variable;
+        type?: Type;
+        variableType?: Type.Variable;
     }
 
     export interface MethodDeclaration extends J, TypedTree {
@@ -495,7 +495,7 @@ export namespace J {
         readonly throws?: Container<NameTree>;
         readonly body?: Block;
         readonly defaultValue?: LeftPadded<Expression>;
-        readonly methodType?: Type.Method;
+        methodType?: Type.Method;
     }
 
     export interface MethodInvocation extends J, TypedTree, MethodCall {
@@ -547,7 +547,7 @@ export namespace J {
         readonly typeExpression?: TypeTree;
         readonly dimensions: ArrayDimension[];
         readonly initializer?: Container<Expression>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface NewClass extends J, TypedTree, MethodCall {
@@ -557,7 +557,7 @@ export namespace J {
         readonly class?: TypeTree;
         readonly arguments: Container<Expression>;
         readonly body?: Block;
-        readonly constructorType?: Type.Method;
+        constructorType?: Type.Method;
     }
 
     export interface NullableType extends J, TypeTree, Expression {
@@ -576,7 +576,7 @@ export namespace J {
         readonly kind: typeof Kind.ParameterizedType;
         readonly class: NameTree;
         readonly typeParameters?: Container<Expression>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface Parentheses<J2 extends J> extends J, Expression {
@@ -591,7 +591,7 @@ export namespace J {
 
     export interface Primitive extends J, TypeTree, Expression {
         readonly kind: typeof Kind.Primitive;
-        readonly type: Type.Primitive;
+        type: Type.Primitive;
     }
 
     export interface Return extends J, Statement {
@@ -609,7 +609,7 @@ export namespace J {
         readonly kind: typeof Kind.SwitchExpression;
         readonly selector: ControlParentheses<Expression>;
         readonly cases: Block;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface Synchronized extends J, Statement {
@@ -623,7 +623,7 @@ export namespace J {
         readonly condition: Expression;
         readonly truePart: LeftPadded<Expression>;
         readonly falsePart: LeftPadded<Expression>;
-        readonly type?: Type;
+        type?: Type;
     }
 
     export interface Throw extends J, Statement {
@@ -677,7 +677,7 @@ export namespace J {
         readonly kind: typeof Kind.Unary;
         readonly operator: LeftPadded<Unary.Type>;
         readonly expression: Expression;
-        readonly type?: Type;
+        type?: Type;
     }
 
 
@@ -709,7 +709,7 @@ export namespace J {
             readonly name: VariableDeclarator;
             readonly dimensionsAfterName: LeftPadded<Space>[];
             readonly initializer?: LeftPadded<Expression>;
-            readonly variableType?: Type.Variable;
+            variableType?: Type.Variable;
         }
     }
 

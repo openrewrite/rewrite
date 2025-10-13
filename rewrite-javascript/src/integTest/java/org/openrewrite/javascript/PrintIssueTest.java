@@ -60,9 +60,16 @@ public class PrintIssueTest implements RewriteTest {
                   .run(new InMemoryLargeSourceSet(List.of(cu)), new InMemoryExecutionContext());
 
                 try {
-                    RewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
                     Files.writeString(log, "PRINTING AFTER --------------------\n", StandardOpenOption.APPEND);
                     requireNonNull(run.getChangeset().getAllResults().getFirst().getAfter()).printAll();
+
+                    // TODO works when shutdownCurrent here because everything is ADDed. Somehow the NO_CHANGE
+                    //  on or directly after JS.Await.getType() causes a maximum call stack exceeded error
+//                    JavaScriptRewriteRpc.shutdownCurrent();
+                    RewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
+
+                    // TODO @knut We turn on traceGetObject here, so that we can see the sender/receiver interaction
+                    //  in the printed log in the finally block
                     rpc.traceGetObject(true, true);
                     Files.writeString(log, "PRINTING BEFORE --------------------\n", StandardOpenOption.APPEND);
                     requireNonNull(run.getChangeset().getAllResults().getFirst().getBefore()).printAll();

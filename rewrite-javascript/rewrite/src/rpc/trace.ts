@@ -42,7 +42,7 @@ export function trace(type: "Receiver" | "Sender"): string | undefined {
                     const codeLine = readFileSync(file, 'utf-8')
                         .split('\n')[parseInt(line, 10) - 1]
                         .trim();
-                    return `${className}:${line} => ${codeLine}`;
+                    return `${className}:${line}:depth(${stack.length}) => ${codeLine}`;
                 } catch {
                     // ignore if reading the source file fails
                 }
