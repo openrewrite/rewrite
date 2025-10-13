@@ -26,15 +26,16 @@ export function hasSourcePath(filePattern: string): Promise<RpcRecipe> | TreeVis
     }) : new IsSourceFile(filePattern);
 }
 
-export function usesMethod(methodMatcher: string, matchOverrides: boolean = false): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
+export function usesMethod(methodPattern: string, matchOverrides: boolean = false): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
     return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesMethod", {
-        methodMatcher,
+        methodPattern,
         matchOverrides
-    }) : new UsesMethod(methodMatcher);
+    }) : new UsesMethod(methodPattern);
 }
 
 export function usesType(fullyQualifiedType: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
     return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesType", {
-        fullyQualifiedType
+        fullyQualifiedType,
+        includeImplicit: false
     }) : new UsesType(fullyQualifiedType);
 }
