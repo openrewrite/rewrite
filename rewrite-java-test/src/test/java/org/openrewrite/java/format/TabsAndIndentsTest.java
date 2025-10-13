@@ -18,11 +18,15 @@ package org.openrewrite.java.format;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -169,6 +173,56 @@ class TabsAndIndentsTest implements RewriteTest {
                           String third
                   ) {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alignMethodDeclarationParamsWhenIndentationNeeded() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+
+              @Override
+              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                  return (J.CompilationUnit) new TabsAndIndents().getVisitor().visit(super.visitCompilationUnit(cu, ctx), ctx);
+              }
+
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                  return m.withParameters(ListUtils.map(m.getParameters(), param -> {
+                      if (!param.getPrefix().getWhitespace().contains("\n")) {
+                          return param.withPrefix(param.getPrefix().withWhitespace("\n"));
+                      }
+                      return param;
+                  }));
+              }
+          })),
+          java(
+            """
+              class Test {
+                  @SuppressWarnings
+                  private void firstArgNoPrefix(String first,int times,      String third) {}
+                  private void secondArgOnNewLine(String first,
+                              int times,
+                     String third
+                  ) {}
+              }
+              """,
+            """
+              class Test {
+                  @SuppressWarnings
+                  private void firstArgNoPrefix(
+                          String first,
+                          int times,
+                          String third) {}
+                  private void secondArgOnNewLine(
+                          String first,
+                          int times,
+                          String third
+                  ) {}
               }
               """
           )
