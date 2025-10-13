@@ -19,7 +19,7 @@ import {isJavaScript, JS, JSX} from "./tree";
 import {Expression, J, Statement, Type, TypedTree, TypeTree} from "../java";
 import {JavaReceiver, JavaSender, registerJLanguageCodecs} from "../java/rpc";
 import {Cursor, Tree} from "../tree";
-import {TreeVisitor} from "../visitor";
+import {updateIfChanged} from "../util";
 import ComputedPropertyName = JS.ComputedPropertyName;
 
 class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
@@ -567,7 +567,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             prefix: await q.receive(j.prefix, space => this.visitSpace(space, q)),
             markers: await q.receive(j.markers)
         };
-        return TreeVisitor.updateIfChanged(j, updates);
+        return updateIfChanged(j, updates);
     }
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -580,7 +580,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             statements: await q.receiveListDefined(cu.statements, stmt => this.visitRightPadded(stmt, q)),
             eof: await q.receive(cu.eof, space => this.visitSpace(space, q))
         };
-        return TreeVisitor.updateIfChanged(cu, updates);
+        return updateIfChanged(cu, updates);
     }
 
     override async visitAlias(alias: JS.Alias, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -588,7 +588,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             propertyName: await q.receive(alias.propertyName, el => this.visitRightPadded(el, q)),
             alias: await q.receive(alias.alias, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(alias, updates);
+        return updateIfChanged(alias, updates);
     }
 
     override async visitArrowFunction(arrowFunction: JS.ArrowFunction, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -599,7 +599,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             lambda: await q.receive(arrowFunction.lambda, el => this.visitDefined<J.Lambda>(el, q)),
             returnTypeExpression: await q.receive(arrowFunction.returnTypeExpression, el => this.visitDefined<TypeTree>(el, q))
         };
-        return TreeVisitor.updateIfChanged(arrowFunction, updates);
+        return updateIfChanged(arrowFunction, updates);
     }
 
     override async visitAwait(anAwait: JS.Await, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -607,7 +607,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             expression: await q.receive(anAwait.expression, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(anAwait.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(anAwait, updates);
+        return updateIfChanged(anAwait, updates);
     }
 
     override async visitConditionalType(conditionalType: JS.ConditionalType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -616,21 +616,21 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             condition: await q.receive(conditionalType.condition, el => this.visitLeftPadded(el, q)),
             type: await q.receive(conditionalType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(conditionalType, updates);
+        return updateIfChanged(conditionalType, updates);
     }
 
     override async visitDelete(delete_: JS.Delete, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(delete_.expression, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(delete_, updates);
+        return updateIfChanged(delete_, updates);
     }
 
     override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(expressionStatement.expression, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(expressionStatement, updates);
+        return updateIfChanged(expressionStatement, updates);
     }
 
     override async visitExpressionWithTypeArguments(expressionWithTypeArguments: JS.ExpressionWithTypeArguments, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -639,7 +639,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeArguments: await q.receive(expressionWithTypeArguments.typeArguments, el => this.visitContainer(el, q)),
             type: await q.receive(expressionWithTypeArguments.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(expressionWithTypeArguments, updates);
+        return updateIfChanged(expressionWithTypeArguments, updates);
     }
 
     override async visitFunctionCall(functionCall: JS.FunctionCall, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -649,7 +649,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             arguments: await q.receive(functionCall.arguments, args => this.visitContainer(args, q)),
             methodType: await q.receive(functionCall.methodType, type => this.visitType(type, q) as unknown as Type.Method)
         };
-        return TreeVisitor.updateIfChanged(functionCall, updates);
+        return updateIfChanged(functionCall, updates);
     }
 
     override async visitFunctionType(functionType: JS.FunctionType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -660,7 +660,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             parameters: await q.receive(functionType.parameters, el => this.visitContainer(el, q)),
             returnType: await q.receive(functionType.returnType, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(functionType, updates);
+        return updateIfChanged(functionType, updates);
     }
 
     override async visitInferType(inferType: JS.InferType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -668,7 +668,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeParameter: await q.receive(inferType.typeParameter, el => this.visitLeftPadded(el, q)),
             type: await q.receive(inferType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(inferType, updates);
+        return updateIfChanged(inferType, updates);
     }
 
     override async visitImportType(importType: JS.ImportType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -679,7 +679,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeArguments: await q.receive(importType.typeArguments, el => this.visitContainer(el, q)),
             type: await q.receive(importType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(importType, updates);
+        return updateIfChanged(importType, updates);
     }
 
     override async visitImportDeclaration(jsImport: JS.Import, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -690,7 +690,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             attributes: await q.receive(jsImport.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q)),
             initializer: await q.receive(jsImport.initializer, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(jsImport, updates);
+        return updateIfChanged(jsImport, updates);
     }
 
     override async visitImportClause(jsImportClause: JS.ImportClause, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -699,7 +699,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             name: await q.receive(jsImportClause.name, el => this.visitRightPadded(el, q)),
             namedBindings: await q.receive(jsImportClause.namedBindings, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(jsImportClause, updates);
+        return updateIfChanged(jsImportClause, updates);
     }
 
     override async visitNamedImports(namedImports: JS.NamedImports, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -707,7 +707,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             elements: await q.receive(namedImports.elements, el => this.visitContainer(el, q)),
             type: await q.receive(namedImports.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(namedImports, updates);
+        return updateIfChanged(namedImports, updates);
     }
 
     override async visitImportSpecifier(jsImportSpecifier: JS.ImportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -716,7 +716,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             specifier: await q.receive(jsImportSpecifier.specifier, el => this.visitDefined<JS.Alias | J.Identifier>(el, q)),
             type: await q.receive(jsImportSpecifier.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(jsImportSpecifier, updates);
+        return updateIfChanged(jsImportSpecifier, updates);
     }
 
     override async visitImportAttributes(importAttributes: JS.ImportAttributes, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -724,7 +724,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             token: await q.receive(importAttributes.token),
             elements: await q.receive(importAttributes.elements, el => this.visitContainer(el, q))
         };
-        return TreeVisitor.updateIfChanged(importAttributes, updates);
+        return updateIfChanged(importAttributes, updates);
     }
 
     override async visitImportTypeAttributes(importTypeAttributes: JS.ImportTypeAttributes, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -733,7 +733,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             elements: await q.receive(importTypeAttributes.elements, el => this.visitContainer(el, q)),
             end: await q.receive(importTypeAttributes.end, el => this.visitSpace(el, q))
         };
-        return TreeVisitor.updateIfChanged(importTypeAttributes, updates);
+        return updateIfChanged(importTypeAttributes, updates);
     }
 
     override async visitImportAttribute(importAttribute: JS.ImportAttribute, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -741,7 +741,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             name: await q.receive(importAttribute.name, el => this.visitDefined<Expression>(el, q)),
             value: await q.receive(importAttribute.value, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(importAttribute, updates);
+        return updateIfChanged(importAttribute, updates);
     }
 
     override async visitBinaryExtensions(binary: JS.Binary, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -751,7 +751,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             right: await q.receive(binary.right, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(binary.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(binary, updates);
+        return updateIfChanged(binary, updates);
     }
 
     override async visitLiteralType(literalType: JS.LiteralType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -759,7 +759,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             literal: await q.receive(literalType.literal, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(literalType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(literalType, updates);
+        return updateIfChanged(literalType, updates);
     }
 
     override async visitMappedType(mappedType: JS.MappedType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -772,7 +772,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             valueType: await q.receive(mappedType.valueType, el => this.visitContainer(el, q)),
             type: await q.receive(mappedType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(mappedType, updates);
+        return updateIfChanged(mappedType, updates);
     }
 
     override async visitMappedTypeKeysRemapping(keysRemapping: JS.MappedType.KeysRemapping, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -780,7 +780,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeParameter: await q.receive(keysRemapping.typeParameter, el => this.visitRightPadded(el, q)),
             nameType: await q.receive(keysRemapping.nameType, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(keysRemapping, updates);
+        return updateIfChanged(keysRemapping, updates);
     }
 
     override async visitMappedTypeParameter(mappedTypeParameter: JS.MappedType.Parameter, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -788,7 +788,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             name: await q.receive(mappedTypeParameter.name, el => this.visitDefined<Expression>(el, q)),
             iterateType: await q.receive(mappedTypeParameter.iterateType, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(mappedTypeParameter, updates);
+        return updateIfChanged(mappedTypeParameter, updates);
     }
 
     override async visitObjectBindingPattern(objectBindingPattern: JS.ObjectBindingPattern, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -799,7 +799,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             bindings: await q.receive(objectBindingPattern.bindings, el => this.visitContainer(el, q)),
             initializer: await q.receive(objectBindingPattern.initializer, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(objectBindingPattern, updates);
+        return updateIfChanged(objectBindingPattern, updates);
     }
 
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -808,7 +808,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             assigmentToken: await q.receive(propertyAssignment.assigmentToken),
             initializer: await q.receive(propertyAssignment.initializer, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(propertyAssignment, updates);
+        return updateIfChanged(propertyAssignment, updates);
     }
 
     override async visitSatisfiesExpression(satisfiesExpression: JS.SatisfiesExpression, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -817,7 +817,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             satisfiesType: await q.receive(satisfiesExpression.satisfiesType, el => this.visitLeftPadded(el, q)),
             type: await q.receive(satisfiesExpression.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(satisfiesExpression, updates);
+        return updateIfChanged(satisfiesExpression, updates);
     }
 
     override async visitScopedVariableDeclarations(scopedVariableDeclarations: JS.ScopedVariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -825,14 +825,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             modifiers: await q.receiveListDefined(scopedVariableDeclarations.modifiers, el => this.visitDefined<J.Modifier>(el, q)),
             variables: await q.receiveListDefined(scopedVariableDeclarations.variables, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(scopedVariableDeclarations, updates);
+        return updateIfChanged(scopedVariableDeclarations, updates);
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             statement: await q.receive(statementExpression.statement, el => this.visitDefined<Statement>(el, q))
         };
-        return TreeVisitor.updateIfChanged(statementExpression, updates);
+        return updateIfChanged(statementExpression, updates);
     }
 
     override async visitTaggedTemplateExpression(taggedTemplateExpression: JS.TaggedTemplateExpression, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -842,7 +842,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             templateExpression: await q.receive(taggedTemplateExpression.templateExpression, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(taggedTemplateExpression.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(taggedTemplateExpression, updates);
+        return updateIfChanged(taggedTemplateExpression, updates);
     }
 
     override async visitTemplateExpression(templateExpression: JS.TemplateExpression, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -851,7 +851,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             spans: await q.receiveListDefined(templateExpression.spans, el => this.visitRightPadded(el, q)),
             type: await q.receive(templateExpression.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(templateExpression, updates);
+        return updateIfChanged(templateExpression, updates);
     }
 
     override async visitTemplateExpressionSpan(span: JS.TemplateExpression.Span, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -859,7 +859,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             expression: await q.receive(span.expression, el => this.visitDefined<J>(el, q)),
             tail: await q.receive(span.tail, el => this.visitDefined<J.Literal>(el, q))
         };
-        return TreeVisitor.updateIfChanged(span, updates);
+        return updateIfChanged(span, updates);
     }
 
     override async visitTuple(tuple: JS.Tuple, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -867,7 +867,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             elements: await q.receive(tuple.elements, el => this.visitContainer(el, q)),
             type: await q.receive(tuple.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(tuple, updates);
+        return updateIfChanged(tuple, updates);
     }
 
     override async visitTypeDeclaration(typeDeclaration: JS.TypeDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -878,7 +878,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             initializer: await q.receive(typeDeclaration.initializer, el => this.visitLeftPadded(el, q)),
             type: await q.receive(typeDeclaration.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeDeclaration, updates);
+        return updateIfChanged(typeDeclaration, updates);
     }
 
     override async visitTypeOf(typeOf: JS.TypeOf, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -886,14 +886,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             expression: await q.receive(typeOf.expression, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(typeOf.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeOf, updates);
+        return updateIfChanged(typeOf, updates);
     }
 
     override async visitTypeTreeExpression(typeTreeExpression: JS.TypeTreeExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(typeTreeExpression.expression, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeTreeExpression, updates);
+        return updateIfChanged(typeTreeExpression, updates);
     }
 
     override async visitAs(as_: JS.As, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -902,7 +902,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             right: await q.receive(as_.right, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(as_.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(as_, updates);
+        return updateIfChanged(as_, updates);
     }
 
     override async visitAssignmentOperationExtensions(assignmentOperation: JS.AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -912,7 +912,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             assignment: await q.receive(assignmentOperation.assignment, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(assignmentOperation.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(assignmentOperation, updates);
+        return updateIfChanged(assignmentOperation, updates);
     }
 
     override async visitIndexedAccessType(indexedAccessType: JS.IndexedAccessType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -921,7 +921,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             indexType: await q.receive(indexedAccessType.indexType, el => this.visitDefined<TypeTree>(el, q)),
             type: await q.receive(indexedAccessType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(indexedAccessType, updates);
+        return updateIfChanged(indexedAccessType, updates);
     }
 
     override async visitIndexedAccessTypeIndexType(indexType: JS.IndexedAccessType.IndexType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -929,7 +929,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             element: await q.receive(indexType.element, el => this.visitRightPadded(el, q)),
             type: await q.receive(indexType.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(indexType, updates);
+        return updateIfChanged(indexType, updates);
     }
 
     override async visitTypeQuery(typeQuery: JS.TypeQuery, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -938,21 +938,21 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeArguments: await q.receive(typeQuery.typeArguments, el => this.visitContainer(el, q)),
             type: await q.receive(typeQuery.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeQuery, updates);
+        return updateIfChanged(typeQuery, updates);
     }
 
     override async visitTypeInfo(typeInfo: JS.TypeInfo, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             typeIdentifier: await q.receive(typeInfo.typeIdentifier, el => this.visitDefined<TypeTree>(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeInfo, updates);
+        return updateIfChanged(typeInfo, updates);
     }
 
     override async visitComputedPropertyName(computedPropertyName: JS.ComputedPropertyName, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(computedPropertyName.expression, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(computedPropertyName, updates);
+        return updateIfChanged(computedPropertyName, updates);
     }
 
     override async visitTypeOperator(typeOperator: JS.TypeOperator, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -960,7 +960,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             operator: await q.receive(typeOperator.operator),
             expression: await q.receive(typeOperator.expression, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeOperator, updates);
+        return updateIfChanged(typeOperator, updates);
     }
 
     override async visitTypePredicate(typePredicate: JS.TypePredicate, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -970,7 +970,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             expression: await q.receive(typePredicate.expression, el => this.visitLeftPadded(el, q)),
             type: await q.receive(typePredicate.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(typePredicate, updates);
+        return updateIfChanged(typePredicate, updates);
     }
 
     override async visitUnion(union: JS.Union, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -978,7 +978,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             types: await q.receiveListDefined(union.types, el => this.visitRightPadded(el, q)),
             type: await q.receive(union.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(union, updates);
+        return updateIfChanged(union, updates);
     }
 
     override async visitIntersection(intersection: JS.Intersection, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -986,14 +986,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             types: await q.receiveListDefined(intersection.types, el => this.visitRightPadded(el, q)),
             type: await q.receive(intersection.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(intersection, updates);
+        return updateIfChanged(intersection, updates);
     }
 
     override async visitVoid(void_: JS.Void, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(void_.expression, el => this.visitDefined<Expression>(el, q))
         };
-        return TreeVisitor.updateIfChanged(void_, updates);
+        return updateIfChanged(void_, updates);
     }
 
     override async visitWithStatement(withStatement: JS.WithStatement, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1001,7 +1001,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             expression: await q.receive(withStatement.expression, el => this.visitDefined<J.ControlParentheses<Expression>>(el, q)),
             body: await q.receive(withStatement.body, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(withStatement, updates);
+        return updateIfChanged(withStatement, updates);
     }
 
     override async visitJsxTag(tag: JSX.Tag, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1014,7 +1014,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 attributes: await q.receiveListDefined(tag.attributes, attr => this.visitRightPadded(attr, q)),
                 selfClosing: await q.receive(tag.selfClosing, space => this.visitSpace(space, q))
             };
-            return TreeVisitor.updateIfChanged(tag, updates);
+            return updateIfChanged(tag, updates);
         } else {
             // Tag with children
             const updates = {
@@ -1026,7 +1026,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
                 closingName: await q.receive(tag.closingName, el => this.visitLeftPadded(el, q)),
                 afterClosingName: await q.receive(tag.afterClosingName, el => this.visitSpace(el, q))
             };
-            return TreeVisitor.updateIfChanged(tag, updates);
+            return updateIfChanged(tag, updates);
         }
     }
 
@@ -1035,7 +1035,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             key: await q.receive(attribute.key, el => this.visitDefined<J.Identifier | JSX.NamespacedName>(el, q)),
             value: await q.receive(attribute.value, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(attribute, updates);
+        return updateIfChanged(attribute, updates);
     }
 
     override async visitJsxSpreadAttribute(spreadAttribute: JSX.SpreadAttribute, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1043,14 +1043,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             dots: await q.receive(spreadAttribute.dots, space => this.visitSpace(space, q)),
             expression: await q.receive(spreadAttribute.expression, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(spreadAttribute, updates);
+        return updateIfChanged(spreadAttribute, updates);
     }
 
     override async visitJsxEmbeddedExpression(embeddedExpression: JSX.EmbeddedExpression, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(embeddedExpression.expression, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(embeddedExpression, updates);
+        return updateIfChanged(embeddedExpression, updates);
     }
 
     override async visitJsxNamespacedName(namespacedName: JSX.NamespacedName, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1058,7 +1058,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             namespace: await q.receive(namespacedName.namespace, el => this.visitDefined<J.Identifier>(el, q)),
             name: await q.receive(namespacedName.name, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(namespacedName, updates);
+        return updateIfChanged(namespacedName, updates);
     }
 
     override async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1068,7 +1068,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             typeExpression: await q.receive(indexSignatureDeclaration.typeExpression, el => this.visitLeftPadded(el, q)),
             type: await q.receive(indexSignatureDeclaration.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(indexSignatureDeclaration, updates);
+        return updateIfChanged(indexSignatureDeclaration, updates);
     }
 
     override async visitComputedPropertyMethodDeclaration(computedPropMethod: JS.ComputedPropertyMethodDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1082,7 +1082,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             body: await q.receive(computedPropMethod.body, el => this.visitDefined<J.Block>(el, q)),
             methodType: await q.receive(computedPropMethod.methodType, el => this.visitType(el, q) as any as Type.Method)
         };
-        return TreeVisitor.updateIfChanged(computedPropMethod, updates);
+        return updateIfChanged(computedPropMethod, updates);
     }
 
     override async visitForOfLoop(forOfLoop: JS.ForOfLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1090,7 +1090,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             await: await q.receive(forOfLoop.await, space => this.visitSpace(space, q)),
             loop: await q.receive(forOfLoop.loop, el => this.visitDefined<J.ForEachLoop>(el, q))
         };
-        return TreeVisitor.updateIfChanged(forOfLoop, updates);
+        return updateIfChanged(forOfLoop, updates);
     }
 
     override async visitForInLoop(forInLoop: JS.ForInLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1098,7 +1098,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             control: await q.receive(forInLoop.control, el => this.visitDefined<JS.ForInLoop.Control>(el, q)),
             body: await q.receive(forInLoop.body, el => this.visitRightPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(forInLoop, updates);
+        return updateIfChanged(forInLoop, updates);
     }
 
     override async visitNamespaceDeclaration(namespaceDeclaration: JS.NamespaceDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1108,7 +1108,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             name: await q.receive(namespaceDeclaration.name, el => this.visitRightPadded(el, q)),
             body: await q.receive(namespaceDeclaration.body, el => this.visitDefined<J.Block>(el, q))
         };
-        return TreeVisitor.updateIfChanged(namespaceDeclaration, updates);
+        return updateIfChanged(namespaceDeclaration, updates);
     }
 
     override async visitTypeLiteral(typeLiteral: JS.TypeLiteral, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1116,7 +1116,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             members: await q.receive(typeLiteral.members, el => this.visitDefined<J.Block>(el, q)),
             type: await q.receive(typeLiteral.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(typeLiteral, updates);
+        return updateIfChanged(typeLiteral, updates);
     }
 
     override async visitArrayBindingPattern(arrayBindingPattern: JS.ArrayBindingPattern, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1124,7 +1124,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             elements: await q.receive(arrayBindingPattern.elements, el => this.visitContainer(el, q)),
             type: await q.receive(arrayBindingPattern.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(arrayBindingPattern, updates);
+        return updateIfChanged(arrayBindingPattern, updates);
     }
 
     override async visitBindingElement(bindingElement: JS.BindingElement, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1134,7 +1134,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             initializer: await q.receive(bindingElement.initializer, el => this.visitLeftPadded(el, q)),
             variableType: await q.receive(bindingElement.variableType, el => this.visitType(el, q) as any as Type.Variable)
         };
-        return TreeVisitor.updateIfChanged(bindingElement, updates);
+        return updateIfChanged(bindingElement, updates);
     }
 
     override async visitExportDeclaration(exportDeclaration: JS.ExportDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1145,7 +1145,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             moduleSpecifier: await q.receive(exportDeclaration.moduleSpecifier, el => this.visitLeftPadded(el, q)),
             attributes: await q.receive(exportDeclaration.attributes, el => this.visitDefined<JS.ImportAttributes>(el, q))
         };
-        return TreeVisitor.updateIfChanged(exportDeclaration, updates);
+        return updateIfChanged(exportDeclaration, updates);
     }
 
     override async visitExportAssignment(exportAssignment: JS.ExportAssignment, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1153,7 +1153,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             exportEquals: await q.receive(exportAssignment.exportEquals),
             expression: await q.receive(exportAssignment.expression, el => this.visitLeftPadded(el, q))
         };
-        return TreeVisitor.updateIfChanged(exportAssignment, updates);
+        return updateIfChanged(exportAssignment, updates);
     }
 
     override async visitNamedExports(namedExports: JS.NamedExports, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1161,7 +1161,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             elements: await q.receive(namedExports.elements, el => this.visitContainer(el, q)),
             type: await q.receive(namedExports.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(namedExports, updates);
+        return updateIfChanged(namedExports, updates);
     }
 
     override async visitExportSpecifier(exportSpecifier: JS.ExportSpecifier, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1170,7 +1170,7 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             specifier: await q.receive(exportSpecifier.specifier, el => this.visitDefined<Expression>(el, q)),
             type: await q.receive(exportSpecifier.type, el => this.visitType(el, q))
         };
-        return TreeVisitor.updateIfChanged(exportSpecifier, updates);
+        return updateIfChanged(exportSpecifier, updates);
     }
 
     override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {

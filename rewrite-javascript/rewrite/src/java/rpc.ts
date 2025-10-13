@@ -19,7 +19,7 @@ import {Expression, isSpace, J, TextComment} from "./tree";
 import {isTree} from "../tree";
 import {Type} from "./type";
 import {TypeVisitor} from "./type-visitor";
-import {TreeVisitor} from "../visitor";
+import {updateIfChanged} from "../util";
 import Space = J.Space;
 
 class TypeSender extends TypeVisitor<RpcSendQueue> {
@@ -832,7 +832,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 prefix: await q.receive(j.prefix, space => this.visitSpace(space, q)),
                 markers: await q.receive(j.markers)
             };
-            return TreeVisitor.updateIfChanged(j, updates);
+            return updateIfChanged(j, updates);
         } catch (e: any) {
             throw e;
         }
@@ -843,7 +843,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotations: await q.receiveListDefined(annotatedType.annotations, annot => this.visit(annot, q)),
             typeExpression: await q.receive(annotatedType.typeExpression, type => this.visit(type, q))
         };
-        return TreeVisitor.updateIfChanged(annotatedType, updates);
+        return updateIfChanged(annotatedType, updates);
     }
 
     protected async visitAnnotation(annotation: J.Annotation, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -851,7 +851,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotationType: await q.receive(annotation.annotationType, type => this.visit(type, q)),
             arguments: await q.receive(annotation.arguments, args => this.visitContainer(args, q))
         };
-        return TreeVisitor.updateIfChanged(annotation, updates);
+        return updateIfChanged(annotation, updates);
     }
 
     protected async visitArrayAccess(arrayAccess: J.ArrayAccess, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -859,14 +859,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             indexed: await q.receive(arrayAccess.indexed, indexed => this.visit(indexed, q)),
             dimension: await q.receive(arrayAccess.dimension, dim => this.visit(dim, q))
         };
-        return TreeVisitor.updateIfChanged(arrayAccess, updates);
+        return updateIfChanged(arrayAccess, updates);
     }
 
     protected async visitArrayDimension(dimension: J.ArrayDimension, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             index: await q.receive(dimension.index, idx => this.visitRightPadded(idx, q))
         };
-        return TreeVisitor.updateIfChanged(dimension, updates);
+        return updateIfChanged(dimension, updates);
     }
 
     protected async visitArrayType(arrayType: J.ArrayType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -877,7 +877,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(arrayType.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(arrayType, updates);
+        return updateIfChanged(arrayType, updates);
     }
 
     protected async visitAssert(assert: J.Assert, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -886,7 +886,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             detail: await q.receive(assert.detail, detail => this.visitOptionalLeftPadded(detail, q))
         };
 
-        return TreeVisitor.updateIfChanged(assert, updates);
+        return updateIfChanged(assert, updates);
     }
 
     protected async visitAssignment(assignment: J.Assignment, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -896,7 +896,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(assignment.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(assignment, updates);
+        return updateIfChanged(assignment, updates);
     }
 
     protected async visitAssignmentOperation(assignOp: J.AssignmentOperation, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -907,7 +907,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(assignOp.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(assignOp, updates);
+        return updateIfChanged(assignOp, updates);
     }
 
     protected async visitBinary(binary: J.Binary, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -918,7 +918,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(binary.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(binary, updates);
+        return updateIfChanged(binary, updates);
     }
 
     protected async visitBreak(breakStmt: J.Break, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -926,7 +926,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             label: await q.receive(breakStmt.label, label => this.visit(label, q))
         };
 
-        return TreeVisitor.updateIfChanged(breakStmt, updates);
+        return updateIfChanged(breakStmt, updates);
     }
 
     protected async visitCase(caseStmt: J.Case, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -938,7 +938,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             guard: await q.receive(caseStmt.guard, guard => this.visit(guard, q))
         };
 
-        return TreeVisitor.updateIfChanged(caseStmt, updates);
+        return updateIfChanged(caseStmt, updates);
     }
 
     protected async visitContinue(continueStmt: J.Continue, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -946,7 +946,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             label: await q.receive(continueStmt.label, label => this.visit(label, q))
         };
 
-        return TreeVisitor.updateIfChanged(continueStmt, updates);
+        return updateIfChanged(continueStmt, updates);
     }
 
     protected async visitControlParentheses<T extends J>(controlParens: J.ControlParentheses<T>, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -954,7 +954,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             tree: await q.receive(controlParens.tree, tree => this.visitRightPadded(tree, q))
         };
 
-        return TreeVisitor.updateIfChanged(controlParens, updates);
+        return updateIfChanged(controlParens, updates);
     }
 
     protected async visitDeconstructionPattern(pattern: J.DeconstructionPattern, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -964,7 +964,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(pattern.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(pattern, updates);
+        return updateIfChanged(pattern, updates);
     }
 
     protected async visitDoWhileLoop(doWhile: J.DoWhileLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -973,7 +973,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             whileCondition: await q.receive(doWhile.whileCondition, cond => this.visitLeftPadded(cond, q))
         };
 
-        return TreeVisitor.updateIfChanged(doWhile, updates);
+        return updateIfChanged(doWhile, updates);
     }
 
     protected async visitEmpty(empty: J.Empty): Promise<J | undefined> {
@@ -987,7 +987,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             terminatedWithSemicolon: await q.receive(enumValueSet.terminatedWithSemicolon)
         };
 
-        return TreeVisitor.updateIfChanged(enumValueSet, updates);
+        return updateIfChanged(enumValueSet, updates);
     }
 
     protected async visitEnumValue(enumValue: J.EnumValue, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -997,7 +997,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             initializer: await q.receive(enumValue.initializer, init => this.visit(init, q))
         };
 
-        return TreeVisitor.updateIfChanged(enumValue, updates);
+        return updateIfChanged(enumValue, updates);
     }
 
     protected async visitErroneous(erroneous: J.Erroneous, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1005,7 +1005,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             text: await q.receive(erroneous.text)
         };
 
-        return TreeVisitor.updateIfChanged(erroneous, updates);
+        return updateIfChanged(erroneous, updates);
     }
 
     protected async visitFieldAccess(fieldAccess: J.FieldAccess, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1015,7 +1015,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(fieldAccess.type, type => this.visitType(type, q))
         };
 
-        return TreeVisitor.updateIfChanged(fieldAccess, updates);
+        return updateIfChanged(fieldAccess, updates);
     }
 
     protected async visitForEachLoop(forEachLoop: J.ForEachLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1024,7 +1024,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             body: await q.receive(forEachLoop.body, body => this.visitRightPadded(body, q))
         };
 
-        return TreeVisitor.updateIfChanged(forEachLoop, updates);
+        return updateIfChanged(forEachLoop, updates);
     }
 
     protected async visitForEachLoopControl(control: J.ForEachLoop.Control, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1033,7 +1033,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             iterable: await q.receive(control.iterable, expr => this.visitRightPadded(expr, q))
         };
 
-        return TreeVisitor.updateIfChanged(control, updates);
+        return updateIfChanged(control, updates);
     }
 
     protected async visitForLoop(forLoop: J.ForLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1042,7 +1042,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             body: await q.receive(forLoop.body, body => this.visitRightPadded(body, q))
         };
 
-        return TreeVisitor.updateIfChanged(forLoop, updates);
+        return updateIfChanged(forLoop, updates);
     }
 
     protected async visitForLoopControl(control: J.ForLoop.Control, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1052,7 +1052,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             update: await q.receiveListDefined(control.update, update => this.visitRightPadded(update, q))
         };
 
-        return TreeVisitor.updateIfChanged(control, updates);
+        return updateIfChanged(control, updates);
     }
 
     protected async visitIf(ifStmt: J.If, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1062,7 +1062,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             elsePart: await q.receive(ifStmt.elsePart, elsePart => this.visit(elsePart, q))
         };
 
-        return TreeVisitor.updateIfChanged(ifStmt, updates);
+        return updateIfChanged(ifStmt, updates);
     }
 
     protected async visitElse(ifElse: J.If.Else, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1070,7 +1070,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             body: await q.receive(ifElse.body, body => this.visitRightPadded(body, q))
         };
 
-        return TreeVisitor.updateIfChanged(ifElse, updates);
+        return updateIfChanged(ifElse, updates);
     }
 
     protected async visitImport(importStmt: J.Import, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1080,7 +1080,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             alias: await q.receive(importStmt.alias, alias => this.visitLeftPadded(alias, q))
         };
 
-        return TreeVisitor.updateIfChanged(importStmt, updates);
+        return updateIfChanged(importStmt, updates);
     }
 
     protected async visitInstanceOf(instanceOf: J.InstanceOf, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1091,14 +1091,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             modifier: await q.receive(instanceOf.modifier, mod => this.visit(mod, q)),
             type: await q.receive(instanceOf.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(instanceOf, updates);
+        return updateIfChanged(instanceOf, updates);
     }
 
     protected async visitIntersectionType(intersectionType: J.IntersectionType, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             bounds: await q.receive(intersectionType.bounds, bounds => this.visitContainer(bounds, q))
         };
-        return TreeVisitor.updateIfChanged(intersectionType, updates);
+        return updateIfChanged(intersectionType, updates);
     }
 
     protected async visitLabel(label: J.Label, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1106,7 +1106,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             label: await q.receive(label.label, lbl => this.visitRightPadded(lbl, q)),
             statement: await q.receive(label.statement, stmt => this.visit(stmt, q))
         };
-        return TreeVisitor.updateIfChanged(label, updates);
+        return updateIfChanged(label, updates);
     }
 
     protected async visitLambda(lambda: J.Lambda, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1116,7 +1116,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             body: await q.receive(lambda.body, body => this.visit(body, q)),
             type: await q.receive(lambda.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(lambda, updates);
+        return updateIfChanged(lambda, updates);
     }
 
     protected async visitLambdaParameters(params: J.Lambda.Parameters, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1124,7 +1124,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             parenthesized: await q.receive(params.parenthesized),
             parameters: await q.receiveListDefined(params.parameters, param => this.visitRightPadded(param, q))
         };
-        return TreeVisitor.updateIfChanged(params, updates);
+        return updateIfChanged(params, updates);
     }
 
     protected async visitLiteral(literal: J.Literal, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1134,7 +1134,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             unicodeEscapes: await q.receiveList(literal.unicodeEscapes),
             type: await q.receive(literal.type, type => this.visitType(type, q) as unknown as Type.Primitive)
         };
-        return TreeVisitor.updateIfChanged(literal, updates);
+        return updateIfChanged(literal, updates);
     }
 
     protected async visitMemberReference(memberRef: J.MemberReference, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1146,7 +1146,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             methodType: await q.receive(memberRef.methodType, type => this.visitType(type, q) as unknown as Type.Method),
             variableType: await q.receive(memberRef.variableType, type => this.visitType(type, q) as unknown as Type.Variable)
         };
-        return TreeVisitor.updateIfChanged(memberRef, updates);
+        return updateIfChanged(memberRef, updates);
     }
 
     protected async visitMethodInvocation(methodInvoc: J.MethodInvocation, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1157,7 +1157,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             arguments: await q.receive(methodInvoc.arguments, args => this.visitContainer(args, q)),
             methodType: await q.receive(methodInvoc.methodType, type => this.visitType(type, q) as unknown as Type.Method)
         };
-        return TreeVisitor.updateIfChanged(methodInvoc, updates);
+        return updateIfChanged(methodInvoc, updates);
     }
 
     protected async visitModifier(modifier: J.Modifier, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1166,14 +1166,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(modifier.type),
             annotations: await q.receiveListDefined(modifier.annotations, annot => this.visit(annot, q))
         };
-        return TreeVisitor.updateIfChanged(modifier, updates);
+        return updateIfChanged(modifier, updates);
     }
 
     protected async visitMultiCatch(multiCatch: J.MultiCatch, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             alternatives: await q.receiveListDefined(multiCatch.alternatives, alt => this.visitRightPadded(alt, q))
         };
-        return TreeVisitor.updateIfChanged(multiCatch, updates);
+        return updateIfChanged(multiCatch, updates);
     }
 
     protected async visitNewArray(newArray: J.NewArray, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1183,7 +1183,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             initializer: await q.receive(newArray.initializer, init => this.visitContainer(init, q)),
             type: await q.receive(newArray.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(newArray, updates);
+        return updateIfChanged(newArray, updates);
     }
 
     protected async visitNewClass(newClass: J.NewClass, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1195,7 +1195,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             body: await q.receive(newClass.body, body => this.visit(body, q)),
             constructorType: await q.receive(newClass.constructorType, type => this.visitType(type, q) as unknown as Type.Method)
         };
-        return TreeVisitor.updateIfChanged(newClass, updates);
+        return updateIfChanged(newClass, updates);
     }
 
     protected async visitNullableType(nullableType: J.NullableType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1203,7 +1203,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotations: await q.receiveListDefined(nullableType.annotations, annot => this.visit(annot, q)),
             typeTree: await q.receive(nullableType.typeTree, type => this.visitRightPadded(type, q))
         };
-        return TreeVisitor.updateIfChanged(nullableType, updates);
+        return updateIfChanged(nullableType, updates);
     }
 
     protected async visitParameterizedType(paramType: J.ParameterizedType, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1212,14 +1212,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             typeParameters: await q.receive(paramType.typeParameters, params => this.visitContainer(params, q)),
             type: await q.receive(paramType.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(paramType, updates);
+        return updateIfChanged(paramType, updates);
     }
 
     protected async visitParentheses<T extends J>(parentheses: J.Parentheses<T>, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             tree: await q.receive(parentheses.tree, tree => this.visitRightPadded(tree, q))
         };
-        return TreeVisitor.updateIfChanged(parentheses, updates);
+        return updateIfChanged(parentheses, updates);
     }
 
     protected async visitParenthesizedTypeTree(parenthesizedType: J.ParenthesizedTypeTree, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1227,14 +1227,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotations: await q.receiveListDefined(parenthesizedType.annotations, annot => this.visit(annot, q)),
             parenthesizedType: await q.receive(parenthesizedType.parenthesizedType, tree => this.visit(tree, q))
         };
-        return TreeVisitor.updateIfChanged(parenthesizedType, updates);
+        return updateIfChanged(parenthesizedType, updates);
     }
 
     protected async visitPrimitive(primitive: J.Primitive, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             type: await q.receive(primitive.type, type => this.visitType(type, q) as unknown as Type.Primitive)
         };
-        return TreeVisitor.updateIfChanged(primitive, updates);
+        return updateIfChanged(primitive, updates);
     }
 
     protected async visitSwitch(switchStmt: J.Switch, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1242,7 +1242,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             selector: await q.receive(switchStmt.selector, selector => this.visit(selector, q)),
             cases: await q.receive(switchStmt.cases, cases => this.visit(cases, q))
         };
-        return TreeVisitor.updateIfChanged(switchStmt, updates);
+        return updateIfChanged(switchStmt, updates);
     }
 
     protected async visitSwitchExpression(switchExpr: J.SwitchExpression, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1251,7 +1251,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             cases: await q.receive(switchExpr.cases, cases => this.visit(cases, q)),
             type: await q.receive(switchExpr.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(switchExpr, updates);
+        return updateIfChanged(switchExpr, updates);
     }
 
     protected async visitTernary(ternary: J.Ternary, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1261,14 +1261,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             falsePart: await q.receive(ternary.falsePart, falsePart => this.visitLeftPadded(falsePart, q)),
             type: await q.receive(ternary.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(ternary, updates);
+        return updateIfChanged(ternary, updates);
     }
 
     protected async visitThrow(throwStmt: J.Throw, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             exception: await q.receive(throwStmt.exception, exception => this.visit(exception, q))
         };
-        return TreeVisitor.updateIfChanged(throwStmt, updates);
+        return updateIfChanged(throwStmt, updates);
     }
 
     protected async visitTry(tryStmt: J.Try, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1278,7 +1278,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             catches: await q.receiveListDefined(tryStmt.catches, catchBlock => this.visit(catchBlock, q)),
             finally: await q.receive(tryStmt.finally, finallyBlock => this.visitOptionalLeftPadded(finallyBlock, q))
         };
-        return TreeVisitor.updateIfChanged(tryStmt, updates);
+        return updateIfChanged(tryStmt, updates);
     }
 
     protected async visitTryResource(resource: J.Try.Resource, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1286,7 +1286,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             variableDeclarations: await q.receive(resource.variableDeclarations, variables => this.visit(variables, q)),
             terminatedWithSemicolon: await q.receive(resource.terminatedWithSemicolon)
         };
-        return TreeVisitor.updateIfChanged(resource, updates);
+        return updateIfChanged(resource, updates);
     }
 
     protected async visitTryCatch(tryCatch: J.Try.Catch, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1294,7 +1294,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             parameter: await q.receive(tryCatch.parameter, param => this.visit(param, q)),
             body: await q.receive(tryCatch.body, body => this.visit(body, q))
         };
-        return TreeVisitor.updateIfChanged(tryCatch, updates);
+        return updateIfChanged(tryCatch, updates);
     }
 
     protected async visitUnary(unary: J.Unary, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1303,21 +1303,21 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             expression: await q.receive(unary.expression, expr => this.visit(expr, q)),
             type: await q.receive(unary.type, type => this.visitType(type, q))
         };
-        return TreeVisitor.updateIfChanged(unary, updates);
+        return updateIfChanged(unary, updates);
     }
 
     protected async visitUnknown(unknown: J.Unknown, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             source: await q.receive(unknown.source, source => this.visit(source, q))
         };
-        return TreeVisitor.updateIfChanged(unknown, updates);
+        return updateIfChanged(unknown, updates);
     }
 
     protected async visitUnknownSource(unknownSource: J.UnknownSource, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             text: await q.receive(unknownSource.text)
         };
-        return TreeVisitor.updateIfChanged(unknownSource, updates);
+        return updateIfChanged(unknownSource, updates);
     }
 
     protected async visitVariable(variable: J.VariableDeclarations.NamedVariable, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1327,7 +1327,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             initializer: await q.receive(variable.initializer, init => this.visitOptionalLeftPadded(init, q)),
             variableType: await q.receive(variable.variableType, type => this.visitType(type, q) as unknown as Type.Variable)
         };
-        return TreeVisitor.updateIfChanged(variable, updates);
+        return updateIfChanged(variable, updates);
     }
 
     protected async visitYield(yieldStmt: J.Yield, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1335,7 +1335,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             implicit: await q.receive(yieldStmt.implicit),
             value: await q.receive(yieldStmt.value, value => this.visit(value, q))
         };
-        return TreeVisitor.updateIfChanged(yieldStmt, updates);
+        return updateIfChanged(yieldStmt, updates);
     }
 
     protected async visitTypeParameters(typeParams: J.TypeParameters, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1343,14 +1343,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotations: await q.receiveListDefined(typeParams.annotations, annot => this.visit(annot, q)),
             typeParameters: await q.receiveListDefined(typeParams.typeParameters, param => this.visitRightPadded(param, q))
         };
-        return TreeVisitor.updateIfChanged(typeParams, updates);
+        return updateIfChanged(typeParams, updates);
     }
 
     protected async visitReturn(returnStmt: J.Return, q: RpcReceiveQueue): Promise<J | undefined> {
         const updates = {
             expression: await q.receive(returnStmt.expression, expr => this.visit(expr, q))
         };
-        return TreeVisitor.updateIfChanged(returnStmt, updates);
+        return updateIfChanged(returnStmt, updates);
     }
 
     protected async visitSynchronized(synchronizedStmt: J.Synchronized, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1358,7 +1358,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             lock: await q.receive(synchronizedStmt.lock, lock => this.visit(lock, q)),
             body: await q.receive(synchronizedStmt.body, body => this.visit(body, q))
         };
-        return TreeVisitor.updateIfChanged(synchronizedStmt, updates);
+        return updateIfChanged(synchronizedStmt, updates);
     }
 
     protected async visitTypeCast(typeCast: J.TypeCast, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1366,7 +1366,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             class: await q.receive(typeCast.class, typeExpr => this.visit(typeExpr, q)),
             expression: await q.receive(typeCast.expression, expr => this.visit(expr, q))
         };
-        return TreeVisitor.updateIfChanged(typeCast, updates);
+        return updateIfChanged(typeCast, updates);
     }
 
     protected async visitTypeParameter(typeParameter: J.TypeParameter, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1376,7 +1376,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             name: await q.receive(typeParameter.name, name => this.visit(name, q)),
             bounds: await q.receive(typeParameter.bounds, bounds => this.visitContainer(bounds, q))
         };
-        return TreeVisitor.updateIfChanged(typeParameter, updates);
+        return updateIfChanged(typeParameter, updates);
     }
 
     protected async visitWhileLoop(whileLoop: J.WhileLoop, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1384,7 +1384,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             condition: await q.receive(whileLoop.condition, cond => this.visit(cond, q)),
             body: await q.receive(whileLoop.body, body => this.visitOptionalRightPadded(body, q))
         };
-        return TreeVisitor.updateIfChanged(whileLoop, updates);
+        return updateIfChanged(whileLoop, updates);
     }
 
     protected async visitWildcard(wildcard: J.Wildcard, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1392,7 +1392,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             bound: await q.receive(wildcard.bound, bound => this.visitLeftPadded(bound, q)),
             boundedType: await q.receive(wildcard.boundedType, type => this.visit(type, q))
         };
-        return TreeVisitor.updateIfChanged(wildcard, updates);
+        return updateIfChanged(wildcard, updates);
     }
 
     protected async visitCompilationUnit(cu: J.CompilationUnit, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1407,7 +1407,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             classes: await q.receiveListDefined(cu.classes, cls => this.visit(cls, q)),
             eof: await q.receive(cu.eof, space => this.visitSpace(space, q))
         };
-        return TreeVisitor.updateIfChanged(cu, updates);
+        return updateIfChanged(cu, updates);
     }
 
     protected async visitPackage(pkg: J.Package, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1415,7 +1415,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             expression: await q.receive<Expression>(pkg.expression, expr => this.visit(expr, q)),
             annotations: await q.receiveListDefined(pkg.annotations, annot => this.visit(annot, q))
         };
-        return TreeVisitor.updateIfChanged(pkg, updates);
+        return updateIfChanged(pkg, updates);
     }
 
     protected async visitClassDeclaration(cls: J.ClassDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1431,7 +1431,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             permitting: await q.receive(cls.permitting, perm => this.visitContainer(perm, q)),
             body: await q.receive(cls.body, body => this.visit(body, q))
         };
-        return TreeVisitor.updateIfChanged(cls, updates);
+        return updateIfChanged(cls, updates);
     }
 
     protected async visitClassDeclarationKind(kind: J.ClassDeclaration.Kind, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1439,7 +1439,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             annotations: await q.receiveListDefined(kind.annotations, annot => this.visit(annot, q)),
             type: await q.receive(kind.type)
         };
-        return TreeVisitor.updateIfChanged(kind, updates);
+        return updateIfChanged(kind, updates);
     }
 
     protected async visitBlock(block: J.Block, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1448,7 +1448,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             statements: await q.receiveListDefined(block.statements, stmt => this.visitRightPadded(stmt, q)),
             end: await q.receive(block.end, space => this.visitSpace(space, q))
         };
-        return TreeVisitor.updateIfChanged(block, updates);
+        return updateIfChanged(block, updates);
     }
 
     protected async visitMethodDeclaration(method: J.MethodDeclaration, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1465,7 +1465,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             defaultValue: await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q)),
             methodType: await q.receive(method.methodType, type => this.visitType(type, q) as unknown as Type.Method)
         };
-        return TreeVisitor.updateIfChanged(method, updates);
+        return updateIfChanged(method, updates);
     }
 
     protected async visitVariableDeclarations(varDecls: J.VariableDeclarations, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1476,7 +1476,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             varargs: await q.receive(varDecls.varargs, space => this.visitSpace(space, q)),
             variables: await q.receiveListDefined(varDecls.variables, variable => this.visitRightPadded(variable, q))
         };
-        return TreeVisitor.updateIfChanged(varDecls, updates);
+        return updateIfChanged(varDecls, updates);
     }
 
     protected async visitIdentifier(ident: J.Identifier, q: RpcReceiveQueue): Promise<J | undefined> {
@@ -1486,7 +1486,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             type: await q.receive(ident.type, type => this.visitType(type, q)),
             fieldType: await q.receive(ident.fieldType, type => this.visitType(type, q) as any as Type.Variable)
         };
-        return TreeVisitor.updateIfChanged(ident, updates);
+        return updateIfChanged(ident, updates);
     }
 
     public override async visitSpace(space: J.Space, q: RpcReceiveQueue): Promise<J.Space> {
@@ -1500,14 +1500,14 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                         suffix: await q.receive(c.suffix),
                         markers: await q.receive(c.markers)
                     };
-                    return TreeVisitor.updateIfChanged(tc, commentUpdates);
+                    return updateIfChanged(tc, commentUpdates);
                 } else {
                     throw new Error(`Unexpected comment type ${c.kind}`);
                 }
             }),
             whitespace: await q.receive(space.whitespace)
         };
-        return TreeVisitor.updateIfChanged(space, updates);
+        return updateIfChanged(space, updates);
     }
 
     public override async visitLeftPadded<T extends J | J.Space | number | string | boolean>(left: J.LeftPadded<T>, q: RpcReceiveQueue): Promise<J.LeftPadded<T>> {
@@ -1528,7 +1528,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             }),
             markers: await q.receive(left.markers)
         };
-        return TreeVisitor.updateIfChanged(left, updates) as J.LeftPadded<T>;
+        return updateIfChanged(left, updates) as J.LeftPadded<T>;
     }
 
     public override async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, q: RpcReceiveQueue): Promise<J.RightPadded<T>> {
@@ -1549,7 +1549,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             after: await q.receive(right.after, space => this.visitSpace(space, q)),
             markers: await q.receive(right.markers)
         };
-        return TreeVisitor.updateIfChanged(right, updates) as J.RightPadded<T>;
+        return updateIfChanged(right, updates) as J.RightPadded<T>;
     }
 
     public override async visitContainer<T extends J>(container: J.Container<T>, q: RpcReceiveQueue): Promise<J.Container<T>> {
@@ -1558,7 +1558,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             elements: await q.receiveListDefined(container.elements, elem => this.visitRightPadded(elem, q)),
             markers: await q.receive(container.markers)
         };
-        return TreeVisitor.updateIfChanged(container, updates) as J.Container<T>;
+        return updateIfChanged(container, updates) as J.Container<T>;
     }
 
     private static typeVisitor = new TypeReceiver();

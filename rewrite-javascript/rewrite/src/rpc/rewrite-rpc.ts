@@ -54,7 +54,7 @@ export class RewriteRpc {
     readonly localRefs: ReferenceMap = new ReferenceMap();
 
     private remoteLanguages?: string[];
-    private readonly logger: rpc.Logger;
+    private readonly logger?: rpc.Logger;
     private traceGetObject: TraceGetObject = {receive: false, send: false};
 
     constructor(readonly connection: MessageConnection = rpc.createMessageConnection(
@@ -64,7 +64,7 @@ export class RewriteRpc {
                 private readonly options: {
                     batchSize?: number,
                     registry?: RecipeRegistry,
-                    logger: rpc.Logger,
+                    logger?: rpc.Logger,
                     metricsCsv?: string,
                     recipeInstallDir?: string
                 }) {

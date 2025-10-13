@@ -261,7 +261,7 @@ export class RpcReceiveQueue {
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
-                private readonly logger: rpc.Logger,
+                private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean) {
     }
 
@@ -405,8 +405,8 @@ export interface RpcObjectData {
 }
 
 export namespace RpcObjectData {
-    export function logTrace(message: RpcObjectData, enabled: boolean, logger: rpc.Logger): void {
-        if (enabled && message.trace) {
+    export function logTrace(message: RpcObjectData, enabled: boolean, logger: rpc.Logger | undefined): void {
+        if (enabled && logger && message.trace) {
             const sendTrace = message.trace;
             delete message.trace;
             logger.info(`${JSON.stringify(message)}`);

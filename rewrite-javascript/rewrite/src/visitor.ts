@@ -42,20 +42,6 @@ export abstract class TreeVisitor<T extends Tree, P> {
     private visitCount: number = 0;
     public afterVisit: TreeVisitor<any, P>[] = [];
 
-    /**
-     * Helper function to create a new object only if any properties have changed.
-     * Compares each property in updates with the original object.
-     * Returns the original object if nothing changed, or a new object with updates applied.
-     */
-    protected static updateIfChanged<O extends object>(original: O, updates: Partial<O>): O {
-        for (const key in updates) {
-            if (updates[key] !== original[key]) {
-                return { ...original, ...updates };
-            }
-        }
-        return original;
-    }
-
     async visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
         return (await this.visit<R>(tree, p, parent))!;
     }
