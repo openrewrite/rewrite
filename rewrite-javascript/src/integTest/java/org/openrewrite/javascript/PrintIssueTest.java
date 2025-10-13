@@ -24,9 +24,11 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -37,6 +39,7 @@ public class PrintIssueTest implements RewriteTest {
     @Test
     void findMethods(@TempDir Path tempDir) {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           javascript(
             """
               import Stream from 'node:stream';
@@ -78,9 +81,11 @@ public class PrintIssueTest implements RewriteTest {
 
                 try {
                     RewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
-//                    rpc.traceGetObject(true, true);
-                    requireNonNull(run.getChangeset().getAllResults().getFirst().getBefore()).printAll();
+                    Files.writeString(log, "PRINTING AFTER --------------------\n", StandardOpenOption.APPEND);
                     requireNonNull(run.getChangeset().getAllResults().getFirst().getAfter()).printAll();
+                    rpc.traceGetObject(true, true);
+                    Files.writeString(log, "PRINTING BEFORE --------------------\n", StandardOpenOption.APPEND);
+                    requireNonNull(run.getChangeset().getAllResults().getFirst().getBefore()).printAll();
                 } finally {
                     if (Files.exists(log)) {
                         System.out.println(Files.readString(log));

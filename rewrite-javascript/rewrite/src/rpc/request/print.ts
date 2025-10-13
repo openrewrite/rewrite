@@ -33,6 +33,7 @@ export class Print {
 
     static handle(connection: rpc.MessageConnection,
                   getObject: (id: string, sourceFileType: string) => any,
+                  logger: rpc.Logger,
                   metricsCsv?: string): void {
         connection.onRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
@@ -42,6 +43,7 @@ export class Print {
                 (context) => async request => {
                     const tree: Tree = await getObject(request.treeId.toString(), request.sourceFileType);
                     context.target = extractSourcePath(tree);
+                    logger.log("Printing " + (isSourceFile(tree) ? tree.sourcePath : `tree of type ${tree.kind} in ${context.target}`));
                     const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
                     let result: string;
                     if (isSourceFile(tree)) {
