@@ -42,29 +42,9 @@ public class PrintIssueTest implements RewriteTest {
           spec -> spec.typeValidationOptions(TypeValidation.none()),
           javascript(
             """
-              import Stream from 'node:stream';
-              import {promisify} from 'node:util';
-              import {
-                    Buffer
-              } from 'node:buffer';
-              
-              const pipeline = promisify(Stream.pipeline);
-              const INTERNALS = Symbol('Body internals');
-              
               class Body {
-                  async arrayBuffer() {
-                      const {buffer, byteOffset, byteLength} = await consumeBody(this);
-                      return buffer.slice(byteOffset, byteOffset + byteLength);
-                  }
-              
-                  async json() {
-                      const text = await this.text();
-                      return JSON.parse(text);
-                  }
-              
                   async blob() {
-                      const ct = (this.headers && this.headers.get('content-type')) || (this[INTERNALS].body && this[INTERNALS].body.type) || '';
-                      const buf = await this.arrayBuffer();
+                      await this.arrayBuffer();
                   }
               }
               """,
