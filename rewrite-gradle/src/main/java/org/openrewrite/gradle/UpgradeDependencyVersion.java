@@ -168,21 +168,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 // Check for any dependency (single or varargs with literal strings)
-                GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher().get(getCursor()).orElse(null);
-                if (multiDependency != null) {
-                    // Scan each dependency
-                    for (GradleDependency dep : multiDependency.getDependencies()) {
-                        scanDependency(dep, ctx);
-                    }
-                    return m;
-                }
-
-                // Handle other dependency notations (map notation, GStrings, etc.)
-                GradleDependency gradleDependency = new GradleDependency.Matcher().get(getCursor()).orElse(null);
-                if (gradleDependency != null) {
-                    scanDependency(gradleDependency, ctx);
-                }
-
+                GradleMultiDependency.matcher(new DependencyMatcher(groupId, artifactId, getVersionComparator()))
+                        .get(getCursor())
+                        .ifPresent(multiDependency ->
+                                multiDependency.forEach(dep -> scanDependency(dep, ctx)));
                 return m;
             }
             /**
@@ -399,37 +388,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            // Check for any dependency with literal strings (single or varargs)
-            GradleMultiDependency multiDependency = new GradleMultiDependency.Matcher()
-                    .groupId(groupId)
-                    .artifactId(artifactId)
-                    .get(getCursor()).orElse(null);
+            GradleMultiDependency multiDependency = GradleMultiDependency.matcher(dependencyMatcher)
+                    .get(getCursor())
+                    .orElse(null);
             if (multiDependency != null) {
-                // Check for exceptions before calling map()
-                if (!multiDependency.isVarargs()) {
-                    // For single dependencies, check for exceptions and mark warnings
-                    for (GradleDependency dep : multiDependency.getDependencies()) {
-                        String depGroupId = dep.getDeclaredGroupId();
-                        String depArtifactId = dep.getDeclaredArtifactId();
-                        if (depGroupId != null && depArtifactId != null) {
-                            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(depGroupId, depArtifactId));
-                            if (scanResult instanceof Exception && dep.matches(dependencyMatcher)) {
-                                return Markup.warn(m, (Exception) scanResult);
-                            }
-                        }
+                m = multiDependency.map(dep -> {
+                    Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                    if (scanResult instanceof Exception) {
+                        return Markup.warn(dep.getTree(), (Exception) scanResult);
                     }
-                }
-                // Use the map function to transform each dependency that matches our pattern
-                m = multiDependency.map(dependencyMatcher, dep -> updateDependency(dep, ctx));
-            } else {
-                // Handle other dependency notations (map notation, GStrings, Kotlin templates, etc.)
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
-                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    GradleDependency gradleDependency = gradleDependencyMatcher.get(getCursor()).get();
-                    if (gradleDependency.matches(dependencyMatcher)) {
-                        m = updateNonLiteralDependency(gradleDependency, ctx);
-                    }
-                }
+                    return updateDependency(dep, ctx);
+                });
             }
 
             if ("ext".equals(method.getSimpleName()) && getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().endsWith("settings.gradle")) {
@@ -465,6 +434,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         VersionComparator versionComparator = getVersionComparator();
                         if (versionComparator != null) {
                             String currentVersion = (String) l.getValue();
+                            //noinspection DataFlowIssue
                             Optional<String> finalVersion = versionComparator.upgrade(currentVersion, singletonList(newVersion));
                             if (!finalVersion.isPresent()) {
                                 // Would be a downgrade, don't change
@@ -493,37 +463,34 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         /**
          * Updates a dependency and returns the transformed GradleDependency.
-         * This method is used by the GradleMultiDependency.map() function.
-         * For single dependencies, the real cursor is used directly.
-         * For varargs, synthetic wrappers are created and unwrapped within map().
          */
-        private GradleDependency updateDependency(GradleDependency dependency, ExecutionContext ctx) {
+        private J.MethodInvocation updateDependency(GradleDependency dependency, ExecutionContext ctx) {
             // Get the current version and coordinates
             String currentVersion = dependency.getDeclaredVersion();
             String groupId = dependency.getDeclaredGroupId();
             String artifactId = dependency.getDeclaredArtifactId();
 
             if (groupId == null || artifactId == null) {
-                return dependency;
+                return dependency.getTree();
             }
 
             // Check if we have a new version for this dependency
             Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(groupId, artifactId));
             if (scanResult instanceof Exception) {
                 // Can't mark warning on a synthetic tree, so just return unchanged
-                return dependency;
+                return dependency.getTree();
             }
 
             // Handle variable references
             String versionVariable = dependency.getVersionVariable();
             if (versionVariable != null) {
                 // Variable updates are handled separately
-                return dependency;
+                return dependency.getTree();
             }
 
             // If version starts with $, it's a variable reference we can't handle directly
             if (currentVersion != null && currentVersion.startsWith("$")) {
-                return dependency;
+                return dependency.getTree();
             }
 
             // Select the new version
@@ -535,7 +502,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     // Only handle dependencies without versions if they are platform dependencies
                     // Regular dependencies without versions are governed by constraints and should not be upgraded
                     if (!dependency.isPlatform()) {
-                        return dependency;
+                        return dependency.getTree();
                     }
                     GroupArtifact ga = new GroupArtifact(groupId, artifactId);
                     selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
@@ -546,75 +513,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             .select(gav, configName, newVersion, versionPattern, ctx);
                 }
             } catch (MavenDownloadingException e) {
-                return dependency;
+                return dependency.getTree();
             }
 
             if (selectedVersion == null || (currentVersion != null && currentVersion.equals(selectedVersion))) {
-                return dependency;
-            }
-
-            // Update the dependency version using the trait's method
-            return dependency.withDeclaredVersion(selectedVersion);
-        }
-
-        /**
-         * Updates a dependency that uses non-literal notation (map notation, GStrings, Kotlin templates, etc.)
-         * This handles dependencies that aren't represented as simple string literals.
-         */
-        private J.MethodInvocation updateNonLiteralDependency(GradleDependency dependency, ExecutionContext ctx) {
-            // Get the current version and coordinates
-            String declaredVersion = dependency.getDeclaredVersion();
-            String groupId = dependency.getGroupId();
-            String artifactId = dependency.getArtifactId();
-
-            // Check if we have a new version for this dependency
-            Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(groupId, artifactId));
-            if (scanResult instanceof Exception) {
-                return Markup.warn(dependency.getTree(), (Exception) scanResult);
-            }
-
-            // Handle variable references
-            String versionVariable = dependency.getVersionVariable();
-            if (versionVariable != null) {
-                replaceVariableValue(versionVariable, dependency.getTree(), groupId, artifactId);
                 return dependency.getTree();
             }
 
-            // If version starts with $, it's a variable reference we can't process directly
-            if (declaredVersion != null && declaredVersion.startsWith("$")) {
-                return dependency.getTree();
-            }
-
-            // Select the new version
-            String selectedVersion;
-            try {
-                String configName = dependency.getConfigurationName();
-
-                if (declaredVersion == null) {
-                    // Only handle dependencies without versions if they are platform dependencies
-                    return dependency.getTree();
-                } else {
-                    GroupArtifactVersion gav = new GroupArtifactVersion(groupId, artifactId, declaredVersion);
-                    selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                            .select(gav, configName, newVersion, versionPattern, ctx);
-                }
-            } catch (MavenDownloadingException e) {
-                return Markup.warn(dependency.getTree(), e);
-            }
-
-            if (selectedVersion == null || (declaredVersion != null && declaredVersion.equals(selectedVersion))) {
-                return dependency.getTree();
-            }
-
-            // Update the dependency version using the trait's method
-            GradleDependency updated = dependency.withDeclaredVersion(selectedVersion);
-            return updated.getTree();
-        }
-
-        private void replaceVariableValue(String versionVariableName, J.MethodInvocation m, String groupId, String artifactId) {
-            acc.variableNames.computeIfAbsent(versionVariableName, it -> new HashMap<>())
-                    .computeIfAbsent(new GroupArtifact(groupId, artifactId), it -> new HashSet<>())
-                    .add(m.getSimpleName());
+            return dependency.withDeclaredVersion(selectedVersion).getTree();
         }
     }
 

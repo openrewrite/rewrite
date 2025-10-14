@@ -17,24 +17,25 @@ package org.openrewrite.gradle.trait;
 
 import lombok.Getter;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
+
+import static org.openrewrite.gradle.trait.GradleDependency.isDependencyDeclaration;
 
 /**
  * Represents one or more Gradle dependencies declared in a single method invocation.
@@ -44,6 +45,7 @@ import java.util.function.Function;
  */
 @Value
 public class GradleMultiDependency implements Trait<J.MethodInvocation> {
+    @With
     Cursor cursor;
 
     /**
@@ -62,6 +64,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      *
      * @return The configuration name
      */
+    @SuppressWarnings("unused")
     public String getConfigurationName() {
         return getTree().getSimpleName();
     }
@@ -73,7 +76,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      */
     private static boolean methodArgumentsContainMultipleDependencyNotations(Cursor methodCursor) {
         Object maybeMi = methodCursor.getValue();
-        if(!(maybeMi instanceof J.MethodInvocation)) {
+        if (!(maybeMi instanceof J.MethodInvocation)) {
             return false;
         }
         J.MethodInvocation m = (J.MethodInvocation) maybeMi;
@@ -91,21 +94,36 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      * @param mapper Function to transform each matching GradleDependency
      * @return The updated J.MethodInvocation if any changes were made, or the original if not
      */
-    public GradleMultiDependency map(Function<GradleDependency, GradleDependency> mapper) {
-        J.MethodInvocation m = cursor.getValue();
-        if (isVarargs())  {
+    public J.MethodInvocation map(Function<GradleDependency, J.MethodInvocation> mapper) {
+        if (isVarargs()) {
+
+        } else {
+            Optional<GradleDependency> dep = new GradleDependency.Matcher()
+                    .matcher(matcher)
+                    .get(cursor);
+            if (dep.isPresent()) {
+                return mapper.apply(dep.get());
+            }
+        }
+        return getTree();
+    }
+
+    public void forEach(Consumer<GradleDependency> consumer) {
+        if (isVarargs()) {
 
         } else {
             new GradleDependency.Matcher()
+                    .matcher(matcher)
                     .get(cursor)
-                    .map(mapper)
-                    .get()
+                    .ifPresent(consumer);
         }
-        return this;
+    }
+
+    public static Matcher matcher(DependencyMatcher matcher) {
+        return new Matcher().matcher(matcher);
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleMultiDependency> {
-        private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
         @Nullable
         protected String configuration;
@@ -113,8 +131,9 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         @Nullable
         protected DependencyMatcher matcher;
 
-        public Matcher(@Nullable DependencyMatcher matcher) {
+        public Matcher matcher(@Nullable DependencyMatcher matcher) {
             this.matcher = matcher;
+            return this;
         }
 
         public Matcher configuration(@Nullable String configuration) {
@@ -123,7 +142,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         }
 
         public Matcher groupId(@Nullable String groupPattern) {
-            if(matcher == null) {
+            if (matcher == null) {
                 matcher = new DependencyMatcher(groupPattern, null, null);
             } else {
                 matcher = matcher.withGroupPattern(groupPattern);
@@ -132,7 +151,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         }
 
         public Matcher artifactId(@Nullable String artifactPattern) {
-            if(matcher == null) {
+            if (matcher == null) {
                 matcher = new DependencyMatcher(null, artifactPattern, null);
             } else {
                 matcher = matcher.withArtifactPattern(artifactPattern);
@@ -155,74 +174,16 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
 
         @Override
         protected @Nullable GradleMultiDependency test(Cursor cursor) {
-            Object object = cursor.getValue();
-            if (!(object instanceof J.MethodInvocation)) {
+            if (!isDependencyDeclaration(cursor)) {
                 return null;
             }
 
-            J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
-            List<Expression> args = methodInvocation.getArguments();
-
-            // Check if this is a varargs invocation (multiple literal strings)
-            methodArgumentsContainMultipleDependencyNotations(cursor);
-            if (args.stream().filter(it -> Dependency.parse(it.print(cursor)) != null).count() > 1) {
-                return testVarargs(cursor, methodInvocation, args);
-            }
-
-            return new GradleMultiDependency(cursor, matcher, );
-        }
-
-        private @Nullable GradleMultiDependency testVarargs(Cursor cursor, J.MethodInvocation methodInvocation, List<Expression> args) {
-            if (!withinDependenciesBlock(cursor)) {
-                return null;
-            }
-
-            if (withinDependencyConstraintsBlock(cursor)) {
-                return null;
-            }
-
-            if (!DEPENDENCY_DSL_MATCHER.matches(methodInvocation) || "project".equals(methodInvocation.getSimpleName())) {
-                return null;
-            }
-
+            J.MethodInvocation methodInvocation = cursor.getValue();
             if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
                 return null;
             }
 
-            // Parse each literal string or GString argument
-            List<Dependency> parsedDependencies = new ArrayList<>();
-            for (Expression arg : args) {
-                Dependency dep = null;
-                if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
-                    String gav = (String) ((J.Literal) arg).getValue();
-                    dep = Dependency.parse(gav);
-                } else if (arg instanceof G.GString) {
-                    // Handle GString notation: "group:artifact:$version"
-                    G.GString gstring = (G.GString) arg;
-                    List<J> strings = gstring.getStrings();
-                    if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
-                        String gav = (String) ((J.Literal) strings.get(0)).getValue();
-                        dep = Dependency.parse(gav);
-                    }
-                }
-                if (dep != null) {
-                    parsedDependencies.add(dep);
-                }
-            }
-
-            if (parsedDependencies.size() <= 1) {
-                return null; // Not really a varargs if only one or zero dependencies
-            }
-
-            return new GradleMultiDependency(cursor, matcher);
-        }
-
-        private boolean withinDependenciesBlock(Cursor cursor) {
-            return withinBlock(cursor, "dependencies");
-        }
-
-        private boolean withinDependencyConstraintsBlock(Cursor cursor) {
-            return withinBlock(cursor, "constraints") && withinDependenciesBlock(cursor);
+            return new GradleMultiDependency(cursor, matcher, methodArgumentsContainMultipleDependencyNotations(cursor));
         }
     }
 }
