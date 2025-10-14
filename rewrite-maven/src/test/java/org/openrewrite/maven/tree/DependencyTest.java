@@ -82,7 +82,6 @@ class DependencyTest {
         assertThat(dep.toStringNotation()).isEqualTo(":artifact");
     }
 
-    // Tests for parse()
     @Test
     void parseWithAllFieldsPresent() {
         Dependency dep = Dependency.parse("com.example:artifact:1.0.0:sources@jar");
@@ -273,5 +272,70 @@ class DependencyTest {
                 })
                 .extracting(Dependency::toStringNotation)
                 .isEqualTo("com.example:artifact:1.0.0:sources@jar");
+    }
+
+    @Test
+    void parseRejectsGroovyMapNotation() {
+        assertThat(Dependency.parse("group : \"com.google.guava\"")).isNull();
+        assertThat(Dependency.parse("name : \"guava\"")).isNull();
+        assertThat(Dependency.parse(" group: \"value\" ")).isNull();
+        assertThat(Dependency.parse("version: '29.0-jre'")).isNull();
+    }
+
+    @Test
+    void parseRejectsNotationWithQuotedValues() {
+        // These look like partial Groovy notation, not valid dependency strings
+        assertThat(Dependency.parse("'com.example':'artifact'")).isNull();
+    }
+
+    @Test
+    void parseRejectsNotationWithTrailingSpaces() {
+        // Valid dependency notation should not have spaces around colons
+        assertThat(Dependency.parse("com.example : artifact")).isNull();
+        assertThat(Dependency.parse("com.example: artifact")).isNull();
+        assertThat(Dependency.parse("com.example :artifact")).isNull();
+    }
+
+    @Test
+    void parseRejectsEmptyString() {
+        assertThat(Dependency.parse("")).isNull();
+    }
+
+    @Test
+    void parseRejectsOnlyColons() {
+        assertThat(Dependency.parse(":")).isNull();
+        assertThat(Dependency.parse("::")).isNull();
+        assertThat(Dependency.parse(":::")).isNull();
+    }
+
+    @Test
+    void parseRejectsInvalidCharactersInGroupId() {
+        // GroupIds must match [A-Za-z0-9_.-]+
+        assertThat(Dependency.parse("com/example:artifact")).isNull();
+        assertThat(Dependency.parse("com example:artifact")).isNull();
+        assertThat(Dependency.parse("com*example:artifact")).isNull();
+        assertThat(Dependency.parse("com@example:artifact")).isNull();
+        assertThat(Dependency.parse("com+example:artifact")).isNull();
+        assertThat(Dependency.parse("com[example]:artifact")).isNull();
+    }
+
+    @Test
+    void parseRejectsInvalidCharactersInArtifactId() {
+        // ArtifactIds must match [A-Za-z0-9_.-]+
+        assertThat(Dependency.parse("com.example:my/artifact")).isNull();
+        assertThat(Dependency.parse("com.example:my artifact")).isNull();
+        assertThat(Dependency.parse("com.example:my*artifact")).isNull();
+        assertThat(Dependency.parse("com.example:my+artifact")).isNull();
+        assertThat(Dependency.parse("com.example:my[artifact]")).isNull();
+        assertThat(Dependency.parse("com.example:my#artifact")).isNull();
+    }
+
+    @Test
+    void parseAcceptsValidCharactersInGroupAndArtifact() {
+        // Valid characters: A-Z, a-z, 0-9, _, ., -
+        Dependency dep = Dependency.parse("com.example-test_123:my-artifact_456.test");
+        assertThat(dep).isNotNull();
+        assertThat(dep.getGroupId()).isEqualTo("com.example-test_123");
+        assertThat(dep.getArtifactId()).isEqualTo("my-artifact_456.test");
     }
 }

@@ -17,8 +17,10 @@ package org.openrewrite.gradle.trait;
 
 import lombok.Getter;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
@@ -43,6 +45,7 @@ import org.openrewrite.trait.VisitFunction2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
@@ -52,10 +55,79 @@ import static java.util.stream.Collectors.toList;
 public class GradleDependency implements Trait<J.MethodInvocation> {
 
     private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-    public static boolean isDependencyDeclaration(J.MethodInvocation methodInvocation) {
+
+    private static @Nullable GradleProject getGradleProject(Cursor cursor) {
+        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
+        if (sourceFile == null) {
+            return null;
+        }
+
+        Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+        return maybeGp.orElse(null);
+    }
+
+    private static boolean withinBlock(Cursor cursor, String name) {
+        Cursor parentCursor = cursor.getParent();
+        while (parentCursor != null) {
+            if (parentCursor.getValue() instanceof J.MethodInvocation) {
+                J.MethodInvocation m = parentCursor.getValue();
+                if (m.getSimpleName().equals(name)) {
+                    return true;
+                }
+            }
+            parentCursor = parentCursor.getParent();
+        }
+
+        return false;
+    }
+
+    private static boolean withinDependenciesBlock(Cursor cursor) {
+        return withinBlock(cursor, "dependencies");
+    }
+
+    private static boolean withinDependencyConstraintsBlock(Cursor cursor) {
+        return withinBlock(cursor, "constraints") && withinDependenciesBlock(cursor);
+    }
+
+    private static @Nullable GradleDependencyConfiguration getConfiguration(@Nullable GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+        if (gradleProject == null) {
+            return null;
+        }
+
+        String methodName = methodInvocation.getSimpleName();
+        if ("classpath".equals(methodName)) {
+            return gradleProject.getBuildscript().getConfiguration(methodName);
+        } else {
+            return gradleProject.getConfiguration(methodName);
+        }
+    }
+
+    public static boolean isDependencyDeclaration(Cursor cursor) {
+        Object object = cursor.getValue();
+        if (!(object instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
+
+        if (!withinDependenciesBlock(cursor)) {
+            return false;
+        }
+
+        if (withinDependencyConstraintsBlock(cursor)) {
+            // A dependency constraint is different from an actual dependency
+            return false;
+        }
+
+        GradleProject gradleProject = getGradleProject(cursor);
+        GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
+        if (gdc == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation) && !"project".equals(methodInvocation.getSimpleName()))) {
+            return false;
+        }
+
         return DEPENDENCY_DSL_MATCHER.matches(methodInvocation);
     }
 
+    @With
     Cursor cursor;
 
     @Getter
@@ -81,6 +153,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
     /**
      * Gets the resolved version of the dependency
+     *
      * @return the resolved version of the dependency, after any variable substitutions have taken place
      */
     public String getVersion() {
@@ -143,7 +216,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
-                Dependency.parse((String) ((J.Literal) arg).getValue());
+                    Dependency.parse((String) ((J.Literal) arg).getValue());
             return dep != null ? dep.getGroupId() : null;
         }
 
@@ -152,7 +225,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = ((G.GString) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 Dependency dep =
-                    Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getGroupId() : null;
             }
         }
@@ -162,7 +235,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = ((K.StringTemplate) arg).getStrings();
             if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 Dependency dep =
-                    Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
                 return dep != null ? dep.getGroupId() : null;
             }
         }
@@ -173,13 +246,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (e instanceof G.MapEntry) {
                     G.MapEntry entry = (G.MapEntry) e;
                     if (entry.getKey() instanceof J.Literal &&
-                        "group".equals(((J.Literal) entry.getKey()).getValue())) {
+                            "group".equals(((J.Literal) entry.getKey()).getValue())) {
                         return extractValueAsString(entry.getValue());
                     }
                 } else if (e instanceof J.Assignment) {
                     J.Assignment assignment = (J.Assignment) e;
                     if (assignment.getVariable() instanceof J.Identifier &&
-                        "group".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
+                            "group".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
                         return extractValueAsString(assignment.getAssignment());
                     }
                 }
@@ -190,7 +263,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof G.MapLiteral) {
             for (G.MapEntry entry : ((G.MapLiteral) arg).getElements()) {
                 if (entry.getKey() instanceof J.Literal &&
-                    "group".equals(((J.Literal) entry.getKey()).getValue())) {
+                        "group".equals(((J.Literal) entry.getKey()).getValue())) {
                     return extractValueAsString(entry.getValue());
                 }
             }
@@ -334,7 +407,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         // String literal notation: "group:artifact:version"
         if (arg instanceof J.Literal && ((J.Literal) arg).getValue() instanceof String) {
             Dependency dep =
-                Dependency.parse((String) ((J.Literal) arg).getValue());
+                    Dependency.parse((String) ((J.Literal) arg).getValue());
             return dep != null ? dep.getVersion() : null;
         }
 
@@ -344,13 +417,13 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (e instanceof G.MapEntry) {
                     G.MapEntry entry = (G.MapEntry) e;
                     if (entry.getKey() instanceof J.Literal &&
-                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                            "version".equals(((J.Literal) entry.getKey()).getValue())) {
                         return extractValueAsString(entry.getValue());
                     }
                 } else if (e instanceof J.Assignment) {
                     J.Assignment assignment = (J.Assignment) e;
                     if (assignment.getVariable() instanceof J.Identifier &&
-                        "version".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
+                            "version".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
                         return extractValueAsString(assignment.getAssignment());
                     }
                 }
@@ -361,7 +434,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arg instanceof G.MapLiteral) {
             for (G.MapEntry entry : ((G.MapLiteral) arg).getElements()) {
                 if (entry.getKey() instanceof J.Literal &&
-                    "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
                     return extractValueAsString(entry.getValue());
                 }
             }
@@ -387,8 +460,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             J.MethodInvocation mi = (J.MethodInvocation) value;
             String methodName = mi.getSimpleName();
             if (("property".equals(methodName) || "findProperty".equals(methodName)) &&
-                mi.getArguments().size() == 1 &&
-                mi.getArguments().get(0) instanceof J.Literal) {
+                    mi.getArguments().size() == 1 &&
+                    mi.getArguments().get(0) instanceof J.Literal) {
                 Object arg = ((J.Literal) mi.getArguments().get(0)).getValue();
                 if (arg instanceof String) {
                     return (String) arg;
@@ -397,10 +470,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
             // Also handle project.property('name') and project.findProperty('name')
             if (mi.getSelect() instanceof J.Identifier &&
-                "project".equals(((J.Identifier) mi.getSelect()).getSimpleName()) &&
-                ("property".equals(methodName) || "findProperty".equals(methodName)) &&
-                mi.getArguments().size() == 1 &&
-                mi.getArguments().get(0) instanceof J.Literal) {
+                    "project".equals(((J.Identifier) mi.getSelect()).getSimpleName()) &&
+                    ("property".equals(methodName) || "findProperty".equals(methodName)) &&
+                    mi.getArguments().size() == 1 &&
+                    mi.getArguments().get(0) instanceof J.Literal) {
                 Object arg = ((J.Literal) mi.getArguments().get(0)).getValue();
                 if (arg instanceof String) {
                     return (String) arg;
@@ -714,7 +787,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * operates on the inner dependency declaration.
      *
      * @return A new GradleDependency with the version removed from the cursor's method invocation,
-     *         or the original GradleDependency if the version cannot be removed
+     * or the original GradleDependency if the version cannot be removed
      */
     public GradleDependency removeVersion() {
         J.MethodInvocation m = cursor.getValue();
@@ -729,7 +802,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (updatedPlatformDep != platformDep) {
                     // The inner dependency was modified, so update the outer method invocation
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                        platformMethod.withArguments(updatedPlatformDep.getTree().getArguments())
+                            platformMethod.withArguments(updatedPlatformDep.getTree().getArguments())
                     ));
                     return new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
                 }
@@ -801,8 +874,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 GradleDependency updated = platformDep.withDeclaredGroupId(newGroupId);
                 if (updated != platformDep) {
                     return new GradleDependency(new Cursor(cursor.getParent(),
-                        m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
-                        resolvedDependency);
+                            m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
+                            resolvedDependency);
                 }
             }
             return this;
@@ -818,7 +891,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
                     Dependency updatedDep = dep.withGroupId(newGroupId);
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                        arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -837,28 +910,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
             List<G.MapEntry> entries = firstArg instanceof G.MapLiteral ?
-                ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
+                    ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
                     .filter(G.MapEntry.class::isInstance)
                     .map(G.MapEntry.class::cast)
                     .collect(Collectors.toList());
 
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
-                    "group".equals(((J.Literal) entry.getKey()).getValue()) &&
-                    entry.getValue() instanceof J.Literal) {
+                        "group".equals(((J.Literal) entry.getKey()).getValue()) &&
+                        entry.getValue() instanceof J.Literal) {
                     String currentGroup = (String) ((J.Literal) entry.getValue()).getValue();
                     if (!newGroupId.equals(currentGroup)) {
                         G.MapEntry updatedEntry = entry.withValue(
-                            ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newGroupId));
+                                ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newGroupId));
 
                         if (firstArg instanceof G.MapLiteral) {
                             G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
                             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                                mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
-                                    e -> e == entry ? updatedEntry : e))));
+                                    mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
+                                            e -> e == entry ? updatedEntry : e))));
                         } else {
                             updated = m.withArguments(ListUtils.map(m.getArguments(),
-                                arg -> arg == entry ? updatedEntry : arg));
+                                    arg -> arg == entry ? updatedEntry : arg));
                         }
                     }
                     break;
@@ -900,7 +973,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         return updated == m ? this :
-            new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
+                new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
     }
 
     /**
@@ -927,8 +1000,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 GradleDependency updated = platformDep.withDeclaredArtifactId(newArtifactId);
                 if (updated != platformDep) {
                     return new GradleDependency(new Cursor(cursor.getParent(),
-                        m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
-                        resolvedDependency);
+                            m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
+                            resolvedDependency);
                 }
             }
             return this;
@@ -944,7 +1017,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
                     Dependency updatedDep = dep.withArtifactId(newArtifactId);
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                        arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -963,28 +1036,28 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
             List<G.MapEntry> entries = firstArg instanceof G.MapLiteral ?
-                ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
+                    ((G.MapLiteral) firstArg).getElements() : m.getArguments().stream()
                     .filter(G.MapEntry.class::isInstance)
                     .map(G.MapEntry.class::cast)
                     .collect(Collectors.toList());
 
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
-                    "name".equals(((J.Literal) entry.getKey()).getValue()) &&
-                    entry.getValue() instanceof J.Literal) {
+                        "name".equals(((J.Literal) entry.getKey()).getValue()) &&
+                        entry.getValue() instanceof J.Literal) {
                     String currentArtifact = (String) ((J.Literal) entry.getValue()).getValue();
                     if (!newArtifactId.equals(currentArtifact)) {
                         G.MapEntry updatedEntry = entry.withValue(
-                            ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newArtifactId));
+                                ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newArtifactId));
 
                         if (firstArg instanceof G.MapLiteral) {
                             G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
                             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                                mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
-                                    e -> e == entry ? updatedEntry : e))));
+                                    mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
+                                            e -> e == entry ? updatedEntry : e))));
                         } else {
                             updated = m.withArguments(ListUtils.map(m.getArguments(),
-                                arg -> arg == entry ? updatedEntry : arg));
+                                    arg -> arg == entry ? updatedEntry : arg));
                         }
                     }
                     break;
@@ -1026,7 +1099,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         return updated == m ? this :
-            new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
+                new GradleDependency(new Cursor(cursor.getParent(), updated), resolvedDependency);
     }
 
     /**
@@ -1056,8 +1129,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 GradleDependency updated = platformDep.withDeclaredVersion(newVersion);
                 if (updated != platformDep) {
                     return new GradleDependency(new Cursor(cursor.getParent(),
-                        m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
-                        resolvedDependency);
+                            m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> updated.getTree()))),
+                            resolvedDependency);
                 }
             }
             return this;
@@ -1073,7 +1146,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (dep != null && !newVersion.equals(dep.getVersion())) {
                     Dependency updatedDep = dep.withVersion(newVersion);
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
-                        arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
+                            arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, updatedDep.toStringNotation())));
                 }
             }
         } else if (firstArg instanceof G.GString) {
@@ -1093,30 +1166,30 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
             List<G.MapEntry> entries = firstArg instanceof G.MapLiteral ?
-                new ArrayList<>(((G.MapLiteral) firstArg).getElements()) :
-                m.getArguments().stream()
-                    .filter(G.MapEntry.class::isInstance)
-                    .map(G.MapEntry.class::cast)
-                    .collect(Collectors.toList());
+                    new ArrayList<>(((G.MapLiteral) firstArg).getElements()) :
+                    m.getArguments().stream()
+                            .filter(G.MapEntry.class::isInstance)
+                            .map(G.MapEntry.class::cast)
+                            .collect(Collectors.toList());
 
             boolean versionFound = false;
             for (G.MapEntry entry : entries) {
                 if (entry.getKey() instanceof J.Literal &&
-                    "version".equals(((J.Literal) entry.getKey()).getValue()) &&
-                    entry.getValue() instanceof J.Literal) {
+                        "version".equals(((J.Literal) entry.getKey()).getValue()) &&
+                        entry.getValue() instanceof J.Literal) {
                     String currentVersion = (String) ((J.Literal) entry.getValue()).getValue();
                     if (!newVersion.equals(currentVersion)) {
                         G.MapEntry updatedEntry = entry.withValue(
-                            ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newVersion));
+                                ChangeStringLiteral.withStringValue((J.Literal) entry.getValue(), newVersion));
 
                         if (firstArg instanceof G.MapLiteral) {
                             G.MapLiteral mapLiteral = (G.MapLiteral) firstArg;
                             updated = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg ->
-                                mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
-                                    e -> e == entry ? updatedEntry : e))));
+                                    mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(),
+                                            e -> e == entry ? updatedEntry : e))));
                         } else {
                             updated = m.withArguments(ListUtils.map(m.getArguments(),
-                                arg -> arg == entry ? updatedEntry : arg));
+                                    arg -> arg == entry ? updatedEntry : arg));
                         }
                     }
                     versionFound = true;
@@ -1176,9 +1249,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         @Nullable
         protected DependencyMatcher matcher;
 
-        public Matcher(@Nullable DependencyMatcher matcher) {
-            this.matcher = matcher;
-        }
+        public Matcher() {}
 
         public Matcher configuration(@Nullable String configuration) {
             this.configuration = configuration;
@@ -1186,7 +1257,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         public Matcher groupId(@Nullable String groupPattern) {
-            if(matcher == null) {
+            if (matcher == null) {
                 matcher = new DependencyMatcher(groupPattern, null, null);
             } else {
                 matcher = matcher.withGroupPattern(groupPattern);
@@ -1195,11 +1266,16 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         public Matcher artifactId(@Nullable String artifactPattern) {
-            if(matcher == null) {
+            if (matcher == null) {
                 matcher = new DependencyMatcher(null, artifactPattern, null);
             } else {
                 matcher = matcher.withArtifactPattern(artifactPattern);
             }
+            return this;
+        }
+
+        public Matcher matcher(@Nullable DependencyMatcher matcher) {
+            this.matcher = matcher;
             return this;
         }
 
@@ -1218,93 +1294,83 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
         @Override
         protected @Nullable GradleDependency test(Cursor cursor) {
-            Object object = cursor.getValue();
-            if (object instanceof J.MethodInvocation) {
-                J.MethodInvocation methodInvocation = (J.MethodInvocation) object;
+            if(!isDependencyDeclaration(cursor)) {
+                return null;
+            }
+            J.MethodInvocation methodInvocation = cursor.getValue();
+            GradleProject gradleProject = getGradleProject(cursor);
+            GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
+            if (gdc == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation) && !"project".equals(methodInvocation.getSimpleName()))) {
+                return null;
+            }
 
-                if (!withinDependenciesBlock(cursor)) {
+            if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
+                return null;
+            }
+
+            Dependency dependency = null;
+            Expression argument = methodInvocation.getArguments().get(0);
+            if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
+                dependency = parseDependency(methodInvocation.getArguments());
+            } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
+                dependency = parseDependency(singletonList(((J.Binary) argument).getLeft()));
+            } else if (argument instanceof J.MethodInvocation) {
+                if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
+                        "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
+                    dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
+                } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
+                    // project dependencies are not yet supported
                     return null;
                 }
+            }
 
-                if (withinDependencyConstraintsBlock(cursor)) {
-                    // A dependency constraint is different from an actual dependency
-                    return null;
-                }
+            if (dependency == null) {
+                return null;
+            }
 
-                GradleProject gradleProject = getGradleProject(cursor);
-                GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
-                if (gdc == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation) && !"project".equals(methodInvocation.getSimpleName()))) {
-                    return null;
-                }
-
-                if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
-                    return null;
-                }
-
-                Dependency dependency = null;
-                Expression argument = methodInvocation.getArguments().get(0);
-                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
-                    dependency = parseDependency(methodInvocation.getArguments());
-                } else if (argument instanceof J.Binary && ((J.Binary) argument).getLeft() instanceof J.Literal) {
-                    dependency = parseDependency(singletonList(((J.Binary) argument).getLeft()));
-                } else if (argument instanceof J.MethodInvocation) {
-                    if ("platform".equals(((J.MethodInvocation) argument).getSimpleName()) ||
-                            "enforcedPlatform".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                        dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
-                    } else if ("project".equals(((J.MethodInvocation) argument).getSimpleName())) {
-                        // project dependencies are not yet supported
-                        return null;
-                    }
-                }
-
-                if (dependency == null) {
-                    return null;
-                }
-
-                if (gdc != null) {
-                    if (gdc.isCanBeResolved()) {
-                        for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
-                            if(matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
-                                Dependency req = resolvedDependency.getRequested();
-                                if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
-                                        req.getArtifactId().equals(dependency.getArtifactId())) {
-                                    return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
-                                }
+            if (gdc != null) {
+                if (gdc.isCanBeResolved()) {
+                    for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
+                        if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
+                            Dependency req = resolvedDependency.getRequested();
+                            if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
+                                    req.getArtifactId().equals(dependency.getArtifactId())) {
+                                return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
                             }
                         }
-                    } else {
-                        for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
-                            if (!transitiveConfiguration.isCanBeResolved()) {
-                                for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
-                                    if(matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
-                                        Dependency req = resolvedDependency.getRequested();
-                                        if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
-                                                req.getArtifactId().equals(dependency.getArtifactId())) {
-                                            return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
-                                        }
+                    }
+                } else {
+                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
+                        if (!transitiveConfiguration.isCanBeResolved()) {
+                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
+                                if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
+                                    Dependency req = resolvedDependency.getRequested();
+                                    if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
+                                            req.getArtifactId().equals(dependency.getArtifactId())) {
+                                        return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                if(matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
-                    // Couldn't find the actual resolved dependency, return a synthetic one instead
-                    ResolvedDependency resolvedDependency = ResolvedDependency.builder()
-                            .depth(-1)
-                            .gav(new ResolvedGroupArtifactVersion(null, dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))
-                            .classifier(dependency.getClassifier())
-                            .type(dependency.getType())
-                            .requested(Dependency.builder()
-                                    .scope(methodInvocation.getSimpleName())
-                                    .type(dependency.getType())
-                                    .gav(dependency.getGav())
-                                    .classifier(dependency.getClassifier())
-                                    .build())
-                            .build();
-                    return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
-                }
+            if (matcher == null || matcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                // Couldn't find the actual resolved dependency, return a synthetic one instead
+                ResolvedDependency resolvedDependency = ResolvedDependency.builder()
+                        .depth(-1)
+                        .gav(new ResolvedGroupArtifactVersion(null, dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))
+                        .classifier(dependency.getClassifier())
+                        .type(dependency.getType())
+                        .requested(Dependency.builder()
+                                .scope(methodInvocation.getSimpleName())
+                                .type(dependency.getType())
+                                .gav(dependency.getGav())
+                                .classifier(dependency.getClassifier())
+                                .build())
+                        .build();
+                return new GradleDependency(cursor, withRequested(resolvedDependency, dependency));
             }
 
             return null;
@@ -1317,28 +1383,6 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
          */
         private static ResolvedDependency withRequested(ResolvedDependency resolved, Dependency requested) {
             return resolved.withRequested(resolved.getRequested().withGav(requested.getGav()));
-        }
-
-
-        private static @Nullable GradleDependencyConfiguration getConfiguration(@Nullable GradleProject gradleProject, J.MethodInvocation methodInvocation) {
-            if (gradleProject == null) {
-                return null;
-            }
-
-            String methodName = methodInvocation.getSimpleName();
-            if ("classpath".equals(methodName)) {
-                return gradleProject.getBuildscript().getConfiguration(methodName);
-            } else {
-                return gradleProject.getConfiguration(methodName);
-            }
-        }
-
-        private boolean withinDependenciesBlock(Cursor cursor) {
-            return withinBlock(cursor, "dependencies");
-        }
-
-        private boolean withinDependencyConstraintsBlock(Cursor cursor) {
-            return withinBlock(cursor, "constraints") && withinDependenciesBlock(cursor);
         }
 
         private @Nullable Dependency parseDependency(List<Expression> arguments) {

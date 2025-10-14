@@ -179,6 +179,21 @@ public class Dependency implements Serializable, Attributed {
         if (notation == null) {
             return null;
         }
+        notation = notation.trim();
+        if (notation.isEmpty()) {
+            return null;
+        }
+
+        if (notation.indexOf('"') >= 0 ||
+            notation.indexOf('\'') >= 0) {
+            return null;
+        }
+
+        // Reject notation with spaces (which would indicate Groovy map notation or other invalid format)
+        if (notation.indexOf(' ') >= 0) {
+            return null;
+        }
+
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
             return parse(notation, null);
@@ -251,6 +266,15 @@ public class Dependency implements Serializable, Attributed {
             return null;
         }
 
+        // Validate groupId and artifactId contain only valid characters [A-Za-z0-9_.-]+
+        // GroupId can be empty string (for notations like ":artifact")
+        if (groupId != null && !groupId.isEmpty() && !isValidIdentifier(groupId)) {
+            return null;
+        }
+        if (!isValidIdentifier(artifactId)) {
+            return null;
+        }
+
         // Handle empty strings in version and classifier
         if ("".equals(version)) {
             version = "";  // Preserve empty strings
@@ -264,5 +288,28 @@ public class Dependency implements Serializable, Attributed {
                 .classifier(classifier)
                 .type(type)
                 .build();
+    }
+
+    /**
+     * Validates that a string contains only valid Maven/Gradle identifier characters.
+     * Valid characters are: A-Z, a-z, 0-9, underscore (_), dot (.), and hyphen (-).
+     *
+     * @param str the string to validate
+     * @return true if the string contains only valid characters, false otherwise
+     */
+    private static boolean isValidIdentifier(@Nullable String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (!((c >= 'A' && c <= 'Z') ||
+                  (c >= 'a' && c <= 'z') ||
+                  (c >= '0' && c <= '9') ||
+                  c == '_' || c == '.' || c == '-')) {
+                return false;
+            }
+        }
+        return true;
     }
 }
