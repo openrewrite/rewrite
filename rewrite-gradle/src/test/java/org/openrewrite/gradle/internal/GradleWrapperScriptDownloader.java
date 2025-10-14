@@ -91,8 +91,8 @@ public class GradleWrapperScriptDownloader {
                 String gradlewBat = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
 
                 // validate
-                validateTemplate("unix", gradlew, unixBindings(wrapper), "\n");
-                validateTemplate("windows", gradlewBat, windowsBindings(wrapper), "\r\n");
+                validateTemplate("unix", gradlew, unixBindings(wrapper.getVersion()), "\n");
+                validateTemplate("windows", gradlewBat, windowsBindings(wrapper.getVersion()), "\r\n");
 
                 // checksum
                 String gradlewChecksum = hash("unix", gradlew);

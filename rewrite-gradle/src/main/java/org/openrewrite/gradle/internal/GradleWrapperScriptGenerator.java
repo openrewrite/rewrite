@@ -28,11 +28,11 @@ import static java.util.Objects.requireNonNull;
 public class GradleWrapperScriptGenerator {
     private GradleWrapperScriptGenerator() {}
 
-    public static Map<String, String> unixBindings(GradleWrapper gradleWrapper) {
+    public static Map<String, String> unixBindings(String gradleVersion) {
         Map<String, String> binding = defaultBindings();
-        String defaultJvmOpts = defaultJvmOpts(gradleWrapper);
+        String defaultJvmOpts = defaultJvmOpts(gradleVersion);
         binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleWrapper.getVersion(), "8.14") >= 0) {
+        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
             binding.put("classpath", "\"\\\\\\\\\\\"\\\\\\\\\\\"\"");
             binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
             binding.put("mainClassName", "");
@@ -44,10 +44,10 @@ public class GradleWrapperScriptGenerator {
         return binding;
     }
 
-    public static Map<String, String> windowsBindings(GradleWrapper gradleWrapper) {
+    public static Map<String, String> windowsBindings(String gradleVersion) {
         Map<String, String> binding = defaultBindings();
-        binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
-        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleWrapper.getVersion(), "8.14") >= 0) {
+        binding.put("defaultJvmOpts", defaultJvmOpts(gradleVersion));
+        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
             binding.put("classpath", "");
             binding.put("mainClassName", "");
             binding.put("entryPointArgs", "-jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\"");
@@ -71,13 +71,13 @@ public class GradleWrapperScriptGenerator {
         return bindings;
     }
 
-    private static String defaultJvmOpts(GradleWrapper gradleWrapper) {
+    private static String defaultJvmOpts(String gradleVersion) {
         VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
         VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
 
-        if (gradle53VersionComparator.isValid(null, gradleWrapper.getVersion())) {
+        if (gradle53VersionComparator.isValid(null, gradleVersion)) {
             return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
+        } else if (gradle50VersionComparator.isValid(null, gradleVersion)) {
             return "\"-Xmx64m\"";
         }
         return "";

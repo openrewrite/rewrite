@@ -404,12 +404,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private String unixScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
         String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
-        return renderTemplate(gradlewTemplate, unixBindings(gradleWrapper), "\n");
+        return renderTemplate(gradlewTemplate, unixBindings(gradleWrapper.getVersion()), "\n");
     }
 
     private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
         String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
-        return renderTemplate(gradlewBatTemplate, windowsBindings(gradleWrapper), "\r\n");
+        return renderTemplate(gradlewBatTemplate, windowsBindings(gradleWrapper.getVersion()), "\r\n");
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
