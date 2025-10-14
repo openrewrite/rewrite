@@ -142,28 +142,39 @@ export class InstallRecipes {
     }
 }
 
+/**
+ * Ensures dynamically loaded modules share the same class instances as the host
+ * by mapping require.cache entries. This prevents instanceof failures when the
+ * same package is installed in multiple node_modules directories.
+ */
 function setupSharedDependencies(targetModulePath: string) {
-    const sharedDeps = [
-        '@openrewrite/rewrite',
-        'vscode-jsonrpc',
-    ];
+    const sharedDeps = ['@openrewrite/rewrite', 'vscode-jsonrpc'];
+    const targetDir = path.dirname(targetModulePath);
 
-    sharedDeps.forEach(dep => {
-        try {
-            // Get your already-loaded version
-            const yourDepPath = require.resolve(dep);
-            const yourModule = require.cache[yourDepPath];
+    sharedDeps.forEach(depName => {
+        const depPattern = path.sep + 'node_modules' + path.sep + depName.replace('/', path.sep);
 
-            if (yourModule) {
-                // Find where the target would look for this dependency
-                const targetDir = path.dirname(targetModulePath);
-                const targetDepPath = require.resolve(dep, {paths: [targetDir]});
+        for (const cachedPath of Object.keys(require.cache)) {
+            if (!cachedPath.includes(depPattern)) continue;
 
-                // Make the target use your cached version
-                require.cache[targetDepPath] = yourModule;
+            try {
+                // Extract subpath: /path/node_modules/@pkg/dist/tree.js -> dist/tree.js
+                const pkgIndex = cachedPath.indexOf(depPattern);
+                let subpath = cachedPath.substring(pkgIndex + depPattern.length)
+                    .replace(/^[/\\]/, '')           // Remove leading slash
+                    .replace(/\.(js|ts)$/, '')        // Remove extension
+                    .replace(/^dist[/\\]/, '')        // Remove dist/ prefix if present
+                    .replace(/[/\\]index$/, '');      // Remove /index suffix
+
+                // Build require path: @pkg or @pkg/subpath
+                const requirePath = subpath ? `${depName}/${subpath}` : depName;
+
+                // Resolve from target's perspective and map cache
+                const targetDepPath = require.resolve(requirePath, {paths: [targetDir]});
+                require.cache[targetDepPath] = require.cache[cachedPath];
+            } catch (e) {
+                // Target can't resolve this path, skip
             }
-        } catch (e) {
-            // Module not found or not resolvable, skip
         }
     });
 }

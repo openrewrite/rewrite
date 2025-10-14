@@ -27,15 +27,15 @@ export function hasSourcePath(filePattern: string): Promise<RpcRecipe> | TreeVis
 }
 
 export function usesMethod(methodPattern: string, matchOverrides: boolean = false): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
-    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesMethod", {
+    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.FindMethods", {
         methodPattern,
         matchOverrides
     }) : new UsesMethod(methodPattern);
 }
 
 export function usesType(fullyQualifiedType: string): Promise<RpcRecipe> | TreeVisitor<any, ExecutionContext> {
-    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.UsesType", {
+    return RewriteRpc.get() ? RewriteRpc.get()!.prepareRecipe("org.openrewrite.java.search.FindTypes", {
         fullyQualifiedType,
-        includeImplicit: false
+        checkAssignability: false
     }) : new UsesType(fullyQualifiedType);
 }
