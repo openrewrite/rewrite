@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.internal;
 
+import groovy.text.SimpleTemplateEngine;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
@@ -30,11 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -46,6 +43,8 @@ import java.util.zip.Adler32;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static org.openrewrite.Result.diff;
+import static org.openrewrite.gradle.internal.GradleWrapperScriptGenerator.*;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 
@@ -87,8 +86,17 @@ public class GradleWrapperScriptDownloader {
                 DistributionInfos infos = DistributionInfos.fetch(version, ctx);
                 GradleWrapper wrapper = new GradleWrapper(v, infos);
 
-                String gradlewChecksum = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
-                String gradlewBatChecksum = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
+                // download
+                String gradlew = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
+                String gradlewBat = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
+
+                // validate
+                validateTemplate("unix", gradlew, unixBindings(wrapper), "\n");
+                validateTemplate("windows", gradlewBat, windowsBindings(wrapper), "\r\n");
+
+                // checksum
+                String gradlewChecksum = hash("unix", gradlew);
+                String gradlewBatChecksum = hash("windows", gradlewBat);
 
                 unixChecksums.add(gradlewChecksum);
                 batChecksums.add(gradlewBatChecksum);
@@ -126,7 +134,7 @@ public class GradleWrapperScriptDownloader {
     }
 
     private static String downloadScript(Path wrapperScriptLocation, GradleWrapper wrapper, String os,
-                                         InMemoryExecutionContext ctx) throws IOException, NoSuchAlgorithmException {
+                                         InMemoryExecutionContext ctx) {
         InputStream is = Remote.builder(wrapperScriptLocation)
                 .build(
                         URI.create(wrapper.getDistributionInfos().getDownloadUrl()),
@@ -135,7 +143,24 @@ public class GradleWrapperScriptDownloader {
                 )
                 .getInputStream(ctx);
 
-        byte[] scriptText = StringUtils.readFully(is).getBytes(StandardCharsets.UTF_8);
+        return StringUtils.readFully(is);
+    }
+
+    private static void validateTemplate(String os, String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
+        SimpleTemplateEngine engine = new SimpleTemplateEngine();
+        String groovyRendered = engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
+          .replaceAll("\r\n|\r|\n", lineSeparator)
+          .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
+
+        String rewriteRendered = renderTemplate(source, new HashMap<>(bindings), lineSeparator);
+
+        if (!groovyRendered.equals(rewriteRendered)) {
+            throw new IllegalStateException(String.format("Rendered %s template does not match\n\n%s", os, diff(groovyRendered, rewriteRendered, Paths.get("a"))));
+        }
+    }
+
+    private static String hash(String os, String text) throws IOException {
+        byte[] scriptText = text.getBytes(StandardCharsets.UTF_8);
         Adler32 adler32 = new Adler32();
         adler32.update(scriptText, 0, scriptText.length);
 

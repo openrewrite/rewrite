@@ -69,8 +69,8 @@ dependencies {
     testImplementation(project(":rewrite-gradle-tooling-model:model"))
     "pluginLocalTestClasspath"(project(mapOf("path" to ":rewrite-gradle-tooling-model:model", "configuration" to "pluginLocalTestClasspath")))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
+    testImplementation(localGroovy())
 
-    testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.google.guava:guava:latest.release")
