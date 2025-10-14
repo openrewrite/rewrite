@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle.internal;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.semver.Semver;
