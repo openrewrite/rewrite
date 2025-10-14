@@ -24,6 +24,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.request.PrepareRecipe;
 
 import java.io.File;
 import java.io.IOException;
@@ -112,7 +113,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         private @Nullable Integer maxHeapSize;
         private @Nullable Path workingDirectory;
-        private ClassLoader recipeClassLoader = JavaScriptRewriteRpc.class.getClassLoader();
+        private PrepareRecipe.@Nullable Loader recipeLoader;
 
         public Builder marketplace(Environment marketplace) {
             this.marketplace = marketplace;
@@ -216,8 +217,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             return this;
         }
 
-        public Builder recipeClassLoader(ClassLoader recipeClassLoader) {
-            this.recipeClassLoader = recipeClassLoader;
+        public Builder recipeLoader(PrepareRecipe.Loader recipeLoader) {
+            this.recipeLoader = recipeLoader;
             return this;
         }
 
@@ -282,7 +283,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)))
-                        .recipeClassLoader(recipeClassLoader);
+                        .recipeLoader(recipeLoader);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
