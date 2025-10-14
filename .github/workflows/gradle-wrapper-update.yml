@@ -4,7 +4,7 @@ name: Update Gradle wrapper scripts
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: 0 10 * * MON
+    - cron: 0 10 * * TUE
 
 jobs:
   update-versions:
