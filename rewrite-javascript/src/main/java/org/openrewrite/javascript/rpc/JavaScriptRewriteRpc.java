@@ -275,6 +275,11 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 }
             }
             process.environment().put("NODE_OPTIONS", nodeOptions.toString());
+            if (npxPath.getParent() != null) {
+                // `npx` is typically a shebang script alongside the `node` executable
+                process.environment().put("PATH", npxPath.getParent() + File.pathSeparator +
+                        System.getenv("PATH"));
+            }
             process.start();
 
             try {

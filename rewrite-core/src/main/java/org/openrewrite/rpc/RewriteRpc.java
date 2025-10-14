@@ -475,6 +475,10 @@ public class RewriteRpc {
 
             // If we get here, we've hit the total timeout
             throw new RuntimeException("Request timed out after " + timeout.getSeconds() + " seconds");
+        } catch (RuntimeException e) {
+            // Check if process crashed during the request
+            checkLiveness();
+            throw e;
         } catch (ExecutionException | InterruptedException e) {
             // Check if process crashed during the request
             checkLiveness();
