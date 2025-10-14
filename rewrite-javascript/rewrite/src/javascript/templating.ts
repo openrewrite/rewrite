@@ -42,18 +42,25 @@ class CaptureImpl implements Capture {
 /**
  * Creates a capture specification for use in template patterns.
  *
+ * @param name Optional name for the capture. If not provided, an auto-generated name is used.
  * @returns A Capture object
  *
  * @example
- * // Multiple captures
+ * // Named inline captures
+ * const pattern = pattern`${capture('left')} + ${capture('right')}`;
+ *
+ * // Unnamed captures
  * const {left, right} = {left: capture(), right: capture()};
  * const pattern = pattern`${left} + ${right}`;
  *
  * // Repeated patterns using the same capture
- * const expr = capture();
+ * const expr = capture('expr');
  * const redundantOr = pattern`${expr} || ${expr}`;
  */
-export function capture(): Capture {
+export function capture(name?: string): Capture {
+    if (name) {
+        return new CaptureImpl(name);
+    }
     return new CaptureImpl(`unnamed_${capture.nextUnnamedId++}`);
 }
 
@@ -359,7 +366,7 @@ class TemplateEngine {
         const substitutions = new Map<string, Parameter>();
         for (let i = 0; i < parameters.length; i++) {
             const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-            substitutions.set(placeholder, typeof parameters[i].value === 'string' ? {value: values.get(parameters[i].value) || parameters[i].value} : parameters[i]);
+            substitutions.set(placeholder, parameters[i]);
         }
 
         // Unsubstitute placeholders with actual parameter values and match results
@@ -377,16 +384,22 @@ class TemplateEngine {
      * @param parameters The parameters between the string parts
      * @returns The template string
      */
-    private static buildTemplateString(templateParts: TemplateStringsArray, parameters: Parameter[]): string {
+    private static buildTemplateString(
+        templateParts: TemplateStringsArray,
+        parameters: Parameter[]
+    ): string {
         let result = '';
         for (let i = 0; i < templateParts.length; i++) {
             result += templateParts[i];
             if (i < parameters.length) {
-                if (parameters[i].value instanceof CaptureImpl || typeof parameters[i].value === 'string' || isTree(parameters[i].value)) {
+                const param = parameters[i].value;
+                // Use a placeholder for Captures and Tree nodes
+                // Inline everything else (strings, numbers, booleans) directly
+                if (param instanceof CaptureImpl || isTree(param)) {
                     const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
                     result += placeholder;
                 } else {
-                    result += parameters[i].value;
+                    result += param;
                 }
             }
         }
