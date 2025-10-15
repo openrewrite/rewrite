@@ -19,21 +19,17 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.trait.GradleDependency;
+import org.openrewrite.gradle.trait.GradleMultiDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -89,6 +85,7 @@ public class ChangeDependencyArtifactId extends Recipe {
         return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
@@ -111,160 +108,13 @@ public class ChangeDependencyArtifactId extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                m = GradleMultiDependency.matcher()
                         .configuration(configuration)
                         .groupId(groupId)
-                        .artifactId(artifactId);
-
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                    return m;
-                }
-
-                List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
-                    m = updateDependency(m);
-                } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           ("platform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()) ||
-                            "enforcedPlatform".equals(((J.MethodInvocation) depArgs.get(0)).getSimpleName()))) {
-                    m = m.withArguments(ListUtils.map(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
-                }
-
-                return m;
-            }
-
-            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
-                List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal) {
-                    String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                    if (gav != null) {
-                        Dependency dependency = Dependency.parse(gav);
-                        if (dependency != null && !newArtifactId.equals(dependency.getArtifactId())) {
-                            Dependency newDependency = dependency.withArtifactId(newArtifactId);
-                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
-                        }
-                    }
-                } else if (depArgs.get(0) instanceof G.GString) {
-                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
-                    if (strings.size() >= 2 &&
-                        strings.get(0) instanceof J.Literal) {
-                        J.Literal firstLiteral = (J.Literal) strings.get(0);
-                        String literalValue = (String) firstLiteral.getValue();
-                        if (literalValue != null) {
-                            // Preserve trailing colon if present (for version interpolation)
-                            boolean hasTrailingColon = literalValue.endsWith(":");
-                            String toParse = hasTrailingColon ? literalValue.substring(0, literalValue.length() - 1) : literalValue;
-
-                            // If there's no version part, add a dummy one for parsing
-                            String[] parts = toParse.split(":");
-                            if (parts.length == 2) {
-                                toParse = toParse + ":1.0"; // Add dummy version for parsing
-                            }
-
-                            Dependency dependency = Dependency.parse(toParse);
-                            if (dependency != null && !newArtifactId.equals(dependency.getArtifactId())) {
-                                // Reconstruct with new artifact ID, preserving original structure
-                                String replacementStr = dependency.getGroupId() + ":" + newArtifactId;
-                                if (hasTrailingColon) {
-                                    replacementStr += ":";
-                                }
-                                final String replacement = replacementStr;
-                                m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
-                                    G.GString gString = (G.GString) arg;
-                                    return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
-                                }));
-                            }
-                        }
-                    }
-                } else if (depArgs.get(0) instanceof G.MapEntry) {
-                    G.MapEntry artifactEntry = null;
-                    String groupId = null;
-                    String artifactId = null;
-
-                    String versionStringDelimiter = "'";
-                    for (Expression e : depArgs) {
-                        if (!(e instanceof G.MapEntry)) {
-                            continue;
-                        }
-                        G.MapEntry arg = (G.MapEntry) e;
-                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                            continue;
-                        }
-                        J.Literal key = (J.Literal) arg.getKey();
-                        J.Literal value = (J.Literal) arg.getValue();
-                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String keyValue = (String) key.getValue();
-                        String valueValue = (String) value.getValue();
-                        if ("group".equals(keyValue)) {
-                            groupId = valueValue;
-                        } else if ("name".equals(keyValue) && !newArtifactId.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
-                            artifactEntry = arg;
-                            artifactId = valueValue;
-                        }
-                    }
-                    if (groupId == null || artifactId == null) {
-                        return m;
-                    }
-                    String delimiter = versionStringDelimiter;
-                    G.MapEntry finalArtifact = artifactEntry;
-                    m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                        if (arg == finalArtifact) {
-                            return finalArtifact.withValue(((J.Literal) finalArtifact.getValue())
-                                    .withValue(newArtifactId)
-                                    .withValueSource(delimiter + newArtifactId + delimiter));
-                        }
-                        return arg;
-                    }));
-                } else if (depArgs.get(0) instanceof G.MapLiteral) {
-                    G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
-                    G.MapEntry artifactEntry = null;
-                    String groupId = null;
-                    String artifactId = null;
-
-                    String versionStringDelimiter = "'";
-                    for (G.MapEntry arg : map.getElements()) {
-                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                            continue;
-                        }
-                        J.Literal key = (J.Literal) arg.getKey();
-                        J.Literal value = (J.Literal) arg.getValue();
-                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                            continue;
-                        }
-                        String keyValue = (String) key.getValue();
-                        String valueValue = (String) value.getValue();
-                        if ("group".equals(keyValue)) {
-                            groupId = valueValue;
-                        } else if ("name".equals(keyValue) && !newArtifactId.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                versionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
-                            artifactEntry = arg;
-                            artifactId = valueValue;
-                        }
-                    }
-                    if (groupId == null || artifactId == null) {
-                        return m;
-                    }
-                    String delimiter = versionStringDelimiter;
-                    G.MapEntry finalArtifact = artifactEntry;
-                    m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        G.MapLiteral mapLiteral = (G.MapLiteral) arg;
-                        return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
-                            if (e == finalArtifact) {
-                                return finalArtifact.withValue(((J.Literal) finalArtifact.getValue())
-                                        .withValue(newArtifactId)
-                                        .withValueSource(delimiter + newArtifactId + delimiter));
-                            }
-                            return e;
-                        }));
-                    }));
-                }
-
+                        .artifactId(artifactId)
+                        .get(getCursor())
+                        .map(gmd -> gmd.map(gd -> gd.withDeclaredArtifactId(newArtifactId).getTree()))
+                        .orElse(m);
                 return m;
             }
 

@@ -171,6 +171,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         return resolvedDependency.getGav().asGroupArtifactVersion();
     }
 
+    @SuppressWarnings("unused")
     public ResolvedGroupArtifactVersion getResolvedGav() {
         return resolvedDependency.getGav();
     }
@@ -914,13 +915,20 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = gstring.getStrings();
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                String originalValue = (String) literal.getValue();
+                Dependency dep = Dependency.parse(originalValue);
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
                     Dependency updatedDep = dep.withGroupId(newGroupId);
                     String replacement = updatedDep.toStringNotation();
+                    // Preserve trailing colon if present (for version interpolation)
+                    if (originalValue.endsWith(":")) {
+                        replacement = replacement + ":";
+                    }
+                    // Update only the literal part, preserve the GString structure with the rest of the elements
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
+                    updated = m.withArguments(singletonList(updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
@@ -1040,13 +1048,20 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             List<J> strings = gstring.getStrings();
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
-                Dependency dep = Dependency.parse((String) literal.getValue());
+                String originalValue = (String) literal.getValue();
+                Dependency dep = Dependency.parse(originalValue);
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
                     Dependency updatedDep = dep.withArtifactId(newArtifactId);
                     String replacement = updatedDep.toStringNotation();
+                    // Preserve trailing colon if present (for version interpolation)
+                    if (originalValue.endsWith(":")) {
+                        replacement = replacement + ":";
+                    }
+                    // Update only the literal part, preserve the GString structure with the rest of the elements
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    G.GString updatedGString = gstring.withStrings(ListUtils.mapFirst(strings, s -> newLiteral));
+                    updated = m.withArguments(singletonList(updatedGString));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
