@@ -1,0 +1,552 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.gradle;
+
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.tree.Toml;
+
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateDependenciesToVersionCatalog.DependencyAccumulator> {
+
+    private static final Pattern DEPENDENCY_STRING_PATTERN = Pattern.compile("([^:]+):([^:]+):([^:@]+)(@.+)?");
+    private static final Pattern DEPENDENCY_MAP_PATTERN = Pattern.compile("group:\\s*['\"]([^'\"]+)['\"],\\s*name:\\s*['\"]([^'\"]+)['\"],\\s*version:\\s*['\"]([^'\"]+)['\"]");
+    private static final String CATALOG_PATH = "gradle/libs.versions.toml";
+
+    @Override
+    public String getDisplayName() {
+        return "Migrate Gradle project dependencies to version catalog";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Migrates Gradle project dependencies to use the version catalog feature.";
+    }
+
+    static class DependencyAccumulator {
+        final Map<String, DependencyInfo> dependencies = Collections.synchronizedMap(new LinkedHashMap<>());
+        final Set<String> configurations = Collections.synchronizedSet(new LinkedHashSet<>());
+        boolean catalogExists = false;
+    }
+
+    static class DependencyCoordinates {
+        String group;
+        String artifact;
+        String version;
+
+        boolean isComplete() {
+            return group != null && artifact != null && version != null;
+        }
+    }
+
+    static class DependencyInfo {
+        final String group;
+        final String artifact;
+        final String version;
+        final String configuration;
+
+        DependencyInfo(String group, String artifact, String version, String configuration) {
+            this.group = group;
+            this.artifact = artifact;
+            this.version = version;
+            this.configuration = configuration;
+        }
+
+        String getTomlAliasName() {
+            // Keep hyphenated names for TOML file
+            return artifact.toLowerCase()
+                    .replaceAll("[^a-z0-9-]", "-")
+                    .replaceAll("-+", "-")
+                    .replaceAll("^-|-$", "");
+        }
+
+        String getAliasName() {
+            // Convert to camelCase for use in build.gradle
+            String cleaned = getTomlAliasName();
+            String[] parts = cleaned.split("-");
+            StringBuilder result = new StringBuilder(parts[0]);
+            for (int i = 1; i < parts.length; i++) {
+                if (parts[i].length() > 0) {
+                    result.append(Character.toUpperCase(parts[i].charAt(0)));
+                    if (parts[i].length() > 1) {
+                        result.append(parts[i].substring(1));
+                    }
+                }
+            }
+            return result.toString();
+        }
+    }
+
+    @Override
+    public DependencyAccumulator getInitialValue(ExecutionContext ctx) {
+        return new DependencyAccumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(DependencyAccumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+
+                SourceFile sourceFile = (SourceFile) tree;
+
+                // Check if version catalog already exists
+                if (sourceFile.getSourcePath().toString().endsWith(CATALOG_PATH)) {
+                    acc.catalogExists = true;
+                    return tree;
+                }
+
+                // Scan Gradle files for dependencies
+                if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
+                    return new GroovyIsoVisitor<ExecutionContext>() {
+
+                        final MethodMatcher projectMatcher = new MethodMatcher("* project(..)");
+
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                            // Skip project dependencies - we don't migrate those
+                            if (projectMatcher.matches(m)) {
+                                return m;
+                            }
+
+                            // Check if this looks like a dependency configuration method
+                            // We check if it has arguments that could be dependencies
+                            String methodName = m.getSimpleName();
+                            if (m.getArguments() != null && !m.getArguments().isEmpty()) {
+                                // Check if the first argument is a dependency string or map notation
+                                Expression firstArg = m.getArguments().get(0);
+                                boolean looksLikeDependency = false;
+
+                                if (firstArg instanceof J.Literal) {
+                                    J.Literal literal = (J.Literal) firstArg;
+                                    if (literal.getValue() instanceof String) {
+                                        String value = (String) literal.getValue();
+                                        // Check if it matches dependency pattern
+                                        looksLikeDependency = DEPENDENCY_STRING_PATTERN.matcher(value).matches();
+                                    }
+                                } else if (firstArg instanceof G.MapEntry) {
+                                    // Map notation dependency
+                                    looksLikeDependency = true;
+                                }
+
+                                if (looksLikeDependency) {
+                                    acc.configurations.add(methodName);
+
+                                    // Check if all arguments together form a map notation dependency
+                                    DependencyCoordinates coords = new DependencyCoordinates();
+                                    boolean isMapNotation = false;
+
+                                    // Check for map entries (Groovy style: group: 'x', name: 'y', version: 'z')
+                                    for (Expression arg : m.getArguments()) {
+                                        if (arg instanceof G.MapEntry) {
+                                            isMapNotation = true;
+                                            G.MapEntry entry = (G.MapEntry) arg;
+                                            String key = extractStringValue(entry.getKey());
+                                            String value = extractStringValue(entry.getValue());
+                                            extractDependencyCoordinate(key, value, coords);
+                                        } else if (arg instanceof G.MapLiteral) {
+                                            // Alternative format: [group: 'x', name: 'y', version: 'z']
+                                            isMapNotation = true;
+                                            G.MapLiteral map = (G.MapLiteral) arg;
+                                            for (G.MapEntry entry : map.getElements()) {
+                                                String key = extractStringValue(entry.getKey());
+                                                String value = extractStringValue(entry.getValue());
+                                                extractDependencyCoordinate(key, value, coords);
+                                            }
+                                        }
+                                    }
+
+                                    if (isMapNotation && coords.isComplete()) {
+                                        String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
+                                        DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, methodName);
+                                        acc.dependencies.put(depKey, dep);
+                                    } else {
+                                        // Process regular string dependencies
+                                        for (Expression arg : m.getArguments()) {
+                                            extractDependency(arg, methodName, acc);
+                                        }
+                                    }
+                                }
+                            }
+
+                            return m;
+                        }
+                    }.visitNonNull(sourceFile, ctx);
+                }
+
+                return tree;
+            }
+        };
+    }
+
+    private String extractStringValue(Expression expr) {
+        if (expr instanceof J.Literal) {
+            J.Literal literal = (J.Literal) expr;
+            if (literal.getValue() instanceof String) {
+                return (String) literal.getValue();
+            }
+        } else if (expr instanceof J.Identifier) {
+            return ((J.Identifier) expr).getSimpleName();
+        }
+        return null;
+    }
+
+    private void extractDependencyCoordinate(String key, String value, DependencyCoordinates coords) {
+        if ("group".equals(key)) {
+            coords.group = value;
+        } else if ("name".equals(key)) {
+            coords.artifact = value;
+        } else if ("version".equals(key)) {
+            coords.version = value;
+        }
+    }
+
+    private void extractDependency(Expression arg, String configuration, DependencyAccumulator acc) {
+        if (arg instanceof J.Literal) {
+            J.Literal literal = (J.Literal) arg;
+            if (literal.getValue() instanceof String) {
+                String depString = (String) literal.getValue();
+                Matcher matcher = DEPENDENCY_STRING_PATTERN.matcher(depString);
+
+                if (matcher.matches()) {
+                    String group = matcher.group(1);
+                    String artifact = matcher.group(2);
+                    String version = matcher.group(3);
+                    String classifier = matcher.group(4);
+
+                    // Skip dependencies with classifiers/extensions as they are not supported in version catalogs
+                    if (classifier != null) {
+                        return;
+                    }
+
+                    DependencyInfo dep = new DependencyInfo(group, artifact, version, configuration);
+                    acc.dependencies.put(depString, dep);
+                }
+            }
+        } else if (arg instanceof G.MapLiteral) {
+            G.MapLiteral map = (G.MapLiteral) arg;
+            DependencyCoordinates coords = new DependencyCoordinates();
+
+            for (G.MapEntry entry : map.getElements()) {
+                String key = extractStringValue(entry.getKey());
+                String value = extractStringValue(entry.getValue());
+                extractDependencyCoordinate(key, value, coords);
+            }
+
+            if (coords.isComplete()) {
+                String key = coords.group + ":" + coords.artifact + ":" + coords.version;
+                DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, configuration);
+                acc.dependencies.put(key, dep);
+            }
+        }
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(DependencyAccumulator acc, ExecutionContext ctx) {
+        // Check if we should skip generation
+        if (acc.dependencies.isEmpty() || acc.catalogExists) {
+            return Collections.emptyList();
+        }
+
+        String tomlContent = generateVersionCatalogContent(acc);
+
+        TomlParser parser = TomlParser.builder().build();
+        Toml.Document versionCatalog = parser.parse(ctx, tomlContent)
+                .findFirst()
+                .map(sourceFile -> (Toml.Document) sourceFile)
+                .map(doc -> doc.withSourcePath(Paths.get(CATALOG_PATH)))
+                .orElseThrow(() -> new IllegalStateException("Failed to create version catalog file"));
+
+        return Collections.singletonList(versionCatalog);
+    }
+
+    private String generateVersionCatalogContent(DependencyAccumulator acc) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("[versions]\n");
+        Map<String, String> versionRefs = new LinkedHashMap<>();
+        Map<String, DependencyInfo> uniqueDeps = new LinkedHashMap<>();
+
+        // Collect unique dependencies preserving order
+        for (Map.Entry<String, DependencyInfo> entry : acc.dependencies.entrySet()) {
+            DependencyInfo dep = entry.getValue();
+            String key = dep.group + ":" + dep.artifact;
+            if (!uniqueDeps.containsKey(key)) {
+                uniqueDeps.put(key, dep);
+                String versionKey = dep.getTomlAliasName();
+                versionRefs.put(key, versionKey);
+                sb.append(versionKey).append(" = \"").append(dep.version).append("\"\n");
+            }
+        }
+
+        sb.append("\n[libraries]\n");
+
+        // Generate libraries in same order
+        for (Map.Entry<String, DependencyInfo> entry : uniqueDeps.entrySet()) {
+            DependencyInfo dep = entry.getValue();
+            String alias = dep.getTomlAliasName(); // Use hyphenated name in TOML
+            String versionRef = versionRefs.get(entry.getKey());
+
+            sb.append(alias).append(" = { ");
+            sb.append("group = \"").append(dep.group).append("\", ");
+            sb.append("name = \"").append(dep.artifact).append("\", ");
+            sb.append("version.ref = \"").append(versionRef).append("\"");
+            sb.append(" }\n");
+        }
+
+        return sb.toString();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(DependencyAccumulator acc) {
+        // If accumulator is empty, don't make changes
+        if (acc.dependencies.isEmpty()) {
+            return TreeVisitor.noop();
+        }
+
+        return new GroovyIsoVisitor<ExecutionContext>() {
+            final MethodMatcher projectMatcher = new MethodMatcher("* project(..)");
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                // Skip project dependencies
+                if (projectMatcher.matches(m)) {
+                    return m;
+                }
+
+                // Process method invocations that have arguments and are in our accumulator
+                if (m.getArguments() != null && !m.getArguments().isEmpty()) {
+                    String methodName = m.getSimpleName();
+
+                    // Check if this method was identified as a dependency configuration
+                    if (acc.configurations.contains(methodName)) {
+                        // Check for map notation dependency
+                        DependencyCoordinates coords = new DependencyCoordinates();
+                        boolean isMapNotation = false;
+
+                        for (Expression arg : m.getArguments()) {
+                            if (arg instanceof G.MapEntry) {
+                                isMapNotation = true;
+                                G.MapEntry entry = (G.MapEntry) arg;
+                                String key = extractStringValue(entry.getKey());
+                                String value = extractStringValue(entry.getValue());
+                                extractDependencyCoordinate(key, value, coords);
+                            }
+                        }
+
+                        if (isMapNotation && coords.isComplete()) {
+                            String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
+                            DependencyInfo dep = acc.dependencies.get(depKey);
+
+                            if (dep != null) {
+                                // Replace all map entries with a single field access for the catalog with OmitParentheses marker
+                                // Preserve the prefix space from the first argument
+                                Space prefixSpace = m.getArguments().isEmpty() ? Space.EMPTY : m.getArguments().get(0).getPrefix();
+
+                                J.Identifier libs = new J.Identifier(
+                                        Tree.randomId(),
+                                        Space.EMPTY,
+                                        Markers.EMPTY,
+                                        Collections.emptyList(),
+                                        "libs",
+                                        null,
+                                        null
+                                );
+
+                                J.FieldAccess catalogRef = new J.FieldAccess(
+                                        Tree.randomId(),
+                                        prefixSpace,  // Preserve the space before the first argument
+                                        new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId()))),
+                                        libs,
+                                        new JLeftPadded<>(
+                                                Space.EMPTY,
+                                                new J.Identifier(
+                                                        Tree.randomId(),
+                                                        Space.EMPTY,
+                                                        Markers.EMPTY,
+                                                        Collections.emptyList(),
+                                                        dep.getAliasName(),
+                                                        null,
+                                                        null
+                                                ),
+                                                Markers.EMPTY
+                                        ),
+                                        null
+                                );
+
+                                m = m.withArguments(Collections.singletonList(catalogRef));
+                            }
+                        } else {
+                            // Handle regular string dependencies
+                            List<Expression> newArgs = new ArrayList<>();
+                            boolean changed = false;
+
+                            for (Expression arg : m.getArguments()) {
+                                Expression newArg = transformDependencyToVersionCatalog(arg, m, acc);
+                                if (newArg != arg) {
+                                    changed = true;
+                                }
+                                newArgs.add(newArg);
+                            }
+
+                            if (changed) {
+                                m = m.withArguments(newArgs);
+                            }
+                        }
+                    }
+                }
+
+                return m;
+            }
+
+            private Expression transformDependencyToVersionCatalog(Expression arg, J.MethodInvocation methodInvocation, DependencyAccumulator acc) {
+                if (arg instanceof J.Literal) {
+                    J.Literal literal = (J.Literal) arg;
+                    if (literal.getValue() instanceof String) {
+                        String depString = (String) literal.getValue();
+                        DependencyInfo dep = acc.dependencies.get(depString);
+
+                        if (dep != null) {
+                            // Create proper field access with OmitParentheses marker for Groovy DSL
+                            // Keep the original argument's prefix space for proper formatting
+                            // Only omit parentheses if this is the only argument (no closure/lambda following)
+                            boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
+
+                            J.Identifier libs = new J.Identifier(
+                                    Tree.randomId(),
+                                    Space.EMPTY,
+                                    Markers.EMPTY,
+                                    Collections.emptyList(),
+                                    "libs",
+                                    null,
+                                    null
+                            );
+
+                            Markers markers = hasMultipleArgs ?
+                                    Markers.EMPTY :
+                                    new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+
+                            return new J.FieldAccess(
+                                    Tree.randomId(),
+                                    literal.getPrefix(),  // Preserve the space before the argument
+                                    markers,
+                                    libs,
+                                    new JLeftPadded<>(
+                                            Space.EMPTY,
+                                            new J.Identifier(
+                                                    Tree.randomId(),
+                                                    Space.EMPTY,
+                                                    Markers.EMPTY,
+                                                    Collections.emptyList(),
+                                                    dep.getAliasName(),
+                                                    null,
+                                                    null
+                                            ),
+                                            Markers.EMPTY
+                                    ),
+                                    null
+                            );
+                        }
+                    }
+                } else if (arg instanceof G.MapLiteral) {
+                    // Handle map notation - transform to catalog reference
+                    G.MapLiteral map = (G.MapLiteral) arg;
+                    DependencyCoordinates coords = new DependencyCoordinates();
+
+                    for (G.MapEntry entry : map.getElements()) {
+                        String key = extractStringValue(entry.getKey());
+                        String value = extractStringValue(entry.getValue());
+                        extractDependencyCoordinate(key, value, coords);
+                    }
+
+                    if (coords.isComplete()) {
+                        String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
+                        DependencyInfo dep = acc.dependencies.get(depKey);
+
+                        if (dep != null) {
+                            // Create a field access for the catalog reference with OmitParentheses marker
+                            // Keep the original argument's prefix space for proper formatting
+                            // Only omit parentheses if this is the only argument (no closure/lambda following)
+                            boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
+
+                            J.Identifier libs = new J.Identifier(
+                                    Tree.randomId(),
+                                    Space.EMPTY,
+                                    Markers.EMPTY,
+                                    Collections.emptyList(),
+                                    "libs",
+                                    null,
+                                    null
+                            );
+
+                            Markers markers = hasMultipleArgs ?
+                                    Markers.EMPTY :
+                                    new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+
+                            return new J.FieldAccess(
+                                    Tree.randomId(),
+                                    map.getPrefix(),  // Preserve the space before the argument
+                                    markers,
+                                    libs,
+                                    new JLeftPadded<>(
+                                            Space.EMPTY,
+                                            new J.Identifier(
+                                                    Tree.randomId(),
+                                                    Space.EMPTY,
+                                                    Markers.EMPTY,
+                                                    Collections.emptyList(),
+                                                    dep.getAliasName(),
+                                                    null,
+                                                    null
+                                            ),
+                                            Markers.EMPTY
+                                    ),
+                                    null
+                            );
+                        }
+                    }
+                }
+
+                return arg;
+            }
+        };
+    }
+}
