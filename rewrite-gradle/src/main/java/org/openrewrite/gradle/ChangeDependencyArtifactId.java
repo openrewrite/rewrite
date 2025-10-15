@@ -114,7 +114,6 @@ public class ChangeDependencyArtifactId extends Recipe {
                         .get(getCursor())
                         .map(gmd -> gmd.map(gd -> gd.withDeclaredArtifactId(newArtifactId).getTree()))
                         .orElse(m);
-                return m;
             }
 
             private GradleProject updateGradleModel(GradleProject gp) {
