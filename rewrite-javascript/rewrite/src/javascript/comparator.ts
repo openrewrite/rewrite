@@ -27,7 +27,7 @@ export class JavaScriptComparatorVisitor extends JavaScriptVisitor<J> {
     /**
      * Flag indicating whether the trees match so far
      */
-    private match: boolean = true;
+    protected match: boolean = true;
 
     /**
      * Creates a new comparator visitor.

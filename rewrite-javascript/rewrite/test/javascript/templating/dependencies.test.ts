@@ -316,14 +316,15 @@ describe('template dependencies integration', () => {
 
     test('rewrite with type-aware pattern prevents false positives - isDate', async () => {
         // Test that rewrite() only replaces util.isDate() from the util module,
-        // not custom isDate() methods on other objects
+        // not custom isDate() methods on other objects.
+        // A single pattern with type attribution should match BOTH isDate(x) and util.isDate(x)
         const spec = new RecipeSpec();
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 const dateArg = capture('dateArg');
-                // Pattern 1: matches imported isDate (e.g., isDate(value))
-                const replaceImportedIsDate = rewrite(() => ({
+                // Single pattern that matches both isDate(x) and util.isDate(x) via type attribution
+                const replaceIsDate = rewrite(() => ({
                     before: pattern`isDate(${dateArg})`.configure({
                         imports: ['import { isDate } from "util"'],
                         dependencies: { '@types/node': '^20.0.0' }
@@ -331,19 +332,7 @@ describe('template dependencies integration', () => {
                     after: template`${dateArg} instanceof Date`
                 }));
 
-                // Pattern 2: matches util.isDate (e.g., util.isDate(value))
-                const replaceUtilIsDate = rewrite(() => ({
-                    before: pattern`util.isDate(${dateArg})`.configure({
-                        imports: ['import * as util from "util"'],
-                        dependencies: { '@types/node': '^20.0.0' }
-                    }),
-                    after: template`${dateArg} instanceof Date`
-                }));
-
-                // Try both patterns
-                return await replaceImportedIsDate.tryOn(this.cursor, method) ||
-                       await replaceUtilIsDate.tryOn(this.cursor, method) ||
-                       method;
+                return await replaceIsDate.tryOn(this.cursor, method) || method;
             }
         });
 

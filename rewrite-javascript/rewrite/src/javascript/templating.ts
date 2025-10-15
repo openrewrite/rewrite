@@ -277,6 +277,8 @@ class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVis
 
     /**
      * Override method invocation comparison to include type attribution checking.
+     * When types match semantically, we allow matching even if one has a receiver
+     * and the other doesn't (e.g., `isDate(x)` vs `util.isDate(x)`).
      */
     override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
         if (other.kind !== J.Kind.MethodInvocation) {
@@ -300,18 +302,49 @@ class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVis
                 return method;
             }
             // If neither has type, fall through to structural comparison
-        } else {
-            // Both have types - check they match semantically
-            const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
-            if (!typesMatch) {
-                // Types don't match - abort comparison
+            return super.visitMethodInvocation(method, other);
+        }
+
+        // Both have types - check they match semantically
+        const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
+        if (!typesMatch) {
+            // Types don't match - abort comparison
+            this.abort();
+            return method;
+        }
+
+        // Types match! Now we can ignore receiver differences and just compare arguments.
+        // This allows pattern `isDate(x)` to match both `isDate(x)` and `util.isDate(x)`
+        // when they have the same type attribution.
+
+        // Compare type parameters
+        if ((method.typeParameters === undefined) !== (otherMethod.typeParameters === undefined)) {
+            this.abort();
+            return method;
+        }
+
+        if (method.typeParameters && otherMethod.typeParameters) {
+            if (method.typeParameters.elements.length !== otherMethod.typeParameters.elements.length) {
                 this.abort();
                 return method;
             }
+            for (let i = 0; i < method.typeParameters.elements.length; i++) {
+                await this.visit(method.typeParameters.elements[i].element, otherMethod.typeParameters.elements[i].element);
+                if (!this.match) return method;
+            }
         }
 
-        // Continue with structural comparison
-        return super.visitMethodInvocation(method, other);
+        // Compare name (already checked simpleName above, but visit for markers/prefix)
+        await this.visit(method.name, otherMethod.name);
+        if (!this.match) return method;
+
+        // Compare arguments
+        for (let i = 0; i < method.arguments.elements.length; i++) {
+            await this.visit(method.arguments.elements[i].element, otherMethod.arguments.elements[i].element);
+            if (!this.match) return method;
+        }
+
+        return method;
     }
 
     /**
