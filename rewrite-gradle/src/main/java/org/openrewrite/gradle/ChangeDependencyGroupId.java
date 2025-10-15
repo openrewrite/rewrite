@@ -114,7 +114,6 @@ public class ChangeDependencyGroupId extends Recipe {
                         .get(getCursor())
                         .map(gmd -> gmd.map(gd -> gd.withDeclaredGroupId(newGroupId).getTree()))
                         .orElse(m);
-                return m;
             }
 
             private GradleProject updateGradleModel(GradleProject gp) {
