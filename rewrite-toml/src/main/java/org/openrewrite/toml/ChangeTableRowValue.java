@@ -29,7 +29,6 @@ import org.openrewrite.toml.tree.TomlValue;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = false)

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
 
@@ -137,15 +138,11 @@ public class ReplaceTableRow extends Recipe {
                 }
 
                 // Replace with incoming key-values, preserving the prefix from the first existing value
-                org.openrewrite.toml.tree.Space firstPrefix = table.getValues().isEmpty() ?
-                    org.openrewrite.toml.tree.Space.format("\n") :
-                    table.getValues().get(0).getPrefix();
+                Space firstPrefix = table.getValues().isEmpty() ? Space.format("\n") : table.getValues().get(0).getPrefix();
 
                 for (int i = 0; i < incomingKeyValues.size(); i++) {
                     Toml.KeyValue incomingKv = incomingKeyValues.get(i);
-                    Toml.KeyValue kvToAdd = i == 0 ?
-                        incomingKv.withPrefix(firstPrefix) :
-                        incomingKv.withPrefix(org.openrewrite.toml.tree.Space.format("\n"));
+                    Toml.KeyValue kvToAdd = i == 0 ? incomingKv.withPrefix(firstPrefix) : incomingKv.withPrefix(Space.format("\n"));
                     newValues.add(kvToAdd);
                 }
 
