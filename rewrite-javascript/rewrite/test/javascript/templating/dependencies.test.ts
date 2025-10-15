@@ -13,10 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {JavaScriptParser, JavaScriptVisitor} from "../../../src/javascript";
-import {pattern, template, MethodMatcher} from "../../../src/javascript";
+import {
+    capture,
+    JavaScriptParser,
+    JavaScriptVisitor,
+    MethodMatcher,
+    npm,
+    packageJson,
+    pattern,
+    rewrite,
+    template,
+    typescript
+} from "../../../src/javascript";
 import {DependencyWorkspace} from "../../../src/javascript/dependency-workspace";
 import {J} from "../../../src/java";
+import {fromVisitor, RecipeSpec} from "../../../src/test";
+import * as path from "path";
+import * as os from "os";
 
 describe('template dependencies integration', () => {
 
@@ -188,6 +201,211 @@ describe('template dependencies integration', () => {
         }).visit(cu, undefined);
 
         expect(checkedMethodType).toBe(true);
+    }, 60000);
+
+    test('pattern with dependencies does not match when types differ', async () => {
+        // Create a pattern that matches v1() from uuid with proper dependencies
+        const pat = pattern`v1()`.configure({
+            imports: ['import { v1 } from "uuid"'],
+            dependencies: { '@types/uuid': '^9.0.0' }
+        });
+
+        // Parse test code that has a v1() call from a DIFFERENT type (custom class)
+        const testCode = `
+            class CustomUuid {
+                v1() {
+                    return 'custom';
+                }
+            }
+            const uuid = new CustomUuid();
+            const id = uuid.v1();
+        `;
+
+        // Create workspace for parsing the test code
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({ '@types/uuid': '^9.0.0' });
+
+        const parser = new JavaScriptParser({relativeTo: workspaceDir});
+        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value;
+
+        // Verify the pattern does NOT match the custom v1() call
+        let foundV1Call = false;
+        let patternMatched = false;
+        await (new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                if (method.name.simpleName === 'v1') {
+                    foundV1Call = true;
+                    // The pattern should NOT match because the types are different
+                    const match = await pat.match(method);
+                    if (match) {
+                        patternMatched = true;
+                    }
+                }
+                return method;
+            }
+        }).visit(cu, undefined);
+
+        // We should have found a v1() call
+        expect(foundV1Call).toBe(true);
+        // But the pattern should NOT have matched (different type)
+        expect(patternMatched).toBe(false);
+    }, 60000);
+
+    test('pattern with dependencies matches when types are correct', async () => {
+        // Create a pattern that matches v1() from uuid with proper dependencies
+        const pat = pattern`v1()`.configure({
+            imports: ['import { v1 } from "uuid"'],
+            dependencies: { '@types/uuid': '^9.0.0' }
+        });
+
+        // Parse test code that has a v1() call from the CORRECT type (uuid module)
+        const testCode = `
+            import { v1 } from 'uuid';
+            const id = v1();
+        `;
+
+        // Create workspace for parsing the test code
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({ '@types/uuid': '^9.0.0' });
+
+        const parser = new JavaScriptParser({relativeTo: workspaceDir});
+        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value;
+
+        // Verify the pattern DOES match the uuid v1() call
+        let foundV1Call = false;
+        let patternMatched = false;
+        await (new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                if (method.name.simpleName === 'v1') {
+                    foundV1Call = true;
+                    // The pattern SHOULD match because the types are the same
+                    const match = await pat.match(method);
+                    if (match) {
+                        patternMatched = true;
+                    }
+                }
+                return method;
+            }
+        }).visit(cu, undefined);
+
+        // We should have found a v1() call
+        expect(foundV1Call).toBe(true);
+        // And the pattern SHOULD have matched (same type)
+        expect(patternMatched).toBe(true);
+    }, 60000);
+
+    test('rewrite with type-aware pattern swaps operands', async () => {
+        // Simple test showing rewrite() with type-aware patterns
+        // This builds on the existing functionality to ensure our semantic equality checking works
+        const spec = new RecipeSpec();
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const swapOperands = rewrite(() => ({
+                    before: pattern`${capture('left')} + ${capture('right')}`,
+                    after: template`${capture('right')} + ${capture('left')}`
+                }));
+                return await swapOperands.tryOn(this.cursor, binary);
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;')
+        );
+    }, 60000);
+
+    test('rewrite with type-aware pattern prevents false positives - isDate', async () => {
+        // Test that rewrite() only replaces util.isDate() from the util module,
+        // not custom isDate() methods on other objects
+        const spec = new RecipeSpec();
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                const dateArg = capture('dateArg');
+                // Pattern 1: matches imported isDate (e.g., isDate(value))
+                const replaceImportedIsDate = rewrite(() => ({
+                    before: pattern`isDate(${dateArg})`.configure({
+                        imports: ['import { isDate } from "util"'],
+                        dependencies: { '@types/node': '^20.0.0' }
+                    }),
+                    after: template`${dateArg} instanceof Date`
+                }));
+
+                // Pattern 2: matches util.isDate (e.g., util.isDate(value))
+                const replaceUtilIsDate = rewrite(() => ({
+                    before: pattern`util.isDate(${dateArg})`.configure({
+                        imports: ['import * as util from "util"'],
+                        dependencies: { '@types/node': '^20.0.0' }
+                    }),
+                    after: template`${dateArg} instanceof Date`
+                }));
+
+                // Try both patterns
+                return await replaceImportedIsDate.tryOn(this.cursor, method) ||
+                       await replaceUtilIsDate.tryOn(this.cursor, method) ||
+                       method;
+            }
+        });
+
+        const tempDir = path.join(os.tmpdir(), `test-${Date.now()}`);
+
+        return spec.rewriteRun(
+            npm(tempDir,
+                packageJson(JSON.stringify({
+                    "name": "test",
+                    "dependencies": {
+                        "@types/node": "^20.0.0"
+                    }
+                }, null, 2)),
+                // language=typescript
+                typescript(
+                    `
+                    import { isDate } from 'util';
+                    import * as util from 'util';
+
+                    class CustomValidator {
+                        isDate(value: any) {
+                            return typeof value === 'string';
+                        }
+                    }
+
+                    const validator = new CustomValidator();
+                    const value = new Date();
+
+                    // This should be replaced (from util module via named import)
+                    const isRealDate1 = isDate(value);
+
+                    // This should be replaced (from util module via namespace import)
+                    const isRealDate2 = util.isDate(new Date());
+
+                    // This should NOT be replaced (custom method)
+                    const isCustomDate = validator.isDate(value);
+                    `,
+                    `
+                    import { isDate } from 'util';
+                    import * as util from 'util';
+
+                    class CustomValidator {
+                        isDate(value: any) {
+                            return typeof value === 'string';
+                        }
+                    }
+
+                    const validator = new CustomValidator();
+                    const value = new Date();
+
+                    // This should be replaced (from util module via named import)
+                    const isRealDate1 = value instanceof Date;
+
+                    // This should be replaced (from util module via namespace import)
+                    const isRealDate2 = new Date() instanceof Date;
+
+                    // This should NOT be replaced (custom method)
+                    const isCustomDate = validator.isDate(value);
+                    `
+                )
+            )
+        );
     }, 60000);
 });
 

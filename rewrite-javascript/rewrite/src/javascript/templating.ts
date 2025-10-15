@@ -17,7 +17,7 @@ import {JS} from '.';
 import {JavaScriptParser} from './parser';
 import {JavaScriptVisitor} from './visitor';
 import {Cursor, isTree, Tree} from '..';
-import {J} from '../java';
+import {J, Type} from '../java';
 import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
 
@@ -236,6 +236,116 @@ export class MatchResult implements Pick<Map<string, J>, "get"> {
 }
 
 /**
+ * A comparator visitor that checks semantic equality including type attribution.
+ * This ensures that patterns only match code with compatible types, not just
+ * structurally similar code.
+ */
+class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVisitor {
+    /**
+     * Checks if two types are semantically equal.
+     * For method types, this checks that the declaring type and method name match.
+     */
+    private isOfType(target?: Type, source?: Type): boolean {
+        if (!target || !source) {
+            return target === source;
+        }
+
+        if (target.kind !== source.kind) {
+            return false;
+        }
+
+        // For method types, check declaring type
+        // Note: We don't check the name field because it might not be fully resolved in patterns
+        // The method invocation visitor already checks that simple names match
+        if (target.kind === Type.Kind.Method && source.kind === Type.Kind.Method) {
+            const targetMethod = target as Type.Method;
+            const sourceMethod = source as Type.Method;
+
+            // Only check that declaring types match
+            return this.isOfType(targetMethod.declaringType, sourceMethod.declaringType);
+        }
+
+        // For fully qualified types, check the fully qualified name
+        if (Type.isFullyQualified(target) && Type.isFullyQualified(source)) {
+            return Type.FullyQualified.getFullyQualifiedName(target) ===
+                   Type.FullyQualified.getFullyQualifiedName(source);
+        }
+
+        // Default: types are equal if they're the same kind
+        return true;
+    }
+
+    /**
+     * Override method invocation comparison to include type attribution checking.
+     */
+    override async visitMethodInvocation(method: J.MethodInvocation, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.MethodInvocation) {
+            return method;
+        }
+
+        const otherMethod = other as J.MethodInvocation;
+
+        // Check basic structural equality first
+        if (method.name.simpleName !== otherMethod.name.simpleName ||
+            method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+            return method;
+        }
+
+        // Check type attribution
+        // Both must have method types for semantic equality
+        if (!method.methodType || !otherMethod.methodType) {
+            // If template has type but target doesn't, they don't match
+            if (method.methodType || otherMethod.methodType) {
+                this.abort();
+                return method;
+            }
+            // If neither has type, fall through to structural comparison
+        } else {
+            // Both have types - check they match semantically
+            const typesMatch = this.isOfType(method.methodType, otherMethod.methodType);
+            if (!typesMatch) {
+                // Types don't match - abort comparison
+                this.abort();
+                return method;
+            }
+        }
+
+        // Continue with structural comparison
+        return super.visitMethodInvocation(method, other);
+    }
+
+    /**
+     * Override identifier comparison to include type checking for field access.
+     */
+    override async visitIdentifier(identifier: J.Identifier, other: J): Promise<J | undefined> {
+        if (other.kind !== J.Kind.Identifier) {
+            return identifier;
+        }
+
+        const otherIdentifier = other as J.Identifier;
+
+        // Check name matches
+        if (identifier.simpleName !== otherIdentifier.simpleName) {
+            return identifier;
+        }
+
+        // For identifiers with field types, check type attribution
+        if (identifier.fieldType && otherIdentifier.fieldType) {
+            if (!this.isOfType(identifier.fieldType, otherIdentifier.fieldType)) {
+                this.abort();
+                return identifier;
+            }
+        } else if (identifier.fieldType || otherIdentifier.fieldType) {
+            // If only one has a type, they don't match
+            this.abort();
+            return identifier;
+        }
+
+        return super.visitIdentifier(identifier, other);
+    }
+}
+
+/**
  * Matcher for checking if a pattern matches an AST node and extracting captured nodes.
  */
 class Matcher {
@@ -301,7 +411,7 @@ class Matcher {
         }
 
         const matcher = this;
-        return await ((new class extends JavaScriptComparatorVisitor {
+        return await ((new class extends JavaScriptTemplateSemanticallyEqualVisitor {
             protected hasSameKind(j: J, other: J): boolean {
                 return super.hasSameKind(j, other) || j.kind == J.Kind.Identifier && this.matchesParameter(j as J.Identifier, other);
             }
@@ -921,6 +1031,15 @@ class TemplateProcessor {
  * Represents a replacement rule that can match a pattern and apply a template.
  */
 export interface RewriteRule {
+    /**
+     * Attempts to apply this rewrite rule to the given AST node.
+     *
+     * @param cursor The cursor context at the current position in the AST
+     * @param node The AST node to try matching and transforming
+     * @returns The transformed node if a pattern matched, or `undefined` if no pattern matched.
+     *          When using in a visitor, always use the `|| node` pattern to return the original
+     *          node when there's no match: `return await rule.tryOn(this.cursor, node) || node;`
+     */
     tryOn(cursor: Cursor, node: J): Promise<J | undefined>;
 }
 
@@ -967,20 +1086,33 @@ class RewriteRuleImpl implements RewriteRule {
  *
  * @example
  * // Single pattern
- * const swapOperands = replace<J.Binary>(() => ({
+ * const swapOperands = rewrite(() => ({
  *     before: pattern`${"left"} + ${"right"}`,
  *     after: template`${"right"} + ${"left"}`
  * }));
  *
  * @example
  * // Multiple patterns
- * const normalizeComparisons = replace<J.Binary>(() => ({
+ * const normalizeComparisons = rewrite(() => ({
  *     before: [
  *         pattern`${"left"} == ${"right"}`,
  *         pattern`${"left"} === ${"right"}`
  *     ],
  *     after: template`${"left"} === ${"right"}`
  * }));
+ *
+ * @example
+ * // Using in a visitor - IMPORTANT: use `|| node` to handle undefined when no match
+ * class MyVisitor extends JavaScriptVisitor<any> {
+ *     override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+ *         const rule = rewrite(() => ({
+ *             before: pattern`${capture('a')} + ${capture('b')}`,
+ *             after: template`${capture('b')} + ${capture('a')}`
+ *         }));
+ *         // tryOn() returns undefined if no pattern matches, so always use || node
+ *         return await rule.tryOn(this.cursor, binary) || binary;
+ *     }
+ * }
  */
 export function rewrite(
     builderFn: () => RewriteConfig
