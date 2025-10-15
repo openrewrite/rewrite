@@ -263,4 +263,48 @@ class ReplaceTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotReplaceInDifferentTable() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceTableRow(
+            "package.contributors",
+            "name = \"Alice Smith\"\nemail = \"alice.new@example.com\"",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              role = "maintainer"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              role = "maintainer"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              role = "developer"
+              """,
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice.new@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              role = "maintainer"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              role = "developer"
+              """
+          )
+        );
+    }
 }

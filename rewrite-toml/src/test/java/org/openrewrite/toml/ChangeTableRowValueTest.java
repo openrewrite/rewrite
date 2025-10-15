@@ -298,4 +298,46 @@ class ChangeTableRowValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotChangeValueInDifferentTable() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTableRowValue(
+            "package.contributors",
+            "name",
+            "Alice Smith",
+            null,
+            "email",
+            "\"alice.new@example.com\""
+          )),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              """,
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice.new@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              """
+          )
+        );
+    }
 }

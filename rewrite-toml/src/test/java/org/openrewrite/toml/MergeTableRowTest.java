@@ -271,4 +271,43 @@ class MergeTableRowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotMergeIntoDifferentTable() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeTableRow(
+            "package.contributors",
+            "name = \"Alice Smith\"\nemail = \"alice.new@example.com\"",
+            "name"
+          )),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              """,
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice.new@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+              """
+          )
+        );
+    }
 }

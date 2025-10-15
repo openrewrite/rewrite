@@ -27,7 +27,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void deleteMatchingTableRow() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("name", "Bob Johnson", null)),
+          spec -> spec.recipe(new DeleteTableRow("package.contributors", "name", "Bob Johnson", null)),
           toml(
             """
               [[package.contributors]]
@@ -58,7 +58,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void deleteMultipleMatchingRows() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("role", "developer", null)),
+          spec -> spec.recipe(new DeleteTableRow("team", "role", "developer", null)),
           toml(
             """
               [[team]]
@@ -85,7 +85,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void deleteWithRegexPattern() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("email", ".*@example\\.com", true)),
+          spec -> spec.recipe(new DeleteTableRow("users","email", ".*@example\\.com", true)),
           toml(
             """
               [[users]]
@@ -112,7 +112,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void noMatchDoesNotDelete() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("name", "NonExistent", null)),
+          spec -> spec.recipe(new DeleteTableRow("contributors", "name", "NonExistent", null)),
           toml(
             """
               [[contributors]]
@@ -130,7 +130,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void deleteFirstTableRow() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("version", "1.0.0", null)),
+          spec -> spec.recipe(new DeleteTableRow("dependencies", "version", "1.0.0", null)),
           toml(
             """
               [[dependencies]]
@@ -153,7 +153,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void deleteLastTableRow() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("version", "2.0.0", null)),
+          spec -> spec.recipe(new DeleteTableRow("dependencies", "version", "2.0.0", null)),
           toml(
             """
               [[dependencies]]
@@ -176,7 +176,7 @@ class DeleteTableRowTest implements RewriteTest {
     @Test
     void regexMatchesPartialString() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteTableRow("description", ".*deprecated.*", true)),
+          spec -> spec.recipe(new DeleteTableRow("plugins", "description", ".*deprecated.*", true)),
           toml(
             """
               [[plugins]]
@@ -199,6 +199,37 @@ class DeleteTableRowTest implements RewriteTest {
               [[plugins]]
               name = "plugin-c"
               description = "Another active plugin"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDeleteFromDifferentTable() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteTableRow("package.contributors", "name", "Alice Smith", null)),
+          toml(
+            """
+              [[package.contributors]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              role = "developer"
+              """,
+            """
+              [[package.maintainers]]
+              name = "Alice Smith"
+              email = "alice@example.com"
+
+              [[team.members]]
+              name = "Alice Smith"
+              role = "developer"
               """
           )
         );
