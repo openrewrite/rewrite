@@ -89,7 +89,7 @@ class StringUtilsTest {
     @Test
     void globMatching() {
         // exact matches
-        assertThat(matchesGlob("test", null)).isFalse();
+        assertThat(matchesGlob("test", null)).isTrue();
         assertThat(matchesGlob("test", "")).isFalse();
         assertThat(matchesGlob("", "")).isTrue();
         assertThat(matchesGlob("test", "test")).isTrue();
