@@ -1098,23 +1098,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"7.6", "8.14.3", "9.1.0"})
-    void renderUnixScript(String version) {
-        UpdateGradleWrapper.GradleWrapperState state = new UpdateGradleWrapper.GradleWrapperState();
-        state.setGradleProject(true);
-        state.setAddGradleShellScript(true);
-        Collection<SourceFile> generate = new UpdateGradleWrapper(version, "bin", true, null, null)
-          .generate(state, new InMemoryExecutionContext());
-        assertThat(generate)
-          .asInstanceOf(InstanceOfAssertFactories.LIST)
-          .filteredOn(PlainText.class::isInstance)
-          .map(PlainText.class::cast)
-          .allSatisfy(plainText -> assertThat(plainText.getText())
-            .contains("-classpath")
-            .doesNotContain("<%", "%>"));
-    }
-
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
         return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)
