@@ -108,4 +108,5 @@ configure<LicenseExtension> {
 tasks.register<JavaExec>("syncWrapperScripts") {
     classpath = sourceSets.test.get().runtimeClasspath + sourceSets.test.get().output
     mainClass = "org.openrewrite.gradle.internal.GradleWrapperScriptDownloader"
+    workingDir = project.rootDir
 }

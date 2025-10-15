@@ -43,7 +43,6 @@ import java.util.*;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
-import static org.openrewrite.gradle.internal.GradleWrapperScriptGenerator.*;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
@@ -403,13 +402,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     private String unixScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
-        return renderTemplate(gradlewTemplate, unixBindings(gradleWrapper.getVersion()), "\n");
+        return StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\n");
     }
 
     private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
-        return renderTemplate(gradlewBatTemplate, windowsBindings(gradleWrapper.getVersion()), "\r\n");
+        return StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\r\n");
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

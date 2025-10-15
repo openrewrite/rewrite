@@ -22,6 +22,8 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -41,10 +43,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.Adler32;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static org.openrewrite.Result.diff;
-import static org.openrewrite.gradle.internal.GradleWrapperScriptGenerator.*;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
 
@@ -87,12 +88,12 @@ public class GradleWrapperScriptDownloader {
                 GradleWrapper wrapper = new GradleWrapper(v, infos);
 
                 // download
-                String gradlew = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
-                String gradlewBat = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
+                String gradlewTemplate = downloadScript(WRAPPER_SCRIPT_LOCATION, wrapper, "unix", ctx);
+                String gradlewBatTemplate = downloadScript(WRAPPER_BATCH_LOCATION, wrapper, "windows", ctx);
 
                 // validate
-                validateTemplate("unix", gradlew, unixBindings(wrapper.getVersion()), "\n");
-                validateTemplate("windows", gradlewBat, windowsBindings(wrapper.getVersion()), "\r\n");
+                String gradlew = renderTemplate(gradlewTemplate, unixBindings(wrapper.getVersion()), "\n");
+                String gradlewBat = renderTemplate(gradlewBatTemplate, windowsBindings(wrapper.getVersion()), "\r\n");
 
                 // checksum
                 String gradlewChecksum = hash("unix", gradlew);
@@ -146,17 +147,66 @@ public class GradleWrapperScriptDownloader {
         return StringUtils.readFully(is);
     }
 
-    private static void validateTemplate(String os, String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
+    private static Map<String, String> unixBindings(String gradleVersion) {
+        Map<String, String> binding = defaultBindings();
+        String defaultJvmOpts = defaultJvmOpts(gradleVersion);
+        binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
+        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
+            binding.put("classpath", "\"\\\\\\\\\\\"\\\\\\\\\\\"\"");
+            binding.put("entryPointArgs", "-jar \"$APP_HOME/gradle/wrapper/gradle-wrapper.jar\"");
+            binding.put("mainClassName", "");
+        } else {
+            binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
+            binding.put("entryPointArgs", "");
+            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+        }
+        return binding;
+    }
+
+    private static Map<String, String> windowsBindings(String gradleVersion) {
+        Map<String, String> binding = defaultBindings();
+        binding.put("defaultJvmOpts", defaultJvmOpts(gradleVersion));
+        if (requireNonNull(Semver.validate("[8.14,)", null).getValue()).compare(null, gradleVersion, "8.14") >= 0) {
+            binding.put("classpath", "");
+            binding.put("mainClassName", "");
+            binding.put("entryPointArgs", "-jar \"%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar\"");
+        } else {
+            binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
+            binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+            binding.put("entryPointArgs", "");
+        }
+        return binding;
+    }
+
+    private static Map<String, String> defaultBindings() {
+        Map<String, String> bindings = new HashMap<>();
+        bindings.put("applicationName", "Gradle");
+        bindings.put("optsEnvironmentVar", "GRADLE_OPTS");
+        bindings.put("exitEnvironmentVar", "GRADLE_EXIT_CONSOLE");
+        bindings.put("moduleEntryPoint", "");
+        bindings.put("appNameSystemProperty", "org.gradle.appname");
+        bindings.put("appHomeRelativePath", "");
+        bindings.put("modulePath", "");
+        return bindings;
+    }
+
+    private static String defaultJvmOpts(String gradleVersion) {
+        VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
+        VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
+
+        if (gradle53VersionComparator.isValid(null, gradleVersion)) {
+            return "\"-Xmx64m\" \"-Xms64m\"";
+        } else if (gradle50VersionComparator.isValid(null, gradleVersion)) {
+            return "\"-Xmx64m\"";
+        }
+        return "";
+    }
+
+    private static String renderTemplate(String source, Map<String, String> bindings, String lineSeparator) throws IOException, ClassNotFoundException {
         SimpleTemplateEngine engine = new SimpleTemplateEngine();
-        String groovyRendered = engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
+        return engine.createTemplate(source).make(new HashMap<>(bindings)).toString()
           .replaceAll("\r\n|\r|\n", lineSeparator)
           .replace("CLASSPATH=\"\\\\\\\\\\\"\\\\\\\\\\\"", "CLASSPATH=\"\\\\\\\"\\\\\\\"");
-
-        String rewriteRendered = renderTemplate(source, new HashMap<>(bindings), lineSeparator);
-
-        if (!groovyRendered.equals(rewriteRendered)) {
-            throw new IllegalStateException(String.format("Rendered %s template does not match\n\n%s", os, diff(groovyRendered, rewriteRendered, Paths.get("a"))));
-        }
     }
 
     private static String hash(String os, String text) throws IOException {
