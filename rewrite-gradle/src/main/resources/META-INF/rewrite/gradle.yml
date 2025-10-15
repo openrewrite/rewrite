@@ -24,15 +24,6 @@ recipeList:
   - org.openrewrite.gradle.EnableGradleParallelExecution
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.search.FindDependencyHandler
-displayName: Find Gradle `dependencies` blocks
-description: Find the dependency handler containing any number of dependency definitions.
-recipeList:
-  - org.openrewrite.java.search.FindMethods:
-      methodPattern: RewriteGradleProject dependencies(groovy.lang.Closure)
-      matchOverrides: false
----
-type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
 displayName: Enable Gradle build cache
 description: Enable the Gradle build cache. By enabling build cache the build outputs are stored externally and fetched from the cache when it is determined that those inputs have no changed, avoiding the expensive work of regenerating them. See the [Gradle Build Cache](https://docs.gradle.org/current/userguide/build_cache.html) for more information.
