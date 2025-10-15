@@ -22,6 +22,78 @@ import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
 
 /**
+ * Cache for compiled templates and patterns.
+ * Stores parsed ASTs to avoid expensive re-parsing and dependency resolution.
+ */
+class TemplateCache {
+    private cache = new Map<string, JS.CompilationUnit>();
+
+    /**
+     * Generates a cache key from template string, captures, and options.
+     */
+    private generateKey(
+        templateString: string,
+        captures: Capture[],
+        imports: string[],
+        dependencies: Record<string, string>
+    ): string {
+        // Use the actual template string (with placeholders) as the primary key
+        const templateKey = templateString;
+
+        // Capture names
+        const capturesKey = captures.map(c => c.name).join(',');
+
+        // Imports
+        const importsKey = imports.join(';');
+
+        // Dependencies
+        const depsKey = JSON.stringify(dependencies || {});
+
+        return `${templateKey}::${capturesKey}::${importsKey}::${depsKey}`;
+    }
+
+    /**
+     * Gets a cached compilation unit or creates and caches a new one.
+     */
+    async getOrParse(
+        templateString: string,
+        captures: Capture[],
+        imports: string[],
+        dependencies: Record<string, string>
+    ): Promise<JS.CompilationUnit> {
+        const key = this.generateKey(templateString, captures, imports, dependencies);
+
+        let cu = this.cache.get(key);
+        if (cu) {
+            return cu;
+        }
+
+        // Prepend imports for type attribution context
+        const fullTemplateString = imports.length > 0
+            ? imports.join('\n') + '\n' + templateString
+            : templateString;
+
+        // Parse and cache
+        const parser = new JavaScriptParser();
+        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
+        cu = (await parseGenerator.next()).value as JS.CompilationUnit;
+
+        this.cache.set(key, cu);
+        return cu;
+    }
+
+    /**
+     * Clears the cache.
+     */
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
+// Global cache instance
+const templateCache = new TemplateCache();
+
+/**
  * Capture specification for pattern matching.
  * Represents a placeholder in a template pattern that can capture a part of the AST.
  */
@@ -68,9 +140,37 @@ export function capture(name?: string): Capture {
 capture.nextUnnamedId = 1;
 
 /**
+ * Configuration options for patterns.
+ */
+export interface PatternOptions {
+    /**
+     * Import statements to provide type attribution context.
+     * These are prepended to the pattern when parsing to ensure proper type information.
+     */
+    imports?: string[];
+
+    /**
+     * NPM dependencies required for import resolution and type attribution.
+     * Maps package names to version specifiers (e.g., { 'util': '^1.0.0' }).
+     * The template engine will create a package.json with these dependencies.
+     */
+    dependencies?: Record<string, string>;
+}
+
+/**
  * Represents a pattern that can be matched against AST nodes.
  */
 export class Pattern {
+    private _options: PatternOptions = {};
+
+    /**
+     * Gets the configuration options for this pattern.
+     * @readonly
+     */
+    get options(): Readonly<PatternOptions> {
+        return this._options;
+    }
+
     /**
      * Creates a new pattern from template parts and captures.
      *
@@ -81,6 +181,24 @@ export class Pattern {
         public readonly templateParts: TemplateStringsArray,
         public readonly captures: Capture[]
     ) {
+    }
+
+    /**
+     * Configures this pattern with additional options.
+     *
+     * @param options Configuration options
+     * @returns This pattern for method chaining
+     *
+     * @example
+     * pattern`isDate(${capture('date')})`
+     *     .configure({
+     *         imports: ['import { isDate } from "util"'],
+     *         dependencies: { 'util': '^1.0.0' }
+     *     })
+     */
+    configure(options: PatternOptions): Pattern {
+        this._options = { ...this._options, ...options };
+        return this;
     }
 
     /**
@@ -135,7 +253,11 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.templateProcessor = new TemplateProcessor(this.pattern.templateParts, this.pattern.captures);
+            this.templateProcessor = new TemplateProcessor(
+                this.pattern.templateParts,
+                this.pattern.captures,
+                this.pattern.options.imports || []
+            );
             this.patternAst = await this.templateProcessor.toAstPattern();
         }
 
@@ -253,6 +375,24 @@ namespace JavaCoordinates {
 export type TemplateParameter = Capture | Tree | string | number | boolean;
 
 /**
+ * Configuration options for templates.
+ */
+export interface TemplateOptions {
+    /**
+     * Import statements to provide type attribution context.
+     * These are prepended to the template when parsing to ensure proper type information.
+     */
+    imports?: string[];
+
+    /**
+     * NPM dependencies required for import resolution and type attribution.
+     * Maps package names to version specifiers (e.g., { 'util': '^1.0.0' }).
+     * The template engine will create a package.json with these dependencies.
+     */
+    dependencies?: Record<string, string>;
+}
+
+/**
  * Template for creating AST nodes.
  *
  * This class provides the public API for template generation.
@@ -267,6 +407,8 @@ export type TemplateParameter = Capture | Tree | string | number | boolean;
  * const result = template`${capture()}`.apply(cursor, coordinates);
  */
 export class Template {
+    private options: TemplateOptions = {};
+
     /**
      * Creates a new template.
      *
@@ -277,6 +419,24 @@ export class Template {
         private readonly templateParts: TemplateStringsArray,
         private readonly parameters: Parameter[]
     ) {
+    }
+
+    /**
+     * Configures this template with additional options.
+     *
+     * @param options Configuration options
+     * @returns This template for method chaining
+     *
+     * @example
+     * template`isDate(${capture('date')})`
+     *     .configure({
+     *         imports: ['import { isDate } from "util"'],
+     *         dependencies: { 'util': '^1.0.0' }
+     *     })
+     */
+    configure(options: TemplateOptions): Template {
+        this.options = { ...this.options, ...options };
+        return this;
     }
 
     /**
@@ -291,7 +451,7 @@ export class Template {
         return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, {
             tree,
             mode: JavaCoordinates.Mode.Replace
-        }, values);
+        }, values, this.options.imports || []);
     }
 }
 
@@ -329,6 +489,7 @@ class TemplateEngine {
      * @param cursor The cursor pointing to the current location in the AST
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
+     * @param imports Import statements to prepend for type attribution
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplate(
@@ -336,7 +497,8 @@ class TemplateEngine {
         parameters: Parameter[],
         cursor: Cursor,
         coordinates: JavaCoordinates,
-        values: Pick<Map<string, J>, 'get'> = new Map()
+        values: Pick<Map<string, J>, 'get'> = new Map(),
+        imports: string[] = []
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -346,21 +508,34 @@ class TemplateEngine {
             return undefined;
         }
 
-        // Parse the template string into an AST
-        const parser = new JavaScriptParser();
-        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
+        // Use cache to get or parse the compilation unit
+        // For templates, we don't have captures, so use empty array
+        const cu = await templateCache.getOrParse(
+            templateString,
+            [], // templates don't have captures in the cache key
+            imports,
+            {} // dependencies not used yet
+        );
 
         // Check if there are any statements
         if (!cu.statements || cu.statements.length === 0) {
             return undefined;
         }
 
+        // Skip import statements to get to the actual template code
+        const templateStatementIndex = imports.length;
+        if (templateStatementIndex >= cu.statements.length) {
+            return undefined;
+        }
+
         // Extract the relevant part of the AST
-        const firstStatement = cu.statements[0].element;
-        const ast = firstStatement.kind === JS.Kind.ExpressionStatement ?
+        const firstStatement = cu.statements[templateStatementIndex].element;
+        let extracted = firstStatement.kind === JS.Kind.ExpressionStatement ?
             (firstStatement as JS.ExpressionStatement).expression :
             firstStatement;
+
+        // Create a copy to avoid sharing cached AST instances
+        const ast = produce(extracted, draft => {});
 
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -659,10 +834,12 @@ class TemplateProcessor {
      *
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
+     * @param imports Import statements to prepend for type attribution
      */
     constructor(
         private readonly templateParts: TemplateStringsArray,
-        private readonly captures: Capture[]
+        private readonly captures: Capture[],
+        private readonly imports: string[] = []
     ) {
     }
 
@@ -675,10 +852,14 @@ class TemplateProcessor {
         // Combine template parts and placeholders
         const templateString = this.buildTemplateString();
 
-        // Parse template string to AST
-        const parser = new JavaScriptParser();
-        const parseGenerator = parser.parse({text: templateString, sourcePath: 'template.ts'});
-        const cu: JS.CompilationUnit = (await parseGenerator.next()).value as JS.CompilationUnit;
+        // Use cache to get or parse the compilation unit
+        const cu = await templateCache.getOrParse(
+            templateString,
+            this.captures,
+            this.imports,
+            {} // dependencies not used in pattern matching yet
+        );
+
         // Extract the relevant part of the AST
         return this.extractPatternFromAst(cu);
     }
@@ -707,16 +888,23 @@ class TemplateProcessor {
      * @returns The extracted pattern
      */
     private extractPatternFromAst(cu: JS.CompilationUnit): J {
-        // Extract the relevant part of the AST based on the template content
-        const firstStatement = cu.statements[0].element;
+        // Skip import statements to get to the actual pattern code
+        const patternStatementIndex = this.imports.length;
 
+        // Extract the relevant part of the AST based on the template content
+        const firstStatement = cu.statements[patternStatementIndex].element;
+
+        let extracted: J;
         // If the first statement is an expression statement, extract the expression
         if (firstStatement.kind === JS.Kind.ExpressionStatement) {
-            return (firstStatement as JS.ExpressionStatement).expression;
+            extracted = (firstStatement as JS.ExpressionStatement).expression;
+        } else {
+            // Otherwise, return the statement itself
+            extracted = firstStatement;
         }
 
-        // Otherwise, return the statement itself
-        return firstStatement;
+        // Return a copy to avoid sharing cached AST instances
+        return produce(extracted, draft => {});
     }
 }
 
