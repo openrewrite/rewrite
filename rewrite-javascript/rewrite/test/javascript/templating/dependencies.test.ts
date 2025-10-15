@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import {
+    _,
     capture,
     JavaScriptParser,
     JavaScriptVisitor,
@@ -306,6 +307,25 @@ describe('template dependencies integration', () => {
                     after: template`${capture('right')} + ${capture('left')}`
                 }));
                 return await swapOperands.tryOn(this.cursor, binary);
+            }
+        });
+
+        return spec.rewriteRun(
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;')
+        );
+    }, 60000);
+
+    test('underscore alias for inline captures', async () => {
+        // Test using the _ alias for concise inline captures
+        const spec = new RecipeSpec();
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const swapOperands = rewrite(() => ({
+                    before: pattern`${_('left')} + ${_('right')}`,
+                    after: template`${_('right')} + ${_('left')}`
+                }));
+                return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
 

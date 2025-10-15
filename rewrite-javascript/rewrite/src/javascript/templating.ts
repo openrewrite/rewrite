@@ -149,6 +149,19 @@ export function capture(name?: string): Capture {
 capture.nextUnnamedId = 1;
 
 /**
+ * Concise alias for `capture`. Works well for inline captures in patterns and templates.
+ *
+ * @param name Optional name for the capture. If not provided, an auto-generated name is used.
+ * @returns A Capture object
+ *
+ * @example
+ * // Inline captures with _ alias
+ * pattern`isDate(${_('dateArg')})`
+ * template`${_('dateArg')} instanceof Date`
+ */
+export const _ = capture;
+
+/**
  * Configuration options for patterns.
  */
 export interface PatternOptions {
