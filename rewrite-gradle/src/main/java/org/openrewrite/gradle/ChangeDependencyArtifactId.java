@@ -108,8 +108,7 @@ public class ChangeDependencyArtifactId extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                m = GradleMultiDependency.matcher()
-                        .configuration(configuration)
+                return GradleMultiDependency.matcher()
                         .groupId(groupId)
                         .artifactId(artifactId)
                         .get(getCursor())

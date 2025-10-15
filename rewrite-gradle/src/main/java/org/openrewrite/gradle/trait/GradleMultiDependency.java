@@ -32,7 +32,7 @@ import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
-import java.util.Collections;
+import static java.util.Collections.singletonList;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -110,7 +110,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
             return getTree().withArguments(
                 ListUtils.map(getTree().getArguments(), argument -> {
                     // Make a synthetic GradleDependency representing wrapping a single dependency notation
-                    J.MethodInvocation m = getTree().withArguments(Collections.singletonList(argument));
+                    J.MethodInvocation m = getTree().withArguments(singletonList(argument));
                     Optional<GradleDependency> dep = new GradleDependency.Matcher()
                             .matcher(matcher)
                             .get(new Cursor(getCursor().getParent(), m));
@@ -135,7 +135,7 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
     public void forEach(Consumer<GradleDependency> consumer) {
         if (isVarargs()) {
             for (Expression argument : getTree().getArguments()) {
-                J.MethodInvocation m = getTree().withArguments(Collections.singletonList(argument));
+                J.MethodInvocation m = getTree().withArguments(singletonList(argument));
                 new GradleDependency.Matcher()
                         .matcher(matcher)
                         .get(new Cursor(getCursor().getParent(), m))
