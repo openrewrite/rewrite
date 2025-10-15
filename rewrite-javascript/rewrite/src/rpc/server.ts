@@ -19,6 +19,7 @@ import {RewriteRpc} from "./rewrite-rpc";
 import * as fs from "fs";
 import {Command} from 'commander';
 import {dir} from 'tmp-promise';
+import {DependencyWorkspace} from "../javascript/dependency-workspace";
 
 // Include all languages you want this server to support.
 import "../text";
@@ -66,6 +67,8 @@ async function main() {
             if (recipeCleanup) {
                 await recipeCleanup();
             }
+            // Clean up old dependency workspaces (older than 24 hours)
+            DependencyWorkspace.cleanupOldWorkspaces();
             process.exit(0);
         });
 
@@ -73,6 +76,8 @@ async function main() {
             if (recipeCleanup) {
                 await recipeCleanup();
             }
+            // Clean up old dependency workspaces (older than 24 hours)
+            DependencyWorkspace.cleanupOldWorkspaces();
             process.exit(0);
         });
 
