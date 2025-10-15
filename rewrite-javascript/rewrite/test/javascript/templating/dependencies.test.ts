@@ -1,3 +1,5 @@
+// noinspection TypeScriptCheckImport,JSUnusedLocalSymbols,ES6UnusedImports,SuspiciousTypeOfGuard
+
 /*
  * Copyright 2025 the original author or authors.
  * <p>
@@ -331,6 +333,106 @@ describe('template dependencies integration', () => {
 
         return spec.rewriteRun(
             typescript('const result = 1 + 2;', 'const result = 2 + 1;')
+        );
+    }, 60000);
+
+    test('recipe: replace deprecated util.isX methods with native checks', async () => {
+        // Tests multiple rewrite rules with different patterns and templates
+        // This ensures each pattern only matches its intended methods and applies the correct template
+        const spec = new RecipeSpec();
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                // Create rewrite rules fresh for each invocation
+                const arg = capture();
+                const replaceUtilIsArray = rewrite(() => ({
+                    before: pattern`util.isArray(${arg})`.configure({
+                        imports: ["import * as util from 'util'"],
+                        dependencies: {'@types/node': '^20.0.0'}
+                    }),
+                    after: template`Array.isArray(${arg})`
+                }));
+
+                const replaceUtilIsBoolean = rewrite(() => ({
+                    before: pattern`util.isBoolean(${arg})`.configure({
+                        imports: ["import * as util from 'util'"],
+                        dependencies: {'@types/node': '^20.0.0'}
+                    }),
+                    after: template`typeof ${arg} === 'boolean'`
+                }));
+
+                return await replaceUtilIsArray.tryOn(this.cursor, method) ||
+                       await replaceUtilIsBoolean.tryOn(this.cursor, method) ||
+                       method;
+            }
+        });
+
+        const tempDir = path.join(os.tmpdir(), `test-${Date.now()}`);
+
+        return spec.rewriteRun(
+            npm(tempDir,
+                packageJson(JSON.stringify({
+                    "name": "test",
+                    "dependencies": {
+                        "@types/node": "^20.0.0"
+                    }
+                }, null, 2)),
+                // language=typescript
+                typescript(
+                    `
+                    import * as util from 'util';
+
+                    class CustomUtil {
+                        isArray(value: any) {
+                            return 'custom';
+                        }
+                        isBoolean(value: any) {
+                            return 'custom';
+                        }
+                    }
+
+                    const customUtil = new CustomUtil();
+                    const arr = [1, 2, 3];
+                    const bool = true;
+
+                    // These should be replaced (from util module)
+                    const check1 = util.isArray(arr);
+                    const check2 = util.isBoolean(bool);
+                    const check3 = util.isArray([]);
+                    const check4 = util.isBoolean(false);
+
+                    // These should NOT be replaced (custom methods)
+                    const custom1 = customUtil.isArray(arr);
+                    const custom2 = customUtil.isBoolean(bool);
+                    `,
+                    `
+                    import * as util from 'util';
+
+                    class CustomUtil {
+                        isArray(value: any) {
+                            return 'custom';
+                        }
+                        isBoolean(value: any) {
+                            return 'custom';
+                        }
+                    }
+
+                    const customUtil = new CustomUtil();
+                    const arr = [1, 2, 3];
+                    const bool = true;
+
+                    // These should be replaced (from util module)
+                    const check1 = Array.isArray(arr);
+                    const check2 = typeof bool === 'boolean';
+                    const check3 = Array.isArray([]);
+                    const check4 = typeof false === 'boolean';
+
+                    // These should NOT be replaced (custom methods)
+                    const custom1 = customUtil.isArray(arr);
+                    const custom2 = customUtil.isBoolean(bool);
+                    `
+                )
+            )
         );
     }, 60000);
 

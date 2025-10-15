@@ -20,6 +20,7 @@ import {Cursor, isTree, Tree} from '..';
 import {J, Type} from '../java';
 import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
+import {DependencyWorkspace} from './dependency-workspace';
 
 /**
  * Cache for compiled templates and patterns.
@@ -73,7 +74,6 @@ class TemplateCache {
         // the same dependencies will automatically share the same workspace
         let workspaceDir: string | undefined;
         if (dependencies && Object.keys(dependencies).length > 0) {
-            const {DependencyWorkspace} = await import('./dependency-workspace.js');
             workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
         }
 
@@ -303,6 +303,7 @@ class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVis
         // Check basic structural equality first
         if (method.name.simpleName !== otherMethod.name.simpleName ||
             method.arguments.elements.length !== otherMethod.arguments.elements.length) {
+            this.abort();
             return method;
         }
 
@@ -421,7 +422,8 @@ class Matcher {
             this.templateProcessor = new TemplateProcessor(
                 this.pattern.templateParts,
                 this.pattern.captures,
-                this.pattern.options.imports || []
+                this.pattern.options.imports || [],
+                this.pattern.options.dependencies || {}
             );
             this.patternAst = await this.templateProcessor.toAstPattern();
         }
@@ -613,10 +615,18 @@ export class Template {
      * @returns A Promise resolving to the generated AST node
      */
     async apply(cursor: Cursor, tree: J, values?: Pick<Map<string, J>, 'get'>): Promise<J | undefined> {
-        return TemplateEngine.applyTemplate(this.templateParts, this.parameters, cursor, {
-            tree,
-            mode: JavaCoordinates.Mode.Replace
-        }, values, this.options.imports || []);
+        return TemplateEngine.applyTemplate(
+            this.templateParts,
+            this.parameters,
+            cursor,
+            {
+                tree,
+                mode: JavaCoordinates.Mode.Replace
+            },
+            values,
+            this.options.imports || [],
+            this.options.dependencies || {}
+        );
     }
 }
 
@@ -655,6 +665,7 @@ class TemplateEngine {
      * @param coordinates The coordinates specifying where and how to insert the generated AST
      * @param values Map of capture names to values to replace the parameters with
      * @param imports Import statements to prepend for type attribution
+     * @param dependencies NPM dependencies for type attribution
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplate(
@@ -663,7 +674,8 @@ class TemplateEngine {
         cursor: Cursor,
         coordinates: JavaCoordinates,
         values: Pick<Map<string, J>, 'get'> = new Map(),
-        imports: string[] = []
+        imports: string[] = [],
+        dependencies: Record<string, string> = {}
     ): Promise<J | undefined> {
         // Build the template string with parameter placeholders
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters);
@@ -679,7 +691,7 @@ class TemplateEngine {
             templateString,
             [], // templates don't have captures in the cache key
             imports,
-            {} // dependencies not used yet
+            dependencies
         );
 
         // Check if there are any statements
@@ -1000,11 +1012,13 @@ class TemplateProcessor {
      * @param templateParts The string parts of the template
      * @param captures The captures between the string parts
      * @param imports Import statements to prepend for type attribution
+     * @param dependencies NPM dependencies for type attribution
      */
     constructor(
         private readonly templateParts: TemplateStringsArray,
         private readonly captures: Capture[],
-        private readonly imports: string[] = []
+        private readonly imports: string[] = [],
+        private readonly dependencies: Record<string, string> = {}
     ) {
     }
 
@@ -1022,7 +1036,7 @@ class TemplateProcessor {
             templateString,
             this.captures,
             this.imports,
-            {} // dependencies not used in pattern matching yet
+            this.dependencies
         );
 
         // Extract the relevant part of the AST
@@ -1110,7 +1124,6 @@ class RewriteRuleImpl implements RewriteRule {
     async tryOn(cursor: Cursor, node: J): Promise<J | undefined> {
         for (const pattern of this.before) {
             const match = await pattern.match(node);
-
             if (match) {
                 const result = await this.after.apply(cursor, node, match);
                 if (result) {
