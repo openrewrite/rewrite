@@ -21,230 +21,358 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.toml.Assertions.toml;
 
-    class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
+class MigrateDependenciesToVersionCatalogGroovyDSLTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MigrateDependenciesToVersionCatalog());
+        spec.beforeRecipe(withToolingApi())
+          .recipe(new MigrateDependenciesToVersionCatalog());
     }
 
     @Test
     @DocumentExample
     void migrateStringNotationDependencies() {
         rewriteRun(
-            buildGradle(
-                """
-                    plugins {
-                        id 'java'
-                    }
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    dependencies {
-                        implementation 'org.springframework:spring-core:5.3.0'
-                        testImplementation 'junit:junit:4.13.2'
-                        runtimeOnly 'com.h2database:h2:1.4.200'
-                    }
-                    """,
-                """
-                    plugins {
-                        id 'java'
-                    }
+              repositories {
+                  mavenCentral()
+              }
 
-                    dependencies {
-                        implementation libs.springCore
-                        testImplementation libs.junit
-                        runtimeOnly libs.h2
-                    }
-                    """
-            ),
-            toml(
-                doesNotExist(),
-                """
-                    [versions]
-                    spring-core = "5.3.0"
-                    junit = "4.13.2"
-                    h2 = "1.4.200"
+              dependencies {
+                  implementation 'org.springframework:spring-core:5.3.0'
+                  testImplementation 'junit:junit:4.13.2'
+                  runtimeOnly 'com.h2database:h2:1.4.200'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    [libraries]
-                    spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
-                    junit = { group = "junit", name = "junit", version.ref = "junit" }
-                    h2 = { group = "com.h2database", name = "h2", version.ref = "h2" }
-                    """,
-                spec -> spec.path("gradle/libs.versions.toml")
-            )
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation libs.springCore
+                  testImplementation libs.junit
+                  runtimeOnly libs.h2
+              }
+              """
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              spring-core = "5.3.0"
+              junit = "4.13.2"
+              h2 = "1.4.200"
+              
+              [libraries]
+              spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
+              junit = { group = "junit", name = "junit", version.ref = "junit" }
+              h2 = { group = "com.h2database", name = "h2", version.ref = "h2" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
         );
     }
 
     @Test
     void migrateMapNotationDependencies() {
         rewriteRun(
-            buildGradle(
-                """
-                    plugins {
-                        id 'java'
-                    }
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    dependencies {
-                        implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
-                        testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.6.1'
-                    }
-                    """,
-                """
-                    plugins {
-                        id 'java'
-                    }
+              repositories {
+                  mavenCentral()
+              }
 
-                    dependencies {
-                        implementation libs.commonsLang3
-                        testImplementation libs.mockitoCore
-                    }
-                    """
-            ),
-            toml(
-                doesNotExist(),
-                """
-                    [versions]
-                    commons-lang3 = "3.12.0"
-                    mockito-core = "4.6.1"
+              dependencies {
+                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.12.0'
+                  testImplementation group: 'org.mockito', name: 'mockito-core', version: '4.6.1'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    [libraries]
-                    commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
-                    mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
-                    """,
-                spec -> spec.path("gradle/libs.versions.toml")
-            )
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation libs.commonsLang3
+                  testImplementation libs.mockitoCore
+              }
+              """
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              commons-lang3 = "3.12.0"
+              mockito-core = "4.6.1"
+              
+              [libraries]
+              commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
+              mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
         );
     }
 
     @Test
-    void migrateMultiProjectDependencies() {
+    void migrateDependenciesInSubprojectsDefinition() {
         rewriteRun(
-            buildGradle(
-                """
-                    subprojects {
-                        apply plugin: 'java'
+          buildGradle(
+            """
+              subprojects {
+                  apply plugin: 'java'
 
-                        dependencies {
-                            implementation 'org.slf4j:slf4j-api:1.7.36'
-                            implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.3'
-                        }
-                    }
-                    """,
-                """
-                    subprojects {
-                        apply plugin: 'java'
+                  repositories {
+                      mavenCentral()
+                  }
 
-                        dependencies {
-                            implementation libs.slf4jApi
-                            implementation libs.jacksonDatabind
-                        }
-                    }
-                    """
-            ),
-            toml(
-                doesNotExist(),
-                """
-                    [versions]
-                    slf4j-api = "1.7.36"
-                    jackson-databind = "2.13.3"
+                  dependencies {
+                      implementation 'org.slf4j:slf4j-api:1.7.36'
+                      implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.3'
+                  }
+              }
+              """,
+            """
+              subprojects {
+                  apply plugin: 'java'
 
-                    [libraries]
-                    slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j-api" }
-                    jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson-databind" }
-                    """,
-                spec -> spec.path("gradle/libs.versions.toml")
-            )
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation libs.slf4jApi
+                      implementation libs.jacksonDatabind
+                  }
+              }
+              """
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              slf4j-api = "1.7.36"
+              jackson-databind = "2.13.3"
+              
+              [libraries]
+              slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j-api" }
+              jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson-databind" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
         );
     }
 
     @Test
     void doNotMigrateProjectDependencies() {
         rewriteRun(
-            buildGradle(
-                """
-                    plugins {
-                        id 'java'
-                    }
-
-                    dependencies {
-                        implementation project(':core')
-                        implementation 'org.springframework:spring-core:5.3.0'
-                        testImplementation project(':test-utils')
-                    }
-                    """,
-                """
-                    plugins {
-                        id 'java'
-                    }
-
-                    dependencies {
-                        implementation project(':core')
-                        implementation libs.springCore
-                        testImplementation project(':test-utils')
-                    }
-                    """
-            ),
-            toml(
-                doesNotExist(),
-                """
-                    [versions]
-                    spring-core = "5.3.0"
-
-                    [libraries]
-                    spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
-                    """,
-                spec -> spec.path("gradle/libs.versions.toml")
-            )
+          settingsGradle(
+            """
+              rootProject.name = 'test'
+              include 'core'
+              include 'test-utils'
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation project(':core')
+                  implementation 'org.springframework:spring-core:5.3.0'
+                  testImplementation project(':test-utils')
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation project(':core')
+                  implementation libs.springCore
+                  testImplementation project(':test-utils')
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              """,
+            spec -> spec.path("core/build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              """,
+            spec -> spec.path("test-utils/build.gradle")
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              spring-core = "5.3.0"
+              
+              [libraries]
+              spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
         );
     }
 
     @Test
     void handleMixedNotations() {
         rewriteRun(
-            buildGradle(
-                """
-                    plugins {
-                        id 'java'
-                    }
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    dependencies {
-                        implementation 'org.springframework:spring-core:5.3.0'
-                        implementation group: 'org.springframework', name: 'spring-context', version: '5.3.0'
-                        implementation('org.springframework:spring-web:5.3.0') {
-                            exclude group: 'commons-logging'
-                        }
-                    }
-                    """,
-                """
-                    plugins {
-                        id 'java'
-                    }
+              repositories {
+                  mavenCentral()
+              }
 
-                    dependencies {
-                        implementation libs.springCore
-                        implementation libs.springContext
-                        implementation(libs.springWeb) {
-                            exclude group: 'commons-logging'
-                        }
-                    }
-                    """
-            ),
-            toml(
-                doesNotExist(),
-                """
-                    [versions]
-                    spring-core = "5.3.0"
-                    spring-context = "5.3.0"
-                    spring-web = "5.3.0"
+              dependencies {
+                  implementation 'org.springframework:spring-core:5.3.0'
+                  implementation group: 'org.springframework', name: 'spring-context', version: '5.3.0'
+                  implementation('org.springframework:spring-web:5.3.0') {
+                      exclude group: 'commons-logging'
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    [libraries]
-                    spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
-                    spring-context = { group = "org.springframework", name = "spring-context", version.ref = "spring-context" }
-                    spring-web = { group = "org.springframework", name = "spring-web", version.ref = "spring-web" }
-                    """,
-                spec -> spec.path("gradle/libs.versions.toml")
-            )
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation libs.springCore
+                  implementation libs.springContext
+                  implementation(libs.springWeb) {
+                      exclude group: 'commons-logging'
+                  }
+              }
+              """
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              spring-core = "5.3.0"
+              spring-context = "5.3.0"
+              spring-web = "5.3.0"
+              
+              [libraries]
+              spring-core = { group = "org.springframework", name = "spring-core", version.ref = "spring-core" }
+              spring-context = { group = "org.springframework", name = "spring-context", version.ref = "spring-context" }
+              spring-web = { group = "org.springframework", name = "spring-web", version.ref = "spring-web" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
+        );
+    }
+
+    @Test
+    void migrateDependenciesWithVersionsFromGradleProperties() {
+        rewriteRun(
+          properties(
+            """
+              junitVersion=4.13.2
+              mockitoVersion=4.6.1
+              unrelatedProperty=someValue
+              """,
+            """
+              unrelatedProperty=someValue
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation "junit:junit:$junitVersion"
+                  testImplementation group: 'org.mockito', name: 'mockito-core', version: mockitoVersion
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  testImplementation libs.junit
+                  testImplementation libs.mockitoCore
+              }
+              """
+          ),
+          toml(
+            doesNotExist(),
+            """
+              [versions]
+              junit = "4.13.2"
+              mockito-core = "4.6.1"
+              
+              [libraries]
+              junit = { group = "junit", name = "junit", version.ref = "junit" }
+              mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito-core" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          )
         );
     }
 
@@ -255,39 +383,46 @@ import static org.openrewrite.toml.Assertions.toml;
     @Test
     void whenVersionCatalogAlreadyExists() {
         rewriteRun(
-            toml(
-                """
-                    [versions]
-                    guava-version = "31.0-jre"
+          toml(
+            """
+              [versions]
+              guava-version = "31.0-jre"
 
-                    [libraries]
-                    guava = { group = "com.google.guava", name = "guava", version.ref = "guava-version" }
-                    """,
-                // The existing catalog remains unchanged
-                spec -> spec.path("gradle/libs.versions.toml")
-            ),
-            buildGradle(
-                """
-                    plugins {
-                        id 'java'
-                    }
+              [libraries]
+              guava = { group = "com.google.guava", name = "guava", version.ref = "guava-version" }
+              """,
+            spec -> spec.path("gradle/libs.versions.toml")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
 
-                    dependencies {
-                        implementation 'org.springframework:spring-core:5.3.0'
-                        testImplementation 'junit:junit:4.13.2'
-                    }
-                    """,
-                """
-                    plugins {
-                        id 'java'
-                    }
+              repositories {
+                  mavenCentral()
+              }
 
-                    dependencies {
-                        implementation libs.springCore
-                        testImplementation libs.junit
-                    }
-                    """
-            )
+              dependencies {
+                  implementation 'org.springframework:spring-core:5.3.0'
+                  testImplementation 'junit:junit:4.13.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation libs.springCore
+                  testImplementation libs.junit
+              }
+              """
+          )
         );
     }
 }
