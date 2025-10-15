@@ -29,6 +29,11 @@ import org.openrewrite.toml.tree.TomlValue;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DeleteTableRow extends Recipe {
+    @Option(displayName = "Table name",
+            description = "The name of the TOML array table to merge into (e.g., 'package.contributors').",
+            example = "package.contributors")
+    String tableName;
+
     @Option(displayName = "Key",
             description = "The key within a table row to match on.",
             example = "name")
@@ -77,9 +82,11 @@ public class DeleteTableRow extends Recipe {
             public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
 
-                // Check if this table contains a matching key-value pair
-                if (TableRowMatcher.hasMatchingKeyValue(t, identifyingKey, identifyingValue, useRegex)) {
-                    return null; // Delete the table
+                if (t.getName() != null && tableName.equals(t.getName().getName())) {
+                    // Check if this table contains a matching key-value pair
+                    if (TableRowMatcher.hasMatchingKeyValue(t, identifyingKey, identifyingValue, useRegex)) {
+                        return null; // Delete the table
+                    }
                 }
 
                 return t;
