@@ -22,15 +22,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.VisitFunction2;
 
+import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -80,10 +82,19 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
             return false;
         }
         J.MethodInvocation m = (J.MethodInvocation) maybeMi;
-        return m.getArguments().size() > 1 && m.getArguments().stream()
-                .filter(it -> Dependency.parse(it.print(methodCursor).trim()) != null)
+        long count = m.getArguments().stream()
+                .filter(it -> {
+                    String printed = it.print(methodCursor).trim();
+                    // Strip surrounding quotes if present (from Groovy/Kotlin string literals)
+                    if ((printed.startsWith("'") && printed.endsWith("'")) ||
+                        (printed.startsWith("\"") && printed.endsWith("\""))) {
+                        printed = printed.substring(1, printed.length() - 1);
+                    }
+                    return Dependency.parse(printed) != null;
+                })
                 .limit(2)
-                .count() > 1;
+                .count();
+        return m.getArguments().size() > 1 && count > 1;
     }
 
     /**
@@ -96,7 +107,20 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
      */
     public J.MethodInvocation map(Function<GradleDependency, J.MethodInvocation> mapper) {
         if (isVarargs()) {
-
+            return getTree().withArguments(
+                ListUtils.map(getTree().getArguments(), argument -> {
+                    // Make a synthetic GradleDependency representing wrapping a single dependency notation
+                    J.MethodInvocation m = getTree().withArguments(Collections.singletonList(argument));
+                    Optional<GradleDependency> dep = new GradleDependency.Matcher()
+                            .matcher(matcher)
+                            .get(new Cursor(getCursor().getParent(), m));
+                    if (dep.isPresent()) {
+                        J.MethodInvocation result = mapper.apply(dep.get());
+                        return result.getArguments().get(0);
+                    }
+                    return argument;
+                })
+            );
         } else {
             Optional<GradleDependency> dep = new GradleDependency.Matcher()
                     .matcher(matcher)
@@ -110,7 +134,13 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
 
     public void forEach(Consumer<GradleDependency> consumer) {
         if (isVarargs()) {
-
+            for (Expression argument : getTree().getArguments()) {
+                J.MethodInvocation m = getTree().withArguments(Collections.singletonList(argument));
+                new GradleDependency.Matcher()
+                        .matcher(matcher)
+                        .get(new Cursor(getCursor().getParent(), m))
+                        .ifPresent(consumer);
+            }
         } else {
             new GradleDependency.Matcher()
                     .matcher(matcher)
@@ -119,8 +149,8 @@ public class GradleMultiDependency implements Trait<J.MethodInvocation> {
         }
     }
 
-    public static Matcher matcher(DependencyMatcher matcher) {
-        return new Matcher().matcher(matcher);
+    public static Matcher matcher() {
+        return new Matcher();
     }
 
     public static class Matcher extends GradleTraitMatcher<GradleMultiDependency> {

@@ -128,7 +128,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                             }
                         }
                     }
-                    if (dependencies.stream().anyMatch(dependency -> (groupId != null && !matchesGlob(dependency.getGroupId(), groupId)) || (artifactId != null && !matchesGlob(dependency.getArtifactId(), artifactId)))) {
+                    if (dependencies.stream().anyMatch(dependency -> !matchesGlob(dependency.getGroupId(), groupId) || !matchesGlob(dependency.getArtifactId(), artifactId))) {
                         dependencies.clear();
                     }
                 }
@@ -139,7 +139,7 @@ public class SpringDependencyManagementPluginEntry implements Trait<J.MethodInvo
                     if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
                         importedBom = parseDependency(methodInvocation.getArguments());
                     }
-                    if (importedBom != null && ((groupId != null && !matchesGlob(importedBom.getGroupId(), groupId)) || (artifactId != null && !matchesGlob(importedBom.getArtifactId(), artifactId)))) {
+                    if (importedBom != null && (!matchesGlob(importedBom.getGroupId(), groupId) || !matchesGlob(importedBom.getArtifactId(), artifactId))) {
                         importedBom = null;
                     }
                 }

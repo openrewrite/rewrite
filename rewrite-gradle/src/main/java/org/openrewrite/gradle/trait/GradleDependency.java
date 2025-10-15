@@ -124,7 +124,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return false;
         }
 
-        return DEPENDENCY_DSL_MATCHER.matches(methodInvocation);
+        // If the DSL matcher matches, this is definitely a dependency (Groovy with type attribution)
+        if (DEPENDENCY_DSL_MATCHER.matches(methodInvocation)) {
+            return true;
+        }
+
+        // If we have a valid configuration, this is a dependency even without type attribution (Kotlin DSL)
+        // This handles cases where methodType is null but Gradle resolved the configuration
+        return gdc != null;
     }
 
     @With
@@ -158,6 +165,14 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      */
     public String getVersion() {
         return resolvedDependency.getVersion();
+    }
+
+    public GroupArtifactVersion getGav() {
+        return resolvedDependency.getGav().asGroupArtifactVersion();
+    }
+
+    public ResolvedGroupArtifactVersion getResolvedGav() {
+        return resolvedDependency.getGav();
     }
 
     /**
@@ -959,7 +974,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (firstArg instanceof K.StringTemplate) {
             K.StringTemplate template = (K.StringTemplate) firstArg;
             List<J> strings = template.getStrings();
-            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+            if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
                 Dependency dep = Dependency.parse((String) literal.getValue());
                 if (dep != null && !newGroupId.equals(dep.getGroupId())) {
@@ -1085,7 +1100,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         } else if (firstArg instanceof K.StringTemplate) {
             K.StringTemplate template = (K.StringTemplate) firstArg;
             List<J> strings = template.getStrings();
-            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+            if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
                 Dependency dep = Dependency.parse((String) literal.getValue());
                 if (dep != null && !newArtifactId.equals(dep.getArtifactId())) {
@@ -1113,10 +1128,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * @return A new GradleDependency with the updated version, or the original if no change was made
      */
     public GradleDependency withDeclaredVersion(@Nullable String newVersion) {
-        if (newVersion == null) {
-            return this;
-        }
-        if (newVersion.isEmpty()) {
+        if (newVersion == null || newVersion.isEmpty()) {
             return removeVersion();
         }
 
@@ -1197,9 +1209,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
             }
 
-            // If no version entry exists, we need to add one
             if (!versionFound && firstArg instanceof G.MapLiteral) {
-                // TODO Add version entry to map literal - this is complex and may need special handling
+                // TODO Add version entry to map literal
             }
         } else if (firstArg instanceof J.Assignment) {
             List<Expression> updatedArgs = m.getArguments();
@@ -1225,7 +1236,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             // For StringTemplate, we convert to a simple string literal with the new version
             K.StringTemplate template = (K.StringTemplate) firstArg;
             List<J> strings = template.getStrings();
-            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+            if (!strings.isEmpty() && strings.get(0) instanceof J.Literal) {
                 J.Literal literal = (J.Literal) strings.get(0);
                 Dependency dep = Dependency.parse((String) literal.getValue());
                 if (dep != null) {
@@ -1341,7 +1352,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     }
                 } else {
                     for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
-                        if (!transitiveConfiguration.isCanBeResolved()) {
+                        if (transitiveConfiguration.isCanBeResolved()) {
                             for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
                                 if (matcher == null || matcher.matches(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId())) {
                                     Dependency req = resolvedDependency.getRequested();
@@ -1406,6 +1417,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             } else if (argument instanceof J.Assignment) {
                 String group = null;
                 String artifact = null;
+                String version = null;
 
                 for (Expression e : arguments) {
                     if (!(e instanceof J.Assignment)) {
@@ -1425,6 +1437,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                         group = (String) value.getValue();
                     } else if ("name".equals(name)) {
                         artifact = (String) value.getValue();
+                    } else if ("version".equals(name)) {
+                        version = (String) value.getValue();
                     }
                 }
 
@@ -1433,12 +1447,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
 
                 return Dependency.builder()
-                        .gav(new GroupArtifactVersion(group, artifact, null))
+                        .gav(new GroupArtifactVersion(group, artifact, version))
                         .build();
             } else if (argument instanceof K.StringTemplate) {
                 K.StringTemplate template = (K.StringTemplate) argument;
                 List<J> strings = template.getStrings();
-                if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                if (!strings.isEmpty() && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
                     return Dependency.parse((String) ((J.Literal) strings.get(0)).getValue());
                 }
             }
@@ -1449,6 +1463,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         private static @Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
             String group = null;
             String artifact = null;
+            String version = null;
 
             for (Expression e : arguments) {
                 if (!(e instanceof G.MapEntry)) {
@@ -1468,6 +1483,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     group = (String) value.getValue();
                 } else if ("name".equals(keyValue)) {
                     artifact = (String) value.getValue();
+                } else if ("version".equals(keyValue)) {
+                    version = (String) value.getValue();
                 }
             }
 
@@ -1476,7 +1493,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
 
             return org.openrewrite.maven.tree.Dependency.builder()
-                    .gav(new GroupArtifactVersion(group, artifact, null))
+                    .gav(new GroupArtifactVersion(group, artifact, version))
                     .build();
         }
     }

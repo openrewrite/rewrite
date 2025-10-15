@@ -168,7 +168,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 // Check for any dependency (single or varargs with literal strings)
-                GradleMultiDependency.matcher(new DependencyMatcher(groupId, artifactId, getVersionComparator()))
+                GradleMultiDependency.matcher()
+                        .matcher(new DependencyMatcher(groupId, artifactId, getVersionComparator()))
                         .get(getCursor())
                         .ifPresent(multiDependency ->
                                 multiDependency.forEach(dep -> scanDependency(dep, ctx)));
@@ -388,7 +389,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-            GradleMultiDependency multiDependency = GradleMultiDependency.matcher(dependencyMatcher)
+            GradleMultiDependency multiDependency = GradleMultiDependency.matcher()
+                    .matcher(dependencyMatcher)
                     .get(getCursor())
                     .orElse(null);
             if (multiDependency != null) {
