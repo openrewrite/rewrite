@@ -68,13 +68,22 @@ class TemplateCache {
             return cu;
         }
 
+        // Create workspace if dependencies are provided
+        // DependencyWorkspace has its own cache, so multiple templates with
+        // the same dependencies will automatically share the same workspace
+        let workspaceDir: string | undefined;
+        if (dependencies && Object.keys(dependencies).length > 0) {
+            const {DependencyWorkspace} = await import('./dependency-workspace.js');
+            workspaceDir = await DependencyWorkspace.getOrCreateWorkspace(dependencies);
+        }
+
         // Prepend imports for type attribution context
         const fullTemplateString = imports.length > 0
             ? imports.join('\n') + '\n' + templateString
             : templateString;
 
-        // Parse and cache
-        const parser = new JavaScriptParser();
+        // Parse and cache (workspace only needed during parsing)
+        const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.ts'});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
