@@ -68,7 +68,7 @@ recipeList:
   - org.openrewrite.java.recipes.UseTreeRandomId
   - org.openrewrite.java.recipes.migrate.RemoveTraitsUsageRecipes
   - org.openrewrite.staticanalysis.NeedBraces
-  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+#  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
 #  - org.openrewrite.java.RemoveAnnotation:
 #      annotationPattern: '@org.openrewrite.NlsRewrite.DisplayName'
 #  - org.openrewrite.java.RemoveAnnotation:
@@ -111,5 +111,5 @@ recipeList:
   - org.openrewrite.java.RemoveAnnotation:
       annotationPattern: '@jakarta.annotation.Nonnull'
 #  - org.openrewrite.java.jspecify.MigrateToJspecify
-  - org.openrewrite.staticanalysis.AnnotateNullableMethods
+#  - org.openrewrite.staticanalysis.AnnotateNullableMethods
   - org.openrewrite.staticanalysis.NullableOnMethodReturnType

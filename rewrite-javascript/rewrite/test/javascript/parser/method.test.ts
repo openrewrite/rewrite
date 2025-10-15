@@ -1,4 +1,4 @@
-// noinspection TypeScriptValidateTypes,TypeScriptUnresolvedReference,JSUnusedLocalSymbols
+// noinspection TypeScriptValidateTypes,TypeScriptUnresolvedReference,JSUnusedLocalSymbols,TypeScriptCheckImport
 
 /*
  * Copyright 2025 the original author or authors.
@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JavaScriptVisitor, npm, packageJson, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
+import {withDir} from "tmp-promise";
 
 describe('method mapping', () => {
     const spec = new RecipeSpec();
@@ -227,8 +229,53 @@ describe('method mapping', () => {
             //language=typescript
             typescript(`
                 class R {
-                    *[Symbol.iterator](): Generator<number> { yield 1;}
+                    * [Symbol.iterator](): Generator<number> {
+                        yield 1;
+                    }
                 }
             `)
         ));
+
+    test("type attribution on third-party library", async () => {
+        await withDir(async repo => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    {
+                        //language=typescript
+                        ...typescript(
+                            `
+                                import _ from 'lodash';
+
+                                const result = _.map([1, 2, 3], n => n * 2);
+                            `
+                        ),
+                        afterRecipe: async cu => {
+                            await (new class extends JavaScriptVisitor<any> {
+                                protected async visitMethodInvocation(method: J.MethodInvocation, _: any): Promise<J | undefined> {
+                                    expect(method.methodType?.name).toEqual('map')
+                                    return method;
+                                }
+                            }).visit(cu, 0);
+                        }
+                    },
+                    //language=json
+                    packageJson(
+                        `
+                          {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                              "lodash": "^4.17.21"
+                            },
+                            "devDependencies": {
+                              "@types/lodash": "^4.14.195"
+                            }
+                          }
+                        `
+                    )
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
 });

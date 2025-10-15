@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {emptyMarkers, findMarker, Marker, Markers} from "./markers";
+import {emptyMarkers, Marker, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, Objectish} from "immer";
 import {mapAsync} from "./util";
@@ -40,7 +40,7 @@ const stopAfterPreVisit = Symbol("STOP_AFTER_PRE_VISIT")
 export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
-    private afterVisit?: TreeVisitor<any, P>[];
+    public afterVisit: TreeVisitor<any, P>[] = [];
 
     async visitDefined<R extends T>(tree: Tree, p: P, parent?: Cursor): Promise<R> {
         return (await this.visit<R>(tree, p, parent))!;
@@ -61,7 +61,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
 
         let t: T | undefined
         const isAcceptable = (!(isSourceFile(tree)) ||
-            this.isAcceptable(tree, p));
+            await this.isAcceptable(tree, p));
 
         try {
             if (isAcceptable) {
@@ -80,14 +80,14 @@ export abstract class TreeVisitor<T extends Tree, P> {
 
             if (topLevel) {
                 if (this.afterVisit) {
-                    for (const v of this.afterVisit) {
+                    while (this.afterVisit.length > 0) {
+                        const v = this.afterVisit.shift()!;
                         v.cursor = this.cursor;
                         if (t !== undefined) {
                             t = await v.visit(t, p);
                         }
                     }
                 }
-                this.afterVisit = undefined;
                 this.visitCount = 0;
             }
         } catch (e) {
@@ -108,7 +108,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
         this.cursor.messages.set(stopAfterPreVisit, true);
     }
 
-    isAcceptable(sourceFile: SourceFile, p: P): boolean {
+    async isAcceptable(sourceFile: SourceFile, p: P): Promise<boolean> {
         return true;
     }
 

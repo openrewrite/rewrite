@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
@@ -39,6 +41,9 @@ import static java.util.Collections.emptyList;
  * @param <T> The type of the inner list of elements.
  */
 public class JContainer<T> {
+    private static final JavaSender RPC_SENDER = new JavaSender();
+    private static final JavaReceiver RPC_RECEIVER = new JavaReceiver();
+
     private transient @Nullable Padding<T> padding;
 
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);

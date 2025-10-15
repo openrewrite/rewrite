@@ -17,7 +17,6 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.BooleanUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -156,7 +155,7 @@ public class Find extends Recipe {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     String text = rawText.substring(matchStart, matcher.end());
-                    snippets.add(SearchResult.found(snippet(text), BooleanUtils.isTrue(description) ? text : null));
+                    snippets.add(SearchResult.found(snippet(text), Boolean.TRUE.equals(description) ? text : null));
                     previousEnd = matcher.end();
 
                     // For the first match, search backwards

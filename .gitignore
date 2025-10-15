@@ -8,6 +8,7 @@ out/
 .project
 .classpath
 .settings/
+.vscode/
 .DS_Store
 **/node_modules/
 IDE.properties
@@ -15,3 +16,4 @@ IDE.properties
 .tool-versions
 .aider*
 /worktrees
+rewrite-gradle-tooling-model/model/src/main/resources/test-manifest.txt

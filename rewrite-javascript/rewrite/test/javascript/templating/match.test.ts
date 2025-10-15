@@ -83,8 +83,8 @@ describe('match extraction', () => {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
 
                 const swapOperands = rewrite(() => ({
-                        before: pattern`${"left"} + ${"right"}`,
-                        after: template`${"right"} + ${"left"}`
+                        before: pattern`${capture('left')} + ${capture('right')}`,
+                        after: template`${capture('right')} + ${capture('left')}`
                     })
                 );
                 return await swapOperands.tryOn(this.cursor, binary);
@@ -118,6 +118,53 @@ describe('match extraction', () => {
                             draft.right = createDraft(leftValue!);
                             draft.right.prefix = binary.right.prefix;
                         });
+                    }
+                }
+                return binary;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
+        );
+    });
+
+    test('extract parts using inline named captures', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                if (binary.operator.element === J.Binary.Type.Addition) {
+                    // Use inline named captures
+                    const m = await pattern`${capture('left')} + ${capture('right')}`.match(binary);
+                    if (m) {
+                        // Can retrieve by string name
+                        return await template`${capture('right')} + ${capture('left')}`.apply(this.cursor, binary, m);
+                    }
+                }
+                return binary;
+            }
+        });
+
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
+        );
+    });
+
+    test('pattern with imports configuration', () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                if (binary.operator.element === J.Binary.Type.Addition) {
+                    // Pattern configured with imports (for future type attribution)
+                    const m = await pattern`${capture('left')} + ${capture('right')}`
+                        .configure({
+                            imports: ['import { SomeType } from "some-module"'],
+                            dependencies: { 'some-module': '^1.0.0' }
+                        })
+                        .match(binary);
+
+                    if (m) {
+                        return await template`${capture('right')} + ${capture('left')}`.apply(this.cursor, binary, m);
                     }
                 }
                 return binary;

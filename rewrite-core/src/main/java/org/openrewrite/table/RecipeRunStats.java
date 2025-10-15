@@ -15,26 +15,18 @@
  */
 package org.openrewrite.table;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
-import static java.util.Objects.requireNonNull;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
-    private final MeterRegistry registry = new SimpleMeterRegistry();
+    private final Map<String, RecipeTimers> recipeTimers = new ConcurrentHashMap<>();
     private final Set<Path> sourceFileVisited = new HashSet<>();
     private final Set<Path> sourceFileChanged = new HashSet<>();
 
@@ -59,57 +51,28 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        Timer.builder("rewrite.recipe.scan")
-                .tag("name", recipe.getName())
-                .publishPercentiles(0.99)
-                .register(registry)
-                .recordCallable(scan);
+        recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordScan(scan);
     }
 
     public @Nullable SourceFile recordEdit(Recipe recipe, Callable<SourceFile> edit) throws Exception {
-        return Timer.builder("rewrite.recipe.edit")
-                .tag("name", recipe.getName())
-                .publishPercentiles(0.99)
-                .register(registry)
-                .recordCallable(edit);
+        return recipeTimers.computeIfAbsent(recipe.getName(), k -> new RecipeTimers()).recordEdit(edit);
     }
 
     public void flush(ExecutionContext ctx) {
-        for (Timer editor : registry.find("rewrite.recipe.edit").timers()) {
-            String recipeName = requireNonNull(editor.getId().getTag("name"));
-            Timer scanner = registry.find("rewrite.recipe.scan").tag("name", recipeName).timer();
+        for (Map.Entry<String, RecipeTimers> entry : recipeTimers.entrySet()) {
+            String recipeName = entry.getKey();
+            RecipeTimers timers = entry.getValue();
+
             Row row = new Row(
                     recipeName,
                     sourceFileVisited.size(),
                     sourceFileChanged.size(),
-                    scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                    scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
-                    (long) editor.totalTime(TimeUnit.NANOSECONDS),
-                    editor.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                    (long) editor.max(TimeUnit.NANOSECONDS)
+                    timers.scan.getTotalNs(),
+                    timers.scan.getMaxNs(),
+                    timers.edit.getTotalNs(),
+                    timers.edit.getMaxNs()
             );
             addRowToDataTable(ctx, row);
-        }
-
-        // find scanners that never finished their edit phase
-        for (Timer scanner : registry.find("rewrite.recipe.scan").timers()) {
-            String recipeName = requireNonNull(scanner.getId().getTag("name"));
-            if (registry.find("rewrite.recipe.edit").tag("name", recipeName).timer() == null) {
-                Row row = new Row(
-                        recipeName,
-                        Long.valueOf(scanner.count()).intValue(),
-                        sourceFileChanged.size(),
-                        (long) scanner.totalTime(TimeUnit.NANOSECONDS),
-                        scanner.takeSnapshot().percentileValues()[0].value(TimeUnit.NANOSECONDS),
-                        (long) scanner.max(TimeUnit.NANOSECONDS),
-                        0L,
-                        0.0,
-                        0L
-                );
-
-                addRowToDataTable(ctx, row);
-            }
         }
     }
 
@@ -141,10 +104,6 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The total time spent across the scanning phase of this recipe.")
         Long scanTotalTimeNs;
 
-        @Column(displayName = "99th percentile scanning time (ns)",
-                description = "99 out of 100 scans completed in this amount of time.")
-        Double scanP99Ns;
-
         @Column(displayName = "Max scanning time (ns)",
                 description = "The max time scanning any one source file.")
         Long scanMaxNs;
@@ -153,12 +112,43 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The total time spent across the editing phase of this recipe.")
         Long editTotalTimeNs;
 
-        @Column(displayName = "99th percentile edit time (ns)",
-                description = "99 out of 100 edits completed in this amount of time.")
-        Double editP99Ns;
-
         @Column(displayName = "Max edit time (ns)",
                 description = "The max time editing any one source file.")
         Long editMaxNs;
+    }
+
+    private static class RecipeTimers {
+        final PhaseTimer scan = new PhaseTimer();
+        final PhaseTimer edit = new PhaseTimer();
+
+        void recordScan(Callable<SourceFile> scanCallable) throws Exception {
+            scan.recordTimed(scanCallable);
+        }
+
+        @Nullable
+        SourceFile recordEdit(Callable<SourceFile> editCallable) throws Exception {
+            return edit.recordTimed(editCallable);
+        }
+    }
+
+    @Getter
+    private static class PhaseTimer {
+        private long totalNs = 0;
+        private long maxNs = 0;
+
+        <T> T recordTimed(Callable<T> callable) throws Exception {
+            long startNs = System.nanoTime();
+            try {
+                return callable.call();
+            } finally {
+                long elapsedNs = System.nanoTime() - startNs;
+                record(elapsedNs);
+            }
+        }
+
+        private void record(long elapsedNs) {
+            totalNs += elapsedNs;
+            maxNs = Math.max(maxNs, elapsedNs);
+        }
     }
 }

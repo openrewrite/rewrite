@@ -1,6 +1,7 @@
 /tmp
 /out-tsc
 /dist
+/dist-fixtures
 
 /node_modules
 npm-debug.log*

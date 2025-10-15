@@ -187,9 +187,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (parenthesized instanceof J.Ternary) {
                 J.Ternary ternary = (J.Ternary) parenthesized;
                 j = ternary
-                        .withCondition(maybeNegate(ternary.getCondition()))
-                        .withTruePart(ternary.getFalsePart())
-                        .withFalsePart(ternary.getTruePart())
+                        .withTruePart(maybeNegate(ternary.getTruePart()))
+                        .withFalsePart(maybeNegate(ternary.getFalsePart()))
                         .withPrefix(j.getPrefix());
             } else if (parenthesized instanceof Expression) {
                 j = unpackExpression((Expression) parenthesized, j);
@@ -202,22 +201,26 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (expr instanceof J.Binary) {
             J.Binary.Type negated = maybeNegate(((J.Binary) expr).getOperator());
             if (negated != ((J.Binary) expr).getOperator()) {
-                expr = ((J.Binary) expr).withOperator(negated).withPrefix(expr.getPrefix());
+                return ((J.Binary) expr).withOperator(negated).withPrefix(expr.getPrefix());
             }
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-            expr = ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
+            return ((J.Unary) expr).getExpression().withPrefix(expr.getPrefix());
         } else if (expr instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) expr;
             Expression negatedCondition = maybeNegate(ternary.getCondition());
             if (negatedCondition != ternary.getCondition()) {
-                expr = ternary
+                return ternary
                         .withCondition(negatedCondition)
                         .withTruePart(ternary.getFalsePart())
                         .withFalsePart(ternary.getTruePart())
                         .withPrefix(expr.getPrefix());
             }
+        } else if (isLiteralTrue(expr)) {
+            return ((J.Literal) expr).withValue(false).withValueSource("false");
+        } else if (isLiteralFalse(expr)) {
+            return ((J.Literal) expr).withValue(true).withValueSource("true");
         }
-        return expr;
+        return not(expr).withPrefix(expr.getPrefix());
     }
 
     private J.Binary.Type maybeNegate(J.Binary.Type operator) {

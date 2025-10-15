@@ -22,13 +22,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.RpcObjectData;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
@@ -36,8 +38,9 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @Value
 public class GetObject implements RpcRequest {
     String id;
+
     @Nullable
-    String lastKnownId;
+    String sourceFileType;
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
@@ -46,12 +49,15 @@ public class GetObject implements RpcRequest {
         private final AtomicInteger batchSize;
         private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
+
         /**
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
          */
         private final IdentityHashMap<Object, Integer> localRefs;
-        private final AtomicBoolean trace;
+
+        private final AtomicReference<PrintStream> log;
+        private final Supplier<Boolean> traceGetObject;
 
         private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
@@ -61,38 +67,32 @@ public class GetObject implements RpcRequest {
 
             if (after == null) {
                 List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null, null));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
+                deleted.add(new RpcObjectData(DELETE, null, null, null, traceGetObject.get()));
+                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get()));
                 return deleted;
             }
 
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
+                Object before = remoteObjects.get(id);
 
-                // Determine what the remote has cached
-                Object before = null;
-                if (request.getLastKnownId() != null) {
-                    before = remoteObjects.get(request.getLastKnownId());
-                    if (before == null) {
-                        // Remote had something cached, but we've evicted it - must send full object
-                        remoteObjects.remove(request.getLastKnownId());
-                    }
-                }
-
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, trace.get());
-                Object beforeFinal = before;
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType(), traceGetObject.get());
                 forkJoin.submit(() -> {
                     try {
-                        sendQueue.send(after, beforeFinal, null);
+                        sendQueue.send(after, before, null);
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state
                         // of this tree.
                         remoteObjects.put(id, after);
-                    } catch (Throwable ignored) {
-                        // TODO do something with this exception
+                    } catch (Throwable t) {
+                        PrintStream logFile = log.get();
+                        //noinspection ConstantValue
+                        if (logFile != null) {
+                            t.printStackTrace(logFile);
+                        }
                     } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, null));
+                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get()));
                         sendQueue.flush();
                     }
                     return 0;

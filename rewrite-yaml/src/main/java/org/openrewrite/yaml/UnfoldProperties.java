@@ -105,6 +105,8 @@ public class UnfoldProperties extends Recipe {
                                 int identLevel = Math.abs(getIndentLevel(entry) - getIndentLevel(newEntry));
                                 if (!hasLineBreak(entry.getPrefix()) && hasLineBreak(newEntry.getPrefix())) {
                                     newEntry = newEntry.withPrefix(substringOfAfterFirstLineBreak(entry.getPrefix()));
+                                } else if (identLevel == 0 && hasLineBreak(newEntry.getPrefix())) {
+                                    identLevel = 2; // autFormat indents the entire block by 2 spaces though it is a root level entry -> shift by 2 later
                                 }
                                 doAfterVisit(new ShiftFormatLeftVisitor<>(newEntry, identLevel));
                             }

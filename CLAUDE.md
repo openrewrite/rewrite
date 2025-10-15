@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Important Instructions
 
-When you need to know something about OpenRewrite, refer to the rewrite-docs folder.
+When you need to know something about OpenRewrite:
+- Refer to the rewrite-docs folder (if available)
+- Consult Architecture Decision Records in `docs/adr/` for design decisions
 
 ## Project Overview
 
@@ -92,6 +94,10 @@ OpenRewrite is an automated refactoring ecosystem for source code that eliminate
 - **`rewrite-java-lombok`**: Lombok-specific Java support
 - **`rewrite-benchmarks`**: JMH performance benchmarks
 - **`tools/language-parser-builder`**: Template tool for generating new language parsers
+
+## Architecture Decision Records (ADRs)
+
+Significant architectural decisions are documented in `docs/adr/`. When working on features that involve architectural decisions, consult existing ADRs and create new ones as needed following the standard ADR format (Context, Decision, Consequences).
 
 ## Development Patterns
 

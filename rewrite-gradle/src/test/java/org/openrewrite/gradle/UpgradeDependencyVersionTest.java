@@ -824,8 +824,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void versionInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$guavaVersion",
+      "${guavaVersion}",
+      "${property('guavaVersion')}",
+      "${project.property('guavaVersion')}",
+      "${findProperty('guavaVersion')}",
+      "${project.findProperty('guavaVersion')}",
+      "${project.properties['guavaVersion']}"
+    })
+    void versionInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -847,9 +856,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation ("com.google.guava:guava:$guavaVersion")
+                implementation ("com.google.guava:guava:%s")
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
@@ -1131,8 +1140,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void mapNotationVariableInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "guavaVersion",
+      "\"$guavaVersion\"",
+      "\"${guavaVersion}\"",
+      "property('guavaVersion')",
+      "\"${property('guavaVersion')}\"",
+      "\"${project.property('guavaVersion')}\"",
+      "findProperty('guavaVersion')",
+      "\"${findProperty('guavaVersion')}\"",
+      "\"${project.findProperty('guavaVersion')}\"",
+      "project.properties['guavaVersion']",
+      "\"${project.properties['guavaVersion']}\""
+    })
+    void mapNotationVariableInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -1154,9 +1176,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation group: "com.google.guava", name: "guava", version: guavaVersion
+                implementation group: "com.google.guava", name: "guava", version: %s
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }

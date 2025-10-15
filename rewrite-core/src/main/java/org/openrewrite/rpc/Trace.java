@@ -16,9 +16,11 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PathUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,8 +33,13 @@ import java.util.stream.Stream;
 public class Trace {
     private static final Trace.StackElementSourceLookup sourceLookup = new Trace.StackElementSourceLookup();
 
-    public static String traceReceiver() {
-        return trace("Receiver");
+    public static void traceReceiver(RpcObjectData message, @Nullable PrintStream logFile) {
+        if (logFile != null && message.getTrace() != null) {
+            logFile.println(message.withoutTrace());
+            logFile.println("  " + message.getTrace());
+            logFile.println("  " + trace("Receiver"));
+            logFile.flush();
+        }
     }
 
     public static String traceSender() {
@@ -56,10 +63,10 @@ public class Trace {
      */
     public static class StackElementSourceLookup {
         private final Map<String, Path> sourceByClassName = new HashMap<>();
-        private Path repositoryRoot = Paths.get(".").toAbsolutePath();
+        private @Nullable Path repositoryRoot = Paths.get(".").toAbsolutePath();
 
         public StackElementSourceLookup() {
-            while (!repositoryRoot.resolve(".git").toFile().exists()) {
+            while (repositoryRoot != null && !repositoryRoot.resolve(".git").toFile().exists()) {
                 repositoryRoot = repositoryRoot.getParent();
             }
         }
@@ -84,6 +91,10 @@ public class Trace {
         }
 
         private @Nullable Path lookupSourcePath(String className) {
+            if (repositoryRoot == null) {
+                // In case the current working directory was not inside a Git repository
+                return null;
+            }
             String relativePath = className.replace('.', File.separatorChar) + ".java";
             try (Stream<Path> paths = Files.walk(repositoryRoot)) {
                 return paths

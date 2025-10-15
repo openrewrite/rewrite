@@ -34,6 +34,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.rpc.JavaReceiver;
+import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
@@ -50,6 +52,9 @@ import java.util.function.UnaryOperator;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JLeftPadded<T> {
+    private static final JavaSender RPC_SENDER = new JavaSender();
+    private static final JavaReceiver RPC_RECEIVER = new JavaReceiver();
+
     Space before;
     T element;
     Markers markers;

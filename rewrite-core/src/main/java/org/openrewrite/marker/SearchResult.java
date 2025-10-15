@@ -22,6 +22,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -34,7 +37,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
 @With
-public final class SearchResult implements Marker {
+public final class SearchResult implements Marker, RpcCodec<SearchResult> {
     UUID id;
 
     @EqualsAndHashCode.Include
@@ -60,8 +63,9 @@ public final class SearchResult implements Marker {
      * <p>
      * If the there already exists a search result with the same description, the existing search result is returned.
      */
+    @Contract("null, _ -> null; !null, _ -> !null")
     @Incubating(since = "8.0.0")
-    public static <T extends @Nullable Tree> T mergingFound(@Nullable T t, String description) {
+    public static <T extends @Nullable Tree> @Nullable T mergingFound(@Nullable T t, String description) {
         return mergingFound(t, description, ", ");
     }
 
@@ -72,6 +76,7 @@ public final class SearchResult implements Marker {
      *
      * @param delimiter The delimiter to use when merging descriptions.
      */
+    @Contract("null, _, _ -> null; !null, _, _ -> !null")
     @Incubating(since = "8.0.0")
     public static <T extends Tree> @Nullable T mergingFound(@Nullable T t, String description, String delimiter) {
         Objects.requireNonNull(delimiter, "delimiter must not be null");
@@ -111,5 +116,18 @@ public final class SearchResult implements Marker {
     @Override
     public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         return commentWrapper.apply(description == null ? "" : "(" + description + ")");
+    }
+
+    @Override
+    public void rpcSend(SearchResult after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, SearchResult::getDescription);
+    }
+
+    @Override
+    public SearchResult rpcReceive(SearchResult before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withDescription(q.receive(before.getDescription()));
     }
 }
