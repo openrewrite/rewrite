@@ -40,6 +40,8 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateDependenciesToVersionCatalog.DependencyAccumulator> {
 
+    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+    private static final MethodMatcher PROJECT_MATCHER = new MethodMatcher("DependencyHandlerSpec project(..)");
     private static final Pattern DEPENDENCY_STRING_PATTERN = Pattern.compile("([^:]+):([^:]+):([^:@]+)(@.+)?");
     private static final Pattern DEPENDENCY_MAP_PATTERN = Pattern.compile("group:\\s*['\"]([^'\"]+)['\"],\\s*name:\\s*['\"]([^'\"]+)['\"],\\s*version:\\s*['\"]([^'\"]+)['\"]");
     private static final String CATALOG_PATH = "gradle/libs.versions.toml";
@@ -134,14 +136,17 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
                     return new GroovyIsoVisitor<ExecutionContext>() {
 
-                        final MethodMatcher projectMatcher = new MethodMatcher("* project(..)");
-
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                             // Skip project dependencies - we don't migrate those
-                            if (projectMatcher.matches(m)) {
+                            if (PROJECT_MATCHER.matches(m)) {
+                                return m;
+                            }
+
+                            // Check if this is a dependency DSL method call
+                            if (!DEPENDENCY_DSL_MATCHER.matches(m)) {
                                 return m;
                             }
 
@@ -341,14 +346,18 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
         }
 
         return new GroovyIsoVisitor<ExecutionContext>() {
-            final MethodMatcher projectMatcher = new MethodMatcher("* project(..)");
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                 // Skip project dependencies
-                if (projectMatcher.matches(m)) {
+                if (PROJECT_MATCHER.matches(m)) {
+                    return m;
+                }
+
+                // Check if this is a dependency DSL method call
+                if (!DEPENDENCY_DSL_MATCHER.matches(m)) {
                     return m;
                 }
 
