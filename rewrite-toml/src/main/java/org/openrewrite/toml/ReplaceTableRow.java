@@ -99,47 +99,37 @@ public class ReplaceTableRow extends Recipe {
             }
 
             private Toml.Table replaceTable(Toml.Table table, List<Toml.KeyValue> incomingKeyValues) {
-                // Build new values list from incoming key-values
-                List<Toml> newValues = new ArrayList<>();
-                boolean hasChanges = false;
-
                 // Check if the incoming values match the existing ones exactly
-                if (table.getValues().size() != incomingKeyValues.size()) {
-                    hasChanges = true;
-                } else {
-                    // Check if any values are different
-                    for (int i = 0; i < incomingKeyValues.size(); i++) {
-                        Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                if (table.getValues().size() == incomingKeyValues.size()) {
+                    boolean allMatch = true;
+                    for (Toml.KeyValue incomingKv : incomingKeyValues) {
                         boolean found = false;
-
                         for (Toml existingValue : table.getValues()) {
                             if (!(existingValue instanceof Toml.KeyValue)) {
-                                hasChanges = true;
+                                allMatch = false;
                                 break;
                             }
                             Toml.KeyValue existingKv = (Toml.KeyValue) existingValue;
-                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
-                                if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                    hasChanges = true;
-                                }
+                            if (areEqual(existingKv.getKey(), incomingKv.getKey()) &&
+                                areEqual(existingKv.getValue(), incomingKv.getValue())) {
                                 found = true;
                                 break;
                             }
                         }
-
                         if (!found) {
-                            hasChanges = true;
+                            allMatch = false;
+                            break;
                         }
                     }
-                }
-
-                if (!hasChanges) {
-                    return table;
+                    if (allMatch) {
+                        return table;
+                    }
                 }
 
                 // Replace with incoming key-values, preserving the prefix from the first existing value
                 Space firstPrefix = table.getValues().isEmpty() ? Space.format("\n") : table.getValues().get(0).getPrefix();
 
+                List<Toml> newValues = new ArrayList<>();
                 for (int i = 0; i < incomingKeyValues.size(); i++) {
                     Toml.KeyValue incomingKv = incomingKeyValues.get(i);
                     Toml.KeyValue kvToAdd = i == 0 ? incomingKv.withPrefix(firstPrefix) : incomingKv.withPrefix(Space.format("\n"));

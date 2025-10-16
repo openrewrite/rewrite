@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.toml.marker.ArrayTable;
 import org.openrewrite.toml.tree.Space;
@@ -161,51 +162,43 @@ public class MergeTableRow extends Recipe {
 
                 if (identifyingValue.equals(tableIdentifyingValue)) {
                     // Merge the values
-                    return mergeTable(table, incomingKeyValues);
+                    return table.withValues(
+                            ListUtils.concatAll(
+                                    ListUtils.map(table.getValues(), value -> {
+                                        if (!(value instanceof Toml.KeyValue)) {
+                                            return value;
+                                        }
+                                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
+
+                                        // Check if any incoming key-value matches this one
+                                        for (int i = 0; i < incomingKeyValues.size(); i++) {
+                                            Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                                            if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
+                                                incomingKeyValues.remove(i);
+
+                                                //noinspection ConstantConditions
+                                                if (incomingKv.getValue() == null) {
+                                                    return null; // Remove the key-value pair
+                                                } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
+                                                    return existingKv.withValue(incomingKv.getValue());
+                                                }
+                                                return existingKv; // No change needed
+                                            }
+                                        }
+                                        return existingKv;
+                                    }),
+                                    ListUtils.map(incomingKeyValues, kv -> {
+                                        //noinspection ConstantConditions
+                                        if (kv.getValue() != null) {
+                                            return kv;
+                                        }
+                                        return null;
+                                    })
+                            )
+                    );
                 }
 
                 return super.visitTable(table, ctx);
-            }
-
-            private Toml.Table mergeTable(Toml.Table table, List<Toml.KeyValue> incomingKeyValues) {
-                List<Toml> currentValues = table.getValues();
-                List<Toml> mergedValues = new ArrayList<>(currentValues);
-                boolean hasChanges = false;
-
-                // Merge or add each incoming key-value
-                for (Toml.KeyValue incomingKv : incomingKeyValues) {
-                    boolean found = false;
-                    for (int i = 0; i < mergedValues.size(); i++) {
-                        Toml value = mergedValues.get(i);
-                        if (!(value instanceof Toml.KeyValue)) {
-                            continue;
-                        }
-                        Toml.KeyValue existingKv = (Toml.KeyValue) value;
-                        if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
-                            //noinspection ConstantConditions
-                            if (incomingKv.getValue() == null) {
-                                mergedValues.remove(i);
-                                hasChanges = true;
-                            } else if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                // Check if values are actually different
-                                mergedValues.set(i, existingKv.withValue(incomingKv.getValue()));
-                                hasChanges = true;
-                            }
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    //noinspection ConstantConditions
-                    if (!found && incomingKv.getValue() != null) {
-                        // Add new key-value with proper formatting (but not if it's null)
-                        Toml.KeyValue kvToAdd = incomingKv.withPrefix(Space.format("\n"));
-                        mergedValues.add(kvToAdd);
-                        hasChanges = true;
-                    }
-                }
-
-                return hasChanges ? table.withValues(mergedValues) : table;
             }
 
             private List<Toml.KeyValue> parseTomlRow(String tomlContent) {

@@ -23,12 +23,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 import org.openrewrite.toml.tree.TomlValue;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -91,43 +89,30 @@ public class ChangeTableRowValue extends Recipe {
                     return super.visitTable(table, ctx);
                 }
 
-                // Update the property value
-                List<Toml> updatedValues = new ArrayList<>(table.getValues());
-                boolean hasChanges = false;
-
-                for (int i = 0; i < updatedValues.size(); i++) {
-                    Toml value = updatedValues.get(i);
+                return table.withValues(ListUtils.map(table.getValues(), value -> {
                     if (!(value instanceof Toml.KeyValue)) {
-                        continue;
+                        return value;
                     }
-
                     Toml.KeyValue kv = (Toml.KeyValue) value;
                     TomlKey key = kv.getKey();
                     if (!(key instanceof Toml.Identifier)) {
-                        continue;
+                        return value;
                     }
-
                     if (propertyKey.equals(((Toml.Identifier) key).getName())) {
                         if (newValue == null) {
-                            // Remove the key-value pair
-                            updatedValues.remove(i);
-                            hasChanges = true;
+                            return null; // Remove the key-value pair
                         } else {
                             // Parse the complete key-value pair with the new value
                             Toml.KeyValue newKv = parseKeyValue(propertyKey, newValue);
 
                             // Check if the key-value is actually different
                             if (newKv != null && !SemanticallyEqual.areEqual(kv, newKv)) {
-                                // Replace with the new key-value, preserving the prefix
-                                updatedValues.set(i, newKv.withPrefix(kv.getPrefix()));
-                                hasChanges = true;
+                                return newKv.withPrefix(kv.getPrefix());
                             }
                         }
-                        break;
                     }
-                }
-
-                return hasChanges ? table.withValues(updatedValues) : table;
+                    return value;
+                }));
             }
 
             // Parse a complete TOML key-value pair using TomlParser.
