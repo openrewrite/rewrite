@@ -609,11 +609,12 @@ export class JavaScriptParserVisitor {
     visitNumericLiteral(node: ts.NumericLiteral): J.Literal {
         // Parse the numeric value from the text
         const text = node.text;
-        let value: number | bigint;
+        let value: number | bigint | string;
 
         // Check if it's a BigInt literal (ends with 'n')
         if (text.endsWith('n')) {
-            value = BigInt(text.slice(0, -1));
+            // TODO consider adding `JS.Literal`
+            value = text.slice(0, -1);
         } else if (text.includes('.') || text.toLowerCase().includes('e')) {
             // Floating point number
             value = parseFloat(text);
@@ -708,7 +709,8 @@ export class JavaScriptParserVisitor {
     visitBigIntLiteral(node: ts.BigIntLiteral): J.Literal {
         // Parse BigInt value, removing the 'n' suffix
         const text = node.text;
-        const value = BigInt(text.slice(0, -1));
+        // TODO consider adding `JS.Literal`
+        const value = text.slice(0, -1);
         return this.mapLiteral(node, value);
     }
 
@@ -717,6 +719,7 @@ export class JavaScriptParserVisitor {
     }
 
     visitRegularExpressionLiteral(node: ts.RegularExpressionLiteral): J.Literal {
+        // TODO consider adding `JS.Literal`
         return this.mapLiteral(node, node.text); // FIXME value not in AST
     }
 
