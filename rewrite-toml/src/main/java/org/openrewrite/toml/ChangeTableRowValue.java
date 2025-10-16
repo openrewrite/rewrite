@@ -94,21 +94,17 @@ public class ChangeTableRowValue extends Recipe {
                         return value;
                     }
                     Toml.KeyValue kv = (Toml.KeyValue) value;
-                    TomlKey key = kv.getKey();
-                    if (!(key instanceof Toml.Identifier)) {
-                        return value;
-                    }
-                    if (propertyKey.equals(((Toml.Identifier) key).getName())) {
+                    if (kv.getKey() instanceof Toml.Identifier &&
+                            propertyKey.equals(((Toml.Identifier) kv.getKey()).getName())) {
                         if (newValue == null) {
                             return null; // Remove the key-value pair
-                        } else {
-                            // Parse the complete key-value pair with the new value
-                            Toml.KeyValue newKv = parseKeyValue(propertyKey, newValue);
+                        }
+                        // Parse the complete key-value pair with the new value
+                        Toml.KeyValue newKv = parseKeyValue(propertyKey, newValue);
 
-                            // Check if the key-value is actually different
-                            if (newKv != null && !SemanticallyEqual.areEqual(kv, newKv)) {
-                                return newKv.withPrefix(kv.getPrefix());
-                            }
+                        // Check if the key-value is actually different
+                        if (newKv != null && !SemanticallyEqual.areEqual(kv, newKv)) {
+                            return newKv.withPrefix(kv.getPrefix());
                         }
                     }
                     return value;
