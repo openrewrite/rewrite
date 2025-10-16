@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlValue;
@@ -91,52 +92,39 @@ public class ReplaceTableRow extends Recipe {
                 String tableIdentifyingValue = TableRowMatcher.getKeyValue(table, identifyingKey);
 
                 if (identifyingValue.equals(tableIdentifyingValue)) {
-                    // Replace the entire table row
-                    return replaceTable(table, incomingKeyValues);
+                    Space firstPrefix = table.getValues().isEmpty() ? Space.format("\n") : table.getValues().get(0).getPrefix();
+
+                    return table.withValues(
+                            ListUtils.mapFirst(
+                                    ListUtils.concatAll(
+                                            ListUtils.map(table.getValues(), value -> {
+                                                if (!(value instanceof Toml.KeyValue)) {
+                                                    return null; // Remove non-KeyValue entries in replace mode
+                                                }
+                                                Toml.KeyValue existingKv = (Toml.KeyValue) value;
+
+                                                // Check if this key exists in the incoming values
+                                                for (int i = 0; i < incomingKeyValues.size(); i++) {
+                                                    Toml.KeyValue incomingKv = incomingKeyValues.get(i);
+                                                    if (areEqual(existingKv.getKey(), incomingKv.getKey())) {
+                                                        incomingKeyValues.remove(i);
+
+                                                        // Replace if value is different
+                                                        if (!areEqual(existingKv.getValue(), incomingKv.getValue())) {
+                                                            return incomingKv.withPrefix(existingKv.getPrefix());
+                                                        }
+                                                        return existingKv; // No change needed
+                                                    }
+                                                }
+                                                return null; // Remove key-value not in incoming
+                                            }),
+                                            incomingKeyValues
+                                    ), first -> first.withPrefix(firstPrefix)
+                            )
+                    );
                 }
 
                 return super.visitTable(table, ctx);
-            }
-
-            private Toml.Table replaceTable(Toml.Table table, List<Toml.KeyValue> incomingKeyValues) {
-                // Check if the incoming values match the existing ones exactly
-                if (table.getValues().size() == incomingKeyValues.size()) {
-                    boolean allMatch = true;
-                    for (Toml.KeyValue incomingKv : incomingKeyValues) {
-                        boolean found = false;
-                        for (Toml existingValue : table.getValues()) {
-                            if (!(existingValue instanceof Toml.KeyValue)) {
-                                allMatch = false;
-                                break;
-                            }
-                            Toml.KeyValue existingKv = (Toml.KeyValue) existingValue;
-                            if (areEqual(existingKv.getKey(), incomingKv.getKey()) &&
-                                areEqual(existingKv.getValue(), incomingKv.getValue())) {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            allMatch = false;
-                            break;
-                        }
-                    }
-                    if (allMatch) {
-                        return table;
-                    }
-                }
-
-                // Replace with incoming key-values, preserving the prefix from the first existing value
-                Space firstPrefix = table.getValues().isEmpty() ? Space.format("\n") : table.getValues().get(0).getPrefix();
-
-                List<Toml> newValues = new ArrayList<>();
-                for (int i = 0; i < incomingKeyValues.size(); i++) {
-                    Toml.KeyValue incomingKv = incomingKeyValues.get(i);
-                    Toml.KeyValue kvToAdd = i == 0 ? incomingKv.withPrefix(firstPrefix) : incomingKv.withPrefix(Space.format("\n"));
-                    newValues.add(kvToAdd);
-                }
-
-                return table.withValues(newValues);
             }
 
             private List<Toml.KeyValue> parseTomlRow(String tomlContent) {
