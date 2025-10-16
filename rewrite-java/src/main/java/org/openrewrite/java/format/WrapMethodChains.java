@@ -18,7 +18,6 @@ package org.openrewrite.java.format;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -63,7 +62,7 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
                 }
 
                 // Not long enough to wrap
-                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && calculateLineLength(getCursor()) <= style.getHardWrapAt()) {
+                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && LengthCalculator.computeTreeLineLength(method, getCursor()) <= style.getHardWrapAt()) {
                     return m;
                 }
 
@@ -83,21 +82,6 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
         }
 
         return m;
-    }
-
-    private int calculateLineLength(Cursor cursor) {
-        Object cursorValue = cursor.getValue();
-        if (cursorValue instanceof J) {
-            J j = (J) cursorValue;
-            boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.getParentTreeCursor();
-            boolean isRoot = Cursor.ROOT_VALUE == parent.getValue();
-            if (!hasNewLine && !isRoot) {
-                return calculateLineLength(parent);
-            }
-            return j.print(cursor).replaceAll("^.*\\n", "").length() + 1;
-        }
-        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + cursorValue.getClass());
     }
 
     private J.@Nullable MethodInvocation findChainStarterInChain(J.MethodInvocation method, List<MethodMatcher> matchers) {
