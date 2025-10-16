@@ -30,7 +30,7 @@ import org.openrewrite.toml.tree.TomlValue;
 @EqualsAndHashCode(callSuper = false)
 public class DeleteTableRow extends Recipe {
     @Option(displayName = "Table name",
-            description = "The name of the TOML array table to merge into (e.g., 'package.contributors').",
+            description = "The name of the TOML array table to delete (e.g., 'package.contributors').",
             example = "package.contributors")
     String tableName;
 
