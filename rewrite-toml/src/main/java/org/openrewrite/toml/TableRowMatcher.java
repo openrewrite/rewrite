@@ -20,7 +20,6 @@ import org.openrewrite.toml.tree.Toml;
 import org.openrewrite.toml.tree.TomlKey;
 
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * Utility methods for matching table rows and extracting values from TOML tables.
@@ -78,52 +77,27 @@ public class TableRowMatcher {
      * @return true if a matching key-value pair is found, false otherwise
      */
     public static boolean hasMatchingKeyValue(Toml.Table table, String key, String value, @Nullable Boolean useRegex) {
-        Pattern pattern = Boolean.TRUE.equals(useRegex) ? Pattern.compile(value) : null;
         for (Toml tableValue : table.getValues()) {
             if (!(tableValue instanceof Toml.KeyValue)) {
                 continue;
             }
 
             Toml.KeyValue kv = (Toml.KeyValue) tableValue;
-            TomlKey kvKey = kv.getKey();
-
-            if (!(kvKey instanceof Toml.Identifier)) {
-                continue;
-            }
-
-            Toml.Identifier identifier = (Toml.Identifier) kvKey;
-            if (!key.equals(identifier.getName())) {
+            if (!(kv.getKey() instanceof Toml.Identifier) ||
+                    !key.equals(((Toml.Identifier) kv.getKey()).getName())) {
                 continue;
             }
 
             // Found the matching key, now check the value
-            if (matchesValue(kv.getValue(), value, pattern)) {
-                return true;
+            Toml valueNode = kv.getValue();
+            if (!(valueNode instanceof Toml.Literal)) {
+                return false;
             }
+            Toml.Literal literal = (Toml.Literal) valueNode;
+            return Boolean.TRUE.equals(useRegex) ?
+                    literal.getValue().toString().matches(value) :
+                    literal.getValue().equals(value);
         }
         return false;
-    }
-
-    /**
-     * Checks if a TOML value matches the specified string value or regex pattern.
-     *
-     * @param valueNode The TOML value node to check
-     * @param value     The value to match (exact match or regex pattern)
-     * @param pattern   Optional compiled regex pattern for value matching
-     * @return true if the value matches, false otherwise
-     */
-    private static boolean matchesValue(Toml valueNode, String value, @Nullable Pattern pattern) {
-        if (!(valueNode instanceof Toml.Literal)) {
-            return false;
-        }
-
-        Toml.Literal literal = (Toml.Literal) valueNode;
-        String literalValue = literal.getValue() != null ? literal.getValue().toString() : "";
-
-        if (pattern != null) {
-            return pattern.matcher(literalValue).matches();
-        } else {
-            return value.equals(literalValue);
-        }
     }
 }
