@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
@@ -28,6 +29,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
@@ -59,6 +62,8 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
     static class DependencyAccumulator {
         final Map<String, DependencyInfo> dependencies = Collections.synchronizedMap(new LinkedHashMap<>());
         final Set<String> configurations = Collections.synchronizedSet(new LinkedHashSet<>());
+        final Set<String> propertyNamesToRemove = Collections.synchronizedSet(new LinkedHashSet<>());
+        final Map<String, String> propertyValues = Collections.synchronizedMap(new LinkedHashMap<>());
         boolean catalogExists = false;
     }
 
@@ -132,8 +137,29 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     return tree;
                 }
 
+                // Parse gradle.properties to extract property values
+                if (sourceFile.getSourcePath().toString().endsWith(".properties") && sourceFile instanceof Properties.File) {
+                    Properties.File propertiesFile = (Properties.File) sourceFile;
+                    for (Properties.Content content : propertiesFile.getContent()) {
+                        if (content instanceof Properties.Entry) {
+                            Properties.Entry entry = (Properties.Entry) content;
+                            acc.propertyValues.put(entry.getKey(), entry.getValue().getText());
+                        }
+                    }
+                    return tree;
+                }
+
                 // Scan Gradle files for dependencies
                 if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
+                    // Extract property references from source text (handles GStrings)
+                    String sourceText = sourceFile.printAll();
+                    Pattern propRefPattern = Pattern.compile("\\$\\{?([a-zA-Z][a-zA-Z0-9_]*)\\}?");
+                    Matcher propMatcher = propRefPattern.matcher(sourceText);
+                    while (propMatcher.find()) {
+                        String propName = propMatcher.group(1);
+                        acc.propertyNamesToRemove.add(propName);
+                    }
+
                     return new GroovyIsoVisitor<ExecutionContext>() {
 
                         @Override
@@ -168,6 +194,9 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                 } else if (firstArg instanceof G.MapEntry) {
                                     // Map notation dependency
                                     looksLikeDependency = true;
+                                } else if (firstArg instanceof G.GString) {
+                                    // GString dependency (will be handled in extractDependency via GradleProject resolution)
+                                    looksLikeDependency = true;
                                 }
 
                                 if (looksLikeDependency) {
@@ -185,6 +214,10 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                             String key = extractStringValue(entry.getKey());
                                             String value = extractStringValue(entry.getValue());
                                             extractDependencyCoordinate(key, value, coords);
+                                            // Track property names from version identifiers
+                                            if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
+                                                acc.propertyNamesToRemove.add(value);
+                                            }
                                         } else if (arg instanceof G.MapLiteral) {
                                             // Alternative format: [group: 'x', name: 'y', version: 'z']
                                             isMapNotation = true;
@@ -193,13 +226,22 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                                                 String key = extractStringValue(entry.getKey());
                                                 String value = extractStringValue(entry.getValue());
                                                 extractDependencyCoordinate(key, value, coords);
+                                                // Track property names from version identifiers
+                                                if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
+                                                    acc.propertyNamesToRemove.add(value);
+                                                }
                                             }
                                         }
                                     }
 
                                     if (isMapNotation && coords.isComplete()) {
-                                        String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
-                                        DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, methodName);
+                                        // Resolve version from properties if it's a property reference
+                                        String version = coords.version;
+                                        if (acc.propertyValues.containsKey(coords.version)) {
+                                            version = acc.propertyValues.get(coords.version);
+                                        }
+                                        String depKey = coords.group + ":" + coords.artifact + ":" + version;
+                                        DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, version, methodName);
                                         acc.dependencies.put(depKey, dep);
                                     } else {
                                         // Process regular string dependencies
@@ -264,6 +306,39 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     acc.dependencies.put(depString, dep);
                 }
             }
+        } else if (arg instanceof G.GString) {
+            // Handle GString dependencies - extract group:artifact:version pattern from the GString structure
+            G.GString gstring = (G.GString) arg;
+            List<J> strings = gstring.getStrings();
+            if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                String firstPart = (String) ((J.Literal) strings.get(0)).getValue();
+                String[] parts = firstPart.split(":", -1);
+                if (parts.length >= 2) {
+                    String group = parts[0];
+                    String artifact = parts[1];
+
+                    // Extract property name from the GString
+                    // The version part should be in strings.get(1) if it's a simple property reference
+                    String propertyName = null;
+                    if (strings.size() >= 2) {
+                        J secondPart = strings.get(1);
+                        if (secondPart instanceof G.GString.Value) {
+                            G.GString.Value value = (G.GString.Value) secondPart;
+                            if (value.getTree() instanceof J.Identifier) {
+                                propertyName = ((J.Identifier) value.getTree()).getSimpleName();
+                            }
+                        }
+                    }
+
+                    // Resolve version from properties
+                    if (propertyName != null && acc.propertyValues.containsKey(propertyName)) {
+                        String version = acc.propertyValues.get(propertyName);
+                        String depKey = group + ":" + artifact + ":" + version;
+                        DependencyInfo dep = new DependencyInfo(group, artifact, version, configuration);
+                        acc.dependencies.put(depKey, dep);
+                    }
+                }
+            }
         } else if (arg instanceof G.MapLiteral) {
             G.MapLiteral map = (G.MapLiteral) arg;
             DependencyCoordinates coords = new DependencyCoordinates();
@@ -272,11 +347,21 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                 String key = extractStringValue(entry.getKey());
                 String value = extractStringValue(entry.getValue());
                 extractDependencyCoordinate(key, value, coords);
+                // Track property names from version identifiers
+                if ("version".equals(key) && entry.getValue() instanceof J.Identifier) {
+                    acc.propertyNamesToRemove.add(value);
+                }
             }
 
             if (coords.isComplete()) {
-                String key = coords.group + ":" + coords.artifact + ":" + coords.version;
-                DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, coords.version, configuration);
+                // Resolve version from properties if it's a property reference
+                String version = coords.version;
+                if (acc.propertyValues.containsKey(coords.version)) {
+                    version = acc.propertyValues.get(coords.version);
+                }
+
+                String key = coords.group + ":" + coords.artifact + ":" + version;
+                DependencyInfo dep = new DependencyInfo(coords.group, coords.artifact, version, configuration);
                 acc.dependencies.put(key, dep);
             }
         }
@@ -345,7 +430,28 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
             return TreeVisitor.noop();
         }
 
-        return new GroovyIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    SourceFile sourceFile = (SourceFile) tree;
+                    if (sourceFile.getSourcePath().toString().endsWith(".properties")) {
+                        return new PropertiesFileVisitor(acc).visitNonNull(sourceFile, ctx);
+                    } else if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
+                        return new GradleFileVisitor(acc).visitNonNull(sourceFile, ctx);
+                    }
+                }
+                return tree;
+            }
+        };
+    }
+
+    private class GradleFileVisitor extends GroovyIsoVisitor<ExecutionContext> {
+        private final DependencyAccumulator acc;
+
+        GradleFileVisitor(DependencyAccumulator acc) {
+            this.acc = acc;
+        }
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -384,6 +490,16 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                         if (isMapNotation && coords.isComplete()) {
                             String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
                             DependencyInfo dep = acc.dependencies.get(depKey);
+
+                            // If not found by exact version, search by group:artifact only
+                            if (dep == null) {
+                                for (DependencyInfo candidate : acc.dependencies.values()) {
+                                    if (candidate.group.equals(coords.group) && candidate.artifact.equals(coords.artifact)) {
+                                        dep = candidate;
+                                        break;
+                                    }
+                                }
+                            }
 
                             if (dep != null) {
                                 // Replace all map entries with a single field access for the catalog with OmitParentheses marker
@@ -495,6 +611,61 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                             );
                         }
                     }
+                } else if (arg instanceof G.GString) {
+                    // Handle GString dependencies (e.g., "group:artifact:$version")
+                    G.GString gstring = (G.GString) arg;
+                    List<J> strings = gstring.getStrings();
+                    if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                        String firstPart = (String) ((J.Literal) strings.get(0)).getValue();
+                        String[] parts = firstPart.split(":", -1);
+                        if (parts.length >= 2) {
+                            String group = parts[0];
+                            String artifact = parts[1];
+
+                            // Look for this dependency in our accumulator by group:artifact
+                            for (DependencyInfo dep : acc.dependencies.values()) {
+                                if (dep.group.equals(group) && dep.artifact.equals(artifact)) {
+                                    // Found a match - replace with catalog reference
+                                    boolean hasMultipleArgs = methodInvocation.getArguments().size() > 1;
+
+                                    J.Identifier libs = new J.Identifier(
+                                            Tree.randomId(),
+                                            Space.EMPTY,
+                                            Markers.EMPTY,
+                                            Collections.emptyList(),
+                                            "libs",
+                                            null,
+                                            null
+                                    );
+
+                                    Markers markers = hasMultipleArgs ?
+                                            Markers.EMPTY :
+                                            new Markers(Tree.randomId(), Collections.singletonList(new OmitParentheses(Tree.randomId())));
+
+                                    return new J.FieldAccess(
+                                            Tree.randomId(),
+                                            gstring.getPrefix(),
+                                            markers,
+                                            libs,
+                                            new JLeftPadded<>(
+                                                    Space.EMPTY,
+                                                    new J.Identifier(
+                                                            Tree.randomId(),
+                                                            Space.EMPTY,
+                                                            Markers.EMPTY,
+                                                            Collections.emptyList(),
+                                                            dep.getAliasName(),
+                                                            null,
+                                                            null
+                                                    ),
+                                                    Markers.EMPTY
+                                            ),
+                                            null
+                                    );
+                                }
+                            }
+                        }
+                    }
                 } else if (arg instanceof G.MapLiteral) {
                     // Handle map notation - transform to catalog reference
                     G.MapLiteral map = (G.MapLiteral) arg;
@@ -509,6 +680,16 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
                     if (coords.isComplete()) {
                         String depKey = coords.group + ":" + coords.artifact + ":" + coords.version;
                         DependencyInfo dep = acc.dependencies.get(depKey);
+
+                        // If not found by exact version, search by group:artifact only
+                        if (dep == null) {
+                            for (DependencyInfo candidate : acc.dependencies.values()) {
+                                if (candidate.group.equals(coords.group) && candidate.artifact.equals(coords.artifact)) {
+                                    dep = candidate;
+                                    break;
+                                }
+                            }
+                        }
 
                         if (dep != null) {
                             // Create a field access for the catalog reference with OmitParentheses marker
@@ -556,6 +737,34 @@ public class MigrateDependenciesToVersionCatalog extends ScanningRecipe<MigrateD
 
                 return arg;
             }
-        };
+    }
+
+    private class PropertiesFileVisitor extends PropertiesVisitor<ExecutionContext> {
+        private final DependencyAccumulator acc;
+
+        PropertiesFileVisitor(DependencyAccumulator acc) {
+            this.acc = acc;
+        }
+
+        @Override
+        public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+            Properties.File f = (Properties.File) super.visitFile(file, ctx);
+            if (acc.propertyNamesToRemove.isEmpty()) {
+                return f;
+            }
+            Properties.File mapped = f.withContent(ListUtils.map(f.getContent(), content -> {
+                if (content instanceof Properties.Entry) {
+                    Properties.Entry entry = (Properties.Entry) content;
+                    if (acc.propertyNamesToRemove.contains(entry.getKey())) {
+                        return null; // Remove this entry
+                    }
+                }
+                return content;
+            }));
+            if (f != mapped) {
+                return mapped.withContent(ListUtils.mapFirst(mapped.getContent(), c -> (Properties.Content) c.withPrefix("")));
+            }
+            return mapped;
+        }
     }
 }
