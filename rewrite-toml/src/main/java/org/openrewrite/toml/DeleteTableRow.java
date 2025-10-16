@@ -82,11 +82,8 @@ public class DeleteTableRow extends Recipe {
             public @Nullable Toml visitTable(Toml.Table table, ExecutionContext ctx) {
                 Toml.Table t = (Toml.Table) super.visitTable(table, ctx);
 
-                if (t.getName() != null && tableName.equals(t.getName().getName())) {
-                    // Check if this table contains a matching key-value pair
-                    if (TableRowMatcher.hasMatchingKeyValue(t, identifyingKey, identifyingValue, useRegex)) {
-                        return null; // Delete the table
-                    }
+                if (t.getName() != null && tableName.equals(t.getName().getName()) && TableRowMatcher.hasMatchingKeyValue(t, identifyingKey, identifyingValue, useRegex)) {
+                    return null; // Delete the table
                 }
 
                 return t;
