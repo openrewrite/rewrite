@@ -100,7 +100,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         if (method.getName().getComments().isEmpty() && method.getName().getPrefix().getWhitespace().contains("\n")) {
-            return method.withName(method.getName().withPrefix(Space.EMPTY));
+            method = method.withName(method.getName().withPrefix(Space.EMPTY));
         }
         return super.visitMethodInvocation(method, p);
     }
