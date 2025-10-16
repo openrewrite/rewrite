@@ -21,6 +21,8 @@ import {J, Type} from '../java';
 import {produce} from "immer";
 import {JavaScriptComparatorVisitor} from "./comparator";
 import {DependencyWorkspace} from './dependency-workspace';
+import {Marker} from '../markers';
+import {randomId} from '../uuid';
 
 /**
  * Cache for compiled templates and patterns.
@@ -101,6 +103,20 @@ class TemplateCache {
 
 // Global cache instance
 const templateCache = new TemplateCache();
+
+/**
+ * Marker that stores capture metadata on pattern AST nodes.
+ * This avoids the need to parse capture names from identifiers during matching.
+ */
+class CaptureMarker implements Marker {
+    readonly kind = 'org.openrewrite.javascript.CaptureMarker';
+    readonly id = randomId();
+
+    constructor(
+        public readonly captureName: string
+    ) {
+    }
+}
 
 /**
  * Capture specification for pattern matching.
@@ -398,7 +414,6 @@ class JavaScriptTemplateSemanticallyEqualVisitor extends JavaScriptComparatorVis
 class Matcher {
     private readonly bindings = new Map<string, J>();
     private patternAst?: J;
-    private templateProcessor?: TemplateProcessor;
 
     /**
      * Creates a new matcher for a pattern against an AST node.
@@ -419,13 +434,13 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.templateProcessor = new TemplateProcessor(
+            const templateProcessor = new TemplateProcessor(
                 this.pattern.templateParts,
                 this.pattern.captures,
                 this.pattern.options.imports || [],
                 this.pattern.options.dependencies || {}
             );
-            this.patternAst = await this.templateProcessor.toAstPattern();
+            this.patternAst = await templateProcessor.toAstPattern();
         }
 
         return this.matchNode(this.patternAst, this.ast);
@@ -469,8 +484,7 @@ class Matcher {
             }
 
             private matchesParameter(identifier: J.Identifier, other: J): boolean {
-                return PlaceholderUtils.isCapture(identifier) &&
-                    matcher.handleCapture(identifier, other);
+                return PlaceholderUtils.isCapture(identifier) && matcher.handleCapture(identifier, other);
             }
         }).compare(pattern, target));
     }
@@ -483,15 +497,14 @@ class Matcher {
      * @returns true if the capture is successful, false otherwise
      */
     private handleCapture(pattern: J, target: J): boolean {
-        const id = pattern as J.Identifier;
-        const captureInfo = PlaceholderUtils.parseCapture(id.simpleName);
+        const captureName = PlaceholderUtils.getCaptureName(pattern);
 
-        if (!captureInfo) {
+        if (!captureName) {
             return false;
         }
 
         // Store the binding
-        this.bindings.set(captureInfo.name, target);
+        this.bindings.set(captureName, target);
         return true;
     }
 }
@@ -774,11 +787,30 @@ class PlaceholderUtils {
      * @returns true if the node is a capture placeholder, false otherwise
      */
     static isCapture(node: J): boolean {
-        if (node.kind === J.Kind.Identifier) {
-            const id = node as J.Identifier;
-            return id.simpleName.startsWith(this.CAPTURE_PREFIX);
+        // Check for CaptureMarker first (efficient)
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * Gets the capture name from a node with a CaptureMarker.
+     *
+     * @param node The node to extract capture name from
+     * @returns The capture name, or null if not a capture
+     */
+    static getCaptureName(node: J): string | undefined {
+        // Check for CaptureMarker
+        for (const marker of node.markers.markers) {
+            if (marker instanceof CaptureMarker) {
+                return marker.captureName;
+            }
+        }
+
+        return undefined;
     }
 
     /**
@@ -1082,8 +1114,66 @@ class TemplateProcessor {
             extracted = firstStatement;
         }
 
-        // Return a copy to avoid sharing cached AST instances
-        return produce(extracted, draft => {});
+        // Attach CaptureMarkers to capture identifiers
+        return this.attachCaptureMarkers(extracted);
+    }
+
+    /**
+     * Attaches CaptureMarkers to capture identifiers in the AST.
+     * This allows efficient capture detection without string parsing.
+     *
+     * @param ast The AST to process
+     * @returns The AST with CaptureMarkers attached
+     */
+    private attachCaptureMarkers(ast: J): J {
+        const visited = new Set<any>();
+        return produce(ast, draft => {
+            this.visitAndAttachMarkers(draft, visited);
+        });
+    }
+
+    /**
+     * Recursively visits AST nodes and attaches CaptureMarkers to capture identifiers.
+     *
+     * @param node The node to visit
+     * @param visited Set of already visited nodes to avoid cycles
+     */
+    private visitAndAttachMarkers(node: any, visited: Set<any>): void {
+        if (!node || typeof node !== 'object' || visited.has(node)) {
+            return;
+        }
+
+        // Mark as visited to avoid cycles
+        visited.add(node);
+
+        // If this is an identifier that looks like a capture, attach a marker
+        if (node.kind === J.Kind.Identifier && node.simpleName?.startsWith(PlaceholderUtils.CAPTURE_PREFIX)) {
+            const captureInfo = PlaceholderUtils.parseCapture(node.simpleName);
+            if (captureInfo) {
+                // Initialize markers if needed
+                if (!node.markers) {
+                    node.markers = { kind: 'org.openrewrite.marker.Markers', id: randomId(), markers: [] };
+                }
+                if (!node.markers.markers) {
+                    node.markers.markers = [];
+                }
+
+                // Add CaptureMarker
+                node.markers.markers.push(new CaptureMarker(captureInfo.name));
+            }
+        }
+
+        // Recursively visit all properties
+        for (const key in node) {
+            if (node.hasOwnProperty(key)) {
+                const value = node[key];
+                if (Array.isArray(value)) {
+                    value.forEach(item => this.visitAndAttachMarkers(item, visited));
+                } else if (typeof value === 'object' && value !== null) {
+                    this.visitAndAttachMarkers(value, visited);
+                }
+            }
+        }
     }
 }
 

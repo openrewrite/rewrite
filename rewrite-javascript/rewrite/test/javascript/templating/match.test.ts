@@ -16,6 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
     capture,
+    JavaScriptParser,
     JavaScriptVisitor,
     pattern,
     rewrite,
@@ -151,29 +152,31 @@ describe('match extraction', () => {
         );
     });
 
-    test('pattern with imports configuration', () => {
-        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                if (binary.operator.element === J.Binary.Type.Addition) {
-                    // Pattern configured with imports (for future type attribution)
-                    const m = await pattern`${capture('left')} + ${capture('right')}`
-                        .configure({
-                            imports: ['import { SomeType } from "some-module"'],
-                            dependencies: { 'some-module': '^1.0.0' }
-                        })
-                        .match(binary);
+    test('pattern with non-existent dependency fails', async () => {
+        // Verify that specifying a non-existent package causes npm install to fail
+        const nonExistentPackage = 'this-package-definitely-does-not-exist-12345';
 
-                    if (m) {
-                        return await template`${capture('right')} + ${capture('left')}`.apply(this.cursor, binary, m);
-                    }
+        const pat = pattern`${capture('left')} + ${capture('right')}`
+            .configure({
+                imports: [`import { SomeType } from "${nonExistentPackage}"`],
+                dependencies: { [nonExistentPackage]: '^1.0.0' }
+            });
+
+        // Create dummy code to trigger pattern parsing (which requires workspace creation)
+        const testCode = 'const result = 1 + 2;';
+        const parser = new JavaScriptParser();
+        const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
+        const cu = (await parseGen.next()).value;
+
+        // Try to match - this should fail because npm install will fail for non-existent package
+        await expect(async () => {
+            await (new class extends JavaScriptVisitor<any> {
+                override async visitBinary(binary: J.Binary, _p: any): Promise<J | undefined> {
+                    // This should throw when trying to create workspace
+                    await pat.match(binary);
+                    return binary;
                 }
-                return binary;
-            }
-        });
-
-        return spec.rewriteRun(
-            //language=typescript
-            typescript('const result = 1 + 2;', 'const result = 2 + 1;'),
-        );
+            }).visit(cu, undefined);
+        }).rejects.toThrow(/Failed to create dependency workspace/);
     });
 });
