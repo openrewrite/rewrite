@@ -25,7 +25,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlKey;
 import org.openrewrite.toml.tree.TomlValue;
 
 @Value
