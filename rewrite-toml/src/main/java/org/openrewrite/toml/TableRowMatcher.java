@@ -17,7 +17,6 @@ package org.openrewrite.toml;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlKey;
 
 import java.util.List;
 
@@ -53,15 +52,10 @@ public class TableRowMatcher {
                 continue;
             }
             Toml.KeyValue kv = (Toml.KeyValue) value;
-            TomlKey kvKey = kv.getKey();
-            if (!(kvKey instanceof Toml.Identifier)) {
-                continue;
-            }
-            if (key.equals(((Toml.Identifier) kvKey).getName())) {
-                if (kv.getValue() instanceof Toml.Literal) {
-                    Object val = ((Toml.Literal) kv.getValue()).getValue();
-                    return val != null ? val.toString() : null;
-                }
+            if (kv.getKey() instanceof Toml.Identifier &&
+                    key.equals(((Toml.Identifier) kv.getKey()).getName()) &&
+                    kv.getValue() instanceof Toml.Literal) {
+                return ((Toml.Literal) kv.getValue()).getValue().toString();
             }
         }
         return null;
@@ -77,27 +71,7 @@ public class TableRowMatcher {
      * @return true if a matching key-value pair is found, false otherwise
      */
     public static boolean hasMatchingKeyValue(Toml.Table table, String key, String value, @Nullable Boolean useRegex) {
-        for (Toml tableValue : table.getValues()) {
-            if (!(tableValue instanceof Toml.KeyValue)) {
-                continue;
-            }
-
-            Toml.KeyValue kv = (Toml.KeyValue) tableValue;
-            if (!(kv.getKey() instanceof Toml.Identifier) ||
-                    !key.equals(((Toml.Identifier) kv.getKey()).getName())) {
-                continue;
-            }
-
-            // Found the matching key, now check the value
-            Toml valueNode = kv.getValue();
-            if (!(valueNode instanceof Toml.Literal)) {
-                return false;
-            }
-            Toml.Literal literal = (Toml.Literal) valueNode;
-            return Boolean.TRUE.equals(useRegex) ?
-                    literal.getValue().toString().matches(value) :
-                    literal.getValue().equals(value);
-        }
-        return false;
+        String keyValue = getKeyValue(table.getValues(), key);
+        return keyValue != null && (Boolean.TRUE.equals(useRegex) ? keyValue.matches(value) : keyValue.equals(value));
     }
 }
