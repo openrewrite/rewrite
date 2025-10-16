@@ -602,6 +602,7 @@ public class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
 
     @Override
     public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
+        //noinspection DataFlowIssue
         return delegate.visitType(javaType, q);
     }
 

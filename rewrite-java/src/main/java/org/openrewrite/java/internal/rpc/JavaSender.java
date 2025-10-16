@@ -17,14 +17,9 @@ package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaTypeSignatureBuilder;
-import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
-
-import java.util.Arrays;
 
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
@@ -645,115 +640,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(space, Space::getWhitespace);
     }
 
-    private static final JavaTypeVisitor<RpcSendQueue> javaTypeSender = new JavaTypeVisitor<RpcSendQueue>() {
-        private final JavaTypeSignatureBuilder sig = new DefaultJavaTypeSignatureBuilder();
-
-        @Override
-        public JavaType visitAnnotation(JavaType.Annotation annotation, RpcSendQueue q) {
-            q.getAndSend(annotation, a -> asRef(a.getType()));
-            q.getAndSendListAsRef(annotation, JavaType.Annotation::getValues, v ->
-                    sig.signature(v.getElement()) + ":" + v.getValue(), v -> {
-                q.getAndSend(v, e -> asRef(e.getElement()));
-                if (v instanceof JavaType.Annotation.SingleElementValue) {
-                    JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-                    q.getAndSend(sev, JavaType.Annotation.SingleElementValue::getConstantValue);
-                    q.getAndSend(sev, e -> asRef(e.getReferenceValue()));
-                } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
-                    JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-                    q.getAndSendList(aev, e -> e.getConstantValues() == null ? null : Arrays.asList(e.getConstantValues()),
-                            Object::toString, null);
-                    q.getAndSendListAsRef(aev, e -> e.getReferenceValues() == null ? null : Arrays.asList(e.getReferenceValues()),
-                            sig::signature, null);
-                }
-            });
-            return annotation;
-        }
-
-        @Override
-        public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, RpcSendQueue q) {
-            q.getAndSendListAsRef(multiCatch, JavaType.MultiCatch::getThrowableTypes,
-                    sig::signature, null);
-            return multiCatch;
-        }
-
-        @Override
-        public JavaType visitIntersection(JavaType.Intersection intersection, RpcSendQueue q) {
-            q.getAndSendListAsRef(intersection, JavaType.Intersection::getBounds,
-                    sig::signature, null);
-            return intersection;
-        }
-
-        @Override
-        public JavaType visitClass(JavaType.Class aClass, RpcSendQueue q) {
-            // Handle ShallowClass specially
-            if (aClass instanceof JavaType.ShallowClass) {
-                q.getAndSend(aClass, JavaType.Class::getFullyQualifiedName);
-                q.getAndSend(aClass, c -> asRef(c.getOwningClass()));
-            } else {
-                q.getAndSend(aClass, JavaType.Class::getKind);
-                q.getAndSend(aClass, JavaType.Class::getFullyQualifiedName);
-                q.getAndSendListAsRef(aClass, JavaType.Class::getTypeParameters, sig::signature, null);
-                q.getAndSend(aClass, c -> asRef(c.getSupertype()));
-                q.getAndSend(aClass, c -> asRef(c.getOwningClass()));
-                q.getAndSendListAsRef(aClass, JavaType.Class::getAnnotations, sig::signature, null);
-                q.getAndSendListAsRef(aClass, JavaType.Class::getInterfaces, sig::signature, null);
-                q.getAndSendListAsRef(aClass, JavaType.Class::getMembers, sig::signature, null);
-                q.getAndSendListAsRef(aClass, JavaType.Class::getMethods, sig::signature, null);
-            }
-            return aClass;
-        }
-
-        @Override
-        public JavaType visitParameterized(JavaType.Parameterized parameterized, RpcSendQueue q) {
-            q.getAndSend(parameterized, p -> asRef(p.getType()), null);
-            q.getAndSendListAsRef(parameterized, JavaType.Parameterized::getTypeParameters, sig::signature, null);
-            return parameterized;
-        }
-
-        @Override
-        public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, RpcSendQueue q) {
-            q.getAndSend(generic, JavaType.GenericTypeVariable::getName);
-            q.getAndSend(generic, JavaType.GenericTypeVariable::getVariance);
-            q.getAndSendListAsRef(generic, JavaType.GenericTypeVariable::getBounds, sig::signature, null);
-            return generic;
-        }
-
-        @Override
-        public JavaType visitArray(JavaType.Array array, RpcSendQueue q) {
-            q.getAndSend(array, a -> asRef(a.getElemType()), null);
-            q.getAndSendListAsRef(array, JavaType.Array::getAnnotations, sig::signature, null);
-            return array;
-        }
-
-        @Override
-        public JavaType visitPrimitive(JavaType.Primitive primitive, RpcSendQueue q) {
-            q.getAndSend(primitive, JavaType.Primitive::getKeyword);
-            return primitive;
-        }
-
-        @Override
-        public JavaType visitMethod(JavaType.Method method, RpcSendQueue q) {
-            q.getAndSend(method, m -> asRef(m.getDeclaringType()));
-            q.getAndSend(method, JavaType.Method::getName);
-            q.getAndSend(method, m -> asRef(m.getReturnType()));
-            q.getAndSendList(method, JavaType.Method::getParameterNames, String::toString, null);
-            q.getAndSendListAsRef(method, JavaType.Method::getParameterTypes, sig::signature, null);
-            q.getAndSendListAsRef(method, JavaType.Method::getThrownExceptions, sig::signature, null);
-            q.getAndSendListAsRef(method, JavaType.Method::getAnnotations, sig::signature, null);
-            q.getAndSendListAsRef(method, JavaType.Method::getDefaultValue, String::toString, null);
-            q.getAndSendListAsRef(method, JavaType.Method::getDeclaredFormalTypeNames, String::toString, null);
-            return method;
-        }
-
-        @Override
-        public JavaType visitVariable(JavaType.Variable variable, RpcSendQueue q) {
-            q.getAndSend(variable, JavaType.Variable::getName);
-            q.getAndSend(variable, v -> asRef(v.getOwner()));
-            q.getAndSend(variable, v -> asRef(v.getType()));
-            q.getAndSendListAsRef(variable, JavaType.Variable::getAnnotations, sig::signature, null);
-            return variable;
-        }
-    };
+    private static final JavaTypeSender javaTypeSender = new JavaTypeSender();
 
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
@@ -763,3 +650,4 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         return javaTypeSender.visit(javaType, q);
     }
 }
+

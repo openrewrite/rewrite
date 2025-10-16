@@ -256,8 +256,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 maybeUpdateModel();
                             }
                         }
-                    } else if (isPluginDependencyTag(groupId, artifactId)) {
-                        t = upgradePluginDependency(ctx, t);
+                    } else if (isPluginDependencyTag(groupId, artifactId) || isAnnotationProcessorPathTag(groupId, artifactId)) {
+                        t = upgradeTag(ctx, t);
                     }
                 } catch (MavenDownloadingException e) {
                     return e.warn(t);
@@ -392,7 +392,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return null;
             }
 
-            private Xml.Tag upgradePluginDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+            private Xml.Tag upgradeTag(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 String groupId = t.getChildValue("groupId").orElse(null);
                 String artifactId = t.getChildValue("artifactId").orElse(null);
                 String version = t.getChildValue("version").orElse(null);
@@ -435,6 +435,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     throws MavenDownloadingException {
                 return MavenDependency.findNewerVersion(groupId, artifactId, version, getResolutionResult(), metadataFailures,
                         versionComparator, ctx);
+            }
+
+            private boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+                if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+                    return false;
+                }
+                Xml.Tag tag = getCursor().getValue();
+                return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
 
             private Xml.Document attemptBomUpgrade(Xml.Document document, ResolvedManagedDependency managedDep,

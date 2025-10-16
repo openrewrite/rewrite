@@ -157,7 +157,7 @@ public interface JavaType {
             return new MultiCatch(throwableTypesArray);
         }
 
-        public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
+        public MultiCatch unsafeSet(@Nullable List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
@@ -198,7 +198,7 @@ public interface JavaType {
             return new Intersection(boundsArray);
         }
 
-        public Intersection unsafeSet(List<JavaType> bounds) {
+        public Intersection unsafeSet(@Nullable List<JavaType> bounds) {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
@@ -600,6 +600,24 @@ public interface JavaType {
             return this;
         }
 
+        public Class unsafeSet(long flags, Kind kind, String fullyQualifiedName, @Nullable List<JavaType> typeParameters,
+                               @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                               @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            //noinspection DuplicatedCode
+            this.kind = kind;
+            this.flagsBitMap = flags;
+            this.fullyQualifiedName = fullyQualifiedName;
+            this.typeParameters = arrayOrNullIfEmpty(typeParameters, EMPTY_JAVA_TYPE_ARRAY);
+            this.supertype = supertype;
+            this.owningClass = owningClass;
+            this.annotations = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            this.interfaces = arrayOrNullIfEmpty(interfaces, EMPTY_FULLY_QUALIFIED_ARRAY);
+            this.members = arrayOrNullIfEmpty(members, EMPTY_VARIABLE_ARRAY);
+            this.methods = arrayOrNullIfEmpty(methods, EMPTY_METHOD_ARRAY);
+            return this;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -658,14 +676,13 @@ public interface JavaType {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @FieldDefaults(level = AccessLevel.PRIVATE)
     class Annotation extends FullyQualified {
-
         @Getter
         @With
-        final FullyQualified type;
+        FullyQualified type;
 
-        final ElementValue @Nullable [] values;
+        ElementValue @Nullable [] values;
 
         public Annotation(FullyQualified type, List<ElementValue> values) {
             this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
@@ -804,6 +821,12 @@ public interface JavaType {
                 //noinspection DataFlowIssue
                 return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
+        }
+
+        public JavaType.Annotation unsafeSet(FullyQualified type, ElementValue @Nullable [] values) {
+            this.type = type;
+            this.values = values;
+            return this;
         }
     }
 
@@ -1400,6 +1423,28 @@ public interface JavaType {
             return this;
         }
 
+        public Method unsafeSet(String name, long flagsBitMap,
+                                @Nullable FullyQualified declaringType,
+                                @Nullable JavaType returnType,
+                                String @Nullable [] parameterNames,
+                                JavaType @Nullable [] parameterTypes,
+                                JavaType @Nullable [] thrownExceptions,
+                                FullyQualified @Nullable [] annotations,
+                                @Nullable List<String> defaultValue,
+                                String @Nullable [] declaredFormalTypeNames) {
+            this.name = name;
+            this.flagsBitMap = flagsBitMap;
+            this.declaringType = unknownIfNull(declaringType);
+            this.returnType = unknownIfNull(returnType);
+            this.parameterNames = parameterNames;
+            this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
+            this.thrownExceptions = ListUtils.nullIfEmpty(thrownExceptions);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
+            this.defaultValue = defaultValue;
+            this.declaredFormalTypeNames = ListUtils.nullIfEmpty(declaredFormalTypeNames);
+            return this;
+        }
+
         public boolean isConstructor() {
             return "<constructor>".equals(name);
         }
@@ -1681,6 +1726,15 @@ public interface JavaType {
         @Override
         public Variable unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
+            return this;
+        }
+
+        public Variable unsafeSet(String name, JavaType owner, @Nullable JavaType type,
+                                  FullyQualified @Nullable [] annotations) {
+            this.name = name;
+            this.owner = owner;
+            this.type = unknownIfNull(type);
+            this.annotations = annotations;
             return this;
         }
 

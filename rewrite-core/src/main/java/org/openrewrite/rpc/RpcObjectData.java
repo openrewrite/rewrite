@@ -26,9 +26,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import lombok.experimental.NonFinal;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -39,7 +38,6 @@ import java.util.Map;
  */
 @Value
 @NoArgsConstructor(force = true, access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
-@RequiredArgsConstructor
 public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
@@ -86,13 +84,18 @@ public class RpcObjectData {
      * useful in debugging asymmetries between senders/receivers.
      */
     @Nullable
-    @NonFinal
-    String trace = Trace.traceSender();
+    String trace;
 
-    public RpcObjectData withTrace() {
-        RpcObjectData d = new RpcObjectData(state, valueType, value, ref);
-        d.trace = null;
-        return d;
+    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref, boolean trace) {
+        this.state = state;
+        this.valueType = valueType;
+        this.value = value;
+        this.ref = ref;
+        this.trace = trace ? Trace.traceSender() : null;
+    }
+
+    public RpcObjectData withoutTrace() {
+        return new RpcObjectData(state, valueType, value, ref, false);
     }
 
     public <V> @Nullable V getValue() {

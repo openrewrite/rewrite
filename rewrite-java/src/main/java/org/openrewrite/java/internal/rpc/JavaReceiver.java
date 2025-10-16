@@ -17,7 +17,6 @@ package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -25,8 +24,6 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -665,148 +662,16 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .withMarkers(q.receive(right.getMarkers()));
     }
 
-    private static final JavaTypeVisitor<RpcReceiveQueue> javaTypeReceiver = new JavaTypeVisitor<RpcReceiveQueue>() {
-        @Override
-        public JavaType visitAnnotation(JavaType.Annotation annotation, RpcReceiveQueue q) {
-            JavaType.FullyQualified type = q.receive(annotation.getType());
-            return annotation.withType(type)
-                    .withValues(q.receiveList(annotation.getValues(), v -> {
-                        if (v instanceof JavaType.Annotation.SingleElementValue) {
-                            JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-                            JavaType element = q.receive(sev.getElement(), null);
-                            Object constantValue = q.receive(sev.getConstantValue(), null);
-                            JavaType referenceValue = q.receive(sev.getReferenceValue(), null);
-                            return new JavaType.Annotation.SingleElementValue(element, constantValue, referenceValue);
-                        } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
-                            JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-                            JavaType element = q.receive(aev.getElement(), null);
-                            List<Object> constantValues = q.receiveList(aev.getConstantValues() == null ? null : Arrays.asList(aev.getConstantValues()), null);
-                            List<JavaType> referenceValues = q.receiveList(aev.getReferenceValues() == null ? null : Arrays.asList(aev.getReferenceValues()), null);
-                            return new JavaType.Annotation.ArrayElementValue(
-                                    element,
-                                    constantValues == null ? null : constantValues.toArray(),
-                                    referenceValues == null ? null : referenceValues.toArray(JavaType.EMPTY_JAVA_TYPE_ARRAY)
-                            );
-                        }
-                        return v;
-                    }));
-        }
-
-        @Override
-        public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, RpcReceiveQueue q) {
-            return multiCatch.withThrowableTypes(q.receiveList(multiCatch.getThrowableTypes(), null));
-        }
-
-        @Override
-        public JavaType visitIntersection(JavaType.Intersection intersection, RpcReceiveQueue q) {
-            return intersection.withBounds(q.receiveList(intersection.getBounds(), null));
-        }
-
-        @Override
-        public JavaType visitClass(JavaType.Class aClass, RpcReceiveQueue q) {
-            // Handle ShallowClass specially
-            if (aClass instanceof JavaType.ShallowClass) {
-                String fqn = q.receive(aClass.getFullyQualifiedName());
-                JavaType.FullyQualified owningClass = q.receive(aClass.getOwningClass());
-                return aClass.withFullyQualifiedName(fqn).withOwningClass(owningClass);
-            } else {
-                JavaType.FullyQualified.Kind kind = q.receiveAndGet(aClass.getKind(), k -> JavaType.FullyQualified.Kind.valueOf(k.toString()));
-                String fqn = q.receive(aClass.getFullyQualifiedName());
-                List<JavaType> typeParameters = q.receiveList(aClass.getTypeParameters(), null);
-                JavaType.FullyQualified supertype = q.receive(aClass.getSupertype(), null);
-                JavaType.FullyQualified owningClass = q.receive(aClass.getOwningClass(), null);
-                List<JavaType.FullyQualified> annotations = q.receiveList(aClass.getAnnotations(), null);
-                List<JavaType.FullyQualified> interfaces = q.receiveList(aClass.getInterfaces(), null);
-                List<JavaType.Variable> members = q.receiveList(aClass.getMembers(), null);
-                List<JavaType.Method> methods = q.receiveList(aClass.getMethods(), null);
-                return aClass.unsafeSet(typeParameters, supertype, owningClass, annotations,
-                                interfaces, members, methods)
-                        .withKind(kind)
-                        .withFullyQualifiedName(fqn);
-            }
-        }
-
-        @Override
-        public JavaType visitParameterized(JavaType.Parameterized parameterized, RpcReceiveQueue q) {
-            JavaType.FullyQualified type = q.receive(parameterized.getType());
-            List<JavaType> typeParameters = q.receiveList(parameterized.getTypeParameters(), null);
-            return parameterized.unsafeSet(type, typeParameters);
-        }
-
-        @Override
-        public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, RpcReceiveQueue q) {
-            String name = q.receive(generic.getName());
-            JavaType.GenericTypeVariable.Variance variance = q.receiveAndGet(generic.getVariance(),
-                    v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString()));
-            List<JavaType> bounds = q.receiveList(generic.getBounds(), null);
-            return generic.unsafeSet(name, variance, bounds);
-        }
-
-        @Override
-        public JavaType visitArray(JavaType.Array array, RpcReceiveQueue q) {
-            JavaType elemType = q.receive(array.getElemType());
-            List<JavaType.FullyQualified> annotations = q.receiveList(array.getAnnotations(), null);
-            JavaType.FullyQualified[] annotationsArray = annotations == null ? null :
-                    annotations.toArray(new JavaType.FullyQualified[0]);
-            return array.unsafeSet(elemType, annotationsArray);
-        }
-
-        @Override
-        public JavaType visitPrimitive(JavaType.Primitive primitive, RpcReceiveQueue q) {
-            String keyword = q.receive(primitive.getKeyword());
-            JavaType.Primitive p = JavaType.Primitive.fromKeyword(keyword);
-            if (p == null) {
-                throw new IllegalArgumentException("Unknown primitive type keyword: " + keyword);
-            }
-            return p;
-        }
-
-        @Override
-        public JavaType visitMethod(JavaType.Method method, RpcReceiveQueue q) {
-            JavaType.FullyQualified declaringType = q.receive(method.getDeclaringType(), null);
-            String name = q.receive(method.getName(), null);
-            JavaType returnType = q.receive(method.getReturnType(), null);
-            List<String> parameterNames = q.receiveList(method.getParameterNames(), null);
-            List<JavaType> parameterTypes = q.receiveList(method.getParameterTypes(), null);
-            List<JavaType> thrownExceptions = q.receiveList(method.getThrownExceptions(), null);
-            List<JavaType.FullyQualified> annotations = q.receiveList(method.getAnnotations(), null);
-            List<String> defaultValue = q.receiveList(method.getDefaultValue(), null);
-            List<String> declaredFormalTypeNames = q.receiveList(method.getDeclaredFormalTypeNames(), null);
-
-            // Use constructor since defaultValue doesn't have a with method
-            return new JavaType.Method(
-                    method.getManagedReference(),
-                    method.getFlagsBitMap(),
-                    declaringType,
-                    name,
-                    returnType,
-                    parameterNames,
-                    parameterTypes,
-                    thrownExceptions,
-                    annotations,
-                    defaultValue,
-                    declaredFormalTypeNames
-            );
-        }
-
-        @Override
-        public JavaType visitVariable(JavaType.Variable variable, RpcReceiveQueue q) {
-            String name = q.receive(variable.getName());
-            JavaType owner = q.receive(variable.getOwner());
-            JavaType type = q.receive(variable.getType());
-            List<JavaType.FullyQualified> annotations = q.receiveList(variable.getAnnotations(), null);
-            return variable.withName(name)
-                    .withOwner(owner)
-                    .withType(type)
-                    .withAnnotations(annotations);
-        }
-    };
+    private static final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
 
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
-        if (javaType == null || javaType instanceof JavaType.Unknown) {
+        if (javaType == null) {
             return null;
+        } else if (javaType instanceof JavaType.Unknown) {
+            return JavaType.Unknown.getInstance();
         }
         return javaTypeReceiver.visit(javaType, q);
     }
 }
+
