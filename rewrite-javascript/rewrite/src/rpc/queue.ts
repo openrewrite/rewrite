@@ -150,7 +150,8 @@ export class RpcSendQueue {
         return saveTrace(this.trace, async () => {
             if (before === after) {
                 this.put({state: RpcObjectState.NO_CHANGE});
-            } else if (before === undefined) {
+            } else if (before === undefined || (after !== undefined && this.typesAreDifferent(after, before))) {
+                // Treat as ADD when before is undefined OR types differ (it's a new object, not a change)
                 await this.add(after, onChange);
             } else if (after === undefined) {
                 this.put({state: RpcObjectState.DELETE});
@@ -182,6 +183,9 @@ export class RpcSendQueue {
                     const aBefore = before ? before[beforePos] : undefined;
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
+                    } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
+                        // Type changed - treat as ADD
+                        await this.add(anAfter, onChangeRun);
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
                         await this.doChange(anAfter, aBefore, onChangeRun, RpcCodecs.forInstance(anAfter, this.sourceFileType));
@@ -246,6 +250,12 @@ export class RpcSendQueue {
         } finally {
             this.before = lastBefore;
         }
+    }
+
+    private typesAreDifferent(after: any, before: any): boolean {
+        const afterKind = after !== undefined && after !== null && typeof after === "object" ? after["kind"] : undefined;
+        const beforeKind = before !== undefined && before !== null && typeof before === "object" ? before["kind"] : undefined;
+        return afterKind !== undefined && beforeKind !== undefined && afterKind !== beforeKind;
     }
 
     private getValueType(after?: any): string | undefined {
