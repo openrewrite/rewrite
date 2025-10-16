@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
 import org.openrewrite.java.style.ImportLayoutStyle;

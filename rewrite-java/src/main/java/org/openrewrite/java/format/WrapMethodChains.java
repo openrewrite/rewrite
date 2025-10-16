@@ -42,38 +42,44 @@ public class WrapMethodChains<P> extends JavaIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P ctx) {
         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-        if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong) {
-            List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
-                    .map(name -> String.format("*..* %s(..)", name))
-                    .map(MethodMatcher::new)
-                    .collect(toList());
-            J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
-            // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
-            if (chainStarter == null || chainStarter == m) {
-                return m;
-            }
+        try {
+            // styles are parent loaded, so the getters may or may not be present and they may or may not return null
+            if (style != null && style.getChainedMethodCalls() != null
+                    && (style.getChainedMethodCalls().getWrap() == LineWrapSetting.WrapAlways || style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong)) {
+                List<MethodMatcher> matchers = style.getChainedMethodCalls().getBuilderMethods().stream()
+                        .map(name -> String.format("*..* %s(..)", name))
+                        .map(MethodMatcher::new)
+                        .collect(toList());
+                J.MethodInvocation chainStarter = findChainStarterInChain(m, matchers);
+                // If there is no chain starter in the chain, or the current method is the actual chain starter call (current chain starter call does not need newline)
+                if (chainStarter == null || chainStarter == m || m.getPadding().getSelect() == null) {
+                    return m;
+                }
 
-            Space after = m.getPadding().getSelect().getAfter();
-            //Already on a new line
-            if (after.getLastWhitespace().contains("\n")) {
-                return m;
-            }
+                Space after = m.getPadding().getSelect().getAfter();
+                //Already on a new line
+                if (after.getLastWhitespace().contains("\n")) {
+                    return m;
+                }
 
-            // Not long enough to wrap
-            if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && calculateLineLength(getCursor()) <= style.getHardWrapAt()) {
-                return m;
-            }
+                // Not long enough to wrap
+                if (style.getChainedMethodCalls().getWrap() == LineWrapSetting.ChopIfTooLong && calculateLineLength(getCursor()) <= style.getHardWrapAt()) {
+                    return m;
+                }
 
-            //Only update the whitespace, preserving comments
-            if (after.getComments().isEmpty()) {
-                after = after.withWhitespace("\n");
-            } else {
-                after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment.withSuffix("\n")));
+                //Only update the whitespace, preserving comments
+                if (after.getComments().isEmpty()) {
+                    after = after.withWhitespace("\n");
+                } else {
+                    after = after.withComments(ListUtils.mapLast(after.getComments(), comment -> comment == null ? null : comment.withSuffix("\n")));
+                }
+                if (after != m.getPadding().getSelect().getAfter()) {
+                    m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
+                            .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
+                }
             }
-            if (after != m.getPadding().getSelect().getAfter()) {
-                m = m.getPadding().withSelect(m.getPadding().getSelect().withAfter(after))
-                        .withArguments(ListUtils.map(m.getArguments(), arg -> arg.withPrefix(Space.EMPTY)));
-            }
+        } catch (NoSuchMethodError ignore) {
+            // Styles are parent-first loaded and this can happen if the style is from a older version of the runtime. Can be removed in future releases.
         }
 
         return m;

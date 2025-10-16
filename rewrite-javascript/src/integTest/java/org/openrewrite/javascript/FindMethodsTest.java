@@ -22,6 +22,7 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 
@@ -84,8 +85,11 @@ class FindMethodsTest implements RewriteTest {
 
     @Test
     void splitWithTemplateString() {
+//        JavaScriptRewriteRpc.getOrStart().traceGetObject(false, true);
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("*..* split(..)", false)),
+          spec -> spec
+            .typeValidationOptions(TypeValidation.none())
+            .recipe(new FindMethods("*..* split(..)", false)),
           javascript(
             "'hello'.split(`; ${cookieName}=`)",
             "/*~~>*/'hello'.split(`; ${cookieName}=`)"

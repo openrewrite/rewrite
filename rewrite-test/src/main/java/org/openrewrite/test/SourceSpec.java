@@ -159,6 +159,9 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec<T> beforeRecipe(ThrowingConsumer<T> beforeRecipe) {
         return mapBeforeRecipe(t -> {
+            if (t instanceof ParseError) {
+                throw ((ParseError) t).toException();
+            }
             beforeRecipe.accept(t);
             return t;
         });

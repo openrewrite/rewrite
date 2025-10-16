@@ -23,6 +23,8 @@ import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 
+import static java.util.Collections.emptyList;
+
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
@@ -42,6 +44,11 @@ public class WrappingAndBracesStyle implements JavaStyle {
         return ifStatement == null ? new IfStatement(false) : ifStatement;
     }
 
+    public ChainedMethodCalls getChainedMethodCalls() {
+        //noinspection ConstantConditions
+        return chainedMethodCalls == null ? new ChainedMethodCalls(LineWrapSetting.DoNotWrap, emptyList()) : chainedMethodCalls;
+    }
+
     @Value
     @With
     public static class IfStatement {
@@ -59,5 +66,15 @@ public class WrappingAndBracesStyle implements JavaStyle {
     public static class ChainedMethodCalls {
         LineWrapSetting wrap;
         List<String> builderMethods;
+
+        public LineWrapSetting getWrap() {
+            //noinspection ConstantConditions
+            return wrap == null ? LineWrapSetting.DoNotWrap : wrap;
+        }
+
+        public List<String> getBuilderMethods() {
+            //noinspection ConstantConditions
+            return builderMethods == null ? emptyList() : builderMethods;
+        }
     }
 }

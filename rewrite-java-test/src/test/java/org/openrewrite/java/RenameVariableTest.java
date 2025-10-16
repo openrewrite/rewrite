@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment"})
+@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment", "MismatchedReadAndWriteOfArray"})
 class RenameVariableTest implements RewriteTest {
 
     @DocumentExample
@@ -1453,8 +1453,8 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3051")
+    @Test
     void mustNotRenameMethod() {
         rewriteRun(
           spec -> spec.recipe(renameVariableTest("foo", "baz", false)),

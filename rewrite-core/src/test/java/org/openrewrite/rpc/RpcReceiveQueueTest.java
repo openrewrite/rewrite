@@ -35,8 +35,8 @@ public class RpcReceiveQueueTest {
     void setUp() {
         batches = new ArrayDeque<>();
         IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
-        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, PlainText.class.getName());
-        rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, PlainText.class.getName());
+        sq = new RpcSendQueue(1, e -> batches.addLast(encode(e)), localRefs, PlainText.class.getName(), false);
+        rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, PlainText.class.getName(), null);
     }
 
     @Test
@@ -92,7 +92,7 @@ public class RpcReceiveQueueTest {
         List<RpcObjectData> encoded = new ArrayList<>();
         for (RpcObjectData data : batch) {
             if (data.getValue() instanceof UUID || data.getValue() instanceof Path) {
-                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef()));
+                encoded.add(new RpcObjectData(data.getState(), data.getValueType(), data.getValue().toString(), data.getRef(), false));
             } else {
                 encoded.add(data);
             }

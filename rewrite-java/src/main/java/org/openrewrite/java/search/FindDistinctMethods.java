@@ -30,9 +30,9 @@ import org.openrewrite.marker.SearchResult;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -116,7 +116,7 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
                                     requireNonNull(methodCall.getMethodType()).getDeclaringType().getFullyQualifiedName(),
                                     methodCall.getMethodType().getName(),
                                     methodCall.getMethodType().getParameterTypes().stream().map(Object::toString)
-                                            .collect(Collectors.joining(","))
+                                            .collect(joining(","))
                             ));
                             acc.remove(key);
                             e = SearchResult.found(e);

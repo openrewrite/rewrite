@@ -230,10 +230,19 @@ public class MavenResolutionResult implements Marker {
     }
 
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
+        // Strange edge case: Some projects specify a <relativePath> to their parent in the maven local directory
+        // e.g.: ../../../.m2/repository/
+        // This is bizarre and generally pointless, but not technically disallowed by Maven
         if (parent != null && !projectPoms.containsKey(parent.getPom().getRequested().getSourcePath())) {
-            parent.getProjectPomsRecursive(projectPoms);
+            Path parentPath = parent.getPom().getRequested().getSourcePath();
+            if (parentPath != null && !parentPath.toString().contains(".m2")) {
+                parent.getProjectPomsRecursive(projectPoms);
+            }
         }
-        projectPoms.put(requireNonNull(pom.getRequested().getSourcePath()), pom.getRequested());
+        Path currentPath = requireNonNull(pom.getRequested().getSourcePath());
+        if (!currentPath.toString().contains(".m2")) {
+            projectPoms.put(currentPath, pom.getRequested());
+        }
         for (MavenResolutionResult module : modules) {
             if (!projectPoms.containsKey(module.getPom().getRequested().getSourcePath())) {
                 module.getProjectPomsRecursive(projectPoms);

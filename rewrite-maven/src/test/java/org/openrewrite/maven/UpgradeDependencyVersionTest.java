@@ -538,6 +538,94 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradeAnnotationProcessors() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.mapstruct</groupId>
+                        <artifactId>mapstruct</artifactId>
+                        <version>1.4.1.Final</version>
+                    </dependency>
+                </dependencies>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>1.4.1.Final</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<version>1.6.\\d+(.\\d+)?</version>")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessorsVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                    <org.mapstruct.version>1.4.1.Final</org.mapstruct.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${org.mapstruct.version}</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<org.mapstruct.version>1.6.\\d+(.\\d+)?</org.mapstruct.version>")
+                .actual())
+          )
+        );
+    }
+
+    @Test
     void upgradePluginDependenciesOnProperty() {
         rewriteRun(
           // Using latest.patch to validate the version property resolution, since it's needed for matching the valid patch.

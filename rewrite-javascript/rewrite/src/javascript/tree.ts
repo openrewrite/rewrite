@@ -355,7 +355,7 @@ export namespace JS {
     export interface LiteralType extends JS, Expression, TypeTree {
         readonly kind: typeof Kind.LiteralType;
         readonly literal: Expression;
-        readonly type: Type;
+        type: Type;
     }
 
 
