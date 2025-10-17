@@ -92,7 +92,6 @@ public class MergeTableRow extends Recipe {
                 }
 
                 // Check if a matching table row exists (table with same name AND identifying value)
-                boolean hasMatchingRow = false;
                 for (TomlValue value : doc.getValues()) {
                     if (!(value instanceof Toml.Table)) {
                         continue;
@@ -101,44 +100,40 @@ public class MergeTableRow extends Recipe {
                     if (table.getName() != null && tableName.equals(table.getName().getName())) {
                         String tableIdentifyingValue = TableRowMatcher.getKeyValue(table, identifyingKey);
                         if (identifyingValue.equals(tableIdentifyingValue)) {
-                            hasMatchingRow = true;
-                            break;
+                            return doc;
                         }
                     }
                 }
 
                 // If no matching row exists, we need to insert one
-                if (!hasMatchingRow) {
-                    Toml.Identifier identifier = new Toml.Identifier(
-                            Tree.randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            MergeTableRow.this.tableName,
-                            MergeTableRow.this.tableName
-                    );
+                Toml.Identifier identifier = new Toml.Identifier(
+                        Tree.randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        MergeTableRow.this.tableName,
+                        MergeTableRow.this.tableName
+                );
 
-                    List<TomlRightPadded<Toml>> values = new ArrayList<>();
-                    for (Toml.KeyValue kv : keyValues) {
-                        Toml.KeyValue kvWithPrefix = kv.withPrefix(Space.format("\n"));
-                        values.add(new TomlRightPadded<>(kvWithPrefix, Space.EMPTY, Markers.EMPTY));
-                    }
-
-                    // Add ArrayTable marker to make it render as [[name]] instead of [name]
-                    Markers markers = Markers.EMPTY.add(new ArrayTable(Tree.randomId()));
-
-                    Toml.Table newTable = new Toml.Table(
-                            Tree.randomId(),
-                            Space.format("\n\n"),
-                            markers,
-                            new TomlRightPadded<>(identifier, Space.EMPTY, Markers.EMPTY),
-                            values
-                    );
-
-                    // Add the new table to the document
-                    return doc.withValues(ListUtils.concat(doc.getValues(), newTable));
+                List<TomlRightPadded<Toml>> values = new ArrayList<>();
+                for (Toml.KeyValue kv : keyValues) {
+                    Toml.KeyValue kvWithPrefix = kv.withPrefix(Space.format("\n"));
+                    values.add(new TomlRightPadded<>(kvWithPrefix, Space.EMPTY, Markers.EMPTY));
                 }
 
-                return doc;
+                // Add ArrayTable marker to make it render as [[name]] instead of [name]
+                Markers markers = Markers.EMPTY.add(new ArrayTable(Tree.randomId()));
+
+                Toml.Table newTable = new Toml.Table(
+                        Tree.randomId(),
+                        Space.format("\n\n"),
+                        markers,
+                        new TomlRightPadded<>(identifier, Space.EMPTY, Markers.EMPTY),
+                        values
+                );
+
+                // Add the new table to the document
+                return doc.withValues(ListUtils.concat(doc.getValues(), newTable));
+
             }
 
             @Override
