@@ -27,6 +27,7 @@ import org.openrewrite.toml.tree.TomlValue;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
 @Value
@@ -127,9 +128,7 @@ public class ReplaceTableRow extends Recipe {
                 return super.visitTable(table, ctx);
             }
 
-            private List<Toml.KeyValue> parseTomlRow(String tomlContent) {
-                List<Toml.KeyValue> result = new ArrayList<>();
-
+            private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
                 try {
                     Toml.Document doc = new TomlParser().parse(tomlContent)
                             .findFirst()
@@ -137,17 +136,19 @@ public class ReplaceTableRow extends Recipe {
                             .orElse(null);
 
                     if (doc != null && !doc.getValues().isEmpty()) {
+                        List<Toml.KeyValue> result = new ArrayList<>();
                         for (TomlValue value : doc.getValues()) {
                             if (value instanceof Toml.KeyValue) {
                                 result.add((Toml.KeyValue) value);
                             }
                         }
+                        return result;
                     }
+
                 } catch (Exception e) {
                     // Failed to parse, return empty list
                 }
-
-                return result;
+                return emptyList();
             }
         };
     }
