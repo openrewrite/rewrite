@@ -110,6 +110,11 @@ public class SemanticallyEqual {
             }
             Toml.Literal otherLiteral = (Toml.Literal) other;
 
+            if (literal.getType() != otherLiteral.getType()) {
+                areEqual = false;
+                return null;
+            }
+
             Object val1 = literal.getValue();
             Object val2 = otherLiteral.getValue();
 

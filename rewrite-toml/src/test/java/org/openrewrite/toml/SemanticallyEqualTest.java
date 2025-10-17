@@ -148,6 +148,14 @@ class SemanticallyEqualTest {
     }
 
     @Test
+    void booleanAndStringLiteralsAreNotEqual() {
+        Toml.Document doc1 = parseToml("enabled = \"true\"");
+        Toml.Document doc2 = parseToml("enabled = true");
+
+        assertThat(SemanticallyEqual.areEqual(doc1, doc2)).isFalse();
+    }
+
+    @Test
     void differentBooleanLiteralsAreNotEqual() {
         Toml.Document doc1 = parseToml("enabled = true");
         Toml.Document doc2 = parseToml("enabled = false");
