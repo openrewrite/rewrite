@@ -30,6 +30,7 @@ import org.openrewrite.toml.tree.TomlValue;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.toml.SemanticallyEqual.areEqual;
 
 @Value
@@ -75,6 +76,9 @@ public class MergeTableRow extends Recipe {
             @Override
             public Toml visitDocument(Toml.Document document, ExecutionContext ctx) {
                 Toml.Document doc = (Toml.Document) super.visitDocument(document, ctx);
+                if (doc != document) {
+                    return doc;
+                }
 
                 // Parse the incoming row to get identifying value
                 List<Toml.KeyValue> keyValues = parseTomlRow(row);
@@ -131,9 +135,7 @@ public class MergeTableRow extends Recipe {
                     );
 
                     // Add the new table to the document
-                    List<TomlValue> newValues = new ArrayList<>(doc.getValues());
-                    newValues.add(newTable);
-                    return doc.withValues(newValues);
+                    return doc.withValues(ListUtils.concat(doc.getValues(), newTable));
                 }
 
                 return doc;
@@ -201,9 +203,7 @@ public class MergeTableRow extends Recipe {
                 return super.visitTable(table, ctx);
             }
 
-            private List<Toml.KeyValue> parseTomlRow(String tomlContent) {
-                List<Toml.KeyValue> result = new ArrayList<>();
-
+            private List<Toml.KeyValue> parseTomlRow(@Language("toml") String tomlContent) {
                 try {
                     Toml.Document doc = new TomlParser().parse(tomlContent)
                             .findFirst()
@@ -211,17 +211,18 @@ public class MergeTableRow extends Recipe {
                             .orElse(null);
 
                     if (doc != null && !doc.getValues().isEmpty()) {
+                        List<Toml.KeyValue> result = new ArrayList<>();
                         for (TomlValue value : doc.getValues()) {
                             if (value instanceof Toml.KeyValue) {
                                 result.add((Toml.KeyValue) value);
                             }
                         }
+                        return result;
                     }
                 } catch (Exception e) {
                     // Failed to parse, return empty list
                 }
-
-                return result;
+                return emptyList();
             }
         };
     }
