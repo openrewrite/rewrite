@@ -49,11 +49,13 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      */
     private final String command;
     private final Map<String, String> commandEnv;
+    private final RewriteRpcProcess process;
 
-    JavaScriptRewriteRpc(JsonRpc jsonRpc, Environment marketplace, String command, Map<String, String> commandEnv) {
-        super(jsonRpc, marketplace);
+    JavaScriptRewriteRpc(RewriteRpcProcess process, Environment marketplace, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace);
         this.command = command;
         this.commandEnv = commandEnv;
+        this.process = process;
     }
 
     public static @Nullable JavaScriptRewriteRpc get() {
@@ -66,6 +68,12 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     public static void setFactory(Builder builder) {
         MANAGER.setFactory(builder);
+    }
+
+    @Override
+    public void shutdown() {
+        super.shutdown();
+        process.shutdown();
     }
 
     public static void shutdownCurrent() {
@@ -283,7 +291,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             process.start();
 
             try {
-                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process.getRpcClient(), marketplace,
+                return (JavaScriptRewriteRpc) new JavaScriptRewriteRpc(process, marketplace,
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)

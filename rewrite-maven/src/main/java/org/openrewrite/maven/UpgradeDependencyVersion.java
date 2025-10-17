@@ -28,15 +28,17 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.*;
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toList;
+
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 /**
@@ -438,7 +440,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
 
             private boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
-                if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+                // Runtime might still have a private version of this class parent-loaded -> remove this once we have had a few releases.
+//                if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+                if (!(getCursor().getValue() instanceof Xml.Tag && "path".equals(getCursor().<Xml.Tag>getValue().getName())) || !new XPathMatcher("//annotationProcessorPaths/path").matches(getCursor())) {
                     return false;
                 }
                 Xml.Tag tag = getCursor().getValue();

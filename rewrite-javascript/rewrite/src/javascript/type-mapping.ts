@@ -196,7 +196,7 @@ export class JavaScriptTypeMapping {
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
         if (declaringType == Type.Primitive.String && this.stringWrapperType) {
             return this.getType(this.stringWrapperType) as Type.FullyQualified;
-        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.Long) && this.numberWrapperType) {
+        } else if ((declaringType == Type.Primitive.Double || declaringType == Type.Primitive.BigInt) && this.numberWrapperType) {
             return this.getType(this.numberWrapperType) as Type.FullyQualified;
         } else if (declaringType == Type.Primitive.Boolean && this.booleanWrapperType) {
             return this.getType(this.booleanWrapperType) as Type.FullyQualified;
@@ -808,7 +808,7 @@ export class JavaScriptTypeMapping {
             type.flags === ts.TypeFlags.BigIntLiteral ||
             type.flags === ts.TypeFlags.BigIntLike
         ) {
-            return Type.Primitive.Long;
+            return Type.Primitive.BigInt;
         } else if (
             (type.symbol !== undefined && type.symbol === this.regExpSymbol) ||
             this.checker.typeToString(type) === "RegExp"
