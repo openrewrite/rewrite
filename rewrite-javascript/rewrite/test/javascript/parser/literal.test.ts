@@ -23,7 +23,7 @@ const spec = new RecipeSpec();
 describe.each([
     ['1', Type.Primitive.Double],
     ['1.0', Type.Primitive.Double],
-    ['123n', Type.Primitive.Long],
+    ['123n', Type.Primitive.BigInt],
     ['"1"', Type.Primitive.String],
     ['true', Type.Primitive.Boolean],
     ['null', Type.Primitive.Null],
