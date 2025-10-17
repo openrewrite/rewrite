@@ -640,7 +640,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSend(space, Space::getWhitespace);
     }
 
-    private static final JavaTypeSender javaTypeSender = new JavaTypeSender();
+    private final JavaTypeSender javaTypeSender = new JavaTypeSender();
 
     @Override
     public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
