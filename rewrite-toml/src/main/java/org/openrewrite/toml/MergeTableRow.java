@@ -63,14 +63,6 @@ public class MergeTableRow extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
-        return super.validate()
-                .and(Validated.required("tableName", tableName))
-                .and(Validated.required("row", row))
-                .and(Validated.required("identifyingKey", identifyingKey));
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TomlVisitor<ExecutionContext>() {
             @Override
