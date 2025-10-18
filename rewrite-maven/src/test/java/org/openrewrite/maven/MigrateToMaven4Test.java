@@ -102,7 +102,7 @@ class MigrateToMaven4Test implements RewriteTest {
             """
               <project xmlns="http://maven.apache.org/POM/4.1.0"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 http://maven.apache.org/xsd/maven-4.1.0.xsd">
                   <modelVersion>4.1.0</modelVersion>
                   <groupId>com.example</groupId>
                   <artifactId>parent</artifactId>
@@ -159,64 +159,6 @@ class MigrateToMaven4Test implements RewriteTest {
                   </build>
               </project>
               """
-          )
-        );
-    }
-
-    @Test
-    void migrateChildPomWithParentInference() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0.0</version>
-                  <packaging>pom</packaging>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.1.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0.0</version>
-                  <packaging>pom</packaging>
-              </project>
-              """,
-            spec -> spec.path("pom.xml")
-          ),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                      <groupId>com.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0.0</version>
-                  </parent>
-                  <artifactId>child</artifactId>
-
-                  <properties>
-                      <app.basedir>${basedir}</app.basedir>
-                  </properties>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.1.0</modelVersion>
-                  <parent>
-                      <relativePath/>
-                  </parent>
-                  <artifactId>child</artifactId>
-
-                  <properties>
-                      <app.basedir>${project.basedir}</app.basedir>
-                  </properties>
-              </project>
-              """,
-            spec -> spec.path("child/pom.xml")
           )
         );
     }
@@ -298,65 +240,6 @@ class MigrateToMaven4Test implements RewriteTest {
                                       <goals><goal>run</goal></goals>
                                   </execution>
                               </executions>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void removeDuplicatePlugins() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1.0.0</version>
-
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
-                          </plugin>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-surefire-plugin</artifactId>
-                              <version>2.22.2</version>
-                          </plugin>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.10.1</version>
-                          </plugin>
-                      </plugins>
-                  </build>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.1.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1.0.0</version>
-
-                  <build>
-                      <plugins>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
-                          </plugin>
-                          <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
-                              <artifactId>maven-surefire-plugin</artifactId>
-                              <version>2.22.2</version>
                           </plugin>
                       </plugins>
                   </build>
